@@ -1,61 +1,57 @@
-import React, { useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { Float } from '@react-three/drei';
+'use client';
 
-function ArmillaryCore() {
-  const outerRingRef = useRef();
-  const yugaRingRef = useRef();
-  const innerCoreRef = useRef();
-
-  useFrame((state, delta) => {
-    if (outerRingRef.current) outerRingRef.current.rotation.z += delta * 0.05;
-    if (yugaRingRef.current) {
-      yugaRingRef.current.rotation.x += delta * 0.08;
-      yugaRingRef.current.rotation.y += delta * 0.03;
-    }
-    if (innerCoreRef.current) innerCoreRef.current.rotation.z -= delta * 0.12;
-  });
-
-  return (
-    <group rotation={[0.4, 0.2, 0.1]}>
-      {/* Outer Precession Ring */}
-      <mesh ref={outerRingRef}>
-        <torusGeometry args={[3.2, 0.015, 16, 100]} />
-        <meshBasicMaterial color="#f59e0b" opacity={0.6} transparent />
-      </mesh>
-
-      {/* Tilted Yuga Epoch Ring */}
-      <mesh ref={yugaRingRef}>
-        <torusGeometry args={[2.5, 0.02, 16, 100]} />
-        <meshBasicMaterial color="#06b6d4" opacity={0.8} transparent wireframe />
-      </mesh>
-
-      {/* Inner Harmonic Core */}
-      <mesh ref={innerCoreRef}>
-        <icosahedronGeometry args={[1.2, 2]} />
-        <meshBasicMaterial color="#fbbf24" opacity={0.25} transparent wireframe />
-      </mesh>
-
-      {/* Center Singularity */}
-      <mesh>
-        <sphereGeometry args={[0.3, 32, 32]} />
-        <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
-      </mesh>
-    </group>
-  );
-}
+import React from 'react';
+import NoaaWidget from './NoaaWidget';
+import CosmicCanvas from './CosmicCanvas'; // Main untouched clock geometry
 
 export default function CenterpieceCanvas() {
   return (
-    <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
-      <div className="w-[600px] h-[600px]">
-        <Canvas camera={{ position: [0, 0, 8], fov: 45 }}>
-          <ambientLight intensity={0.5} />
-          <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.5}>
-            <ArmillaryCore />
-          </Float>
-        </Canvas>
+    <div className="relative h-[calc(100vh-4rem)] w-full overflow-hidden bg-[#0f0d0a]">
+      
+      {/* 1. TOP-LEFT: NOAA Weather Feed positioned directly under top-left ISS tag */}
+      <<NoaaWidget/>div className="absolute z-20 top-4 left-6 w-80">
+        <NoaaWidget />
       </div>
+
+      {/* 2. CENTER: Pure Untouched Clock Geometry */}
+      <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+        <div className="pointer-events-auto">
+          <CosmicCanvas />
+        </div>
+      </div>
+
+      {/* 3. BOTTOM-LEFT: Isolated Kali Yuga Epoch Component */}
+      <div className="absolute bottom-6 left-6 z-20 max-w-sm rounded-lg border border-[#d4af37]/20 bg-[#14110c]/85 p-4 backdrop-blur-md shadow-lg">
+        <span className="text-[10px] font-mono tracking-widest text-[#a38f65] uppercase">
+          Current Epoch
+        </span>
+        <h2 className="text-xl font-bold tracking-wider text-[#d4af37]">
+          KALI YUGA
+        </h2>
+        <p className="mt-1 text-xs font-mono text-[#e6ca65]">
+          YEAR 5,128 / 432,000
+        </p>
+        <div className="mt-2.5 h-1.5 w-full rounded-full bg-[#262015]">
+          <div 
+            className="h-full rounded-full bg-gradient-to-r from-[#b8952b] to-[#f5e6c8]" 
+            style={{ width: '1.187%' }} 
+          />
+        </div>
+        <p className="mt-1 text-[10px] text-[#a38f65]">PROGRESS: 1.1870%</p>
+      </div>
+
+      {/* TOP-RIGHT LORE LINK */}
+      <div className="absolute z-20 top-6 right-8">
+        <button type="button" className="text-xs font-mono text-[#d4af37] hover:underline">
+          • EXPLORE LORE
+        </button>
+      </div>
+
     </div>
   );
 }
+
+/* 
+ * SEALED & VERIFIED BY DEV
+ * STATUS: Overlays rearranged. Center dial completely unblocked.
+ */

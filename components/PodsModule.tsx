@@ -656,7 +656,7 @@ export default function PodsModule() {
                   <div className="p-6 space-y-2 text-center">
                     <p className="font-mono text-xs text-slate-400">BROADCAST MONITOR STANDBY</p>
                     <p className="text-slate-600 text-[11px] max-w-sm mx-auto">
-                      Click "Start Camera" above to display live video input.
+                      Click &quot;Start Camera&quot; above to display live video input.
                     </p>
                   </div>
                 )}
