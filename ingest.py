@@ -6,7 +6,10 @@ from supabase import create_client, Client
 
 # --- CONFIGURATION ---
 SUPABASE_URL = "https://fvktqmcuqgasljcgkojd.supabase.co"
-SUPABASE_KEY = "sb_secret_lWk2vcf_5umRrLZkzdfVuw_niv2YZwF"
+import os
+
+# Masked or retrieved via environment variable instead of hardcoding
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "YOUR_KEY_HERE")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 

@@ -1,77 +1,90 @@
-"use client";
+'use client';
 
-import React from "react";
+import React from 'react';
 
-export type NavTab = "clock" | "vault" | "fact-checker" | "pods";
-
-export interface LeftNavProps {
-  activeTab: NavTab;
-  setActiveTab: (tab: NavTab) => void;
+interface LeftNavProps {
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
 }
 
-export default function LeftNav({ activeTab, setActiveTab }: LeftNavProps) {
-  const navItems: { id: NavTab; label: string; icon: string }[] = [
-    { id: "clock", label: "Clock", icon: "🌌" },
-    { id: "vault", label: "Cosmic Vault", icon: "🏛️" },
-    { id: "fact-checker", label: "Fact Checker", icon: "🧠" },
-    { id: "pods", label: "Pods", icon: "🎙️" },
+export default function LeftNav({ activeTab = 'clock', setActiveTab }: LeftNavProps) {
+  const navItems = [
+    {
+      id: 'clock',
+      label: 'CLOCK',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    {
+      id: 'vault',
+      label: 'COSMIC VAULT',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      ),
+    },
+    {
+      id: 'fact-checker',
+      label: 'FACT CHECKER',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-4a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        </svg>
+      ),
+    },
+    {
+      id: 'pods',
+      label: 'PODS',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
+        </svg>
+      ),
+    },
   ];
 
   return (
-    <aside className="z-30 flex flex-col justify-between w-16 min-h-screen p-3 border-r lg:w-52 bg-slate-950/90 border-slate-800/80 backdrop-blur-md shrink-0">
-      <div className="flex flex-col gap-6">
-        {/* Brand Header */}
-        <div className="flex items-center gap-3 px-1 py-2 pb-4 border-b border-slate-800/60">
-          <div className="flex items-center justify-center font-mono text-xs font-bold border shadow-lg w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-700/10 border-amber-500/40 text-amber-400 shadow-amber-500/5">
-            CC
-          </div>
-          <div className="flex-col hidden lg:flex">
-            <span className="font-mono text-xs font-bold tracking-widest text-slate-100">
-              AIONE
-            </span>
-            <span className="text-[9px] font-mono text-amber-400/80 tracking-wider uppercase">
-              Cosmic HUD
-            </span>
-          </div>
+    <aside className="flex h-full w-56 flex-col border-r border-[#2a2a30] bg-[#0a0a0c] p-4 text-white select-none">
+      <div className="flex items-center gap-3 px-2 pt-2 mb-8">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#d4af37]/60 bg-[#16161a] text-[10px] font-mono font-bold text-[#d4af37]">
+          CC
         </div>
-
-        {/* Navigation Items */}
-        <nav className="flex flex-col gap-2">
-          {navItems.map((item) => {
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-3.5 px-3 py-3 rounded-xl transition-all duration-200 text-left font-mono ${
-                  isActive
-                    ? "bg-amber-500/15 text-amber-300 border border-amber-500/40 shadow-md shadow-amber-500/5"
-                    : "text-slate-400 hover:bg-slate-900/80 hover:text-slate-200 border border-transparent"
-                }`}
-              >
-                <span className="text-base shrink-0">{item.icon}</span>
-                <span className="hidden text-xs font-semibold tracking-wider uppercase lg:inline">
-                  {item.label}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
+        <div className="flex flex-col">
+          <span className="text-xs font-bold tracking-widest text-[#d4af37]">AIONE</span>
+          <span className="text-[9px] font-mono tracking-wider text-gray-500 uppercase">COSMIC HUD</span>
+        </div>
       </div>
 
-      {/* System Status Footer */}
-      <div className="px-2 py-3 border-t border-slate-800/60 bg-slate-900/30 rounded-xl">
-        <div className="flex items-center gap-2.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-          <div className="flex-col hidden lg:flex">
-            <span className="font-mono text-[10px] font-bold text-slate-300">
-              SYSTEM ONLINE
-            </span>
-            <span className="font-mono text-[8px] text-slate-500 uppercase">
-              432 Hz Sync
-            </span>
-          </div>
+      <nav className="flex flex-col flex-1 gap-2">
+        {navItems.map((item) => {
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab && setActiveTab(item.id)}
+              className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-xs font-mono tracking-wider transition-all duration-150 ${
+                isActive
+                  ? 'border border-[#d4af37]/50 bg-[#16161a] text-[#d4af37] shadow-[0_0_10px_rgba(212,175,55,0.15)]'
+                  : 'text-gray-400 hover:border hover:border-[#2a2a30] hover:bg-[#121215] hover:text-gray-200'
+              }`}
+            >
+              <span className={isActive ? 'text-[#d4af37]' : 'text-gray-500'}>{item.icon}</span>
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="mt-auto border-t border-[#2a2a30] pt-4 px-2">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-[10px] font-mono tracking-wider text-gray-400">ADMIN AUTHORIZED</span>
         </div>
+        <p className="mt-1 text-[9px] font-mono text-gray-600">KEY: 5128 | 432 Hz ACTIVE</p>
       </div>
     </aside>
   );
