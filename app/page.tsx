@@ -1,5 +1,5 @@
 'use client';
-
+import { useContextMenuShare } from '@/components/useContextMenuShare';
 import React, { useState } from 'react';
 import TopHeader from '@/components/TopHeader';
 import LeftNav from '@/components/LeftNav';
@@ -10,7 +10,7 @@ import LoreVault from '@/components/LoreVault';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<string>('clock');
-
+useContextMenuShare();
   return (
     <main className="flex h-screen w-screen overflow-hidden bg-[#0a0a0c]">
       <LeftNav activeTab={activeTab} setActiveTab={setActiveTab} />

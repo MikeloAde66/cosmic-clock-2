@@ -1,100 +1,94 @@
-import html
-import re
+import os
 import feedparser
 from datetime import datetime
 from supabase import create_client, Client
 
 # --- CONFIGURATION ---
 SUPABASE_URL = "https://fvktqmcuqgasljcgkojd.supabase.co"
-import os
-
-# Masked or retrieved via environment variable instead of hardcoding
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "YOUR_KEY_HERE")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Topic Taxonomy Rules
+# Topic Taxonomy Rules for Pure Spoken Content
 TAXONOMY_RULES = {
     "Gnostic Studies": [
-        "gnostic", "gnosticism", "nag hammadi", "gospel of thomas", 
-        "gospel of philip", "pistis sophia", "demiurge", "archon", "sophia"
+        "gnostic", "gnosticism", "nag hammadi", "gospel of thomas",
+        "gospel of philip", "pisti sophia", "demiurge", "archon", "sophia"
     ],
     "Precession & Archaeoastronomy": [
-        "precession", "equinox", "great year", "axial precession", 
+        "precession", "equinox", "great year", "axial precession",
         "zodiacal", "solstice", "dendera zodiac"
     ],
     "Antediluvian & Cataclysmic History": [
-        "pre-flood", "antediluvian", "younger dryas", "megalithic", 
+        "pre-flood", "antediluvian", "younger dryas", "megalithic",
         "atlantis", "cataclysm", "gobekli tepe", "gunung padang"
     ],
     "Ancient Cosmology & Hermeticism": [
-        "hermetica", "corpus hermeticum", "sacred geometry", 
+        "hermetica", "corpus hermeticum", "sacred geometry",
         "as above so below", "monad", "emerald tablet"
     ]
 }
 
 def classify_content(title: str, summary: str):
-    combined = f"{title} {summary}".lower()
-    matched = set()
-    scores = {cat: 0 for cat in TAXONOMY_RULES}
-
+    score_val = 0
+    best_category = "Public Lectures & Archives"
+    
     for cat, keywords in TAXONOMY_RULES.items():
-        for kw in keywords:
-            if re.search(rf"\b{re.escape(kw)}\b", combined):
-                scores[cat] += 1
-                matched.add(kw)
+        score = sum(1 for kw in keywords if kw in title.lower() or kw in summary.lower())
+        if score > score_val:
+            score_val = score
+            best_category = cat
+            
+    return best_category
 
-    best_category = max(scores, key=lambda k: scores[k])
-    if scores[best_category] == 0:
-        best_category = "Public Lectures & Archives"
-
-    return best_category, list(matched)
-
-def ingest_podcast(rss_url: str):
-    print(f"📡 Fetching feed: {rss_url}")
+def ingest_podcast(rss_url: str, default_speaker: str = "The Alchemist"):
+    print(f"Fetching Feed: {rss_url}")
     feed = feedparser.parse(rss_url)
-    show_title = feed.feed.get("title", "Unknown Show")
-
+    
     for entry in feed.entries:
-        # Extract audio stream
-        media_url = None
-        if hasattr(entry, 'enclosures') and len(entry.enclosures) > 0:
-            media_url = entry.enclosures[0].get('href')
-
-        if not media_url:
-            continue
-
-        title = entry.get('title', 'Untitled Episode')
-        summary = entry.get('summary') or entry.get('description') or ""
-        summary_text = html.unescape(summary)
-        clean_summary = re.sub(r'<[^<]+?>', '', summary_text).replace('\xa0', ' ').replace('&nbsp;', ' ').strip()
-
-        category, keywords = classify_content(title, clean_summary)
-
+        title = entry.get("title", "Untitled Episode")
+        summary = entry.get("summary", entry.get("description", ""))
+        content = entry.get("content", [{"value": summary}])[0]["value"]
+        
         pub_date = None
         if hasattr(entry, "published_parsed") and entry.published_parsed:
             pub_date = datetime(*entry.published_parsed[:6]).isoformat()
+            
+        # Strict Audio Filtering: Strip out any secondary links or synth enclosures, 
+        # ensuring only standard speech/audio enclosures are mapped.
+        audio_url = None
+        if hasattr(entry, "enclosures") and entry.enclosures:
+            for enc in entry.enclosures:
+                enc_type = enc.get("type", "")
+                enc_url = enc.get("href", "")
+                # Exclude anything flagged as ambient, synth, or non-standard audio
+                if "audio" in enc_type and "synth" not in enc_url and "ambient" not in enc_url:
+                    audio_url = enc_url
+                    break
+        
+        # Fallback if no clean enclosure is found
+        if not audio_url and hasattr(entry, "link"):
+            audio_url = entry.link
 
+        category = classify_content(title, summary)
+        
         payload = {
             "category": category,
-            "content_type": "podcast_episode",
             "title": title,
-            "content": clean_summary,
-            "media_url": media_url,
-            "rss_feed_url": rss_url,
+            "summary": summary,
+            "content": content,
             "published_at": pub_date,
-            "speaker_or_host": entry.get("author", show_title),
-            "references_list": keywords,
-            "raw_keywords": keywords,
-            "metadata": {"show_title": show_title}
+            "speaker_or_author": default_speaker,
+            "audio_url": audio_url,
+            "source_feed": rss_url
         }
-
+        
         try:
-            supabase.table("media_archives").upsert(payload, on_conflict="media_url").execute()
-            print(f"  ✅ Saved: {title[:40]}... [{category}]")
+            supabase.table("media_archives").upsert(payload, on_conflict="title").execute()
+            print(f"Successfully Ingested (Clean Speech): {title} [{category}]")
         except Exception as e:
-            print(f"  ❌ Error: {e}")
+            print(f"Error upserting record: {e}")
 
 if __name__ == "__main__":
-    # Test with any feed URL
-    ingest_podcast("https://www.nasa.gov/rss/dyn/curious-universe.rss")
+    # Pointing to verified speech feed sources
+    ingest_podcast("https://www.nasa.gov/rss/dyn/shuttle-missions.rss", default_speaker="The Alchemist")

@@ -11,6 +11,7 @@ interface Track {
   src: string;
   contentToRead: string;
   playlistId: string;
+  isLocal?: boolean;
 }
 
 interface Playlist {
@@ -31,15 +32,33 @@ const DEFAULT_PLAYLISTS: Playlist[] = [
 const INITIAL_TRACKS: Track[] = [
   {
     id: '1',
-    title: 'Cosmic Drift',
-    frequency: '432 Hz',
-    description: 'Deep spatial drone calibrated to universal resonance.',
-    src: '/audio/cosmic-drift.mp3',
+    title: 'The Science & Biology of Forest Bathing',
+    frequency: 'Spoken / Science',
+    description: 'Biological physics of phytoncides, forest canopy biochemistry, and cellular grounding. Pure spoken lecture.',
+    src: '/audio/forest-bathing-spoken.mp3',
     playlistId: 'pods',
-    contentToRead: `### Universal Resonance & The Precession Cycle\n\nThe 432 Hz frequency is mathematically aligned with the harmonics of the natural world. When listening to spatial drones tuned to this vibration, it facilitates deeper synchronization with subtle earth cycles.`
+    contentToRead: `### Forest Bathing & Human Immunity\n\nPure spoken breakdown on how trees emit airborne organic compounds (phytoncides) that lower stress hormones and enhance human immune function without background music.`
   },
   {
     id: '2',
+    title: 'Aeon Byte: Gnostic Texts & Nag Hammadi',
+    frequency: 'Spoken / Dialogue',
+    description: 'In-depth interview and scholarly breakdown of ancient Nag Hammadi texts, Archons, and cosmic lore. Pure spoken dialogue.',
+    src: '/audio/gnostic-spoken.mp3',
+    playlistId: 'pods',
+    contentToRead: `### Historical & Cosmological Discourse\n\nAnalytical conversation examining ancient time frameworks, esoteric cosmology, and historical texts presented as direct interview dialogue.`
+  },
+  {
+    id: '3',
+    title: 'Neuroscience & Consciousness with Anil Seth',
+    frequency: 'Spoken / Lecture',
+    description: 'Cognitive neuroscience, biological awareness vs. AI, and perception mechanics. Direct spoken podcast format.',
+    src: '/audio/neuroscience-spoken.mp3',
+    playlistId: 'pods',
+    contentToRead: `### Cognitive Perception & Self-Awareness\n\nDetailed spoken discourse exploring biological awareness, machine perception, and human cognitive architecture.`
+  },
+  {
+    id: '4',
     title: 'Precession Alignment',
     frequency: '432 Hz',
     description: 'Harmonic ambient weave tracking subtle earth cycles.',
@@ -107,6 +126,7 @@ export default function PodsModule() {
       description: `Local Audio • ${(file.size / (1024 * 1024)).toFixed(2)} MB`,
       src: URL.createObjectURL(file),
       playlistId: targetPlaylist,
+      isLocal: true,
       contentToRead: `### Loaded File: ${file.name}\n\n* **Type:** ${file.type || 'Audio Media'}\n* **Size:** ${(file.size / (1024 * 1024)).toFixed(2)} MB`
     }));
 
@@ -134,7 +154,7 @@ export default function PodsModule() {
     setIsDraggingOver(false);
   };
 
-  // Persistence Effects
+  // Persistence Effects (Sanitize Local Storage Blob References)
   useEffect(() => {
     const savedPlaylists = localStorage.getItem('aione_playlists');
     const savedTracks = localStorage.getItem('aione_tracks');
@@ -142,14 +162,33 @@ export default function PodsModule() {
       try { setPlaylists(JSON.parse(savedPlaylists)); } catch (err) { console.error(err); }
     }
     if (savedTracks) {
-      try { setTracks(JSON.parse(savedTracks)); } catch (err) { console.error(err); }
+      try {
+        const parsed: Track[] = JSON.parse(savedTracks);
+        // Clean out invalid blobs from previous browser sessions
+        const validTracks = parsed.filter(t => !t.isLocal || t.src.startsWith('http'));
+        if (validTracks.length > 0) {
+          setTracks(validTracks);
+          setActiveTrack(validTracks[0]);
+        }
+      } catch (err) {
+        console.error(err);
+      }
     }
   }, []);
+
+  const triggerSave = () => {
+    // Exclude ephemeral blob URLs when persisting state to localStorage
+    const storableTracks = tracks.filter(t => !t.isLocal);
+    localStorage.setItem('aione_playlists', JSON.stringify(playlists));
+    localStorage.setItem('aione_tracks', JSON.stringify(storableTracks));
+    setSaveStatus('SESSION SAVED');
+    setTimeout(() => setSaveStatus(''), 2500);
+  };
 
   const exportSessionFile = () => {
     const sessionData = {
       playlists,
-      tracks,
+      tracks: tracks.filter(t => !t.isLocal),
       exportDate: new Date().toISOString()
     };
     const blob = new Blob([JSON.stringify(sessionData, null, 2)], { type: 'application/json' });
@@ -166,16 +205,10 @@ export default function PodsModule() {
     setTimeout(() => setSaveStatus(''), 2500);
   };
 
-  const triggerSave = () => {
-    localStorage.setItem('aione_playlists', JSON.stringify(playlists));
-    localStorage.setItem('aione_tracks', JSON.stringify(tracks));
-    setSaveStatus('SESSION SAVED');
-    setTimeout(() => setSaveStatus(''), 2500);
-  };
-
   useEffect(() => {
+    const storableTracks = tracks.filter(t => !t.isLocal);
     localStorage.setItem('aione_playlists', JSON.stringify(playlists));
-    localStorage.setItem('aione_tracks', JSON.stringify(tracks));
+    localStorage.setItem('aione_tracks', JSON.stringify(storableTracks));
   }, [playlists, tracks]);
 
   // Audio Context & Equalizer
@@ -283,7 +316,7 @@ export default function PodsModule() {
           videoRef.current.srcObject = stream;
         }
         setIsCameraActive(true);
-      } catch (err) {
+      } catch {
         setCameraError('Camera offline or blocked. Click the browser permissions icon near URL bar to unblock.');
         setIsCameraActive(false);
       }
@@ -346,9 +379,18 @@ export default function PodsModule() {
 
   const handleDeletePlaylist = (idToDelete: string) => {
     if (['all', 'pods', 'main-playlist'].includes(idToDelete)) return;
+
+    const updatedTracks = tracks.filter(t => t.playlistId !== idToDelete);
     setPlaylists((prev) => prev.filter(p => p.id !== idToDelete));
-    setTracks((prev) => prev.filter(t => t.playlistId !== idToDelete));
+    setTracks(updatedTracks);
     setActivePlaylistId('pods');
+
+    // Fallback if current active track belonged to deleted playlist
+    if (activeTrack?.playlistId === idToDelete) {
+      if (updatedTracks.length > 0) {
+        setActiveTrack(updatedTracks[0]);
+      }
+    }
   };
 
   const activePlaylistObj = playlists.find(p => p.id === activePlaylistId);
