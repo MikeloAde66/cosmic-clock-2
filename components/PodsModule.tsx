@@ -96,6 +96,10 @@ export default function PodsModule() {
   const [cameraError, setCameraError] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  // Custom Video/Playlist Embed State
+  const [mediaUrl, setMediaUrl] = useState<string>('');
+  const [activeEmbedUrl, setActiveEmbedUrl] = useState<string>('');
+
   // EQ Audio Nodes
   const [eqGains, setEqGains] = useState<{ [freq: string]: number }>({
     '60': 0,
@@ -321,6 +325,29 @@ export default function PodsModule() {
         setIsCameraActive(false);
       }
     }
+  };
+
+  // Parse & load a custom YouTube video/playlist or direct media URL into the monitor
+  const loadMedia = () => {
+    const input = mediaUrl.trim();
+    if (!input) return;
+    if (input.includes('list=')) {
+      const listId = input.split('list=')[1]?.split('&')[0];
+      setActiveEmbedUrl(`https://www.youtube.com/embed/videoseries?list=${listId}`);
+    } else if (input.includes('watch?v=')) {
+      const videoId = input.split('v=')[1]?.split('&')[0];
+      setActiveEmbedUrl(`https://www.youtube.com/embed/${videoId}?autoplay=1`);
+    } else if (input.includes('youtu.be/')) {
+      const videoId = input.split('youtu.be/')[1]?.split('?')[0];
+      setActiveEmbedUrl(`https://www.youtube.com/embed/${videoId}?autoplay=1`);
+    } else {
+      setActiveEmbedUrl(input);
+    }
+  };
+
+  const clearMedia = () => {
+    setActiveEmbedUrl('');
+    setMediaUrl('');
   };
 
   const filteredTracks = activePlaylistId === 'all'
@@ -680,6 +707,30 @@ export default function PodsModule() {
                 </button>
               </div>
 
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={mediaUrl}
+                  onChange={(e) => setMediaUrl(e.target.value)}
+                  placeholder="Paste YouTube video/playlist URL or direct media link..."
+                  className="flex-1 px-3 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded font-mono text-slate-300 focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  onClick={loadMedia}
+                  className="px-3 py-1.5 rounded text-xs font-mono font-bold transition bg-amber-500 text-slate-950 hover:bg-amber-400 whitespace-nowrap"
+                >
+                  LOAD LINK
+                </button>
+                {activeEmbedUrl && (
+                  <button
+                    onClick={clearMedia}
+                    className="px-3 py-1.5 rounded text-xs font-mono transition bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200 whitespace-nowrap"
+                  >
+                    CLEAR
+                  </button>
+                )}
+              </div>
+
               {cameraError && (
                 <div className="p-2 font-mono text-xs text-red-300 border border-red-800 rounded bg-red-950/60">
                   {cameraError}
@@ -687,20 +738,36 @@ export default function PodsModule() {
               )}
 
               <div className="relative flex items-center justify-center overflow-hidden border rounded-lg aspect-video bg-slate-900 border-slate-800">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={`w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
-                />
-                {!isCameraActive && (
-                  <div className="p-6 space-y-2 text-center">
-                    <p className="font-mono text-xs text-slate-400">BROADCAST MONITOR STANDBY</p>
-                    <p className="text-slate-600 text-[11px] max-w-sm mx-auto">
-                      Click &quot;Start Camera&quot; above to display live video input.
-                    </p>
-                  </div>
+                {activeEmbedUrl ? (
+                  activeEmbedUrl.endsWith('.mp4') || activeEmbedUrl.endsWith('.webm') ? (
+                    <video src={activeEmbedUrl} controls className="w-full h-full object-cover" />
+                  ) : (
+                    <iframe
+                      src={activeEmbedUrl}
+                      title="Broadcast Monitor Video Embed"
+                      className="w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  )
+                ) : (
+                  <>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className={`w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
+                    />
+                    {!isCameraActive && (
+                      <div className="p-6 space-y-2 text-center">
+                        <p className="font-mono text-xs text-slate-400">BROADCAST MONITOR STANDBY</p>
+                        <p className="text-slate-600 text-[11px] max-w-sm mx-auto">
+                          Click &quot;Start Camera&quot; above or paste a link to display video input.
+                        </p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
