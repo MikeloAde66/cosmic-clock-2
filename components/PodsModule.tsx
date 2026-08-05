@@ -99,6 +99,8 @@ export default function PodsModule() {
   // Custom Video/Playlist Embed State
   const [mediaUrl, setMediaUrl] = useState<string>('');
   const [activeEmbedUrl, setActiveEmbedUrl] = useState<string>('');
+  const [localVideoUrl, setLocalVideoUrl] = useState<string>('');
+  const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // EQ Audio Nodes
   const [eqGains, setEqGains] = useState<{ [freq: string]: number }>({
@@ -346,8 +348,19 @@ export default function PodsModule() {
   };
 
   const clearMedia = () => {
+    if (localVideoUrl) URL.revokeObjectURL(localVideoUrl);
+    setLocalVideoUrl('');
     setActiveEmbedUrl('');
     setMediaUrl('');
+  };
+
+  const handleLocalVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (localVideoUrl) URL.revokeObjectURL(localVideoUrl);
+    setActiveEmbedUrl('');
+    setLocalVideoUrl(URL.createObjectURL(file));
+    e.target.value = '';
   };
 
   const filteredTracks = activePlaylistId === 'all'
@@ -707,6 +720,14 @@ export default function PodsModule() {
                 </button>
               </div>
 
+              <input
+                type="file"
+                ref={mediaFileInputRef}
+                onChange={handleLocalVideoSelect}
+                accept="video/*"
+                className="hidden"
+              />
+
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -721,7 +742,14 @@ export default function PodsModule() {
                 >
                   LOAD LINK
                 </button>
-                {activeEmbedUrl && (
+                <button
+                  onClick={() => mediaFileInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded text-xs font-mono font-bold transition bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 whitespace-nowrap"
+                  title="Load a local video file (e.g. Canva export)"
+                >
+                  BROWSE FILE
+                </button>
+                {(activeEmbedUrl || localVideoUrl) && (
                   <button
                     onClick={clearMedia}
                     className="px-3 py-1.5 rounded text-xs font-mono transition bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200 whitespace-nowrap"
@@ -738,7 +766,9 @@ export default function PodsModule() {
               )}
 
               <div className="relative flex items-center justify-center overflow-hidden border rounded-lg aspect-video bg-slate-900 border-slate-800">
-                {activeEmbedUrl ? (
+                {localVideoUrl ? (
+                  <video src={localVideoUrl} controls autoPlay className="w-full h-full object-cover" />
+                ) : activeEmbedUrl ? (
                   activeEmbedUrl.endsWith('.mp4') || activeEmbedUrl.endsWith('.webm') ? (
                     <video src={activeEmbedUrl} controls className="w-full h-full object-cover" />
                   ) : (
