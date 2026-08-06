@@ -128,6 +128,8 @@ export default function PodsModule() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('');
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const overflowMenuRef = useRef<HTMLDivElement | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -169,6 +171,18 @@ export default function PodsModule() {
     e.preventDefault();
     setIsDraggingOver(false);
   };
+
+  // Close the overflow menu on outside click
+  useEffect(() => {
+    if (!showOverflowMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (overflowMenuRef.current && !overflowMenuRef.current.contains(e.target as Node)) {
+        setShowOverflowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showOverflowMenu]);
 
   // Persistence Effects (Sanitize Local Storage Blob References)
   useEffect(() => {
@@ -497,57 +511,72 @@ export default function PodsModule() {
       />
 
       {/* Header Bar */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-wider text-amber-400">AUDIO & CONTENT PODS</h2>
-          <p className="mt-1 text-sm text-slate-400">Custom Playlists & Synchronized Media Hub</p>
+      <div className="flex items-center justify-between min-h-[44px] gap-4">
+        <h2 className="text-sm font-mono font-bold tracking-widest text-amber-500 uppercase whitespace-nowrap">
+          AUDIO & CONTENT PODS
+        </h2>
+
+        {/* Reserved banner slot — dormant for now, activated later */}
+        <div className="flex items-center justify-center flex-1 h-8 border border-dashed rounded-md border-amber-500/15 bg-amber-500/[0.03]">
+          <span className="text-[10px] font-mono tracking-widest uppercase text-amber-500/25">
+            Banner Reserved
+          </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           {saveStatus && (
-            <span className="text-xs font-mono text-emerald-400 animate-pulse bg-emerald-950/60 border border-emerald-800 px-3 py-1.5 rounded-lg">
+            <span className="text-[11px] font-mono text-emerald-400 animate-pulse bg-emerald-950/60 border border-emerald-800 px-2 py-1 rounded">
               {saveStatus}
             </span>
           )}
 
           <button
-            onClick={triggerSave}
-            className="px-3 py-2 font-mono text-xs transition border rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700"
-            title="Save Session to Browser"
-          >
-            💾 SAVE SESSION
-          </button>
-
-          <button
-            onClick={exportSessionFile}
-            className="flex items-center justify-center p-2 transition border rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-400 border-slate-700"
-            title="Download Free Session File"
-          >
-            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-            </svg>
-          </button>
-
-          <button
-            onClick={() => setShowHelpModal(true)}
-            className="px-3 py-2 font-mono text-xs transition border rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700"
-          >
-            ? HELP
-          </button>
-
-          <button
             onClick={() => setShowCreateModal(true)}
-            className="px-3 py-2 font-mono text-xs transition border rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 border-amber-500/30"
+            className="h-8 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
           >
-            + NEW PLAYLIST
+            + Playlist
           </button>
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="px-4 py-2 font-mono text-xs font-bold transition rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950"
+            className="h-8 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
           >
-            + UPLOAD TRACKS
+            + Upload
           </button>
+
+          <div className="relative" ref={overflowMenuRef}>
+            <button
+              onClick={() => setShowOverflowMenu((v) => !v)}
+              className="flex items-center justify-center w-8 h-8 font-bold transition border rounded bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+              aria-label="More options"
+              title="More options"
+            >
+              ⋮
+            </button>
+
+            {showOverflowMenu && (
+              <div className="absolute right-0 z-50 py-1 mt-2 border rounded-md shadow-lg w-36 bg-slate-900 border-amber-500/30">
+                {[
+                  { label: 'Download', action: exportSessionFile },
+                  { label: 'Save', action: triggerSave },
+                  { label: 'Save As', action: exportSessionFile },
+                  { label: 'Save Session', action: triggerSave },
+                  { label: 'Help', action: () => setShowHelpModal(true) },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={() => {
+                      item.action();
+                      setShowOverflowMenu(false);
+                    }}
+                    className="w-full px-3 py-1.5 text-left text-[11px] font-mono text-slate-300 hover:bg-amber-500/10 hover:text-amber-400 transition-colors"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
