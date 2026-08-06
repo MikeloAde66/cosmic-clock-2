@@ -12,6 +12,8 @@ interface Track {
   contentToRead: string;
   playlistId: string;
   isLocal?: boolean;
+  embedUrl?: string;
+  watchUrl?: string;
 }
 
 interface Playlist {
@@ -32,37 +34,45 @@ const DEFAULT_PLAYLISTS: Playlist[] = [
 const INITIAL_TRACKS: Track[] = [
   {
     id: '1',
-    title: 'The Science & Biology of Forest Bathing',
-    frequency: 'Spoken / Science',
-    description: 'Biological physics of phytoncides, forest canopy biochemistry, and cellular grounding. Pure spoken lecture.',
-    src: '/audio/forest-bathing-spoken.mp3',
+    title: 'The Art & Science of Forest Bathing',
+    frequency: 'Video / Science',
+    description: 'Dr Qing Li on the biology of phytoncides and shinrin-yoku forest medicine. (Penguin Books UK)',
+    src: '',
+    embedUrl: 'https://www.youtube.com/embed/12CCjoixpkA',
+    watchUrl: 'https://www.youtube.com/watch?v=12CCjoixpkA',
     playlistId: 'pods',
-    contentToRead: `### Forest Bathing & Human Immunity\n\nPure spoken breakdown on how trees emit airborne organic compounds (phytoncides) that lower stress hormones and enhance human immune function without background music.`
+    contentToRead: `### Forest Bathing & Human Immunity\n\nDr Qing Li, the world's foremost expert in forest medicine, explains how trees emit airborne organic compounds (phytoncides) that lower stress hormones and enhance human immune function.`
   },
   {
     id: '2',
-    title: 'Aeon Byte: Gnostic Texts & Nag Hammadi',
-    frequency: 'Spoken / Dialogue',
-    description: 'In-depth interview and scholarly breakdown of ancient Nag Hammadi texts, Archons, and cosmic lore. Pure spoken dialogue.',
-    src: '/audio/gnostic-spoken.mp3',
+    title: 'Aeon Byte: A Gnostic View of the Soul',
+    frequency: 'Video / Dialogue',
+    description: 'Aeon Byte Gnostic Radio on the Hymn of the Pearl and the Exegesis from the Nag Hammadi library.',
+    src: '',
+    embedUrl: 'https://www.youtube.com/embed/CY2P9q7bEVY',
+    watchUrl: 'https://www.youtube.com/watch?v=CY2P9q7bEVY',
     playlistId: 'pods',
-    contentToRead: `### Historical & Cosmological Discourse\n\nAnalytical conversation examining ancient time frameworks, esoteric cosmology, and historical texts presented as direct interview dialogue.`
+    contentToRead: `### Historical & Cosmological Discourse\n\nAeon Byte Gnostic Radio examines two key Nag Hammadi scriptures on the fall and redemption of the soul: the Hymn of the Pearl and the Exegesis.`
   },
   {
     id: '3',
-    title: 'Neuroscience & Consciousness with Anil Seth',
-    frequency: 'Spoken / Lecture',
-    description: 'Cognitive neuroscience, biological awareness vs. AI, and perception mechanics. Direct spoken podcast format.',
-    src: '/audio/neuroscience-spoken.mp3',
+    title: 'Anil Seth: The Mystery of Consciousness',
+    frequency: 'Video / Lecture',
+    description: 'The TED Interview with neuroscientist Anil Seth on perception, prediction, and machine consciousness.',
+    src: '',
+    embedUrl: 'https://www.youtube.com/embed/aQVedpfKt88',
+    watchUrl: 'https://www.youtube.com/watch?v=aQVedpfKt88',
     playlistId: 'pods',
-    contentToRead: `### Cognitive Perception & Self-Awareness\n\nDetailed spoken discourse exploring biological awareness, machine perception, and human cognitive architecture.`
+    contentToRead: `### Cognitive Perception & Self-Awareness\n\nNeuroscientist Anil Seth explores his theory that consciousness is a controlled hallucination — the brain constantly predicting and constructing our perceived reality.`
   },
   {
     id: '4',
-    title: 'Precession Alignment',
-    frequency: '432 Hz',
-    description: 'Harmonic ambient weave tracking subtle earth cycles.',
-    src: '/audio/precession.mp3',
+    title: 'The Precession of Equinox',
+    frequency: 'Video / Ambient',
+    description: 'A short visual on the slow astronomical cycle behind the Great Year. (The Randall Carlson)',
+    src: '',
+    embedUrl: 'https://www.youtube.com/embed/jnIBFXVWZXg',
+    watchUrl: 'https://www.youtube.com/watch?v=jnIBFXVWZXg',
     playlistId: 'pods',
     contentToRead: `### The Great Year & Astronomical Alignment\n\nAncient timekeeping systems tracked vast epochs through the slow movement of the equinoxes across the zodiac constellations.`
   }
@@ -162,8 +172,8 @@ export default function PodsModule() {
 
   // Persistence Effects (Sanitize Local Storage Blob References)
   useEffect(() => {
-    const savedPlaylists = localStorage.getItem('aione_playlists');
-    const savedTracks = localStorage.getItem('aione_tracks');
+    const savedPlaylists = localStorage.getItem('aione_playlists_v2');
+    const savedTracks = localStorage.getItem('aione_tracks_v2');
     if (savedPlaylists) {
       try { setPlaylists(JSON.parse(savedPlaylists)); } catch (err) { console.error(err); }
     }
@@ -182,11 +192,20 @@ export default function PodsModule() {
     }
   }, []);
 
+  // Keep the Broadcast Monitor in sync with the active track whenever it's video-backed
+  // (covers initial mount and localStorage restore, not just clicks handled by selectTrack)
+  useEffect(() => {
+    if (activeTrack?.embedUrl) {
+      setMediaUrl(activeTrack.watchUrl || '');
+      setActiveEmbedUrl(activeTrack.embedUrl);
+    }
+  }, [activeTrack]);
+
   const triggerSave = () => {
     // Exclude ephemeral blob URLs when persisting state to localStorage
     const storableTracks = tracks.filter(t => !t.isLocal);
-    localStorage.setItem('aione_playlists', JSON.stringify(playlists));
-    localStorage.setItem('aione_tracks', JSON.stringify(storableTracks));
+    localStorage.setItem('aione_playlists_v2', JSON.stringify(playlists));
+    localStorage.setItem('aione_tracks_v2', JSON.stringify(storableTracks));
     setSaveStatus('SESSION SAVED');
     setTimeout(() => setSaveStatus(''), 2500);
   };
@@ -213,8 +232,8 @@ export default function PodsModule() {
 
   useEffect(() => {
     const storableTracks = tracks.filter(t => !t.isLocal);
-    localStorage.setItem('aione_playlists', JSON.stringify(playlists));
-    localStorage.setItem('aione_tracks', JSON.stringify(storableTracks));
+    localStorage.setItem('aione_playlists_v2', JSON.stringify(playlists));
+    localStorage.setItem('aione_tracks_v2', JSON.stringify(storableTracks));
   }, [playlists, tracks]);
 
   // Audio Context & Equalizer
@@ -363,6 +382,25 @@ export default function PodsModule() {
     e.target.value = '';
   };
 
+  // Selecting a track: routes video-backed tracks into the Broadcast Monitor,
+  // and audio-backed tracks into the <audio> player, clearing the other each time.
+  const selectTrack = (track: Track) => {
+    setActiveTrack(track);
+    if (track.embedUrl) {
+      setIsPlaying(false);
+      if (localVideoUrl) URL.revokeObjectURL(localVideoUrl);
+      setLocalVideoUrl('');
+      setMediaUrl(track.watchUrl || '');
+      setActiveEmbedUrl(track.embedUrl);
+    } else {
+      setActiveEmbedUrl('');
+      setMediaUrl('');
+      if (localVideoUrl) URL.revokeObjectURL(localVideoUrl);
+      setLocalVideoUrl('');
+      setIsPlaying(true);
+    }
+  };
+
   const filteredTracks = activePlaylistId === 'all'
     ? tracks
     : tracks.filter(t => t.playlistId === activePlaylistId);
@@ -376,28 +414,24 @@ export default function PodsModule() {
       }
     } else if (playbackMode === 'random') {
       const randomIndex = Math.floor(Math.random() * filteredTracks.length);
-      setActiveTrack(filteredTracks[randomIndex]);
-      setIsPlaying(true);
+      selectTrack(filteredTracks[randomIndex]);
     } else {
       const currentIndex = filteredTracks.findIndex(t => t.id === activeTrack?.id);
       const nextIndex = (currentIndex + 1) % filteredTracks.length;
-      setActiveTrack(filteredTracks[nextIndex]);
-      setIsPlaying(true);
+      selectTrack(filteredTracks[nextIndex]);
     }
   };
 
   const handleNextTrack = () => {
     if (filteredTracks.length === 0) return;
     const currentIndex = filteredTracks.findIndex(t => t.id === activeTrack?.id);
-    setActiveTrack(filteredTracks[(currentIndex + 1) % filteredTracks.length]);
-    setIsPlaying(true);
+    selectTrack(filteredTracks[(currentIndex + 1) % filteredTracks.length]);
   };
 
   const handlePrevTrack = () => {
     if (filteredTracks.length === 0) return;
     const currentIndex = filteredTracks.findIndex(t => t.id === activeTrack?.id);
-    setActiveTrack(filteredTracks[(currentIndex - 1 + filteredTracks.length) % filteredTracks.length]);
-    setIsPlaying(true);
+    selectTrack(filteredTracks[(currentIndex - 1 + filteredTracks.length) % filteredTracks.length]);
   };
 
   const handleCreatePlaylist = (e: React.FormEvent) => {
@@ -446,7 +480,7 @@ export default function PodsModule() {
     >
       <audio
         ref={audioRef}
-        src={activeTrack?.src}
+        src={activeTrack?.src || undefined}
         onPlay={initAudioContext}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleTimeUpdate}
@@ -586,20 +620,22 @@ export default function PodsModule() {
                 <p className="text-xs truncate text-slate-400">{activeTrack.description}</p>
               </div>
 
-              <div className="space-y-1">
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 100}
-                  value={currentTime}
-                  onChange={handleSeek}
-                  className="w-full accent-amber-500 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
-                />
-                <div className="flex justify-between font-mono text-xs text-amber-400/90">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
+              {!activeTrack.embedUrl && (
+                <div className="space-y-1">
+                  <input
+                    type="range"
+                    min={0}
+                    max={duration || 100}
+                    value={currentTime}
+                    onChange={handleSeek}
+                    className="w-full accent-amber-500 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
+                  />
+                  <div className="flex justify-between font-mono text-xs text-amber-400/90">
+                    <span>{formatTime(currentTime)}</span>
+                    <span>{formatTime(duration)}</span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-center gap-3">
                 <button
@@ -609,12 +645,18 @@ export default function PodsModule() {
                   ◀◀
                 </button>
 
-                <button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className="flex-1 py-3 text-sm font-bold tracking-wide transition rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950"
-                >
-                  {isPlaying ? 'PAUSE STREAM' : 'PLAY STREAM'}
-                </button>
+                {activeTrack.embedUrl ? (
+                  <div className="flex-1 py-3 text-sm font-bold tracking-wide text-center rounded-lg bg-slate-950 border border-amber-500/30 text-amber-400">
+                    ▶ PLAYING IN BROADCAST MONITOR →
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className="flex-1 py-3 text-sm font-bold tracking-wide transition rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950"
+                  >
+                    {isPlaying ? 'PAUSE STREAM' : 'PLAY STREAM'}
+                  </button>
+                )}
 
                 <button
                   onClick={handleNextTrack}
@@ -678,10 +720,7 @@ export default function PodsModule() {
               {filteredTracks.map((track) => (
                 <div
                   key={track.id}
-                  onClick={() => {
-                    setActiveTrack(track);
-                    setIsPlaying(true);
-                  }}
+                  onClick={() => selectTrack(track)}
                   className={`p-3.5 rounded-lg border cursor-pointer transition flex justify-between items-center ${
                     activeTrack?.id === track.id
                       ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
@@ -728,13 +767,13 @@ export default function PodsModule() {
                 className="hidden"
               />
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <input
                   type="text"
                   value={mediaUrl}
                   onChange={(e) => setMediaUrl(e.target.value)}
                   placeholder="Paste YouTube video/playlist URL or direct media link..."
-                  className="flex-1 px-3 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded font-mono text-slate-300 focus:outline-none focus:border-amber-500"
+                  className="flex-1 min-w-[180px] px-3 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded font-mono text-slate-300 focus:outline-none focus:border-amber-500"
                 />
                 <button
                   onClick={loadMedia}
@@ -749,6 +788,17 @@ export default function PodsModule() {
                 >
                   BROWSE FILE
                 </button>
+                {activeEmbedUrl.includes('youtube.com') && (
+                  <a
+                    href={mediaUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded text-xs font-mono transition bg-slate-900 text-amber-400 border border-amber-500/30 hover:bg-slate-800 whitespace-nowrap flex items-center"
+                    title="Some videos block embedding entirely — opens the original YouTube page as a fallback"
+                  >
+                    OPEN ON YOUTUBE ↗
+                  </a>
+                )}
                 {(activeEmbedUrl || localVideoUrl) && (
                   <button
                     onClick={clearMedia}
