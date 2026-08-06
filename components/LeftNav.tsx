@@ -7,7 +7,7 @@ interface LeftNavProps {
   setActiveTab?: (tab: string) => void;
 }
 
-export default function LeftNav({ activeTab = 'clock', setActiveTab }: LeftNavProps) {
+export default function LeftNav({ activeTab = 'aione', setActiveTab }: LeftNavProps) {
   const handleNavClick = (tabKey: string) => {
     if (setActiveTab) {
       setActiveTab(tabKey);
@@ -35,15 +35,27 @@ export default function LeftNav({ activeTab = 'clock', setActiveTab }: LeftNavPr
         {/* Navigation Links */}
         <nav className="space-y-2 font-mono text-xs">
           <button
-            onClick={() => handleNavClick('clock')}
+            onClick={() => handleNavClick('aione')}
             className={`w-full flex items-center space-x-2 px-3 py-2 rounded transition-all cursor-pointer ${
-              activeTab === 'clock'
+              activeTab === 'aione'
                 ? 'bg-neutral-900 text-amber-400 border border-amber-500/30'
                 : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border border-transparent'
             }`}
           >
-            <span>🕒</span>
-            <span>CLOCK</span>
+            <span>💡</span>
+            <span>Home</span>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('radio')}
+            className={`w-full flex items-center space-x-2 px-3 py-2 rounded transition-all cursor-pointer ${
+              activeTab === 'radio'
+                ? 'bg-neutral-900 text-amber-400 border border-amber-500/30'
+                : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border border-transparent'
+            }`}
+          >
+            <span>📻</span>
+            <span>RADIO</span>
           </button>
 
           <button
@@ -56,18 +68,6 @@ export default function LeftNav({ activeTab = 'clock', setActiveTab }: LeftNavPr
           >
             <span>🏛️</span>
             <span>COSMIC VAULT</span>
-          </button>
-
-          <button
-            onClick={() => handleNavClick('aione')}
-            className={`w-full flex items-center space-x-2 px-3 py-2 rounded transition-all cursor-pointer ${
-              activeTab === 'aione'
-                ? 'bg-neutral-900 text-amber-400 border border-amber-500/30'
-                : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border border-transparent'
-            }`}
-          >
-            <span>💡</span>
-            <span>Ai-One</span>
           </button>
 
           <button
