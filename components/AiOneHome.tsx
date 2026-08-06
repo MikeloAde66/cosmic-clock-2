@@ -26,23 +26,23 @@ export default function AiOneHome() {
       <div className="flex items-center justify-center w-full py-3 space-x-8 text-xs font-mono tracking-widest uppercase border-b border-slate-800/80 bg-[#0b1326] shrink-0">
         <span
           className="cursor-default text-slate-600"
-          title="Pods now lives in the left sidebar"
+          title="Products — coming soon"
         >
-          Pods
+          Products
         </span>
 
         <span
           className="cursor-default text-amber-500/40 transition-all duration-300 hover:text-amber-300 hover:drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]"
-          title="Cosmic Clock — coming soon"
+          title="Pricing — coming soon"
         >
-          Cosmic Clock
+          Pricing
         </span>
 
         <span
           className="cursor-default text-slate-600"
-          title="Cosmic Vault now lives in the left sidebar"
+          title="About Us — coming soon"
         >
-          Cosmic Vault
+          About Us
         </span>
       </div>
 
