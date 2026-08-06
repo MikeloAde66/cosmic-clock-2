@@ -6,7 +6,8 @@ import LeftNav from '@/components/LeftNav';
 import CosmicCanvas from '@/components/CosmicCanvas';
 import FactChecker from '@/components/FactChecker';
 import PodsModule from '@/components/PodsModule';
-import LoreVault from '@/components/LoreVault';
+import CosmicVaultAuth from '@/components/CosmicVaultAuth';
+import AiOneHome from '@/components/AiOneHome';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<string>('clock');
@@ -21,7 +22,9 @@ useContextMenuShare();
         <div className="relative flex-1 overflow-hidden">
           {activeTab === 'clock' && <CosmicCanvas />}
 
-          {activeTab === 'vault' && <LoreVault />}
+          {activeTab === 'vault' && <CosmicVaultAuth />}
+
+          {activeTab === 'aione' && <AiOneHome />}
 
           {activeTab === 'fact-checker' && (
             <div className="w-full h-full p-6 overflow-auto">

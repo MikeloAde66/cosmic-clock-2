@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local archive of non-media files pulled out of public/assets (never web-servable, never committed)
+/_local-archive/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

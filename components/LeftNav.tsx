@@ -59,8 +59,12 @@ export default function LeftNav({ activeTab = 'clock', setActiveTab }: LeftNavPr
           </button>
 
           <button
-            className="flex items-center w-full px-3 py-2 space-x-2 border border-transparent rounded cursor-not-allowed text-neutral-500 opacity-70"
-            title="Ai-One Core Static"
+            onClick={() => handleNavClick('aione')}
+            className={`w-full flex items-center space-x-2 px-3 py-2 rounded transition-all cursor-pointer ${
+              activeTab === 'aione'
+                ? 'bg-neutral-900 text-amber-400 border border-amber-500/30'
+                : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border border-transparent'
+            }`}
           >
             <span>💡</span>
             <span>Ai-One</span>
