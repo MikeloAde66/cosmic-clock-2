@@ -28,7 +28,7 @@ type PlaybackMode = 'autoplay' | 'random' | 'loop';
 const DEFAULT_PLAYLISTS: Playlist[] = [
   { id: 'all', name: 'All Tracks', description: 'Master stream feed' },
   { id: 'pods', name: 'Pods', description: 'Main Podcast & Cosmic Lore Streams' },
-  { id: 'main-playlist', name: 'Main Playlist', description: 'User Custom Media & Audio' },
+  { id: 'main-playlist', name: 'Playlist', description: 'User Custom Media & Audio' },
 ];
 
 const INITIAL_TRACKS: Track[] = [
@@ -128,6 +128,9 @@ export default function PodsModule() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('');
+  const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
+  const [addPlaylistUrl, setAddPlaylistUrl] = useState('');
+  const [isImportingPlaylist, setIsImportingPlaylist] = useState(false);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -465,6 +468,62 @@ export default function PodsModule() {
     setShowCreateModal(false);
   };
 
+  // Parse a pasted YouTube video/playlist URL (or direct media link) into a new Playlist track,
+  // fetching the real title via YouTube's public oEmbed endpoint (no API key required).
+  const handleImportPlaylistUrl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const url = addPlaylistUrl.trim();
+    if (!url) return;
+    setIsImportingPlaylist(true);
+
+    let embedUrl = '';
+    const isPlaylistOnly = url.includes('list=') && !url.includes('watch?v=') && !url.includes('youtu.be/');
+    if (isPlaylistOnly) {
+      const listId = url.split('list=')[1]?.split('&')[0];
+      embedUrl = `https://www.youtube.com/embed/videoseries?list=${listId}`;
+    } else if (url.includes('watch?v=')) {
+      const videoId = url.split('v=')[1]?.split('&')[0];
+      embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    } else if (url.includes('youtu.be/')) {
+      const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+      embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    } else {
+      embedUrl = url;
+    }
+
+    let title = isPlaylistOnly ? 'YouTube Playlist' : 'Imported Media';
+    let description = url;
+    try {
+      const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.title) title = data.title;
+        if (data.author_name) description = data.author_name;
+      }
+    } catch {
+      // oEmbed can fail for playlist-only URLs or network issues — keep the fallback label
+    }
+
+    const newTrack: Track = {
+      id: `playlist-${Date.now()}`,
+      title,
+      frequency: isPlaylistOnly ? 'YouTube Playlist' : 'YouTube Video',
+      description,
+      src: '',
+      embedUrl,
+      watchUrl: url,
+      playlistId: 'main-playlist',
+      contentToRead: `### ${title}\n\nImported from: ${url}`,
+    };
+
+    setTracks((prev) => [newTrack, ...prev]);
+    setActivePlaylistId('main-playlist');
+    selectTrack(newTrack);
+    setAddPlaylistUrl('');
+    setIsImportingPlaylist(false);
+    setShowAddPlaylistModal(false);
+  };
+
   const handleDeletePlaylist = (idToDelete: string) => {
     if (['all', 'pods', 'main-playlist'].includes(idToDelete)) return;
 
@@ -584,17 +643,28 @@ export default function PodsModule() {
       <div className="flex items-center justify-between pb-2 border-b border-slate-800">
         <div className="flex gap-2 overflow-x-auto">
           {playlists.map((pl) => (
-            <button
-              key={pl.id}
-              onClick={() => setActivePlaylistId(pl.id)}
-              className={`px-4 py-2 rounded-lg text-xs font-mono transition whitespace-nowrap ${
-                activePlaylistId === pl.id
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
-                  : 'bg-slate-900/60 text-slate-400 border border-slate-800 hover:border-slate-700'
-              }`}
-            >
-              {pl.name}
-            </button>
+            <div key={pl.id} className="flex items-center gap-1">
+              <button
+                onClick={() => setActivePlaylistId(pl.id)}
+                className={`px-4 py-2 rounded-lg text-xs font-mono transition whitespace-nowrap ${
+                  activePlaylistId === pl.id
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
+                    : 'bg-slate-900/60 text-slate-400 border border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                {pl.name}
+              </button>
+
+              {pl.id === 'main-playlist' && (
+                <button
+                  onClick={() => setShowAddPlaylistModal(true)}
+                  title="Add a YouTube video or playlist link"
+                  className="flex items-center justify-center w-6 h-6 font-bold transition border rounded-lg bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+                >
+                  +
+                </button>
+              )}
+            </div>
           ))}
         </div>
 
@@ -769,7 +839,7 @@ export default function PodsModule() {
 
         {/* Right Column: Camera & Reader */}
         <div className="flex flex-col space-y-4 lg:col-span-7">
-          {activePlaylistId === 'pods' && (
+          {(
             <div className="p-4 space-y-3 border bg-slate-950 border-amber-500/30 rounded-xl">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 font-mono text-xs tracking-wider uppercase text-amber-400">
@@ -905,6 +975,41 @@ export default function PodsModule() {
           </div>
         </div>
       </div>
+
+      {/* Modal: Add YouTube Video/Playlist to Playlist */}
+      {showAddPlaylistModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <form onSubmit={handleImportPlaylistUrl} className="w-full max-w-md p-6 space-y-4 border shadow-2xl bg-slate-900 border-amber-500/40 rounded-xl">
+            <h3 className="text-lg font-bold text-amber-400">Add Media / YouTube Playlist</h3>
+            <p className="text-xs text-slate-400">Paste a YouTube video or playlist link to add it to your Playlist.</p>
+            <input
+              type="url"
+              placeholder="Paste YouTube video or playlist URL..."
+              value={addPlaylistUrl}
+              onChange={(e) => setAddPlaylistUrl(e.target.value)}
+              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-amber-500"
+              autoFocus
+              required
+            />
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAddPlaylistModal(false)}
+                className="px-4 py-2 font-mono text-xs text-slate-400 hover:text-slate-200"
+              >
+                CANCEL
+              </button>
+              <button
+                type="submit"
+                disabled={isImportingPlaylist}
+                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-amber-500 text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+              >
+                {isImportingPlaylist ? 'IMPORTING…' : 'IMPORT'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Modal: Create Playlist */}
       {showCreateModal && (
