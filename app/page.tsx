@@ -18,7 +18,7 @@ useContextMenuShare();
       <LeftNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <div className="flex flex-col flex-1 overflow-hidden">
-        <TopHeader setActiveTab={setActiveTab} />
+        <TopHeader />
 
         <div className="relative flex-1 overflow-hidden">
           {activeTab === 'radio' && <RadioStreams />}

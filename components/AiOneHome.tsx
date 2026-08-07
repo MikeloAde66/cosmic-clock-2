@@ -1,11 +1,29 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import CosmicCanvas from './CosmicCanvas';
 import SignUpModal from './SignUpModal';
+import { supabase } from '@/lib/supabase';
 
 export default function AiOneHome() {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
+
+  useEffect(() => {
+    // Supabase's default email template sends a magic link, not a 6-digit
+    // code — clicking it authenticates silently via a URL token rather than
+    // going through the in-app "enter code" step. Catch that here so
+    // onboarding (terms/profile) still continues instead of leaving the
+    // user stranded on a closed modal despite being signed in.
+    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+      // Log In uses the same passwordless mechanism as Sign Up, so this
+      // fires for both — only pop the Sign Up onboarding (terms/profile)
+      // when the sign-in was actually initiated from Sign Up.
+      if (event === 'SIGNED_IN' && localStorage.getItem('cosmic_auth_intent') === 'signup') {
+        setIsSignUpOpen(true);
+      }
+    });
+    return () => subscription.subscription.unsubscribe();
+  }, []);
 
   return (
     <div className="w-full h-full overflow-y-auto bg-[#070b14] text-slate-100 flex flex-col font-sans">

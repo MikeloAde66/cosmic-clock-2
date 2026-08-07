@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -20,6 +20,20 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
   const [preferences, setPreferences] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    // If we got here because a magic-link click already authenticated the
+    // user (no code was ever typed in), skip straight past the dead
+    // email/code steps into terms instead of showing a code box no one can
+    // fill in.
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session && (step === 'email' || step === 'code')) {
+        setStep('terms');
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -42,6 +56,7 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
     if (!email.trim()) return;
     setLoading(true);
     setError('');
+    localStorage.setItem('cosmic_auth_intent', 'signup');
     const { error: sendError } = await supabase.auth.signInWithOtp({ email: email.trim() });
     setLoading(false);
     if (sendError) {
@@ -94,7 +109,9 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
         {step === 'email' && (
           <form onSubmit={sendCode} className="space-y-4">
             <h3 className="text-lg font-bold text-amber-400 tracking-wider">CREATE ACCOUNT</h3>
-            <p className="text-xs text-slate-400">Enter your email address to receive a verification code.</p>
+            <p className="text-xs text-slate-400">
+              Enter your email address to receive a sign-in link (or code, depending on your account settings).
+            </p>
             <input
               type="email"
               required

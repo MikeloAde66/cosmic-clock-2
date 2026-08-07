@@ -3,13 +3,11 @@
 import React, { useState } from 'react';
 import SearchMaster from './SearchMaster';
 import ISSFeedModal from './ISSFeedModal';
+import LoginModal from './LoginModal';
 
-interface TopHeaderProps {
-  setActiveTab?: (tab: string) => void;
-}
-
-export default function TopHeader({ setActiveTab }: TopHeaderProps) {
+export default function TopHeader() {
   const [isIssOpen, setIsIssOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   return (
     <>
@@ -23,22 +21,15 @@ export default function TopHeader({ setActiveTab }: TopHeaderProps) {
           <span>LIVE ISS</span>
         </button>
 
-        {/* Right Side: Fact Checker + SearchBar + Auth Controls */}
+        {/* Right Side: SearchBar + Auth Controls */}
         <div className="flex items-center space-x-2">
-          {/* Fact Checker Button — navigates to the real Fact Checker page */}
-          <button
-            onClick={() => setActiveTab?.('fact-checker')}
-            className="flex items-center space-x-1.5 bg-neutral-900 border border-amber-500/40 hover:border-amber-500 px-2.5 py-1 rounded text-xs text-amber-400 font-mono transition-all cursor-pointer"
-            title="Verify storyline / Fact Check"
-          >
-            <span>💡</span>
-            <span className="hidden sm:inline">FACT CHECK</span>
-          </button>
-
           {/* Search Bar */}
           <SearchMaster />
 
-          <button className="px-3 py-1 ml-1 text-xs border rounded bg-neutral-900 border-neutral-700 hover:border-amber-500 text-neutral-300">
+          <button
+            onClick={() => setIsLoginOpen(true)}
+            className="px-3 py-1 ml-1 text-xs border rounded bg-neutral-900 border-neutral-700 hover:border-amber-500 text-neutral-300"
+          >
             Log In
           </button>
           <button className="px-3 py-1 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-neutral-950">
@@ -49,6 +40,9 @@ export default function TopHeader({ setActiveTab }: TopHeaderProps) {
 
       {/* ISS Stream Modal */}
       <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
+
+      {/* Log In Modal */}
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
     </>
   );
 }
