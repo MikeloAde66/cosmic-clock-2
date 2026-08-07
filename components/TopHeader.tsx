@@ -3,11 +3,13 @@
 import React, { useState } from 'react';
 import SearchMaster from './SearchMaster';
 import ISSFeedModal from './ISSFeedModal';
-import FactCheckerModal from './FactCheckerModal'; // Or inline trigger modal
 
-export default function TopHeader() {
+interface TopHeaderProps {
+  setActiveTab?: (tab: string) => void;
+}
+
+export default function TopHeader({ setActiveTab }: TopHeaderProps) {
   const [isIssOpen, setIsIssOpen] = useState(false);
-  const [isFactCheckerOpen, setIsFactCheckerOpen] = useState(false);
 
   return (
     <>
@@ -23,9 +25,9 @@ export default function TopHeader() {
 
         {/* Right Side: Fact Checker + SearchBar + Auth Controls */}
         <div className="flex items-center space-x-2">
-          {/* Fact Checker Button placed right next to Search */}
+          {/* Fact Checker Button — navigates to the real Fact Checker page */}
           <button
-            onClick={() => setIsFactCheckerOpen(true)}
+            onClick={() => setActiveTab?.('fact-checker')}
             className="flex items-center space-x-1.5 bg-neutral-900 border border-amber-500/40 hover:border-amber-500 px-2.5 py-1 rounded text-xs text-amber-400 font-mono transition-all cursor-pointer"
             title="Verify storyline / Fact Check"
           >
@@ -47,38 +49,6 @@ export default function TopHeader() {
 
       {/* ISS Stream Modal */}
       <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
-
-      {/* Fact Checker Modal / Popup */}
-      {isFactCheckerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-xl p-6 border rounded-lg shadow-2xl bg-neutral-900 border-neutral-800">
-            <button
-              onClick={() => setIsFactCheckerOpen(false)}
-              className="absolute font-mono text-sm top-4 right-4 text-neutral-400 hover:text-neutral-100"
-            >
-              ✕
-            </button>
-            
-            <h2 className="mb-2 font-mono text-lg tracking-wider text-center text-amber-400">
-              COSMIC FACT CHECKER
-            </h2>
-            <p className="mb-4 text-xs text-center text-neutral-400">
-              Cross-referencing historical epochs, astronomical datasets, and natural frequency harmonics.
-            </p>
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Ask a cosmic question or query ingested archives..."
-                className="flex-1 px-3 py-2 text-xs border rounded bg-neutral-950 border-neutral-800 text-neutral-200 focus:outline-none focus:border-amber-500"
-              />
-              <button className="px-4 py-2 font-mono text-xs font-bold rounded bg-amber-500 hover:bg-amber-400 text-neutral-950">
-                VERIFY
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

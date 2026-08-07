@@ -8,6 +8,7 @@ import PodsModule from '@/components/PodsModule';
 import CosmicVaultAuth from '@/components/CosmicVaultAuth';
 import AiOneHome from '@/components/AiOneHome';
 import RadioStreams from '@/components/RadioStreams';
+import SiteFooter from '@/components/SiteFooter';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<string>('aione');
@@ -17,7 +18,7 @@ useContextMenuShare();
       <LeftNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <div className="flex flex-col flex-1 overflow-hidden">
-        <TopHeader />
+        <TopHeader setActiveTab={setActiveTab} />
 
         <div className="relative flex-1 overflow-hidden">
           {activeTab === 'radio' && <RadioStreams />}
@@ -34,6 +35,8 @@ useContextMenuShare();
 
           {activeTab === 'pods' && <PodsModule />}
         </div>
+
+        <SiteFooter />
       </div>
     </main>
   );

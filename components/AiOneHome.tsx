@@ -1,9 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import CosmicCanvas from './CosmicCanvas';
+import SignUpModal from './SignUpModal';
 
 export default function AiOneHome() {
+  const [isSignUpOpen, setIsSignUpOpen] = useState(false);
+
   return (
     <div className="w-full h-full overflow-y-auto bg-[#070b14] text-slate-100 flex flex-col font-sans">
 
@@ -38,13 +41,15 @@ export default function AiOneHome() {
           Pricing
         </span>
 
-        <span
-          className="cursor-default text-slate-600"
-          title="About Us — coming soon"
+        <button
+          onClick={() => setIsSignUpOpen(true)}
+          className="text-amber-400 hover:text-amber-300 font-bold border-b border-amber-400 pb-0.5 transition-colors"
         >
-          About Us
-        </span>
+          Sign Up
+        </button>
       </div>
+
+      <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} />
 
       {/* MAIN CONTENT VIEW: Cosmic Clock centerpiece, replacing the old video monitor */}
       <div className="flex-1 w-full max-w-6xl px-6 py-10 mx-auto">
