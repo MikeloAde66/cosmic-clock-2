@@ -136,6 +136,10 @@ export default function PodsModule() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Skips the auto-save effect's own first invocation on mount, since at that
+  // point it would still see default state — the restore effect's setTracks/
+  // setPlaylists calls haven't applied to a render yet, only been queued.
+  const isFirstAutoSaveRef = useRef(true);
 
   // File Processing
   const processAudioFiles = (files: FileList | File[]) => {
@@ -248,6 +252,13 @@ export default function PodsModule() {
   };
 
   useEffect(() => {
+    // Skip the first pass — at mount time this still sees default state,
+    // since the restore effect's setTracks/setPlaylists calls above are only
+    // queued, not yet applied to a render, when this first runs.
+    if (isFirstAutoSaveRef.current) {
+      isFirstAutoSaveRef.current = false;
+      return;
+    }
     const storableTracks = tracks.filter(t => !t.isLocal);
     localStorage.setItem('aione_playlists_v2', JSON.stringify(playlists));
     localStorage.setItem('aione_tracks_v2', JSON.stringify(storableTracks));
@@ -450,6 +461,42 @@ export default function PodsModule() {
     const currentIndex = filteredTracks.findIndex(t => t.id === activeTrack?.id);
     selectTrack(filteredTracks[(currentIndex - 1 + filteredTracks.length) % filteredTracks.length]);
   };
+
+  // Bluetooth / lock-screen media controls (Web MediaSession API).
+  // Only applies to real <audio> playback — video tracks play inside a
+  // cross-origin YouTube iframe, which handles its own Bluetooth/lock-screen
+  // integration natively; we can't and shouldn't override that from here.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+
+    if (!activeTrack || activeTrack.embedUrl) {
+      navigator.mediaSession.metadata = null;
+      return;
+    }
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: activeTrack.title,
+      artist: activeTrack.frequency,
+      album: 'AIONE Cosmic HUD — Pods',
+    });
+
+    navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
+    navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
+    navigator.mediaSession.setActionHandler('previoustrack', handlePrevTrack);
+    navigator.mediaSession.setActionHandler('nexttrack', handleNextTrack);
+
+    return () => {
+      navigator.mediaSession.setActionHandler('play', null);
+      navigator.mediaSession.setActionHandler('pause', null);
+      navigator.mediaSession.setActionHandler('previoustrack', null);
+      navigator.mediaSession.setActionHandler('nexttrack', null);
+    };
+  }, [activeTrack, handlePrevTrack, handleNextTrack]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator) || activeTrack?.embedUrl) return;
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [isPlaying, activeTrack]);
 
   const handleCreatePlaylist = (e: React.FormEvent) => {
     e.preventDefault();
@@ -656,13 +703,22 @@ export default function PodsModule() {
               </button>
 
               {pl.id === 'main-playlist' && (
-                <button
-                  onClick={() => setShowAddPlaylistModal(true)}
-                  title="Add a YouTube video or playlist link"
-                  className="flex items-center justify-center w-6 h-6 font-bold transition border rounded-lg bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
-                >
-                  +
-                </button>
+                <>
+                  <button
+                    onClick={() => setShowAddPlaylistModal(true)}
+                    title="Add a YouTube video or playlist link"
+                    className="flex items-center justify-center w-6 h-6 font-bold transition border rounded-lg bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={triggerSave}
+                    title="Save Playlist"
+                    className="flex items-center justify-center w-6 h-6 text-xs transition border rounded-lg bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+                  >
+                    💾
+                  </button>
+                </>
               )}
             </div>
           ))}
