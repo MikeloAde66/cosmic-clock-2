@@ -19,10 +19,17 @@ export default function AiOneChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    // Bring the input into view on mount — the popup card can be taller than
+    // short/narrow browser windows, and the input sits near its bottom.
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,12 +77,12 @@ export default function AiOneChat() {
   };
 
   return (
-    <div className="flex flex-col h-80">
+    <div className="flex flex-col h-full min-h-[220px]">
       <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto pr-1">
         {messages.map((m, idx) => (
           <div
             key={idx}
-            className={`text-xs font-mono leading-relaxed ${
+            className={`text-[11px] font-mono leading-relaxed break-words ${
               m.role === 'user' ? 'text-slate-300' : 'text-[#e6ca65]'
             }`}
           >
@@ -91,7 +98,7 @@ export default function AiOneChat() {
         {error && <p className="text-[10px] font-mono text-red-400">{error}</p>}
       </div>
 
-      <form onSubmit={sendMessage} className="flex gap-1.5 pt-2 mt-2 border-t border-slate-800">
+      <form ref={formRef} onSubmit={sendMessage} className="flex gap-1.5 pt-2 mt-2 border-t border-slate-800">
         <input
           type="text"
           value={input}

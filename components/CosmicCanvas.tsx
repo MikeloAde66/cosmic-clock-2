@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { CloudSun, Compass } from 'lucide-react';
+import { ArrowLeft, CloudSun, Compass } from 'lucide-react';
 import NoaaWidget from './NoaaWidget';
 import AiOneChat from './AiOneChat';
 
@@ -48,8 +48,20 @@ function useRealTimeEarthRotation() {
   return offsetPercent;
 }
 
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+    >
+      <ArrowLeft className="w-3.5 h-3.5" />
+      Back
+    </button>
+  );
+}
+
 export default function CosmicCanvas() {
-  const [activeModal, setActiveModal] = useState<'weather' | 'kali' | null>(null);
+  const [activeView, setActiveView] = useState<'clock' | 'weather' | 'kali'>('clock');
   const earthOffsetPercent = useRealTimeEarthRotation();
 
   return (
@@ -72,115 +84,123 @@ export default function CosmicCanvas() {
         ))}
       </div>
 
-      {/* Compact HUD toggle buttons — weather & epoch, collapsed by default so the center stays open */}
-      <div className="absolute z-30 flex items-center gap-2 top-4 left-4">
-        <button
-          onClick={() => setActiveModal(activeModal === 'weather' ? null : 'weather')}
-          className={`flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition ${
-            activeModal === 'weather'
-              ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
-              : 'bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10'
-          }`}
-        >
-          <CloudSun className="w-3.5 h-3.5" />
-          Weather
-        </button>
+      {activeView === 'clock' && (
+        <>
+          {/* Compact HUD toggle buttons — weather & epoch, each opens its own full section */}
+          <div className="absolute z-30 flex items-center gap-2 top-4 left-4">
+            <button
+              onClick={() => setActiveView('weather')}
+              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+            >
+              <CloudSun className="w-3.5 h-3.5" />
+              Weather
+            </button>
 
-        <button
-          onClick={() => setActiveModal(activeModal === 'kali' ? null : 'kali')}
-          className={`flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition ${
-            activeModal === 'kali'
-              ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
-              : 'bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10'
-          }`}
-        >
-          <Compass className="w-3.5 h-3.5" />
-          Kali Yuga
-        </button>
-      </div>
+            <button
+              onClick={() => setActiveView('kali')}
+              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+            >
+              <Compass className="w-3.5 h-3.5" />
+              Kali Yuga
+            </button>
+          </div>
 
-      {/* Weather Popup — reuses the real NoaaWidget (address lookup included) */}
-      {activeModal === 'weather' && (
-        <div className="absolute z-40 w-80 top-14 left-4">
-          <NoaaWidget />
-        </div>
+          {/* Expanded center: live SVG/CSS Earth-axis animation */}
+          <main className="relative flex items-center justify-center flex-1 p-6">
+            <div className="relative w-full max-w-[480px] aspect-square flex items-center justify-center">
+
+              {/* Tilted Axial Assembly (23.4° Earth axis) */}
+              <div className="absolute inset-0 flex items-center justify-center transform -rotate-[23.4deg]">
+                {/* Precession Wobble Ring */}
+                <div className="absolute top-[8%] w-[45%] h-[10%] border border-dashed rounded-full border-white/70 animate-[spin_26s_linear_infinite]" />
+
+                {/* Earth Rotational Axis Vector */}
+                <div className="absolute w-[1px] h-[96%] bg-gradient-to-b from-red-500 via-white/80 to-red-500 shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
+
+                {/* Rotating Earth: real NASA Blue Marble photo (public domain),
+                    panned at the true 24-hour rotation rate computed from real
+                    time above — not a drawn approximation, not a fast decorative
+                    spin. */}
+                <div className="relative z-10 w-[62%] aspect-square rounded-full overflow-hidden shadow-[inset_0_0_35px_rgba(0,0,0,0.9),0_0_20px_rgba(255,255,255,0.15)]">
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backgroundImage: 'url(/earth/blue-marble.jpg)',
+                      backgroundSize: '200% 100%',
+                      backgroundRepeat: 'repeat-x',
+                      backgroundPositionX: `${earthOffsetPercent}%`,
+                    }}
+                  />
+                  {/* Subtle spherical shading */}
+                  <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_35%_35%,transparent_35%,rgba(0,0,0,0.55)_100%)]" />
+                  {/* Day/night terminator */}
+                  <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-black/35 to-black/85" />
+                </div>
+              </div>
+
+              {/* Counter-Rotating Outer Rings */}
+              <div className="absolute inset-0 border border-dashed rounded-full border-white/20 animate-[spin_40s_linear_infinite]">
+                <svg className="w-full h-full transform -rotate-45" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="48" fill="none" stroke="#ffffff" strokeWidth="0.3" strokeDasharray="10 80" strokeLinecap="round" />
+                </svg>
+              </div>
+
+              <div className="absolute rounded-full inset-[8%] border border-white/10 animate-[spin_28s_linear_infinite_reverse]">
+                <svg className="w-full h-full" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="44" fill="none" stroke="#ffffff" strokeWidth="0.4" strokeDasharray="15 65" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Sweeping horizon vector, anchored to the bottom of the canvas */}
+            <div className="absolute inset-x-0 bottom-0 h-8 overflow-hidden pointer-events-none">
+              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] bg-slate-900" />
+              <div className="absolute top-1/2 -translate-y-1/2 h-[2px] w-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent shadow-[0_0_6px_rgba(255,255,255,0.15)] animate-[sweepEast_9s_linear_infinite]" />
+            </div>
+          </main>
+        </>
       )}
 
-      {/* Kali Yuga Popup — epoch readout on top, Ai One chat below */}
-      {activeModal === 'kali' && (
-        <div className="absolute z-40 w-96 p-4 border rounded-lg shadow-2xl top-14 left-4 border-slate-800 bg-slate-950/95 backdrop-blur-md">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono tracking-widest text-amber-500/80 uppercase">
-              Current Epoch
-            </span>
-            <button onClick={() => setActiveModal(null)} className="text-slate-500 hover:text-slate-200">✕</button>
+      {/* Weather — takes over the whole section, reuses the real NoaaWidget */}
+      {activeView === 'weather' && (
+        <div className="relative z-30 flex flex-col w-full h-full p-6">
+          <div className="shrink-0 mb-4">
+            <BackButton onClick={() => setActiveView('clock')} />
           </div>
-          <h2 className="text-2xl font-bold tracking-wider text-[#d4af37]">KALI YUGA</h2>
-          <p className="text-xs font-mono text-[#e6ca65] mt-1">YEAR 5,128 / 432,000</p>
-          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[#2a2a30]">
-            <div className="h-full w-[1.18%] bg-[#d4af37]" />
-          </div>
-          <span className="mt-1 block text-[9px] font-mono text-slate-500">PROGRESS: 1.1870%</span>
-
-          <div className="pt-3 mt-3 border-t border-slate-800">
-            <AiOneChat />
-          </div>
-        </div>
-      )}
-
-      {/* Expanded center: live SVG/CSS Earth-axis animation */}
-      <main className="relative flex items-center justify-center flex-1 p-6">
-        <div className="relative w-full max-w-[480px] aspect-square flex items-center justify-center">
-
-          {/* Tilted Axial Assembly (23.4° Earth axis) */}
-          <div className="absolute inset-0 flex items-center justify-center transform -rotate-[23.4deg]">
-            {/* Precession Wobble Ring */}
-            <div className="absolute top-[8%] w-[45%] h-[10%] border border-dashed rounded-full border-white/70 animate-[spin_26s_linear_infinite]" />
-
-            {/* Earth Rotational Axis Vector */}
-            <div className="absolute w-[1px] h-[96%] bg-gradient-to-b from-red-500 via-white/80 to-red-500 shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
-
-            {/* Rotating Earth: real NASA Blue Marble photo (public domain),
-                panned at the true 24-hour rotation rate computed from real
-                time above — not a drawn approximation, not a fast decorative
-                spin. */}
-            <div className="relative z-10 w-[62%] aspect-square rounded-full overflow-hidden shadow-[inset_0_0_35px_rgba(0,0,0,0.9),0_0_20px_rgba(255,255,255,0.15)]">
-              <div
-                className="absolute inset-0"
-                style={{
-                  backgroundImage: 'url(/earth/blue-marble.jpg)',
-                  backgroundSize: '200% 100%',
-                  backgroundRepeat: 'repeat-x',
-                  backgroundPositionX: `${earthOffsetPercent}%`,
-                }}
-              />
-              {/* Subtle spherical shading */}
-              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_35%_35%,transparent_35%,rgba(0,0,0,0.55)_100%)]" />
-              {/* Day/night terminator */}
-              <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-black/35 to-black/85" />
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="max-w-md mx-auto">
+              <NoaaWidget />
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Counter-Rotating Outer Rings */}
-          <div className="absolute inset-0 border border-dashed rounded-full border-white/20 animate-[spin_40s_linear_infinite]">
-            <svg className="w-full h-full transform -rotate-45" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="48" fill="none" stroke="#ffffff" strokeWidth="0.3" strokeDasharray="10 80" strokeLinecap="round" />
-            </svg>
+      {/* Kali Yuga — takes over the whole section: epoch readout on top, Ai One chat filling the rest */}
+      {activeView === 'kali' && (
+        <div className="relative z-30 flex flex-col w-full h-full p-6">
+          <div className="shrink-0 mb-4">
+            <BackButton onClick={() => setActiveView('clock')} />
           </div>
 
-          <div className="absolute rounded-full inset-[8%] border border-white/10 animate-[spin_28s_linear_infinite_reverse]">
-            <svg className="w-full h-full" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="44" fill="none" stroke="#ffffff" strokeWidth="0.4" strokeDasharray="15 65" strokeLinecap="round" />
-            </svg>
+          <div className="flex flex-col flex-1 min-h-0 max-w-lg mx-auto w-full border rounded-lg shadow-2xl p-4 border-slate-800 bg-slate-950/95 backdrop-blur-md">
+            <div className="shrink-0">
+              <span className="text-[10px] font-mono tracking-widest text-amber-500/80 uppercase">
+                Current Epoch
+              </span>
+              <h2 className="text-2xl font-bold tracking-wider text-[#d4af37]">KALI YUGA</h2>
+              <p className="text-xs font-mono text-[#e6ca65] mt-1">YEAR 5,128 / 432,000</p>
+              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[#2a2a30]">
+                <div className="h-full w-[1.18%] bg-[#d4af37]" />
+              </div>
+              <span className="mt-1 block text-[9px] font-mono text-slate-500">PROGRESS: 1.1870%</span>
+            </div>
+
+            <div className="flex-1 min-h-0 pt-3 mt-3 border-t border-slate-800">
+              <AiOneChat />
+            </div>
           </div>
         </div>
-
-        {/* Sweeping horizon vector, anchored to the bottom of the canvas */}
-        <div className="absolute inset-x-0 bottom-0 h-8 overflow-hidden pointer-events-none">
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] bg-slate-900" />
-          <div className="absolute top-1/2 -translate-y-1/2 h-[2px] w-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent shadow-[0_0_6px_rgba(255,255,255,0.15)] animate-[sweepEast_9s_linear_infinite]" />
-        </div>
-      </main>
+      )}
 
       <style jsx>{`
         @keyframes sweepEast {
