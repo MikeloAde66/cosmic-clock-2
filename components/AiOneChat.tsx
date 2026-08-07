@@ -80,13 +80,12 @@ export default function AiOneChat() {
     <div className="flex flex-col h-full min-h-[220px]">
       <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto pr-1">
         {messages.map((m, idx) => (
-          <div
-            key={idx}
-            className={`text-[11px] font-mono leading-relaxed break-words ${
-              m.role === 'user' ? 'text-slate-300' : 'text-[#e6ca65]'
-            }`}
-          >
-            <span className="mr-1.5 text-[9px] uppercase tracking-wider text-slate-600">
+          <div key={idx} className="text-[11px] font-mono leading-relaxed break-words text-slate-100">
+            <span
+              className={`mr-1.5 text-[9px] uppercase tracking-wider font-bold ${
+                m.role === 'user' ? 'text-slate-500' : 'text-amber-400'
+              }`}
+            >
               {m.role === 'user' ? 'you' : 'ai one'}
             </span>
             {m.content}
@@ -105,7 +104,7 @@ export default function AiOneChat() {
           onChange={(e) => setInput(e.target.value)}
           placeholder="ASK AI ONE..."
           disabled={isStreaming}
-          className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-amber-300 placeholder-slate-600 outline-none focus:border-amber-500/60 disabled:opacity-50"
+          className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-amber-500/60 disabled:opacity-50"
         />
         <button
           type="submit"

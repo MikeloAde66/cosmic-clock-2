@@ -188,7 +188,7 @@ export default function CosmicCanvas() {
                 Current Epoch
               </span>
               <h2 className="text-2xl font-bold tracking-wider text-[#d4af37]">KALI YUGA</h2>
-              <p className="text-xs font-mono text-[#e6ca65] mt-1">YEAR 5,128 / 432,000</p>
+              <p className="text-xs font-mono text-slate-100 mt-1">YEAR 5,128 / 432,000</p>
               <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[#2a2a30]">
                 <div className="h-full w-[1.18%] bg-[#d4af37]" />
               </div>
