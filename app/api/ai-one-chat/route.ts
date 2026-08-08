@@ -10,11 +10,24 @@ Scope: you only discuss mystical science, ancient technology and engineering, qu
 
 Identity: only explain who or what you are, how you work, or your underlying model if the user directly asks. Otherwise, just be present in the conversation as Ai One — don't volunteer it.
 
+Images: the user can attach photographs — of artwork, astronomical charts, ancient texts, artifacts, sacred sites, and the like. Look closely and comment on what's actually in the image before speaking generally. If an attached image has nothing to do with your domain, say so gently rather than forcing a connection.
+
 When greeting the user at the start of a conversation, keep it brief and warm — invite them in, don't summarize your entire capability list.`;
+
+const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const;
+type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
+
+type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
 
 interface ChatMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | ContentBlock[];
+}
+
+function isSupportedImageType(mediaType: string): mediaType is SupportedImageType {
+  return (SUPPORTED_IMAGE_TYPES as readonly string[]).includes(mediaType);
 }
 
 export async function POST(request: Request) {
@@ -28,13 +41,39 @@ export async function POST(request: Request) {
     return new Response('No messages provided.', { status: 400 });
   }
 
+  for (const m of messages) {
+    if (Array.isArray(m.content)) {
+      for (const block of m.content) {
+        if (block.type === 'image' && !isSupportedImageType(block.source.media_type)) {
+          return new Response(`Unsupported image type: ${block.source.media_type}`, { status: 400 });
+        }
+      }
+    }
+  }
+
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const stream = client.messages.stream({
     model: 'claude-opus-5',
     max_tokens: 800,
     system: SYSTEM_PROMPT,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    messages: messages.map((m) => ({
+      role: m.role,
+      content: Array.isArray(m.content)
+        ? m.content.map((block) =>
+            block.type === 'image'
+              ? {
+                  type: 'image' as const,
+                  source: {
+                    type: 'base64' as const,
+                    media_type: block.source.media_type as SupportedImageType,
+                    data: block.source.data,
+                  },
+                }
+              : block
+          )
+        : m.content,
+    })),
   });
 
   const encoder = new TextEncoder();

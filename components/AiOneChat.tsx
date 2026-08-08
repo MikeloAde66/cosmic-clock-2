@@ -1,10 +1,16 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { Mic, MicOff, Plus, X } from 'lucide-react';
+import { useSpeechToText } from './useSpeechToText';
+
+type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
 
 interface ChatMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | ContentBlock[];
 }
 
 const GREETING: ChatMessage = {
@@ -13,13 +19,43 @@ const GREETING: ChatMessage = {
     "Welcome. I'm Ai One — I keep company with ancient technology, quantum physics, and the mysteries stitched between them. Ask me what's on your mind.",
 };
 
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB — a sane guard before base64 inflation
+
+function messageText(content: string | ContentBlock[]): string {
+  if (typeof content === 'string') return content;
+  const textBlock = content.find((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text');
+  return textBlock?.text ?? '';
+}
+
+function messageImages(content: string | ContentBlock[]): string[] {
+  if (typeof content === 'string') return [];
+  return content
+    .filter((b): b is Extract<ContentBlock, { type: 'image' }> => b.type === 'image')
+    .map((b) => `data:${b.source.media_type};base64,${b.source.data}`);
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '');
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function AiOneChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
   const [input, setInput] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const { isListening, toggleListening, hasSupport } = useSpeechToText((transcript) => {
+    setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+  });
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -31,15 +67,43 @@ export default function AiOneChat() {
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, []);
 
-  const sendMessage = async (e: React.FormEvent) => {
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    const oversized = files.find((f) => f.size > MAX_IMAGE_BYTES);
+    setError(oversized ? `${oversized.name.toUpperCase()} IS TOO LARGE (5MB MAX).` : '');
+    setAttachedFiles((prev) => [...prev, ...files.filter((f) => f.size <= MAX_IMAGE_BYTES)]);
+    e.target.value = ''; // allow re-selecting the same file later
+  };
+
+  const removeFile = (idx: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text || isStreaming) return;
+    if ((!text && attachedFiles.length === 0) || isStreaming) return;
 
     setError('');
-    const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: text }];
+
+    const imageBlocks: ContentBlock[] = await Promise.all(
+      attachedFiles.map(async (file) => ({
+        type: 'image' as const,
+        source: {
+          type: 'base64' as const,
+          media_type: file.type || 'image/png',
+          data: await fileToBase64(file),
+        },
+      }))
+    );
+
+    const userContent: string | ContentBlock[] =
+      imageBlocks.length > 0 ? [...imageBlocks, { type: 'text', text: text || 'What do you see here?' }] : text;
+
+    const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: userContent }];
     setMessages([...nextMessages, { role: 'assistant', content: '' }]);
     setInput('');
+    setAttachedFiles([]);
     setIsStreaming(true);
 
     try {
@@ -64,7 +128,8 @@ export default function AiOneChat() {
         setMessages((prev) => {
           const updated = [...prev];
           const last = updated[updated.length - 1];
-          updated[updated.length - 1] = { ...last, content: last.content + chunk };
+          const lastText = typeof last.content === 'string' ? last.content : '';
+          updated[updated.length - 1] = { ...last, content: lastText + chunk };
           return updated;
         });
       }
@@ -79,36 +144,95 @@ export default function AiOneChat() {
   return (
     <div className="flex flex-col h-full min-h-[220px]">
       <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto pr-1">
-        {messages.map((m, idx) => (
-          <div key={idx} className="text-[11px] font-mono leading-relaxed break-words text-slate-100">
-            <span
-              className={`mr-1.5 text-[9px] uppercase tracking-wider font-bold ${
-                m.role === 'user' ? 'text-slate-500' : 'text-white'
-              }`}
-            >
-              {m.role === 'user' ? 'you' : 'ai one'}
-            </span>
-            {m.content}
-            {m.role === 'assistant' && idx === messages.length - 1 && isStreaming && (
-              <span className="text-white animate-pulse">▋</span>
-            )}
-          </div>
-        ))}
+        {messages.map((m, idx) => {
+          const text = messageText(m.content);
+          const images = messageImages(m.content);
+          return (
+            <div key={idx} className="text-[11px] font-mono leading-relaxed break-words text-slate-100">
+              <span
+                className={`mr-1.5 text-[9px] uppercase tracking-wider font-bold ${
+                  m.role === 'user' ? 'text-slate-500' : 'text-white'
+                }`}
+              >
+                {m.role === 'user' ? 'you' : 'ai one'}
+              </span>
+              {images.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1 mb-1">
+                  {images.map((src, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={i}
+                      src={src}
+                      alt="Attached to message"
+                      className="object-cover w-16 h-16 border rounded border-slate-800"
+                    />
+                  ))}
+                </div>
+              )}
+              {text}
+              {m.role === 'assistant' && idx === messages.length - 1 && isStreaming && (
+                <span className="text-white animate-pulse">▋</span>
+              )}
+            </div>
+          );
+        })}
         {error && <p className="text-[10px] font-mono text-red-400">{error}</p>}
       </div>
 
+      {attachedFiles.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-2">
+          {attachedFiles.map((file, idx) => (
+            <div
+              key={idx}
+              className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono border rounded bg-slate-900 border-slate-800 text-slate-300"
+            >
+              <span className="truncate max-w-[100px]">{file.name}</span>
+              <button type="button" onClick={() => removeFile(idx)} className="hover:text-red-400">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <form ref={formRef} onSubmit={sendMessage} className="flex gap-1.5 pt-2 mt-2 border-t border-slate-800">
+        <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/*" className="hidden" />
+
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          title="Attach an image"
+          className="flex items-center justify-center w-8 h-8 transition rounded shrink-0 text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+
+        {hasSupport && (
+          <button
+            type="button"
+            onClick={toggleListening}
+            title={isListening ? 'Stop voice input' : 'Voice input'}
+            className={`flex items-center justify-center w-8 h-8 shrink-0 rounded transition ${
+              isListening
+                ? 'bg-red-500/20 text-red-400 animate-pulse border border-red-500/40'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+        )}
+
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="ASK AI ONE..."
+          placeholder={isListening ? 'LISTENING…' : 'ASK AI ONE...'}
           disabled={isStreaming}
           className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-white/50 disabled:opacity-50"
         />
         <button
           type="submit"
-          disabled={isStreaming || !input.trim()}
+          disabled={isStreaming || (!input.trim() && attachedFiles.length === 0)}
           className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-white text-black hover:bg-neutral-200 disabled:opacity-50 whitespace-nowrap"
         >
           {isStreaming ? '…' : 'Send'}
