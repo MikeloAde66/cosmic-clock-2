@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import SearchMaster from './SearchMaster';
 
 interface RadioStation {
   id: string;
@@ -170,9 +171,12 @@ export default function RadioStreams() {
       />
 
       <div className="max-w-5xl mx-auto space-y-4">
-        <h2 className="text-sm font-mono font-bold tracking-widest text-amber-500 uppercase">
-          Radio
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-mono font-bold tracking-widest text-amber-500 uppercase">
+            Radio
+          </h2>
+          <SearchMaster />
+        </div>
 
         <div className="flex gap-2 pb-2 overflow-x-auto border-b border-slate-800">
           {CATEGORIES.map((cat) => (

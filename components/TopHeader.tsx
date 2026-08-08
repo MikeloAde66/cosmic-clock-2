@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import SearchMaster from './SearchMaster';
 import ISSFeedModal from './ISSFeedModal';
 import LoginModal from './LoginModal';
 
@@ -21,11 +20,8 @@ export default function TopHeader() {
           <span>LIVE ISS</span>
         </button>
 
-        {/* Right Side: SearchBar + Auth Controls */}
+        {/* Right Side: Auth Controls (search now lives on the Radio page only) */}
         <div className="flex items-center space-x-2">
-          {/* Search Bar */}
-          <SearchMaster />
-
           <button
             onClick={() => setIsLoginOpen(true)}
             className="px-3 py-1 ml-1 text-xs border rounded bg-neutral-900 border-neutral-700 hover:border-amber-500 text-neutral-300"
@@ -34,6 +30,13 @@ export default function TopHeader() {
           </button>
           <button className="px-3 py-1 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-neutral-950">
             Share
+          </button>
+          <button
+            onClick={() => setIsLoginOpen(true)}
+            title="Account Profile"
+            className="flex items-center justify-center w-8 h-8 text-xs font-semibold text-white transition border rounded-full bg-neutral-800 border-neutral-700 hover:border-neutral-500"
+          >
+            CC
           </button>
         </div>
       </header>

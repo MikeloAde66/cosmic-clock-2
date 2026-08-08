@@ -34,8 +34,8 @@ export default function AiOneHome() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-transparent to-[#070b14]/70" />
 
         <div className="relative z-10 px-4 space-y-2 text-center">
-          <h1 className="text-5xl md:text-6xl font-black tracking-wider text-amber-400 drop-shadow-[0_0_25px_rgba(245,158,11,0.4)]">
-            AI ONE
+          <h1 className="text-5xl md:text-6xl font-black tracking-wider text-white">
+            Ai One
           </h1>
           <p className="font-mono text-xs tracking-widest uppercase md:text-sm text-slate-300">
             Cosmic Creation & Broadcast Hub

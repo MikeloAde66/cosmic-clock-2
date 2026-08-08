@@ -38,7 +38,7 @@ export default function LeftNav({ activeTab = 'aione', setActiveTab }: LeftNavPr
             onClick={() => handleNavClick('aione')}
             className={`w-full flex items-center space-x-2 px-3 py-2 rounded transition-all cursor-pointer ${
               activeTab === 'aione'
-                ? 'bg-neutral-900 text-amber-400 border border-amber-500/30'
+                ? 'bg-neutral-900 text-white border border-amber-500/30'
                 : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border border-transparent'
             }`}
           >
@@ -50,7 +50,7 @@ export default function LeftNav({ activeTab = 'aione', setActiveTab }: LeftNavPr
             onClick={() => handleNavClick('radio')}
             className={`w-full flex items-center space-x-2 px-3 py-2 rounded transition-all cursor-pointer ${
               activeTab === 'radio'
-                ? 'bg-neutral-900 text-amber-400 border border-amber-500/30'
+                ? 'bg-neutral-900 text-white border border-amber-500/30'
                 : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border border-transparent'
             }`}
           >
@@ -62,7 +62,7 @@ export default function LeftNav({ activeTab = 'aione', setActiveTab }: LeftNavPr
             onClick={() => handleNavClick('vault')}
             className={`w-full flex items-center space-x-2 px-3 py-2 rounded transition-all cursor-pointer ${
               activeTab === 'vault'
-                ? 'bg-neutral-900 text-amber-400 border border-amber-500/30'
+                ? 'bg-neutral-900 text-white border border-amber-500/30'
                 : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border border-transparent'
             }`}
           >
@@ -74,7 +74,7 @@ export default function LeftNav({ activeTab = 'aione', setActiveTab }: LeftNavPr
             onClick={() => handleNavClick('pods')}
             className={`w-full flex items-center space-x-2 px-3 py-2 rounded transition-all cursor-pointer ${
               activeTab === 'pods'
-                ? 'bg-neutral-900 text-amber-400 border border-amber-500/30'
+                ? 'bg-neutral-900 text-white border border-amber-500/30'
                 : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border border-transparent'
             }`}
           >
