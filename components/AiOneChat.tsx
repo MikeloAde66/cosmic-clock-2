@@ -21,6 +21,14 @@ const GREETING: ChatMessage = {
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB — a sane guard before base64 inflation
 
+type DiscoveryMode = 'cosmic' | 'quantum' | 'synthesis';
+
+const MODES: { key: DiscoveryMode; label: string; title: string }[] = [
+  { key: 'cosmic', label: 'Cosmic', title: 'Cosmic / Ancient — archaeoastronomy, cycles, classical metaphysics' },
+  { key: 'synthesis', label: 'Synthesis', title: 'Synthesis / Discovery — bridges ancient and modern (default)' },
+  { key: 'quantum', label: 'Quantum', title: 'Quantum / Science — field theory, physics, consciousness models' },
+];
+
 function messageText(content: string | ContentBlock[]): string {
   if (typeof content === 'string') return content;
   const textBlock = content.find((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text');
@@ -47,6 +55,7 @@ export default function AiOneChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
   const [input, setInput] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [mode, setMode] = useState<DiscoveryMode>('synthesis');
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -110,7 +119,7 @@ export default function AiOneChat() {
       const res = await fetch('/api/ai-one-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: nextMessages }),
+        body: JSON.stringify({ messages: nextMessages, mode }),
       });
 
       if (!res.ok || !res.body) {
@@ -143,6 +152,24 @@ export default function AiOneChat() {
 
   return (
     <div className="flex flex-col h-full min-h-[220px]">
+      <div className="flex items-center justify-center gap-1 pb-2 shrink-0">
+        {MODES.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            onClick={() => setMode(m.key)}
+            title={m.title}
+            className={`px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded border transition ${
+              mode === m.key
+                ? 'bg-white/10 border-neutral-500 text-white'
+                : 'border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
       <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto pr-1">
         {messages.map((m, idx) => {
           const text = messageText(m.content);
