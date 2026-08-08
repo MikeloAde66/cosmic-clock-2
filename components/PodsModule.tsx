@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { ArrowUpDown, Camera } from 'lucide-react';
 
 interface Track {
   id: string;
@@ -650,6 +651,14 @@ export default function PodsModule() {
             + Upload
           </button>
 
+          <button
+            onClick={() => mediaFileInputRef.current?.click()}
+            title="Browse a local video file for the Broadcast Monitor"
+            className="flex items-center justify-center w-8 h-8 transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+          >
+            <ArrowUpDown className="w-4 h-4" />
+          </button>
+
           <div className="relative" ref={overflowMenuRef}>
             <button
               onClick={() => setShowOverflowMenu((v) => !v)}
@@ -661,8 +670,12 @@ export default function PodsModule() {
             </button>
 
             {showOverflowMenu && (
-              <div className="absolute right-0 z-50 py-1 mt-2 border rounded-md shadow-lg w-36 bg-slate-900 border-neutral-700">
+              <div className="absolute right-0 z-50 py-1 mt-2 border rounded-md shadow-lg w-40 bg-slate-900 border-neutral-700">
                 {[
+                  { label: 'Load Link', action: loadMedia },
+                  ...(activeEmbedUrl.includes('youtube.com')
+                    ? [{ label: 'Open on YouTube', action: () => window.open(mediaUrl, '_blank', 'noopener,noreferrer') }]
+                    : []),
                   { label: 'Download', action: exportSessionFile },
                   { label: 'Save', action: triggerSave },
                   { label: 'Save As', action: exportSessionFile },
@@ -904,13 +917,19 @@ export default function PodsModule() {
                 </span>
                 <button
                   onClick={toggleCamera}
-                  className={`px-3 py-1 rounded text-xs font-mono transition ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-mono uppercase tracking-wider transition flex items-center gap-1.5 ${
                     isCameraActive
                       ? 'bg-red-950 text-red-300 border border-red-800'
                       : 'bg-white text-black font-bold hover:bg-neutral-200'
                   }`}
                 >
-                  {isCameraActive ? 'STOP BROADCAST' : '📷 START CAMERA'}
+                  {isCameraActive ? (
+                    'Stop Broadcast'
+                  ) : (
+                    <>
+                      <Camera className="w-3.5 h-3.5" /> Pod Cam
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -922,7 +941,13 @@ export default function PodsModule() {
                 className="hidden"
               />
 
-              <div className="flex flex-wrap gap-2">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  loadMedia();
+                }}
+                className="flex flex-wrap gap-2"
+              >
                 <input
                   type="text"
                   value={mediaUrl}
@@ -930,30 +955,6 @@ export default function PodsModule() {
                   placeholder="Paste YouTube video/playlist URL or direct media link..."
                   className="flex-1 min-w-[180px] px-3 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded font-mono text-slate-300 focus:outline-none focus:border-white/50"
                 />
-                <button
-                  onClick={loadMedia}
-                  className="px-3 py-1.5 rounded text-xs font-mono font-bold transition bg-white text-black hover:bg-neutral-200 whitespace-nowrap"
-                >
-                  LOAD LINK
-                </button>
-                <button
-                  onClick={() => mediaFileInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded text-xs font-mono font-bold transition bg-slate-800 hover:bg-slate-700 text-white border border-neutral-700 whitespace-nowrap"
-                  title="Load a local video file (e.g. Canva export)"
-                >
-                  BROWSE FILE
-                </button>
-                {activeEmbedUrl.includes('youtube.com') && (
-                  <a
-                    href={mediaUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1.5 rounded text-xs font-mono transition bg-slate-900 text-white border border-neutral-700 hover:bg-slate-800 whitespace-nowrap flex items-center"
-                    title="Some videos block embedding entirely — opens the original YouTube page as a fallback"
-                  >
-                    OPEN ON YOUTUBE ↗
-                  </a>
-                )}
                 {(activeEmbedUrl || localVideoUrl) && (
                   <button
                     onClick={clearMedia}
@@ -962,7 +963,7 @@ export default function PodsModule() {
                     CLEAR
                   </button>
                 )}
-              </div>
+              </form>
 
               {cameraError && (
                 <div className="p-2 font-mono text-xs text-red-300 border border-red-800 rounded bg-red-950/60">
