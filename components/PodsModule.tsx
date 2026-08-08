@@ -134,6 +134,7 @@ export default function PodsModule() {
   const [isImportingPlaylist, setIsImportingPlaylist] = useState(false);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement | null>(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -611,7 +612,12 @@ export default function PodsModule() {
       <input
         type="file"
         ref={fileInputRef}
-        onChange={(e) => e.target.files && processAudioFiles(e.target.files)}
+        onChange={(e) => {
+          if (e.target.files) {
+            processAudioFiles(e.target.files);
+            setShowUploadModal(false);
+          }
+        }}
         accept="audio/*"
         multiple
         className="hidden"
@@ -645,7 +651,7 @@ export default function PodsModule() {
           </button>
 
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setShowUploadModal(true)}
             className="h-8 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
           >
             + Upload
@@ -1098,6 +1104,44 @@ export default function PodsModule() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Upload Files Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-md p-6 border shadow-2xl bg-slate-900 border-neutral-700 rounded-xl">
+            <button
+              onClick={() => setShowUploadModal(false)}
+              className="absolute text-slate-500 top-4 right-4 hover:text-white"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+
+            <h3 className="mb-1 text-lg font-bold text-white">Upload Files</h3>
+            <p className="mb-6 text-xs text-slate-400">
+              Select local audio files to add to <span className="font-semibold text-white">{activePlaylistObj?.name || 'this playlist'}</span>.
+            </p>
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex flex-col items-center justify-center w-full gap-2 p-8 mb-6 text-center transition border-2 border-dashed rounded-lg cursor-pointer border-neutral-700 bg-slate-950/50 hover:border-neutral-500 hover:bg-slate-950"
+            >
+              <span className="text-3xl text-slate-500">⇧</span>
+              <span className="text-xs font-semibold text-slate-200">Click to browse local files</span>
+              <span className="text-[10px] text-slate-500">Or drag audio files anywhere on this page</span>
+            </button>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="px-4 py-2 font-mono text-xs uppercase text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
