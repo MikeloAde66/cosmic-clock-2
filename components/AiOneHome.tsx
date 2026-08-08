@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import CosmicCanvas from './CosmicCanvas';
 import SignUpModal from './SignUpModal';
+import DonationButton from './DonationButton';
 import { supabase } from '@/lib/supabase';
 
 export default function AiOneHome() {
@@ -53,7 +54,7 @@ export default function AiOneHome() {
         </span>
 
         <span
-          className="cursor-default text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]"
+          className="cursor-default text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
           title="Pricing — coming soon"
         >
           Pricing
@@ -65,6 +66,8 @@ export default function AiOneHome() {
         >
           Sign Up
         </button>
+
+        <DonationButton />
       </div>
 
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} />
