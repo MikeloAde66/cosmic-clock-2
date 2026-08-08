@@ -22,13 +22,14 @@ function useLiveClock() {
   return label;
 }
 
+// Placeholder destinations — swap for the real profile URLs once they exist.
 const SOCIAL_LINKS = [
-  { name: 'Facebook', glyph: 'FB', href: '#' },
-  { name: 'Instagram', glyph: 'IG', href: '#' },
-  { name: 'Reddit', glyph: 'r/', href: '#' },
-  { name: 'TikTok', icon: Music2, href: '#' },
-  { name: 'X', glyph: '𝕏', href: '#' },
-  { name: 'YouTube', glyph: 'YT', href: '#' },
+  { name: 'Facebook', glyph: 'FB', href: 'https://facebook.com/your-page' },
+  { name: 'Instagram', glyph: 'IG', href: 'https://instagram.com/your-handle' },
+  { name: 'Reddit', glyph: 'r/', href: 'https://reddit.com/r/your-subreddit' },
+  { name: 'TikTok', icon: Music2, href: 'https://tiktok.com/@your-handle' },
+  { name: 'X', glyph: '𝕏', href: 'https://x.com/your-handle' },
+  { name: 'YouTube', glyph: 'YT', href: 'https://youtube.com/@your-channel' },
 ];
 
 export default function SiteFooter() {
@@ -51,7 +52,14 @@ export default function SiteFooter() {
 
       <div className="flex items-center gap-4 text-slate-500">
         {SOCIAL_LINKS.map((s) => (
-          <a key={s.name} href={s.href} aria-label={s.name} className="hover:text-white transition-colors">
+          <a
+            key={s.name}
+            href={s.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={s.name}
+            className="hover:text-white transition-colors"
+          >
             {s.icon ? <s.icon size={16} /> : <span className="font-bold text-sm">{s.glyph}</span>}
           </a>
         ))}
