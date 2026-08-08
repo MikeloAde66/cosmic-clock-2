@@ -37,7 +37,7 @@ export default function SearchMaster() {
       <form onSubmit={handleSearch} className="flex items-center">
         <svg
           className={`absolute left-2.5 w-3.5 h-3.5 ${
-            loading ? 'text-amber-500 animate-pulse' : 'text-neutral-400'
+            loading ? 'text-white animate-pulse' : 'text-neutral-400'
           } pointer-events-none`}
           fill="none"
           stroke="currentColor"
@@ -57,7 +57,7 @@ export default function SearchMaster() {
           onChange={(e) => setQuery(e.target.value)}
           disabled={loading}
           placeholder={loading ? 'Searching...' : 'Search masters...'}
-          className="w-48 py-1 pl-8 pr-3 text-xs border rounded bg-neutral-900 border-neutral-700 text-neutral-200 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+          className="w-48 py-1 pl-8 pr-3 text-xs border rounded bg-neutral-900 border-neutral-700 text-neutral-200 focus:outline-none focus:border-white/50 disabled:opacity-50"
         />
       </form>
 
@@ -80,9 +80,9 @@ export default function SearchMaster() {
               {results.map((item) => (
                 <div
                   key={item.id}
-                  className="p-2 transition-all border rounded cursor-pointer bg-neutral-950/60 border-neutral-800/80 hover:border-amber-500/50"
+                  className="p-2 transition-all border rounded cursor-pointer bg-neutral-950/60 border-neutral-800/80 hover:border-neutral-500/50"
                 >
-                  <p className="font-semibold text-amber-400">{item.title}</p>
+                  <p className="font-semibold text-white">{item.title}</p>
                   <p className="text-neutral-400 mt-1 text-[11px]">
                     {item.snippet}
                   </p>

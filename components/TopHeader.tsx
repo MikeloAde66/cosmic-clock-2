@@ -4,9 +4,14 @@ import React, { useState } from 'react';
 import ISSFeedModal from './ISSFeedModal';
 import LoginModal from './LoginModal';
 
-export default function TopHeader() {
+interface TopHeaderProps {
+  activeTab?: string;
+}
+
+export default function TopHeader({ activeTab }: TopHeaderProps) {
   const [isIssOpen, setIsIssOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const isHome = activeTab === 'aione';
 
   return (
     <>
@@ -22,15 +27,18 @@ export default function TopHeader() {
 
         {/* Right Side: Auth Controls (search now lives on the Radio page only) */}
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setIsLoginOpen(true)}
-            className="px-3 py-1 ml-1 text-xs border rounded bg-neutral-900 border-neutral-700 hover:border-amber-500 text-neutral-300"
-          >
-            Log In
-          </button>
-          <button className="px-3 py-1 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-neutral-950">
-            Share
-          </button>
+          {isHome ? (
+            <button
+              onClick={() => setIsLoginOpen(true)}
+              className="px-3 py-1 ml-1 text-xs border rounded bg-neutral-900 border-neutral-700 hover:border-neutral-500 text-neutral-300"
+            >
+              Log In
+            </button>
+          ) : (
+            <button className="px-3 py-1 text-xs font-semibold rounded bg-white hover:bg-neutral-200 text-neutral-950">
+              Share
+            </button>
+          )}
           <button
             onClick={() => setIsLoginOpen(true)}
             title="Account Profile"

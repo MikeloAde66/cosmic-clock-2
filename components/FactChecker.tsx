@@ -52,8 +52,8 @@ export default function FactChecker() {
 
   return (
     <div className="max-w-4xl p-6 mx-auto space-y-6 text-white">
-      <div className="p-8 text-center border shadow-2xl bg-slate-900/80 border-amber-500/30 rounded-2xl backdrop-blur-md">
-        <h1 className="text-2xl font-bold tracking-wider md:text-3xl text-amber-400">
+      <div className="p-8 text-center border shadow-2xl bg-slate-900/80 border-neutral-700 rounded-2xl backdrop-blur-md">
+        <h1 className="text-2xl font-bold tracking-wider md:text-3xl text-white">
           COSMIC FACT CHECKER
         </h1>
         <p className="mt-2 text-sm text-slate-400">
@@ -66,12 +66,12 @@ export default function FactChecker() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ask a cosmic question or query ingested archives..."
-            className="flex-1 px-4 py-3 text-white transition-colors border bg-slate-950/70 border-slate-700 rounded-xl placeholder-slate-500 focus:outline-none focus:border-amber-500"
+            className="flex-1 px-4 py-3 text-white transition-colors border bg-slate-950/70 border-slate-700 rounded-xl placeholder-slate-500 focus:outline-none focus:border-white/50"
           />
           <button
             type="submit"
             disabled={isLoading}
-            className="px-6 py-3 font-bold transition-all bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl disabled:opacity-50 shrink-0"
+            className="px-6 py-3 font-bold transition-all bg-white hover:bg-neutral-200 text-slate-950 rounded-xl disabled:opacity-50 shrink-0"
           >
             {isLoading ? 'ANALYZING...' : 'VERIFY'}
           </button>
@@ -92,10 +92,10 @@ export default function FactChecker() {
             results.map((res) => (
               <div
                 key={res.id}
-                className="p-5 transition-all border bg-slate-900/60 border-slate-800 hover:border-amber-500/40 rounded-xl"
+                className="p-5 transition-all border bg-slate-900/60 border-slate-800 hover:border-neutral-500 rounded-xl"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] uppercase font-mono text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/20">
+                  <span className="text-[10px] uppercase font-mono text-white bg-neutral-800/40 px-2 py-0.5 rounded border border-neutral-700">
                     {res.category}
                   </span>
                 </div>

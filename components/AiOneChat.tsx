@@ -83,14 +83,14 @@ export default function AiOneChat() {
           <div key={idx} className="text-[11px] font-mono leading-relaxed break-words text-slate-100">
             <span
               className={`mr-1.5 text-[9px] uppercase tracking-wider font-bold ${
-                m.role === 'user' ? 'text-slate-500' : 'text-amber-400'
+                m.role === 'user' ? 'text-slate-500' : 'text-white'
               }`}
             >
               {m.role === 'user' ? 'you' : 'ai one'}
             </span>
             {m.content}
             {m.role === 'assistant' && idx === messages.length - 1 && isStreaming && (
-              <span className="text-amber-500 animate-pulse">▋</span>
+              <span className="text-white animate-pulse">▋</span>
             )}
           </div>
         ))}
@@ -104,12 +104,12 @@ export default function AiOneChat() {
           onChange={(e) => setInput(e.target.value)}
           placeholder="ASK AI ONE..."
           disabled={isStreaming}
-          className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-amber-500/60 disabled:opacity-50"
+          className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-white/50 disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={isStreaming || !input.trim()}
-          className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-amber-500 text-slate-950 hover:bg-amber-400 disabled:opacity-50 whitespace-nowrap"
+          className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-white text-black hover:bg-neutral-200 disabled:opacity-50 whitespace-nowrap"
         >
           {isStreaming ? '…' : 'Send'}
         </button>

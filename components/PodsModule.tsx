@@ -595,7 +595,7 @@ export default function PodsModule() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`p-8 max-w-6xl mx-auto space-y-6 relative transition ${
-        isDraggingOver ? 'bg-amber-500/10 border-2 border-dashed border-amber-500 rounded-2xl' : ''
+        isDraggingOver ? 'bg-white/10 border-2 border-dashed border-neutral-700 rounded-2xl' : ''
       }`}
     >
       <audio
@@ -618,13 +618,13 @@ export default function PodsModule() {
 
       {/* Header Bar */}
       <div className="flex items-center justify-between min-h-[44px] gap-4">
-        <h2 className="text-sm font-mono font-bold tracking-widest text-amber-500 uppercase whitespace-nowrap">
+        <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase whitespace-nowrap">
           AUDIO & CONTENT PODS
         </h2>
 
         {/* Reserved banner slot — dormant for now, activated later */}
-        <div className="flex items-center justify-center flex-1 h-8 border border-dashed rounded-md border-amber-500/15 bg-amber-500/[0.03]">
-          <span className="text-[10px] font-mono tracking-widest uppercase text-amber-500/25">
+        <div className="flex items-center justify-center flex-1 h-8 border border-dashed rounded-md border-neutral-700 bg-white/[0.03]">
+          <span className="text-[10px] font-mono tracking-widest uppercase text-white/70">
             Banner Reserved
           </span>
         </div>
@@ -638,14 +638,14 @@ export default function PodsModule() {
 
           <button
             onClick={() => setShowCreateModal(true)}
-            className="h-8 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+            className="h-8 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
           >
             + Playlist
           </button>
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="h-8 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+            className="h-8 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
           >
             + Upload
           </button>
@@ -653,7 +653,7 @@ export default function PodsModule() {
           <div className="relative" ref={overflowMenuRef}>
             <button
               onClick={() => setShowOverflowMenu((v) => !v)}
-              className="flex items-center justify-center w-8 h-8 font-bold transition border rounded bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+              className="flex items-center justify-center w-8 h-8 font-bold transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
               aria-label="More options"
               title="More options"
             >
@@ -661,7 +661,7 @@ export default function PodsModule() {
             </button>
 
             {showOverflowMenu && (
-              <div className="absolute right-0 z-50 py-1 mt-2 border rounded-md shadow-lg w-36 bg-slate-900 border-amber-500/30">
+              <div className="absolute right-0 z-50 py-1 mt-2 border rounded-md shadow-lg w-36 bg-slate-900 border-neutral-700">
                 {[
                   { label: 'Download', action: exportSessionFile },
                   { label: 'Save', action: triggerSave },
@@ -675,7 +675,7 @@ export default function PodsModule() {
                       item.action();
                       setShowOverflowMenu(false);
                     }}
-                    className="w-full px-3 py-1.5 text-left text-[11px] font-mono text-slate-300 hover:bg-amber-500/10 hover:text-amber-400 transition-colors"
+                    className="w-full px-3 py-1.5 text-left text-[11px] font-mono text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
                   >
                     {item.label}
                   </button>
@@ -695,7 +695,7 @@ export default function PodsModule() {
                 onClick={() => setActivePlaylistId(pl.id)}
                 className={`px-4 py-2 rounded-lg text-xs font-mono transition whitespace-nowrap ${
                   activePlaylistId === pl.id
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
+                    ? 'bg-white/20 text-white border border-neutral-700'
                     : 'bg-slate-900/60 text-slate-400 border border-slate-800 hover:border-slate-700'
                 }`}
               >
@@ -707,14 +707,14 @@ export default function PodsModule() {
                   <button
                     onClick={() => setShowAddPlaylistModal(true)}
                     title="Add a YouTube video or playlist link"
-                    className="flex items-center justify-center w-6 h-6 font-bold transition border rounded-lg bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+                    className="flex items-center justify-center w-6 h-6 font-bold transition border rounded-lg bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
                   >
                     +
                   </button>
                   <button
                     onClick={triggerSave}
                     title="Save Playlist"
-                    className="flex items-center justify-center w-6 h-6 text-xs transition border rounded-lg bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+                    className="flex items-center justify-center w-6 h-6 text-xs transition border rounded-lg bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
                   >
                     💾
                   </button>
@@ -740,9 +740,9 @@ export default function PodsModule() {
         {/* Left Column: Player & EQ */}
         <div className="space-y-4 lg:col-span-5">
           {activeTrack ? (
-            <div className="p-5 space-y-4 border bg-slate-900/90 border-amber-500/30 rounded-xl backdrop-blur">
+            <div className="p-5 space-y-4 border bg-slate-900/90 border-neutral-700 rounded-xl backdrop-blur">
               <div className="flex items-center justify-between gap-2">
-                <span className="inline-block px-2 py-0.5 bg-amber-500/10 text-amber-400 text-xs font-mono rounded">
+                <span className="inline-block px-2 py-0.5 bg-white/10 text-white text-xs font-mono rounded">
                   {activeTrack.frequency}
                 </span>
 
@@ -751,7 +751,7 @@ export default function PodsModule() {
                     onClick={() => setShowEq(!showEq)}
                     className={`px-2 py-1 border rounded text-xs font-mono transition ${
                       showEq
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                        ? 'bg-white/20 border-neutral-700 text-white'
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
                     }`}
                   >
@@ -761,7 +761,7 @@ export default function PodsModule() {
                   <select
                     value={playbackMode}
                     onChange={(e) => setPlaybackMode(e.target.value as PlaybackMode)}
-                    className="px-2 py-1 font-mono text-xs border rounded bg-slate-950 text-slate-300 border-slate-800 focus:outline-none focus:border-amber-500"
+                    className="px-2 py-1 font-mono text-xs border rounded bg-slate-950 text-slate-300 border-slate-800 focus:outline-none focus:border-white/50"
                   >
                     <option value="autoplay">Mode: Autoplay Next</option>
                     <option value="random">Mode: Random Play</option>
@@ -783,9 +783,9 @@ export default function PodsModule() {
                     max={duration || 100}
                     value={currentTime}
                     onChange={handleSeek}
-                    className="w-full accent-amber-500 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
+                    className="w-full accent-white bg-slate-950 h-1.5 rounded-lg cursor-pointer"
                   />
-                  <div className="flex justify-between font-mono text-xs text-amber-400/90">
+                  <div className="flex justify-between font-mono text-xs text-white/70">
                     <span>{formatTime(currentTime)}</span>
                     <span>{formatTime(duration)}</span>
                   </div>
@@ -795,19 +795,19 @@ export default function PodsModule() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={handlePrevTrack}
-                  className="px-4 py-3 font-mono text-xs font-bold transition rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400"
+                  className="px-4 py-3 font-mono text-xs font-bold transition rounded-lg bg-slate-800 hover:bg-slate-700 text-white"
                 >
                   ◀◀
                 </button>
 
                 {activeTrack.embedUrl ? (
-                  <div className="flex-1 py-3 text-sm font-bold tracking-wide text-center rounded-lg bg-slate-950 border border-amber-500/30 text-amber-400">
+                  <div className="flex-1 py-3 text-sm font-bold tracking-wide text-center rounded-lg bg-slate-950 border border-neutral-700 text-white">
                     ▶ PLAYING IN BROADCAST MONITOR →
                   </div>
                 ) : (
                   <button
                     onClick={() => setIsPlaying(!isPlaying)}
-                    className="flex-1 py-3 text-sm font-bold tracking-wide transition rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950"
+                    className="flex-1 py-3 text-sm font-bold tracking-wide transition rounded-lg bg-white hover:bg-neutral-200 text-slate-950"
                   >
                     {isPlaying ? 'PAUSE STREAM' : 'PLAY STREAM'}
                   </button>
@@ -815,7 +815,7 @@ export default function PodsModule() {
 
                 <button
                   onClick={handleNextTrack}
-                  className="px-4 py-3 font-mono text-xs font-bold transition rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400"
+                  className="px-4 py-3 font-mono text-xs font-bold transition rounded-lg bg-slate-800 hover:bg-slate-700 text-white"
                 >
                   ▶▶
                 </button>
@@ -824,12 +824,12 @@ export default function PodsModule() {
               {showEq && (
                 <div className="pt-3 space-y-3 transition-all border-t border-slate-800">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs tracking-wider uppercase text-amber-400">
+                    <span className="font-mono text-xs tracking-wider uppercase text-white">
                       Parametric Equalizer
                     </span>
                     <div className="flex gap-1 text-[10px] font-mono">
                       <button onClick={() => applyPreset('flat')} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">FLAT</button>
-                      <button onClick={() => applyPreset('warm432')} className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded hover:bg-amber-500/30">432Hz WARM</button>
+                      <button onClick={() => applyPreset('warm432')} className="px-1.5 py-0.5 bg-white/20 text-white rounded hover:bg-white/10">432Hz WARM</button>
                       <button onClick={() => applyPreset('vocal')} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">VOCAL</button>
                       <button onClick={() => applyPreset('bass')} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">BASS</button>
                     </div>
@@ -851,10 +851,10 @@ export default function PodsModule() {
                           step={1}
                           value={eqGains[band.freq] || 0}
                           onChange={(e) => handleEqChange(band.freq, parseFloat(e.target.value))}
-                          className="h-16 accent-amber-400 bg-slate-950 rounded cursor-pointer [writing-mode:vertical-lr] [direction:rtl]"
+                          className="h-16 accent-white bg-slate-950 rounded cursor-pointer [writing-mode:vertical-lr] [direction:rtl]"
                         />
                         <span className="text-[10px] font-mono text-slate-400">{band.label}</span>
-                        <span className="text-[9px] font-mono text-amber-400">{eqGains[band.freq] > 0 ? `+${eqGains[band.freq]}` : eqGains[band.freq]}dB</span>
+                        <span className="text-[9px] font-mono text-white">{eqGains[band.freq] > 0 ? `+${eqGains[band.freq]}` : eqGains[band.freq]}dB</span>
                       </div>
                     ))}
                   </div>
@@ -878,7 +878,7 @@ export default function PodsModule() {
                   onClick={() => selectTrack(track)}
                   className={`p-3.5 rounded-lg border cursor-pointer transition flex justify-between items-center ${
                     activeTrack?.id === track.id
-                      ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                      ? 'border-neutral-700 bg-white/10 text-white'
                       : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:border-slate-700'
                   }`}
                 >
@@ -886,7 +886,7 @@ export default function PodsModule() {
                     <p className="text-xs font-semibold truncate text-slate-200">{track.title}</p>
                     <p className="text-[11px] text-slate-500 truncate">{track.description}</p>
                   </div>
-                  <span className="text-[10px] font-mono text-amber-400/80">{track.frequency}</span>
+                  <span className="text-[10px] font-mono text-white/70">{track.frequency}</span>
                 </div>
               ))}
             </div>
@@ -896,9 +896,9 @@ export default function PodsModule() {
         {/* Right Column: Camera & Reader */}
         <div className="flex flex-col space-y-4 lg:col-span-7">
           {(
-            <div className="p-4 space-y-3 border bg-slate-950 border-amber-500/30 rounded-xl">
+            <div className="p-4 space-y-3 border bg-slate-950 border-neutral-700 rounded-xl">
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 font-mono text-xs tracking-wider uppercase text-amber-400">
+                <span className="flex items-center gap-2 font-mono text-xs tracking-wider uppercase text-white">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                   Podcasts & Broadcast Monitor
                 </span>
@@ -907,7 +907,7 @@ export default function PodsModule() {
                   className={`px-3 py-1 rounded text-xs font-mono transition ${
                     isCameraActive
                       ? 'bg-red-950 text-red-300 border border-red-800'
-                      : 'bg-amber-500 text-slate-950 font-bold hover:bg-amber-400'
+                      : 'bg-white text-black font-bold hover:bg-neutral-200'
                   }`}
                 >
                   {isCameraActive ? 'STOP BROADCAST' : '📷 START CAMERA'}
@@ -928,17 +928,17 @@ export default function PodsModule() {
                   value={mediaUrl}
                   onChange={(e) => setMediaUrl(e.target.value)}
                   placeholder="Paste YouTube video/playlist URL or direct media link..."
-                  className="flex-1 min-w-[180px] px-3 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded font-mono text-slate-300 focus:outline-none focus:border-amber-500"
+                  className="flex-1 min-w-[180px] px-3 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded font-mono text-slate-300 focus:outline-none focus:border-white/50"
                 />
                 <button
                   onClick={loadMedia}
-                  className="px-3 py-1.5 rounded text-xs font-mono font-bold transition bg-amber-500 text-slate-950 hover:bg-amber-400 whitespace-nowrap"
+                  className="px-3 py-1.5 rounded text-xs font-mono font-bold transition bg-white text-black hover:bg-neutral-200 whitespace-nowrap"
                 >
                   LOAD LINK
                 </button>
                 <button
                   onClick={() => mediaFileInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded text-xs font-mono font-bold transition bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 whitespace-nowrap"
+                  className="px-3 py-1.5 rounded text-xs font-mono font-bold transition bg-slate-800 hover:bg-slate-700 text-white border border-neutral-700 whitespace-nowrap"
                   title="Load a local video file (e.g. Canva export)"
                 >
                   BROWSE FILE
@@ -948,7 +948,7 @@ export default function PodsModule() {
                     href={mediaUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-1.5 rounded text-xs font-mono transition bg-slate-900 text-amber-400 border border-amber-500/30 hover:bg-slate-800 whitespace-nowrap flex items-center"
+                    className="px-3 py-1.5 rounded text-xs font-mono transition bg-slate-900 text-white border border-neutral-700 hover:bg-slate-800 whitespace-nowrap flex items-center"
                     title="Some videos block embedding entirely — opens the original YouTube page as a fallback"
                   >
                     OPEN ON YOUTUBE ↗
@@ -1011,7 +1011,7 @@ export default function PodsModule() {
           <div className="flex flex-col justify-between flex-1 p-6 border bg-slate-900/60 border-slate-800 rounded-xl">
             <div>
               <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
-                <span className="font-mono text-xs tracking-wider uppercase truncate text-amber-400">
+                <span className="font-mono text-xs tracking-wider uppercase truncate text-white">
                   Reading Material • {activeTrack?.title || 'No Selection'}
                 </span>
                 <span className="font-mono text-xs text-slate-500">FORMAT: LORE / TEXT</span>
@@ -1035,15 +1035,15 @@ export default function PodsModule() {
       {/* Modal: Add YouTube Video/Playlist to Playlist */}
       {showAddPlaylistModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <form onSubmit={handleImportPlaylistUrl} className="w-full max-w-md p-6 space-y-4 border shadow-2xl bg-slate-900 border-amber-500/40 rounded-xl">
-            <h3 className="text-lg font-bold text-amber-400">Add Media / YouTube Playlist</h3>
+          <form onSubmit={handleImportPlaylistUrl} className="w-full max-w-md p-6 space-y-4 border shadow-2xl bg-slate-900 border-neutral-700 rounded-xl">
+            <h3 className="text-lg font-bold text-white">Add Media / YouTube Playlist</h3>
             <p className="text-xs text-slate-400">Paste a YouTube video or playlist link to add it to your Playlist.</p>
             <input
               type="url"
               placeholder="Paste YouTube video or playlist URL..."
               value={addPlaylistUrl}
               onChange={(e) => setAddPlaylistUrl(e.target.value)}
-              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-amber-500"
+              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
               autoFocus
               required
             />
@@ -1058,7 +1058,7 @@ export default function PodsModule() {
               <button
                 type="submit"
                 disabled={isImportingPlaylist}
-                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-amber-500 text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-white text-black hover:bg-neutral-200 disabled:opacity-50"
               >
                 {isImportingPlaylist ? 'IMPORTING…' : 'IMPORT'}
               </button>
@@ -1070,15 +1070,15 @@ export default function PodsModule() {
       {/* Modal: Create Playlist */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <form onSubmit={handleCreatePlaylist} className="w-full max-w-md p-6 space-y-4 border shadow-2xl bg-slate-900 border-amber-500/40 rounded-xl">
-            <h3 className="text-lg font-bold text-amber-400">Create New Playlist</h3>
+          <form onSubmit={handleCreatePlaylist} className="w-full max-w-md p-6 space-y-4 border shadow-2xl bg-slate-900 border-neutral-700 rounded-xl">
+            <h3 className="text-lg font-bold text-white">Create New Playlist</h3>
             <p className="text-xs text-slate-400">Enter a title below to organize your audio tracks and podcasts.</p>
             <input
               type="text"
               placeholder="Playlist Name"
               value={newPlaylistName}
               onChange={(e) => setNewPlaylistName(e.target.value)}
-              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-amber-500"
+              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
               autoFocus
             />
             <div className="flex justify-end gap-3 pt-2">
@@ -1091,7 +1091,7 @@ export default function PodsModule() {
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-amber-500 text-slate-950 hover:bg-amber-400"
+                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-white text-black hover:bg-neutral-200"
               >
                 CREATE & OPEN
               </button>
@@ -1104,7 +1104,7 @@ export default function PodsModule() {
       {showHelpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-lg p-6 space-y-4 border bg-slate-900 border-slate-800 rounded-xl">
-            <h3 className="pb-2 text-lg font-bold border-b text-amber-400 border-slate-800">
+            <h3 className="pb-2 text-lg font-bold border-b text-white border-slate-800">
               Pods Hub & Audio Studio Instructions
             </h3>
             <div className="space-y-2 font-sans text-xs leading-relaxed text-slate-300">
@@ -1115,7 +1115,7 @@ export default function PodsModule() {
             <div className="flex justify-end pt-2 border-t border-slate-800">
               <button
                 onClick={() => setShowHelpModal(false)}
-                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-amber-500 text-slate-950"
+                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-white text-black"
               >
                 CLOSE
               </button>

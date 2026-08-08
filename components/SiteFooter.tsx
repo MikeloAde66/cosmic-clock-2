@@ -39,7 +39,7 @@ export default function SiteFooter() {
       <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
         <div className="flex items-center gap-2">
           <span className="text-slate-500">EARTH TIME</span>
-          <span className="text-amber-400 font-bold bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded">
+          <span className="text-white font-bold bg-white/10 border border-neutral-700/30 px-2 py-0.5 rounded">
             {clockLabel || '—'}
           </span>
         </div>
@@ -51,7 +51,7 @@ export default function SiteFooter() {
 
       <div className="flex items-center gap-4 text-slate-500">
         {SOCIAL_LINKS.map((s) => (
-          <a key={s.name} href={s.href} aria-label={s.name} className="hover:text-amber-400 transition-colors">
+          <a key={s.name} href={s.href} aria-label={s.name} className="hover:text-white transition-colors">
             {s.icon ? <s.icon size={16} /> : <span className="font-bold text-sm">{s.glyph}</span>}
           </a>
         ))}

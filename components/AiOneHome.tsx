@@ -30,7 +30,7 @@ export default function AiOneHome() {
 
       {/* HERO BANNER */}
       <div className="relative w-full h-80 bg-[#060a12] overflow-hidden border-b border-slate-800/80 flex flex-col items-center justify-center shrink-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-600/20 via-indigo-500/30 to-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-600/20 via-indigo-500/30 to-white/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-transparent to-[#070b14]/70" />
 
         <div className="relative z-10 px-4 space-y-2 text-center">
@@ -53,7 +53,7 @@ export default function AiOneHome() {
         </span>
 
         <span
-          className="cursor-default text-amber-500/40 transition-all duration-300 hover:text-amber-300 hover:drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]"
+          className="cursor-default text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]"
           title="Pricing — coming soon"
         >
           Pricing
@@ -61,7 +61,7 @@ export default function AiOneHome() {
 
         <button
           onClick={() => setIsSignUpOpen(true)}
-          className="text-amber-400 hover:text-amber-300 font-bold border-b border-amber-400 pb-0.5 transition-colors"
+          className="text-white hover:text-white font-bold border-b border-neutral-700 pb-0.5 transition-colors"
         >
           Sign Up
         </button>

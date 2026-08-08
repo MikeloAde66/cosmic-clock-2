@@ -172,7 +172,7 @@ export default function RadioStreams() {
 
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-mono font-bold tracking-widest text-amber-500 uppercase">
+          <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase">
             Radio
           </h2>
           <SearchMaster />
@@ -185,7 +185,7 @@ export default function RadioStreams() {
               onClick={() => setActiveCategory(cat)}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-mono uppercase tracking-wide transition whitespace-nowrap ${
                 activeCategory === cat
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
+                  ? 'bg-white/20 text-white border border-neutral-700'
                   : 'bg-slate-900/60 text-slate-400 border border-slate-800 hover:border-slate-700'
               }`}
             >
@@ -206,13 +206,13 @@ export default function RadioStreams() {
               return (
                 <div
                   key={station.id}
-                  className="relative flex flex-col justify-between p-4 space-y-4 border border-dashed rounded-xl bg-slate-900/30 border-amber-500/15"
+                  className="relative flex flex-col justify-between p-4 space-y-4 border border-dashed rounded-xl bg-slate-900/30 border-neutral-700"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono tracking-wider uppercase text-slate-600">
                       {station.genre}
                     </span>
-                    <span className="px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded bg-amber-500/5 text-amber-500/40 border-amber-500/15">
+                    <span className="px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded bg-white/5 text-white/70 border-neutral-700">
                       Coming Soon
                     </span>
                   </div>
@@ -241,7 +241,7 @@ export default function RadioStreams() {
                 key={station.id}
                 className={`relative flex flex-col justify-between p-4 space-y-4 overflow-hidden transition-all border rounded-xl bg-slate-900/80 ${
                   isPlaying
-                    ? 'border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.12)]'
+                    ? 'border-neutral-700 '
                     : 'border-slate-800 hover:border-slate-700'
                 }`}
               >
@@ -251,7 +251,7 @@ export default function RadioStreams() {
                   </span>
 
                   {isPlaying && (
-                    <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider border rounded bg-amber-500/20 text-amber-400 border-amber-500/30">
+                    <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider border rounded bg-white/20 text-white border-neutral-700">
                       ● On Air
                     </span>
                   )}
@@ -285,17 +285,17 @@ export default function RadioStreams() {
                     onClick={() => togglePlay(station)}
                     className={`h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition ${
                       isPlaying
-                        ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold hover:bg-amber-400'
-                        : 'bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10'
+                        ? 'bg-white text-black border-neutral-700 font-bold hover:bg-neutral-200'
+                        : 'bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10'
                     }`}
                   >
                     {isPlaying ? '■ Pause' : isLoading ? '… Tuning' : '▶ Tune In'}
                   </button>
 
                   <div className="flex items-end h-3 gap-1">
-                    <span className={`w-1 h-1 rounded-xs ${isPlaying ? 'bg-amber-500/50 animate-pulse' : 'bg-slate-700'}`} />
-                    <span className={`w-1 h-2 rounded-xs ${isPlaying ? 'bg-amber-500/70 animate-pulse' : 'bg-slate-700'}`} style={{ animationDelay: '150ms' }} />
-                    <span className={`w-1 h-3 rounded-xs ${isPlaying ? 'bg-amber-500 animate-pulse' : 'bg-slate-700'}`} style={{ animationDelay: '300ms' }} />
+                    <span className={`w-1 h-1 rounded-xs ${isPlaying ? 'bg-white/50 animate-pulse' : 'bg-slate-700'}`} />
+                    <span className={`w-1 h-2 rounded-xs ${isPlaying ? 'bg-white/70 animate-pulse' : 'bg-slate-700'}`} style={{ animationDelay: '150ms' }} />
+                    <span className={`w-1 h-3 rounded-xs ${isPlaying ? 'bg-white animate-pulse' : 'bg-slate-700'}`} style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>

@@ -52,7 +52,7 @@ function BackButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+      className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
     >
       <ArrowLeft className="w-3.5 h-3.5" />
       Back
@@ -90,7 +90,7 @@ export default function CosmicCanvas() {
           <div className="absolute z-30 flex items-center gap-2 top-4 left-4">
             <button
               onClick={() => setActiveView('weather')}
-              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
             >
               <CloudSun className="w-3.5 h-3.5" />
               Weather
@@ -98,7 +98,7 @@ export default function CosmicCanvas() {
 
             <button
               onClick={() => setActiveView('kali')}
-              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-amber-500/30 text-amber-500/80 hover:border-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
             >
               <Compass className="w-3.5 h-3.5" />
               Kali Yuga
@@ -184,13 +184,13 @@ export default function CosmicCanvas() {
 
           <div className="flex flex-col flex-1 min-h-0 max-w-lg mx-auto w-full border rounded-lg shadow-2xl p-4 border-slate-800 bg-slate-950/95 backdrop-blur-md">
             <div className="shrink-0">
-              <span className="text-[10px] font-mono tracking-widest text-amber-500/80 uppercase">
+              <span className="text-[10px] font-mono tracking-widest text-white/70 uppercase">
                 Current Epoch
               </span>
-              <h2 className="text-2xl font-bold tracking-wider text-[#d4af37]">KALI YUGA</h2>
+              <h2 className="text-2xl font-bold tracking-wider text-[#ffffff]">KALI YUGA</h2>
               <p className="text-xs font-mono text-slate-100 mt-1">YEAR 5,128 / 432,000</p>
               <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[#2a2a30]">
-                <div className="h-full w-[1.18%] bg-[#d4af37]" />
+                <div className="h-full w-[1.18%] bg-[#ffffff]" />
               </div>
               <span className="mt-1 block text-[9px] font-mono text-slate-500">PROGRESS: 1.1870%</span>
             </div>

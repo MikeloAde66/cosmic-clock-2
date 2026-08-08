@@ -144,10 +144,10 @@ export default function NoaaWidget() {
           className="w-full text-left transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-amber-500/80">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-white/70">
               NOAA GROUND TELEMETRY
             </span>
-            <span className="text-[10px] font-mono text-slate-500 group-hover:text-amber-400">
+            <span className="text-[10px] font-mono text-slate-500 group-hover:text-white">
               {showSatellite ? "CLOSE SAT" : "CLICK FOR SATELLITE"}
             </span>
           </div>
@@ -165,7 +165,7 @@ export default function NoaaWidget() {
                 </p>
               </div>
               <div className="text-right">
-                <span className={`inline-block w-2 h-2 rounded-full ${weather.isDaytime ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]'}`} />
+                <span className={`inline-block w-2 h-2 rounded-full ${weather.isDaytime ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]'}`} />
                 <span className="text-[10px] font-mono text-slate-500 block mt-1">
                   {weather.isDaytime ? "SOLAR DAY" : "NIGHT OBS"}
                 </span>
@@ -180,7 +180,7 @@ export default function NoaaWidget() {
         <div className="pt-2 mt-2 border-t border-slate-900">
           <button
             onClick={() => { setShowLookup(!showLookup); setShowSatellite(false); }}
-            className="flex items-center gap-1 text-[10px] font-mono text-slate-500 hover:text-amber-400 transition-colors"
+            className="flex items-center gap-1 text-[10px] font-mono text-slate-500 hover:text-white transition-colors"
           >
             <Search className="w-3 h-3" />
             {showLookup ? "CLOSE LOOKUP" : "LOOKUP LOCATION"}
@@ -194,12 +194,12 @@ export default function NoaaWidget() {
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="ADDRESS OR CITY..."
-                  className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-amber-500/60"
+                  className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-white/50"
                 />
                 <button
                   type="submit"
                   disabled={lookupLoading}
-                  className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-amber-500 text-slate-950 hover:bg-amber-400 disabled:opacity-50 whitespace-nowrap"
+                  className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-white text-black hover:bg-neutral-200 disabled:opacity-50 whitespace-nowrap"
                 >
                   {lookupLoading ? "…" : "Go"}
                 </button>
@@ -214,7 +214,7 @@ export default function NoaaWidget() {
                   <pre className="whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-slate-300">
                     {typedOutput}
                     {typedOutput.length < forecastText.length && (
-                      <span className="text-amber-500 animate-pulse">▋</span>
+                      <span className="text-white animate-pulse">▋</span>
                     )}
                   </pre>
                 </div>
@@ -227,7 +227,7 @@ export default function NoaaWidget() {
       {/* Night / Satellite Overlay Modal */}
       {showSatellite && (
         <div className="p-2 mt-2 border rounded-lg shadow-2xl border-slate-800 bg-slate-900/90">
-          <div className="text-[10px] font-mono text-amber-500 mb-1">
+          <div className="text-[10px] font-mono text-white mb-1">
             GOES-EAST GEOCOLOR INFRARED SKY FEED
           </div>
           <div className="relative overflow-hidden bg-black border rounded aspect-video border-slate-800">

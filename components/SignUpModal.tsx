@@ -108,7 +108,7 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
 
         {step === 'email' && (
           <form onSubmit={sendCode} className="space-y-4">
-            <h3 className="text-lg font-bold text-amber-400 tracking-wider">CREATE ACCOUNT</h3>
+            <h3 className="text-lg font-bold text-white tracking-wider">CREATE ACCOUNT</h3>
             <p className="text-xs text-slate-400">
               Enter your email address to receive a sign-in link (or code, depending on your account settings).
             </p>
@@ -118,13 +118,13 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
               placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-black/60 border border-slate-800 rounded p-2.5 text-sm text-slate-100 outline-none focus:border-amber-400"
+              className="w-full bg-black/60 border border-slate-800 rounded p-2.5 text-sm text-slate-100 outline-none focus:border-white/50"
             />
             {error && <p className="text-xs text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors"
+              className="w-full bg-white hover:bg-neutral-200 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors"
             >
               {loading ? 'Sending…' : 'Send Verification Code'}
             </button>
@@ -133,7 +133,7 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
 
         {step === 'code' && (
           <form onSubmit={verifyCode} className="space-y-4">
-            <h3 className="text-lg font-bold text-amber-400 tracking-wider">VERIFY EMAIL</h3>
+            <h3 className="text-lg font-bold text-white tracking-wider">VERIFY EMAIL</h3>
             <p className="text-xs text-slate-400">
               Enter the code sent to <span className="text-slate-100">{email}</span>
             </p>
@@ -143,13 +143,13 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
               placeholder="Verification code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="w-full bg-black/60 border border-slate-800 rounded p-2.5 text-center text-lg tracking-widest text-slate-100 outline-none focus:border-amber-400"
+              className="w-full bg-black/60 border border-slate-800 rounded p-2.5 text-center text-lg tracking-widest text-slate-100 outline-none focus:border-white/50"
             />
             {error && <p className="text-xs text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors"
+              className="w-full bg-white hover:bg-neutral-200 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors"
             >
               {loading ? 'Verifying…' : 'Verify'}
             </button>
@@ -158,7 +158,7 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
 
         {step === 'terms' && (
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-amber-400 tracking-wider">LEGAL AGREEMENT</h3>
+            <h3 className="text-lg font-bold text-white tracking-wider">LEGAL AGREEMENT</h3>
             <div className="h-32 bg-black/60 border border-slate-800 rounded p-3 text-xs text-slate-400 overflow-y-auto space-y-2">
               <p>
                 <strong className="text-slate-300">Placeholder Terms & Privacy Notice:</strong> this text is a
@@ -171,14 +171,14 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
                 type="checkbox"
                 checked={termsAgreed}
                 onChange={(e) => setTermsAgreed(e.target.checked)}
-                className="accent-amber-400 w-4 h-4 rounded"
+                className="accent-white w-4 h-4 rounded"
               />
               I agree to the Terms & Conditions and Privacy Policy
             </label>
             <button
               disabled={!termsAgreed}
               onClick={() => setStep('profile')}
-              className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors"
+              className="w-full bg-white hover:bg-neutral-200 disabled:opacity-40 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors"
             >
               Continue to AI ONE
             </button>
@@ -188,7 +188,7 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
         {step === 'profile' && (
           <div className="space-y-4">
             <div className="text-center">
-              <h3 className="text-xl font-bold text-amber-400">WELCOME TO AI ONE</h3>
+              <h3 className="text-xl font-bold text-white">WELCOME TO AI ONE</h3>
             </div>
             <div className="space-y-2 text-xs">
               <input
@@ -196,14 +196,14 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
                 placeholder="Mailing Address (optional)"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                className="w-full bg-black/60 border border-slate-800 rounded p-2 text-slate-100 outline-none focus:border-amber-400"
+                className="w-full bg-black/60 border border-slate-800 rounded p-2 text-slate-100 outline-none focus:border-white/50"
               />
               <input
                 type="text"
                 placeholder="Preferences (optional)"
                 value={preferences}
                 onChange={(e) => setPreferences(e.target.value)}
-                className="w-full bg-black/60 border border-slate-800 rounded p-2 text-slate-100 outline-none focus:border-amber-400"
+                className="w-full bg-black/60 border border-slate-800 rounded p-2 text-slate-100 outline-none focus:border-white/50"
               />
               <div className="grid grid-cols-2 gap-2">
                 <button disabled className="bg-slate-900 p-2 rounded text-slate-600 text-left cursor-not-allowed">
@@ -217,7 +217,7 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
             <button
               onClick={completeProfile}
               disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors mt-2"
+              className="w-full bg-white hover:bg-neutral-200 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors mt-2"
             >
               {loading ? 'Saving…' : 'Complete Setup'}
             </button>
@@ -226,11 +226,11 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
 
         {step === 'done' && (
           <div className="space-y-4 text-center">
-            <h3 className="text-xl font-bold text-amber-400">YOU'RE IN</h3>
+            <h3 className="text-xl font-bold text-white">YOU'RE IN</h3>
             <p className="text-xs text-slate-400">Your account is set up. Welcome to Ai One.</p>
             <button
               onClick={handleClose}
-              className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors"
+              className="w-full bg-white hover:bg-neutral-200 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors"
             >
               Done
             </button>

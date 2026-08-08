@@ -70,7 +70,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
         {step === 'email' && (
           <form onSubmit={sendLink} className="space-y-4">
-            <h3 className="text-lg font-bold text-amber-400 tracking-wider">LOG IN</h3>
+            <h3 className="text-lg font-bold text-white tracking-wider">LOG IN</h3>
             <p className="text-xs text-slate-400">
               Enter your email to receive a sign-in link (or code, depending on your account settings).
             </p>
@@ -80,13 +80,13 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-black/60 border border-slate-800 rounded p-2.5 text-sm text-slate-100 outline-none focus:border-amber-400"
+              className="w-full bg-black/60 border border-slate-800 rounded p-2.5 text-sm text-slate-100 outline-none focus:border-white/50"
             />
             {error && <p className="text-xs text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors"
+              className="w-full bg-white hover:bg-neutral-200 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded text-sm transition-colors"
             >
               {loading ? 'Sending…' : 'Send Sign-In Link'}
             </button>
@@ -95,7 +95,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
         {step === 'sent' && (
           <div className="space-y-4 text-center">
-            <h3 className="text-lg font-bold text-amber-400 tracking-wider">CHECK YOUR EMAIL</h3>
+            <h3 className="text-lg font-bold text-white tracking-wider">CHECK YOUR EMAIL</h3>
             <p className="text-xs text-slate-400">
               We sent a sign-in link to <span className="text-slate-100">{email}</span>. Click it to log in — this
               window will close automatically once you're signed in.

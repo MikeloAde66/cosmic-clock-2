@@ -89,12 +89,12 @@ export default function CosmicVaultAuth() {
                 placeholder="Enter Key..."
                 value={securityPin}
                 onChange={(e) => setSecurityPin(e.target.value)}
-                className="w-full px-4 py-3 font-mono text-lg text-center border rounded bg-slate-950 border-slate-800 text-amber-400 focus:outline-none focus:border-amber-500"
+                className="w-full px-4 py-3 font-mono text-lg text-center border rounded bg-slate-950 border-slate-800 text-white focus:outline-none focus:border-white/50"
               />
               {errorMsg && <p className="font-mono text-xs text-rose-400">{errorMsg}</p>}
               <button
                 type="submit"
-                className="w-full py-3 text-xs font-bold uppercase transition-all rounded bg-amber-500 hover:bg-amber-400 text-slate-950"
+                className="w-full py-3 text-xs font-bold uppercase transition-all rounded bg-white hover:bg-neutral-200 text-slate-950"
               >
                 Authenticate
               </button>
@@ -103,7 +103,7 @@ export default function CosmicVaultAuth() {
         ) : (
           <div className="space-y-6">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <h2 className="text-2xl font-bold text-amber-400">Automated Asset Drawers</h2>
+              <h2 className="text-2xl font-bold text-white">Automated Asset Drawers</h2>
               <button
                 onClick={() => setIsUnlocked(false)}
                 className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 rounded font-mono"
@@ -117,7 +117,7 @@ export default function CosmicVaultAuth() {
                 onClick={() => setSelectedCategory('ALL')}
                 className={`px-3 py-1.5 rounded text-xs font-mono uppercase transition-all border ${
                   selectedCategory === 'ALL'
-                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/50'
+                    ? 'bg-white/20 text-white border-neutral-700'
                     : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
                 }`}
               >
@@ -129,7 +129,7 @@ export default function CosmicVaultAuth() {
                   onClick={() => setSelectedCategory(cat.toUpperCase())}
                   className={`px-3 py-1.5 rounded text-xs font-mono uppercase transition-all border ${
                     selectedCategory === cat.toUpperCase()
-                      ? 'bg-amber-500/20 text-amber-400 border-amber-500/50'
+                      ? 'bg-white/20 text-white border-neutral-700'
                       : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
                   }`}
                 >
@@ -148,7 +148,7 @@ export default function CosmicVaultAuth() {
                   >
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-[11px] font-mono">
-                        <span className="px-2 py-0.5 bg-amber-950/80 border border-amber-800/60 text-amber-400 rounded">
+                        <span className="px-2 py-0.5 bg-neutral-800/80 border border-neutral-700 text-white rounded">
                           {item.drawerNumber}
                         </span>
                         <span className="text-slate-500">{item.date}</span>
