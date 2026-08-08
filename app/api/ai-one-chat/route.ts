@@ -1,4 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
+import dbConnect from '@/lib/dbConnect';
+import { embedOne } from '@/lib/voyage';
 
 export const runtime = 'nodejs';
 
@@ -44,6 +46,51 @@ function isSupportedImageType(mediaType: string): mediaType is SupportedImageTyp
   return (SUPPORTED_IMAGE_TYPES as readonly string[]).includes(mediaType);
 }
 
+function latestUserText(messages: ChatMessage[]): string {
+  const latest = [...messages].reverse().find((m) => m.role === 'user');
+  if (!latest) return '';
+  if (typeof latest.content === 'string') return latest.content;
+  return latest.content.find((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')?.text ?? '';
+}
+
+// Purely additive — retrieval is skipped silently (never surfaced as an
+// error) if MongoDB/Voyage aren't configured, the index doesn't exist yet,
+// or nothing relevant has been ingested. The chat works exactly as before
+// with no ingested knowledge base at all.
+async function retrieveContext(queryText: string, mode: DiscoveryMode): Promise<string> {
+  if (!queryText.trim() || !process.env.MONGODB_URI || !process.env.VOYAGE_API_KEY) return '';
+
+  try {
+    const mongoose = await dbConnect();
+    const queryEmbedding = await embedOne(queryText, 'query');
+
+    const pipeline: Record<string, unknown>[] = [
+      {
+        $vectorSearch: {
+          index: 'vector_index',
+          path: 'embedding',
+          queryVector: queryEmbedding,
+          numCandidates: 100,
+          limit: 5,
+          ...(mode !== 'synthesis' ? { filter: { mode_tag: mode } } : {}),
+        },
+      },
+      { $project: { text: 1, source: 1, _id: 0 } },
+    ];
+
+    const results = await mongoose.connection
+      .collection('knowledgechunks')
+      .aggregate<{ text: string; source: string }>(pipeline)
+      .toArray();
+
+    if (results.length === 0) return '';
+    return results.map((r) => `[${r.source}] ${r.text}`).join('\n\n---\n\n');
+  } catch (err) {
+    console.warn('Knowledge retrieval skipped (non-fatal):', err);
+    return '';
+  }
+}
+
 export async function POST(request: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return new Response('Ai One is not connected yet — no API key configured.', { status: 500 });
@@ -56,7 +103,13 @@ export async function POST(request: Request) {
   }
 
   const resolvedMode: DiscoveryMode = isDiscoveryMode(mode) ? mode : 'synthesis';
-  const systemPrompt = BASE_SYSTEM_PROMPT + MODE_ADDENDA[resolvedMode];
+  const retrievedContext = await retrieveContext(latestUserText(messages), resolvedMode);
+  const systemPrompt =
+    BASE_SYSTEM_PROMPT +
+    MODE_ADDENDA[resolvedMode] +
+    (retrievedContext
+      ? `\n\nRelevant excerpts from ingested primary sources — draw on these where genuinely relevant, cite the source naturally, and ignore any that aren't a good fit for this question:\n\n${retrievedContext}`
+      : '');
 
   for (const m of messages) {
     if (Array.isArray(m.content)) {
