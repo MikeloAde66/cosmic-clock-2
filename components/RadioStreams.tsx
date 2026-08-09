@@ -15,31 +15,7 @@ interface RadioStation {
   badgeColor: string;
 }
 
-interface TvShow {
-  id: string;
-  name: string;
-  summary: string;
-  genre: string;
-  status: string;
-  image: string | null;
-  url: string;
-  category: string;
-}
-
-// TVMaze (no API key required) fills categories where no free live audio
-// stream exists — these are TV show cards, not radio stations, so they get
-// their own card treatment (status + a real link to the show, no fake
-// "Tune In" button that would have nothing to actually play).
-const TVMAZE_QUERIES: { category: string; query: string }[] = [
-  { category: 'COSMIC AMBIENT', query: 'space' },
-  { category: 'FRINGE TV', query: 'paranormal' },
-];
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, '').trim();
-}
-
-const CATEGORIES = ['ALL', 'CURRENT AFFAIRS', 'COSMIC AMBIENT', 'FRINGE TV', 'GNOSTIC & ANCIENT', 'STOIC & WISDOM'];
+const CATEGORIES = ['ALL', 'CURRENT AFFAIRS', 'COSMIC AMBIENT', 'CONSCIOUSNESS & FRINGE', 'GNOSTIC & ANCIENT', 'STOIC & WISDOM'];
 
 const STATIONS: RadioStation[] = [
   // Current Affairs — real, verified working streams
@@ -64,6 +40,35 @@ const STATIONS: RadioStation[] = [
     streamUrl: 'https://npr-ice.streamguys1.com/live.mp3',
     badge: 'NPR',
     badgeColor: '#1b3668',
+  },
+
+  // Cosmic Ambient — the SomaFM streams respond fine at the network level
+  // (verified: HTTP 200, audio/mpeg) but were reported not playing in
+  // practice, so this stays an honest placeholder rather than claiming a
+  // working stream that isn't confirmed working for real users.
+  {
+    id: 'cosmic-ambient-pending',
+    name: 'Ambient & Space Radio',
+    network: 'TBD',
+    tagline: 'Looking for a reliably playable ambient/space stream',
+    genre: 'Ambient / Space',
+    category: 'COSMIC AMBIENT',
+    streamUrl: '',
+    badge: '∞',
+    badgeColor: '#3a3a3a',
+  },
+
+  // Consciousness & Fringe — no free public stream exists yet; honest placeholder
+  {
+    id: 'coast-to-coast',
+    name: 'Coast to Coast AM',
+    network: 'Premiere Networks',
+    tagline: 'Late-night paranormal, consciousness & unexplained phenomena',
+    genre: 'Talk / Late-Night',
+    category: 'CONSCIOUSNESS & FRINGE',
+    streamUrl: '',
+    badge: 'C2C',
+    badgeColor: '#3a3a3a',
   },
 
   // Gnostic & Ancient — honest placeholders (the real Aeon Byte content already lives in Pods)
@@ -111,45 +116,7 @@ export default function RadioStreams() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeStationId, setActiveStationId] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>('idle');
-  const [tvShows, setTvShows] = useState<TvShow[]>([]);
-  const [tvShowsLoading, setTvShowsLoading] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchTvShows() {
-      try {
-        const results = await Promise.all(
-          TVMAZE_QUERIES.map(async ({ category, query }) => {
-            const res = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query)}`);
-            if (!res.ok) throw new Error(`TVMaze request failed: ${res.status}`);
-            const data: { show: Record<string, unknown> }[] = await res.json();
-            return data.slice(0, 6).map(({ show }): TvShow => ({
-              id: String(show.id),
-              name: String(show.name),
-              summary: show.summary ? stripHtml(String(show.summary)) : 'No description available.',
-              genre: Array.isArray(show.genres) && show.genres.length > 0 ? String(show.genres[0]) : 'TV',
-              status: String(show.status ?? 'Unknown'),
-              image: (show.image as { medium?: string } | null)?.medium ?? null,
-              url: String(show.url ?? ''),
-              category,
-            }));
-          })
-        );
-        if (!cancelled) setTvShows(results.flat());
-      } catch (err) {
-        console.error('TVMaze fetch failed:', err);
-      } finally {
-        if (!cancelled) setTvShowsLoading(false);
-      }
-    }
-
-    fetchTvShows();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const togglePlay = (station: RadioStation) => {
     const audio = audioRef.current;
@@ -179,16 +146,6 @@ export default function RadioStreams() {
       !query || s.name.toLowerCase().includes(query) || s.tagline.toLowerCase().includes(query);
     return matchesCategory && matchesSearch;
   });
-
-  const filteredTvShows = tvShows.filter((show) => {
-    const matchesCategory = activeCategory === 'ALL' || show.category === activeCategory;
-    const matchesSearch =
-      !query || show.name.toLowerCase().includes(query) || show.summary.toLowerCase().includes(query);
-    return matchesCategory && matchesSearch;
-  });
-
-  const showTvLoadingCard =
-    tvShowsLoading && (activeCategory === 'ALL' || TVMAZE_QUERIES.some((q) => q.category === activeCategory));
 
   return (
     <div className="w-full h-full p-8 overflow-y-auto bg-[#0a0a0c]">
@@ -340,75 +297,6 @@ export default function RadioStreams() {
               </div>
             );
           })}
-
-          {filteredTvShows.map((show) => {
-            const isEnded = show.status.toLowerCase() === 'ended';
-            return (
-              <div
-                key={show.id}
-                className="relative flex flex-col justify-between p-4 space-y-4 overflow-hidden transition-all border rounded-xl bg-slate-900/80 border-slate-800 hover:border-slate-700"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono tracking-wider uppercase text-slate-500">
-                    {show.genre}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded ${
-                      isEnded
-                        ? 'bg-slate-800 text-slate-500 border-slate-700'
-                        : 'bg-white/10 text-white border-neutral-700'
-                    }`}
-                  >
-                    {show.status}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {show.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={show.image}
-                      alt={show.name}
-                      className="object-cover w-12 h-12 rounded shrink-0"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center w-12 h-12 text-xs font-mono font-black tracking-wider rounded shrink-0 bg-slate-800/60 text-slate-500">
-                      TV
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-bold truncate text-slate-100">{show.name}</h3>
-                    <p className="text-xs truncate text-slate-400">{show.summary}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
-                  {show.url ? (
-                    <a
-                      href={show.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="h-8 px-3 flex items-center text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
-                    >
-                      View Show ↗
-                    </a>
-                  ) : (
-                    <span className="h-8 px-3 flex items-center text-[11px] font-mono uppercase tracking-wide text-slate-600">
-                      No link available
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {showTvLoadingCard && (
-            <div className="flex items-center justify-center p-4 border border-dashed h-36 rounded-xl border-neutral-700 bg-slate-900/30">
-              <span className="text-[11px] font-mono uppercase tracking-widest text-slate-500 animate-pulse">
-                Loading shows from TVMaze…
-              </span>
-            </div>
-          )}
         </div>
       </div>
     </div>
