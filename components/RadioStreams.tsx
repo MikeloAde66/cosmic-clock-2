@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import SearchMaster from './SearchMaster';
+import { Search } from 'lucide-react';
 
 interface RadioStation {
   id: string;
@@ -132,6 +132,7 @@ type Status = 'idle' | 'loading' | 'playing' | 'error';
 
 export default function RadioStreams() {
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeStationId, setActiveStationId] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -156,9 +157,13 @@ export default function RadioStreams() {
     return () => { audioRef.current?.pause(); };
   }, []);
 
-  const filteredStations = activeCategory === 'ALL'
-    ? STATIONS
-    : STATIONS.filter((s) => s.category === activeCategory);
+  const filteredStations = STATIONS.filter((s) => {
+    const matchesCategory = activeCategory === 'ALL' || s.category === activeCategory;
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !query || s.name.toLowerCase().includes(query) || s.tagline.toLowerCase().includes(query);
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <div className="w-full h-full p-8 overflow-y-auto bg-[#0a0a0c]">
@@ -175,7 +180,16 @@ export default function RadioStreams() {
           <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase">
             Radio
           </h2>
-          <SearchMaster />
+          <div className="relative w-64">
+            <Search className="absolute w-3.5 h-3.5 text-slate-500 left-2.5 top-2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter stations..."
+              className="w-full py-1.5 pl-8 pr-3 text-xs bg-slate-900/90 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-white/50 transition"
+            />
+          </div>
         </div>
 
         <div className="flex gap-2 pb-2 overflow-x-auto border-b border-slate-800">
