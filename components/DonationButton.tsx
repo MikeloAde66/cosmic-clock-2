@@ -45,9 +45,11 @@ export default function DonationButton() {
       >
         {loading ? '…' : 'Donations'}
       </button>
-      <span className="text-[10px] font-mono text-slate-500 tracking-wider">
-        {error || 'Support the Mission'}
-      </span>
+      {error && (
+        <span className="text-[10px] font-mono text-red-400 tracking-wider">
+          {error}
+        </span>
+      )}
     </div>
   );
 }
