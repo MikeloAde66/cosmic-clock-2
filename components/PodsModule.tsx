@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ArrowUpDown, Camera } from 'lucide-react';
+import { ArrowUpDown, Camera, Trash2 } from 'lucide-react';
 
 interface Track {
   id: string;
@@ -434,6 +434,23 @@ export default function PodsModule() {
   const filteredTracks = activePlaylistId === 'all'
     ? tracks
     : tracks.filter(t => t.playlistId === activePlaylistId);
+
+  const deleteTrack = (e: React.MouseEvent, trackId: string) => {
+    e.stopPropagation(); // don't let this also trigger the row's selectTrack click
+    const target = tracks.find(t => t.id === trackId);
+    if (target?.isLocal) {
+      URL.revokeObjectURL(target.src); // free the blob now that nothing will reference it
+    }
+
+    setTracks(prev => prev.filter(t => t.id !== trackId));
+
+    if (activeTrack?.id === trackId) {
+      const remaining = filteredTracks.filter(t => t.id !== trackId);
+      if (remaining.length > 0) {
+        selectTrack(remaining[0]);
+      }
+    }
+  };
 
   const handleTrackEnd = () => {
     if (filteredTracks.length === 0) return;
@@ -905,7 +922,16 @@ export default function PodsModule() {
                     <p className="text-xs font-semibold truncate text-slate-200">{track.title}</p>
                     <p className="text-[11px] text-slate-500 truncate">{track.description}</p>
                   </div>
-                  <span className="text-[10px] font-mono text-white/70">{track.frequency}</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-[10px] font-mono text-white/70">{track.frequency}</span>
+                    <button
+                      onClick={(e) => deleteTrack(e, track.id)}
+                      title="Delete Track"
+                      className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
