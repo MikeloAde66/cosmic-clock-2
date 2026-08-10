@@ -33,7 +33,14 @@ useContextMenuShare();
             </div>
           )}
 
-          {activeTab === 'pods' && <PodsModule />}
+          {/* Pods stays mounted (just hidden) instead of unmounting on tab
+              switch — it holds local file uploads as in-memory blob URLs,
+              which die the instant the component unmounts. Unlike a real
+              page reload (where blob URLs are gone regardless), switching
+              tabs within this single-page app doesn't need to destroy them. */}
+          <div className={activeTab === 'pods' ? 'w-full h-full' : 'hidden'}>
+            <PodsModule />
+          </div>
         </div>
 
         <SiteFooter />
