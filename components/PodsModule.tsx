@@ -124,6 +124,15 @@ export default function PodsModule() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const filtersRef = useRef<{ [freq: string]: BiquadFilterNode }>({});
 
+  // Output Monitor: master volume + a real DynamicsCompressorNode for
+  // broadcast-style loudness mastering. No spatial/surround processing —
+  // Web Audio API doesn't decode or pass through real multichannel Dolby
+  // bitstreams, so this only ever claims to do what it actually does.
+  const [showOutputMonitor, setShowOutputMonitor] = useState<boolean>(false);
+  const [masterVolume, setMasterVolume] = useState<number>(100);
+  const [masteringPreset, setMasteringPreset] = useState<'flat' | 'broadcast'>('flat');
+  const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+
   // Modals & Notifications
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -295,9 +304,50 @@ export default function PodsModule() {
         prevFilter = filter;
       });
 
+      const compressor = ctx.createDynamicsCompressor();
+      applyCompressorValues(compressor, masteringPreset);
+      compressorRef.current = compressor;
+
       if (prevFilter) {
-        prevFilter.connect(ctx.destination);
+        prevFilter.connect(compressor);
+      } else {
+        source.connect(compressor);
       }
+      compressor.connect(ctx.destination);
+    }
+  };
+
+  function applyCompressorValues(compressor: DynamicsCompressorNode, mode: 'flat' | 'broadcast') {
+    const t = compressor.context.currentTime;
+    if (mode === 'broadcast') {
+      // Dense broadcast/radio-style loudness limiting
+      compressor.threshold.setValueAtTime(-24, t);
+      compressor.knee.setValueAtTime(30, t);
+      compressor.ratio.setValueAtTime(12, t);
+      compressor.attack.setValueAtTime(0.003, t);
+      compressor.release.setValueAtTime(0.25, t);
+    } else {
+      // Gentle safety limiting only — near-transparent
+      compressor.threshold.setValueAtTime(-12, t);
+      compressor.knee.setValueAtTime(6, t);
+      compressor.ratio.setValueAtTime(2, t);
+      compressor.attack.setValueAtTime(0.02, t);
+      compressor.release.setValueAtTime(0.3, t);
+    }
+  }
+
+  const applyMasteringPreset = (mode: 'flat' | 'broadcast') => {
+    setMasteringPreset(mode);
+    if (compressorRef.current) {
+      applyCompressorValues(compressorRef.current, mode);
+    }
+  };
+
+  const handleMasterVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    setMasterVolume(val);
+    if (audioRef.current) {
+      audioRef.current.volume = val / 100;
     }
   };
 
@@ -793,6 +843,61 @@ export default function PodsModule() {
                   >
                     EQ
                   </button>
+
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowOutputMonitor(!showOutputMonitor)}
+                      title="Output Volume & Mastering"
+                      className={`px-2 py-1 border rounded text-xs font-mono transition ${
+                        showOutputMonitor || masteringPreset !== 'flat'
+                          ? 'bg-white/20 border-neutral-700 text-white'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      VC
+                    </button>
+
+                    {showOutputMonitor && (
+                      <div className="absolute left-0 z-50 p-4 mt-2 border shadow-2xl w-64 rounded-xl bg-slate-950 border-neutral-700">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="font-bold text-slate-300">OUTPUT MONITOR</span>
+                          <span className="text-white">{masterVolume}%</span>
+                        </div>
+
+                        <div className="mb-4">
+                          <label className="block mb-1 text-slate-400">Master Volume</label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={masterVolume}
+                            onChange={handleMasterVolumeChange}
+                            className="w-full h-1 rounded cursor-pointer accent-white bg-slate-800"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-slate-400">Mastering</label>
+                          <button
+                            onClick={() => applyMasteringPreset('broadcast')}
+                            className={`w-full py-1.5 px-2 rounded text-left transition ${
+                              masteringPreset === 'broadcast' ? 'bg-white/20 text-white' : 'bg-slate-900 hover:bg-slate-800 text-slate-300'
+                            }`}
+                          >
+                            • Broadcast (dense limiting)
+                          </button>
+                          <button
+                            onClick={() => applyMasteringPreset('flat')}
+                            className={`w-full py-1.5 px-2 rounded text-left transition ${
+                              masteringPreset === 'flat' ? 'bg-white/20 text-white' : 'bg-slate-900 hover:bg-slate-800 text-slate-300'
+                            }`}
+                          >
+                            • Flat (near-transparent)
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <select
                     value={playbackMode}
