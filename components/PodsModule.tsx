@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ArrowUpDown, Camera, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Camera, Sparkles, Trash2 } from 'lucide-react';
+import CosmicVisualizer from './CosmicVisualizer';
 
 interface Track {
   id: string;
@@ -123,6 +124,11 @@ export default function PodsModule() {
   });
   const audioCtxRef = useRef<AudioContext | null>(null);
   const filtersRef = useRef<{ [freq: string]: BiquadFilterNode }>({});
+  const analyserRef = useRef<AnalyserNode | null>(null);
+
+  // Dedicated full-view switch (player vs. cosmic visualizer) — not a modal,
+  // so audio stays mounted and playing underneath while visualizer is active.
+  const [activeView, setActiveView] = useState<'player' | 'visualizer'>('player');
 
   // Output Monitor: master volume + a real DynamicsCompressorNode for
   // broadcast-style loudness mastering. No spatial/surround processing —
@@ -284,7 +290,7 @@ export default function PodsModule() {
 
       const source = ctx.createMediaElementSource(audioRef.current);
       const frequencies = ['60', '250', '1000', '4000', '12000'];
-      let prevFilter: BiquadFilterNode | null = null;
+      let lastNode: AudioNode = source;
 
       frequencies.forEach((freq, idx) => {
         const filter = ctx.createBiquadFilter();
@@ -296,24 +302,23 @@ export default function PodsModule() {
         filter.gain.value = eqGains[freq] || 0;
         filtersRef.current[freq] = filter;
 
-        if (prevFilter) {
-          prevFilter.connect(filter);
-        } else {
-          source.connect(filter);
-        }
-        prevFilter = filter;
+        lastNode.connect(filter);
+        lastNode = filter;
       });
 
       const compressor = ctx.createDynamicsCompressor();
       applyCompressorValues(compressor, masteringPreset);
       compressorRef.current = compressor;
+      lastNode.connect(compressor);
 
-      if (prevFilter) {
-        prevFilter.connect(compressor);
-      } else {
-        source.connect(compressor);
-      }
-      compressor.connect(ctx.destination);
+      // Visualizer tap: sits between the compressor and the destination so
+      // the CosmicVisualizer canvas reads post-mastering audio without
+      // altering what's actually heard.
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 128;
+      analyserRef.current = analyser;
+      compressor.connect(analyser);
+      analyser.connect(ctx.destination);
     }
   };
 
@@ -690,6 +695,19 @@ export default function PodsModule() {
         className="hidden"
       />
 
+      {activeView === 'visualizer' && (
+        <div className="h-[75vh] rounded-2xl overflow-hidden border border-neutral-700">
+          <CosmicVisualizer
+            analyser={analyserRef.current}
+            isPlaying={isPlaying && !activeTrack?.embedUrl}
+            trackTitle={activeTrack?.title}
+            onBack={() => setActiveView('player')}
+          />
+        </div>
+      )}
+
+      {activeView === 'player' && (
+      <>
       {/* Header Bar */}
       <div className="flex items-center justify-between min-h-[44px] gap-4">
         <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase whitespace-nowrap">
@@ -722,6 +740,15 @@ export default function PodsModule() {
             className="h-8 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
           >
             + Upload
+          </button>
+
+          <button
+            onClick={() => setActiveView('visualizer')}
+            title="Cosmic Visualizer"
+            className="flex items-center h-8 gap-1.5 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Visualizer
           </button>
 
           <button
@@ -1298,6 +1325,8 @@ export default function PodsModule() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );
