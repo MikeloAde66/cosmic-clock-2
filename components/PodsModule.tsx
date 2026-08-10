@@ -173,6 +173,13 @@ export default function PodsModule() {
     }));
 
     setTracks((prev) => [...newTracks, ...prev]);
+    // Clear whatever was in the Broadcast Monitor (a video-backed track can
+    // still be active from before) so the uploaded audio actually takes over
+    // the monitor frame instead of leaving a stale video/iframe in front of it.
+    if (localVideoUrl) URL.revokeObjectURL(localVideoUrl);
+    setLocalVideoUrl('');
+    setActiveEmbedUrl('');
+    setMediaUrl('');
     setActiveTrack(newTracks[0]);
     setIsPlaying(true);
   };
@@ -1160,12 +1167,20 @@ export default function PodsModule() {
                       className={`w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
                     />
                     {!isCameraActive && (
-                      <div className="p-6 space-y-2 text-center">
-                        <p className="font-mono text-xs text-slate-400">BROADCAST MONITOR STANDBY</p>
-                        <p className="text-slate-600 text-[11px] max-w-sm mx-auto">
-                          Click &quot;Start Camera&quot; above or paste a link to display video input.
-                        </p>
-                      </div>
+                      activeTrack && !activeTrack.embedUrl ? (
+                        <CosmicVisualizer
+                          analyser={analyserRef.current}
+                          isPlaying={isPlaying}
+                          trackTitle={activeTrack.title}
+                        />
+                      ) : (
+                        <div className="p-6 space-y-2 text-center">
+                          <p className="font-mono text-xs text-slate-400">BROADCAST MONITOR STANDBY</p>
+                          <p className="text-slate-600 text-[11px] max-w-sm mx-auto">
+                            Click &quot;Start Camera&quot; above or paste a link to display video input.
+                          </p>
+                        </div>
+                      )
                     )}
                   </>
                 )}

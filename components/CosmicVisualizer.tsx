@@ -7,7 +7,9 @@ interface CosmicVisualizerProps {
   analyser: AnalyserNode | null;
   isPlaying: boolean;
   trackTitle?: string;
-  onBack: () => void;
+  // Omit when embedding inline (e.g. inside the Broadcast Monitor frame) —
+  // there's nothing to navigate "back" from in that context.
+  onBack?: () => void;
 }
 
 export default function CosmicVisualizer({ analyser, isPlaying, trackTitle, onBack }: CosmicVisualizerProps) {
@@ -86,15 +88,17 @@ export default function CosmicVisualizer({ analyser, isPlaying, trackTitle, onBa
 
   return (
     <div className="relative flex flex-col w-full h-full overflow-hidden bg-[#070b14]">
-      <div className="absolute z-10 top-4 left-4">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Back
-        </button>
-      </div>
+      {onBack && (
+        <div className="absolute z-10 top-4 left-4">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back
+          </button>
+        </div>
+      )}
 
       {trackTitle && (
         <div className="absolute z-10 text-right top-4 right-4">
