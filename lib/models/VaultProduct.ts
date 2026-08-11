@@ -1,17 +1,37 @@
-import mongoose, { Schema, type Document, type Model } from 'mongoose';
+import mongoose, { Schema, type Document, type Model, type Types } from 'mongoose';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
+
+export interface VaultTrackSub {
+  filename: string;
+  // Object path inside the private Supabase 'vault' bucket, e.g.
+  // "MUSIC/MUS-432-01/1723315200000-track-01.mp3" — not a public URL. The
+  // API layer exchanges this for a short-lived signed download URL on read.
+  storagePath: string;
+  sizeBytes: number;
+  durationSeconds?: number;
+}
+
+const VaultTrackSchema = new Schema<VaultTrackSub>(
+  {
+    filename: { type: String, required: true },
+    storagePath: { type: String, required: true },
+    sizeBytes: { type: Number, required: true },
+    durationSeconds: { type: Number },
+  },
+  { _id: false }
+);
 
 export interface VaultProductDoc extends Document {
   sku: string;
   drawer: VaultDrawer;
   title: string;
   description: string;
-  // Object path inside the private Supabase 'vault' bucket, e.g.
-  // "PODS/POD-XYZ-1723315200000-episode.mp3" — not a public URL. The API
-  // layer exchanges this for a short-lived signed download URL on read.
-  storagePath: string;
   readmeGuide: string;
   createdAt: Date;
+  // Every product is a "pack" of at least one track — a single-file upload
+  // is just a pack with tracks.length === 1. Uploading again with the same
+  // sku+drawer appends to this array rather than creating a new card.
+  tracks: Types.DocumentArray<VaultTrackSub>;
 }
 
 const VaultProductSchema = new Schema<VaultProductDoc>({
@@ -24,10 +44,12 @@ const VaultProductSchema = new Schema<VaultProductDoc>({
   },
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  storagePath: { type: String, required: true },
   readmeGuide: { type: String, default: '' },
+  tracks: { type: [VaultTrackSchema], default: [] },
   createdAt: { type: Date, default: Date.now },
 });
+
+VaultProductSchema.index({ sku: 1, drawer: 1 }, { unique: true });
 
 export default (mongoose.models.VaultProduct as Model<VaultProductDoc>) ||
   mongoose.model<VaultProductDoc>('VaultProduct', VaultProductSchema);

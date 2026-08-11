@@ -17,20 +17,32 @@ export const VAULT_DRAWERS: VaultDrawer[] = [
   'PHOTOS',
 ];
 
+export interface VaultTrack {
+  filename: string;
+  fileUrl: string;
+  sizeBytes: number;
+  durationSeconds?: number;
+}
+
 export interface VaultProduct {
   id: string;
   sku: string;
   drawer: VaultDrawer;
   title: string;
   description: string;
+  // Only meaningful for the seed placeholders below (never a working link).
+  // Real inventory items carry their file(s) in `tracks` instead — even a
+  // single-file upload is a one-track pack, so every real product has a
+  // uniform shape: one card, an inline expand to reach the actual file(s).
   fileUrl: string;
   readmeGuide: string;
   dateAdded: string;
   // True for the starter rows below — they describe the drawer but don't
   // point at a real uploaded file, so the UI shouldn't offer them for
   // download. Real uploads (via the Vault's "+ Upload File" flow) are
-  // false/undefined and always have a working signed download link.
+  // false/undefined and always carry a populated `tracks` array.
   isPlaceholder?: boolean;
+  tracks?: VaultTrack[];
 }
 
 // One starter row per drawer so every section has something to look at

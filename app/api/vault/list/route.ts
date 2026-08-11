@@ -19,9 +19,23 @@ export async function GET() {
     const admin = getSupabaseAdmin();
     const uploaded: VaultProductShape[] = await Promise.all(
       docs.map(async (doc) => {
-        const { data: signed, error } = await admin.storage
-          .from(VAULT_BUCKET)
-          .createSignedUrl(doc.storagePath, 60 * 60); // 1 hour
+        const tracks = await Promise.all(
+          doc.tracks.map(async (t) => {
+            const { data: signed, error } = await admin.storage
+              .from(VAULT_BUCKET)
+              .createSignedUrl(t.storagePath, 60 * 60); // 1 hour
+
+            return {
+              filename: t.filename,
+              // Falls back to a dead marker rather than throwing the whole
+              // list out if one track's signed URL can't be generated (e.g.
+              // deleted directly from the Supabase dashboard).
+              fileUrl: error ? '' : signed.signedUrl,
+              sizeBytes: t.sizeBytes,
+              durationSeconds: t.durationSeconds,
+            };
+          })
+        );
 
         return {
           id: doc._id.toString(),
@@ -29,13 +43,11 @@ export async function GET() {
           drawer: doc.drawer,
           title: doc.title,
           description: doc.description,
-          // Falls back to a dead marker rather than throwing the whole list
-          // out if one file's signed URL can't be generated (e.g. deleted
-          // directly from the Supabase dashboard).
-          fileUrl: error ? '' : signed.signedUrl,
+          fileUrl: '',
           readmeGuide: doc.readmeGuide,
           dateAdded: doc.createdAt.toISOString().slice(0, 10),
           isPlaceholder: false,
+          tracks,
         };
       })
     );

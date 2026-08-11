@@ -3,6 +3,48 @@
 import React, { useEffect, useState } from 'react';
 import { VAULT_DRAWERS, type VaultDrawer, type VaultProduct } from '@/lib/vaultRegistry';
 
+function formatBytes(bytes: number) {
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function formatDuration(seconds: number) {
+  const total = Math.round(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = h > 0 ? String(m).padStart(2, '0') : String(m);
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+// Best-effort: loads audio metadata off-DOM to read its duration. Only
+// attempted for audio files, and gives up after 5s rather than hanging the
+// upload flow on a file the browser can't probe.
+function probeAudioDuration(file: File): Promise<number | undefined> {
+  if (!file.type.startsWith('audio/')) return Promise.resolve(undefined);
+  return new Promise((resolve) => {
+    const audio = document.createElement('audio');
+    const url = URL.createObjectURL(file);
+    let settled = false;
+    const finish = (value: number | undefined) => {
+      if (settled) return;
+      settled = true;
+      URL.revokeObjectURL(url);
+      resolve(value);
+    };
+    const timeout = setTimeout(() => finish(undefined), 5000);
+    audio.addEventListener('loadedmetadata', () => {
+      clearTimeout(timeout);
+      finish(Number.isFinite(audio.duration) ? audio.duration : undefined);
+    });
+    audio.addEventListener('error', () => {
+      clearTimeout(timeout);
+      finish(undefined);
+    });
+    audio.src = url;
+  });
+}
+
 export default function CosmicVaultAuth() {
   // Security Key 432 Lock State
   const [securityPin, setSecurityPin] = useState<string>('');
@@ -12,6 +54,7 @@ export default function CosmicVaultAuth() {
 
   const [products, setProducts] = useState<VaultProduct[]>([]);
   const [isLoadingInventory, setIsLoadingInventory] = useState<boolean>(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
   const [uploadTitle, setUploadTitle] = useState<string>('');
@@ -19,9 +62,39 @@ export default function CosmicVaultAuth() {
   const [uploadDrawer, setUploadDrawer] = useState<VaultDrawer>('PODS');
   const [uploadDescription, setUploadDescription] = useState<string>('');
   const [uploadReadme, setUploadReadme] = useState<string>('');
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [fileDurations, setFileDurations] = useState<Map<File, number>>(new Map());
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string>('');
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Folder selects (webkitdirectory) can include OS junk files — drop them
+  // client-side too, on top of the server-side filter, so the file count
+  // shown while picking already matches what will actually upload.
+  const addFiles = (incoming: FileList | null) => {
+    if (!incoming) return;
+    const cleaned = Array.from(incoming).filter((f) => !f.name.split('/').pop()?.startsWith('.'));
+    setUploadFiles((prev) => [...prev, ...cleaned]);
+
+    cleaned.forEach((file) => {
+      probeAudioDuration(file).then((duration) => {
+        if (duration === undefined) return;
+        setFileDurations((prev) => new Map(prev).set(file, duration));
+      });
+    });
+  };
+
+  const removeUploadFile = (index: number) => {
+    setUploadFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const fetchInventory = async () => {
     setIsLoadingInventory(true);
@@ -56,14 +129,15 @@ export default function CosmicVaultAuth() {
     setUploadDrawer('PODS');
     setUploadDescription('');
     setUploadReadme('');
-    setUploadFile(null);
+    setUploadFiles([]);
+    setFileDurations(new Map());
     setUploadError('');
   };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadFile) {
-      setUploadError('Choose a file to upload.');
+    if (uploadFiles.length === 0) {
+      setUploadError('Choose at least one file to upload.');
       return;
     }
     setIsUploading(true);
@@ -71,12 +145,13 @@ export default function CosmicVaultAuth() {
 
     const form = new FormData();
     form.set('pin', securityPin.trim());
-    form.set('file', uploadFile);
+    uploadFiles.forEach((file) => form.append('file', file));
     form.set('title', uploadTitle);
     form.set('sku', uploadSku);
     form.set('drawer', uploadDrawer);
     form.set('description', uploadDescription);
     form.set('readmeGuide', uploadReadme);
+    form.set('durations', JSON.stringify(uploadFiles.map((f) => fileDurations.get(f) ?? null)));
 
     try {
       const res = await fetch('/api/vault/upload', { method: 'POST', body: form });
@@ -84,16 +159,39 @@ export default function CosmicVaultAuth() {
         setUploadError(await res.text());
         return;
       }
-      const data = await res.json();
-      setProducts((prev) => [data.product, ...prev]);
-      resetUploadForm();
-      setShowUploadModal(false);
+      const data: { product: VaultProduct | null; errors: { filename: string; message: string }[] } = await res.json();
+
+      if (data.product) {
+        // The server returns the pack's full current track list (existing +
+        // new), so replace any card with the same sku+drawer rather than
+        // appending a duplicate.
+        setProducts((prev) => [
+          data.product as VaultProduct,
+          ...prev.filter((p) => !(p.sku === data.product!.sku && p.drawer === data.product!.drawer)),
+        ]);
+      }
+
+      if (data.errors.length > 0) {
+        // Keep the failed files staged so the pack upload can just be
+        // retried without re-picking everything that already succeeded.
+        const failedNames = new Set(data.errors.map((e) => e.filename));
+        setUploadFiles((prev) => prev.filter((f) => failedNames.has(f.name)));
+        setUploadError(
+          `${uploadFiles.length - data.errors.length} uploaded, ${data.errors.length} failed: ` +
+            data.errors.map((e) => `${e.filename} (${e.message})`).join('; ')
+        );
+      } else {
+        resetUploadForm();
+        setShowUploadModal(false);
+      }
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
       setIsUploading(false);
     }
   };
+
+  const totalUploadBytes = uploadFiles.reduce((sum, f) => sum + f.size, 0);
 
   const visibleProducts = products.filter(
     (item) => selectedCategory === 'ALL' || item.drawer === selectedCategory
@@ -174,40 +272,77 @@ export default function CosmicVaultAuth() {
               <p className="font-mono text-xs text-slate-500">Loading inventory…</p>
             ) : (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {visibleProducts.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col justify-between p-5 space-y-4 border bg-slate-900/80 border-slate-800 rounded-xl"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-[11px] font-mono">
-                        <span className="px-2 py-0.5 bg-neutral-800/80 border border-neutral-700 text-white rounded">
-                          {item.drawer}
-                        </span>
-                        <span className="text-slate-500">{item.dateAdded}</span>
+                {visibleProducts.map((item) => {
+                  const tracks = item.tracks ?? [];
+                  const totalSize = tracks.reduce((s, t) => s + t.sizeBytes, 0);
+                  const totalDuration = tracks.reduce((s, t) => s + (t.durationSeconds ?? 0), 0);
+                  const isExpanded = expandedIds.has(item.id);
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex flex-col justify-between p-5 space-y-4 border bg-slate-900/80 border-slate-800 rounded-xl"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[11px] font-mono">
+                          <span className="px-2 py-0.5 bg-neutral-800/80 border border-neutral-700 text-white rounded">
+                            {item.drawer}
+                          </span>
+                          <span className="text-slate-500">{item.dateAdded}</span>
+                        </div>
+
+                        <h3 className="text-base font-bold text-slate-100">{item.title}</h3>
+                        <p className="text-xs text-slate-400">{item.description}</p>
+                        <p className="font-mono text-[10px] text-slate-600">SKU: {item.sku}</p>
                       </div>
 
-                      <h3 className="text-base font-bold text-slate-100">{item.title}</h3>
-                      <p className="text-xs text-slate-400">{item.description}</p>
-                      <p className="font-mono text-[10px] text-slate-600">SKU: {item.sku}</p>
-                    </div>
+                      {item.isPlaceholder ? (
+                        <span className="font-mono text-[10px] uppercase tracking-wide text-slate-600">
+                          Placeholder — no file uploaded yet
+                        </span>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-[10px] text-slate-500">
+                              {tracks.length} file{tracks.length !== 1 ? 's' : ''} • {formatBytes(totalSize)}
+                              {totalDuration > 0 ? ` • ${formatDuration(totalDuration)}` : ''}
+                            </span>
+                            <button
+                              onClick={() => toggleExpanded(item.id)}
+                              className="font-mono text-[10px] uppercase text-white/70 hover:text-white"
+                            >
+                              {isExpanded ? '▾ Hide Contents' : '▸ Inspect Contents'}
+                            </button>
+                          </div>
 
-                    {item.isPlaceholder ? (
-                      <span className="font-mono text-[10px] uppercase tracking-wide text-slate-600">
-                        Placeholder — no file uploaded yet
-                      </span>
-                    ) : (
-                      <a
-                        href={item.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 text-xs font-mono text-center uppercase transition border rounded bg-white/10 hover:bg-white/20 border-neutral-700 text-white"
-                      >
-                        Download
-                      </a>
-                    )}
-                  </div>
-                ))}
+                          {isExpanded && (
+                            <div className="pt-2 space-y-1.5 border-t border-slate-800">
+                              {tracks.map((t, i) => (
+                                <div key={`${t.filename}-${i}`} className="flex items-center justify-between gap-2">
+                                  <span className="font-mono text-xs truncate text-slate-300">{t.filename}</span>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-[10px] font-mono text-slate-500">
+                                      {formatBytes(t.sizeBytes)}
+                                      {t.durationSeconds ? ` • ${formatDuration(t.durationSeconds)}` : ''}
+                                    </span>
+                                    <a
+                                      href={t.fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-mono text-[10px] uppercase underline text-white/70 hover:text-white"
+                                    >
+                                      Download
+                                    </a>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -224,7 +359,7 @@ export default function CosmicVaultAuth() {
 
             <input
               type="text"
-              placeholder="Title"
+              placeholder="Title (pack title for multi-file uploads)"
               value={uploadTitle}
               onChange={(e) => setUploadTitle(e.target.value)}
               required
@@ -232,7 +367,7 @@ export default function CosmicVaultAuth() {
             />
             <input
               type="text"
-              placeholder="SKU (e.g. POD-S1E2)"
+              placeholder="SKU (same SKU adds tracks to an existing pack)"
               value={uploadSku}
               onChange={(e) => setUploadSku(e.target.value)}
               required
@@ -263,12 +398,68 @@ export default function CosmicVaultAuth() {
               rows={2}
               className="w-full p-3 font-mono text-sm border rounded-lg resize-none bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
             />
-            <input
-              type="file"
-              onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-              required
-              className="w-full text-xs text-slate-400 font-mono file:mr-3 file:px-3 file:py-1.5 file:rounded file:border file:border-neutral-700 file:bg-neutral-800 file:text-white file:text-xs file:font-mono file:uppercase"
-            />
+            <div className="flex gap-2">
+              <label className="flex-1 px-3 py-2 text-xs font-mono text-center text-white uppercase transition border rounded-lg cursor-pointer bg-neutral-800 hover:bg-neutral-700 border-neutral-700">
+                + Add Files
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => {
+                    addFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+              </label>
+              <label className="flex-1 px-3 py-2 text-xs font-mono text-center text-white uppercase transition border rounded-lg cursor-pointer bg-neutral-800 hover:bg-neutral-700 border-neutral-700">
+                + Add Folder
+                <input
+                  type="file"
+                  multiple
+                  {...{ webkitdirectory: 'true' }}
+                  onChange={(e) => {
+                    addFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {uploadFiles.length > 0 && (
+              <div className="space-y-1.5 max-h-40 overflow-y-auto border rounded-lg border-slate-800 bg-slate-950/60 p-2">
+                <div className="flex items-center justify-between px-1 font-mono text-[10px] uppercase text-slate-500">
+                  <span>
+                    {uploadFiles.length} file{uploadFiles.length > 1 ? 's' : ''} • {formatBytes(totalUploadBytes)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUploadFiles([]);
+                      setFileDurations(new Map());
+                    }}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                {uploadFiles.map((file, i) => (
+                  <div key={`${file.name}-${i}`} className="flex items-center justify-between gap-2 px-1 py-0.5">
+                    <span className="font-mono text-xs truncate text-slate-300">
+                      {file.name}
+                      {fileDurations.has(file) ? ` (${formatDuration(fileDurations.get(file)!)})` : ''}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeUploadFile(i)}
+                      className="shrink-0 font-mono text-xs text-slate-500 hover:text-rose-400"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {uploadError && <p className="font-mono text-xs text-rose-400">{uploadError}</p>}
 

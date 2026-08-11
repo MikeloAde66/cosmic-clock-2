@@ -1,15 +1,45 @@
+import type { UpdateQuery } from 'mongoose';
 import dbConnect from '@/lib/dbConnect';
-import VaultProduct from '@/lib/models/VaultProduct';
+import VaultProduct, { type VaultProductDoc } from '@/lib/models/VaultProduct';
 import { ensureVaultBucket, getSupabaseAdmin, VAULT_BUCKET } from '@/lib/supabaseAdmin';
 import { VAULT_DRAWERS, type VaultDrawer } from '@/lib/vaultRegistry';
 
 export const runtime = 'nodejs';
 
-// Proxies the file through this route rather than issuing the client a
-// direct-to-storage signed upload URL — simpler to reason about for what is
+// Proxies files through this route rather than issuing the client
+// direct-to-storage signed upload URLs — simpler to reason about for what is
 // an internal/admin action, not a public-facing upload surface. Revisit with
-// a direct-to-storage flow if uploads ever need to bypass this size limit.
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100MB
+// a direct-to-storage flow if uploads ever need to bypass these limits.
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100MB per file
+const MAX_BATCH_FILES = 200;
+const BATCH_CONCURRENCY = 4;
+
+interface TrackUploadSuccess {
+  file: File;
+  ok: true;
+  track: { filename: string; storagePath: string; sizeBytes: number; durationSeconds?: number };
+}
+interface TrackUploadFailure {
+  file: File;
+  ok: false;
+  error: string;
+}
+
+// Runs `task` across `items` with at most `limit` in flight at once — plain
+// Promise.all would fire every file in the batch simultaneously, which is
+// unnecessary load for something like a 30-track folder upload.
+async function mapWithConcurrency<T, R>(items: T[], limit: number, task: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await task(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
 
 export async function POST(request: Request) {
   if (!process.env.MONGODB_URI) {
@@ -31,15 +61,33 @@ export async function POST(request: Request) {
     return new Response('Invalid vault key.', { status: 401 });
   }
 
-  const file = form.get('file');
+  // Folder/batch selects (webkitdirectory) can include OS junk files
+  // (.DS_Store, Thumbs.db) — drop dotfiles before they become tracks.
+  const files = form.getAll('file').filter((f): f is File => f instanceof File && !f.name.split('/').pop()?.startsWith('.'));
   const title = form.get('title');
   const sku = form.get('sku');
   const drawer = form.get('drawer');
-  const description = form.get('description') ?? '';
-  const readmeGuide = form.get('readmeGuide') ?? '';
+  const description = String(form.get('description') ?? '');
+  const readmeGuide = String(form.get('readmeGuide') ?? '');
 
-  if (!(file instanceof File)) {
-    return new Response('file is required.', { status: 400 });
+  // Optional: client-probed audio durations, positionally aligned with the
+  // `file` entries in the order they were appended (FormData preserves
+  // append order, and getAll() returns them in that order).
+  let durations: (number | null)[] = [];
+  const durationsRaw = form.get('durations');
+  if (typeof durationsRaw === 'string') {
+    try {
+      durations = JSON.parse(durationsRaw);
+    } catch {
+      // Ignore malformed payloads — duration is a nice-to-have, not required.
+    }
+  }
+
+  if (files.length === 0) {
+    return new Response('At least one file is required.', { status: 400 });
+  }
+  if (files.length > MAX_BATCH_FILES) {
+    return new Response(`A single batch is limited to ${MAX_BATCH_FILES} files.`, { status: 400 });
   }
   if (typeof title !== 'string' || !title.trim()) {
     return new Response('title is required.', { status: 400 });
@@ -50,36 +98,74 @@ export async function POST(request: Request) {
   if (typeof drawer !== 'string' || !VAULT_DRAWERS.includes(drawer as VaultDrawer)) {
     return new Response(`drawer must be one of: ${VAULT_DRAWERS.join(', ')}`, { status: 400 });
   }
-  if (file.size > MAX_UPLOAD_BYTES) {
-    return new Response(`File exceeds the ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB upload limit.`, { status: 413 });
-  }
-
-  const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-  const storagePath = `${drawer}/${sku.trim()}-${Date.now()}-${sanitizedFilename}`;
 
   try {
     await ensureVaultBucket();
+    await dbConnect();
     const admin = getSupabaseAdmin();
 
-    const { error: uploadError } = await admin.storage
-      .from(VAULT_BUCKET)
-      .upload(storagePath, file, { contentType: file.type || 'application/octet-stream' });
-    if (uploadError) throw uploadError;
+    const outcomes = await mapWithConcurrency(files, BATCH_CONCURRENCY, async (file, index): Promise<TrackUploadSuccess | TrackUploadFailure> => {
+      try {
+        if (file.size > MAX_UPLOAD_BYTES) {
+          throw new Error(`Exceeds the ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB upload limit.`);
+        }
 
-    await dbConnect();
-    const doc = await VaultProduct.create({
-      sku: sku.trim(),
-      drawer: drawer as VaultDrawer,
-      title: title.trim(),
-      description: String(description),
-      storagePath,
-      readmeGuide: String(readmeGuide),
+        // Directory-mode file pickers can hand back a name carrying the
+        // folder path (e.g. "432Hz Pack/Track 01.mp3") rather than a bare
+        // filename — strip to the basename before it's used anywhere.
+        const baseName = file.name.split('/').pop() || file.name;
+        const sanitizedFilename = baseName.replace(/[^a-zA-Z0-9_.-]/g, '_');
+        // Nested under the pack's own sku so every product's files live
+        // together in the bucket: drawer/sku/timestamp-filename.
+        const storagePath = `${drawer}/${sku.trim()}/${Date.now()}-${sanitizedFilename}`;
+
+        const { error: uploadError } = await admin.storage
+          .from(VAULT_BUCKET)
+          .upload(storagePath, file, { contentType: file.type || 'application/octet-stream' });
+        if (uploadError) throw uploadError;
+
+        const durationSeconds = durations[index] ?? undefined;
+
+        return {
+          file,
+          ok: true,
+          track: { filename: baseName, storagePath, sizeBytes: file.size, ...(durationSeconds ? { durationSeconds } : {}) },
+        };
+      } catch (err) {
+        return { file, ok: false, error: err instanceof Error ? err.message : 'Upload failed.' };
+      }
     });
 
-    const { data: signed, error: signError } = await admin.storage
-      .from(VAULT_BUCKET)
-      .createSignedUrl(storagePath, 60 * 60); // 1 hour, matches the download link's expiry in the list route
-    if (signError) throw signError;
+    const newTracks = outcomes.filter((o): o is TrackUploadSuccess => o.ok).map((o) => o.track);
+    const errors = outcomes
+      .filter((o): o is TrackUploadFailure => !o.ok)
+      .map((o) => ({ filename: o.file.name, message: o.error }));
+
+    if (newTracks.length === 0) {
+      return Response.json({ product: null, errors }, { status: 500 });
+    }
+
+    // Upsert: a second upload with the same sku+drawer appends tracks to the
+    // existing pack (and refreshes its metadata) instead of spawning a
+    // duplicate card.
+    const update: UpdateQuery<VaultProductDoc> = {
+      $set: { title: title.trim(), description, readmeGuide },
+      $push: { tracks: { $each: newTracks } },
+      $setOnInsert: { createdAt: new Date() },
+    };
+    const doc = await VaultProduct.findOneAndUpdate<VaultProductDoc>(
+      { sku: sku.trim(), drawer: drawer as VaultDrawer },
+      update,
+      { upsert: true, new: true }
+    );
+    if (!doc) throw new Error('Failed to upsert vault pack.');
+
+    const trackUrls = await Promise.all(
+      doc.tracks.map(async (t) => {
+        const { data: signed, error } = await admin.storage.from(VAULT_BUCKET).createSignedUrl(t.storagePath, 60 * 60);
+        return { filename: t.filename, fileUrl: error ? '' : signed.signedUrl, sizeBytes: t.sizeBytes, durationSeconds: t.durationSeconds };
+      })
+    );
 
     return Response.json({
       product: {
@@ -88,11 +174,13 @@ export async function POST(request: Request) {
         drawer: doc.drawer,
         title: doc.title,
         description: doc.description,
-        fileUrl: signed.signedUrl,
         readmeGuide: doc.readmeGuide,
         dateAdded: doc.createdAt.toISOString().slice(0, 10),
         isPlaceholder: false,
+        fileUrl: '',
+        tracks: trackUrls,
       },
+      errors,
     });
   } catch (err) {
     console.error('Vault upload error:', err);
