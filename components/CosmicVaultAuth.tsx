@@ -270,6 +270,10 @@ export default function CosmicVaultAuth() {
 
             {isLoadingInventory ? (
               <p className="font-mono text-xs text-slate-500">Loading inventory…</p>
+            ) : visibleProducts.length === 0 ? (
+              <p className="font-mono text-xs text-slate-500">
+                No items in this drawer yet — use + Upload File to add the first one.
+              </p>
             ) : (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {visibleProducts.map((item) => {
@@ -296,50 +300,44 @@ export default function CosmicVaultAuth() {
                         <p className="font-mono text-[10px] text-slate-600">SKU: {item.sku}</p>
                       </div>
 
-                      {item.isPlaceholder ? (
-                        <span className="font-mono text-[10px] uppercase tracking-wide text-slate-600">
-                          Placeholder — no file uploaded yet
-                        </span>
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono text-[10px] text-slate-500">
-                              {tracks.length} file{tracks.length !== 1 ? 's' : ''} • {formatBytes(totalSize)}
-                              {totalDuration > 0 ? ` • ${formatDuration(totalDuration)}` : ''}
-                            </span>
-                            <button
-                              onClick={() => toggleExpanded(item.id)}
-                              className="font-mono text-[10px] uppercase text-white/70 hover:text-white"
-                            >
-                              {isExpanded ? '▾ Hide Contents' : '▸ Inspect Contents'}
-                            </button>
-                          </div>
-
-                          {isExpanded && (
-                            <div className="pt-2 space-y-1.5 border-t border-slate-800">
-                              {tracks.map((t, i) => (
-                                <div key={`${t.filename}-${i}`} className="flex items-center justify-between gap-2">
-                                  <span className="font-mono text-xs truncate text-slate-300">{t.filename}</span>
-                                  <div className="flex items-center gap-2 shrink-0">
-                                    <span className="text-[10px] font-mono text-slate-500">
-                                      {formatBytes(t.sizeBytes)}
-                                      {t.durationSeconds ? ` • ${formatDuration(t.durationSeconds)}` : ''}
-                                    </span>
-                                    <a
-                                      href={t.fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="font-mono text-[10px] uppercase underline text-white/70 hover:text-white"
-                                    >
-                                      Download
-                                    </a>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[10px] text-slate-500">
+                            {tracks.length} file{tracks.length !== 1 ? 's' : ''} • {formatBytes(totalSize)}
+                            {totalDuration > 0 ? ` • ${formatDuration(totalDuration)}` : ''}
+                          </span>
+                          <button
+                            onClick={() => toggleExpanded(item.id)}
+                            className="font-mono text-[10px] uppercase text-white/70 hover:text-white"
+                          >
+                            {isExpanded ? '▾ Hide Contents' : '▸ Inspect Contents'}
+                          </button>
                         </div>
-                      )}
+
+                        {isExpanded && (
+                          <div className="pt-2 space-y-1.5 border-t border-slate-800">
+                            {tracks.map((t, i) => (
+                              <div key={`${t.filename}-${i}`} className="flex items-center justify-between gap-2">
+                                <span className="font-mono text-xs truncate text-slate-300">{t.filename}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-[10px] font-mono text-slate-500">
+                                    {formatBytes(t.sizeBytes)}
+                                    {t.durationSeconds ? ` • ${formatDuration(t.durationSeconds)}` : ''}
+                                  </span>
+                                  <a
+                                    href={t.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-mono text-[10px] uppercase underline text-white/70 hover:text-white"
+                                  >
+                                    Download
+                                  </a>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

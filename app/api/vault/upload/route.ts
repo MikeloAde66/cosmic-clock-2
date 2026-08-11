@@ -176,8 +176,6 @@ export async function POST(request: Request) {
         description: doc.description,
         readmeGuide: doc.readmeGuide,
         dateAdded: doc.createdAt.toISOString().slice(0, 10),
-        isPlaceholder: false,
-        fileUrl: '',
         tracks: trackUrls,
       },
       errors,
