@@ -1,146 +1,26 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Search } from 'lucide-react';
-
-interface RadioStation {
-  id: string;
-  name: string;
-  network: string;
-  tagline: string;
-  genre: string;
-  category: string;
-  streamUrl: string; // empty string = not yet available (renders as a "Coming Soon" placeholder)
-  badge: string;
-  badgeColor: string;
-}
-
-const CATEGORIES = ['ALL', 'CURRENT AFFAIRS', 'COSMIC AMBIENT', 'CONSCIOUSNESS & FRINGE', 'GNOSTIC & ANCIENT', 'STOIC & WISDOM'];
-
-const STATIONS: RadioStation[] = [
-  // Current Affairs — real, verified working streams
-  {
-    id: 'bbc-world',
-    name: 'BBC World Service',
-    network: 'BBC',
-    tagline: 'Global News & Analysis',
-    genre: 'News / Current Affairs',
-    category: 'CURRENT AFFAIRS',
-    streamUrl: 'https://stream.live.vc.bbcmedia.co.uk/bbc_world_service',
-    badge: 'BBC',
-    badgeColor: '#bb1919',
-  },
-  {
-    id: 'npr-news',
-    name: 'NPR News',
-    network: 'NPR',
-    tagline: 'National Public Radio Live',
-    genre: 'Public Radio / Talk',
-    category: 'CURRENT AFFAIRS',
-    streamUrl: 'https://npr-ice.streamguys1.com/live.mp3',
-    badge: 'NPR',
-    badgeColor: '#1b3668',
-  },
-
-  // Cosmic Ambient — the SomaFM streams respond fine at the network level
-  // (verified: HTTP 200, audio/mpeg) but were reported not playing in
-  // practice, so this stays an honest placeholder rather than claiming a
-  // working stream that isn't confirmed working for real users.
-  {
-    id: 'cosmic-ambient-pending',
-    name: 'Ambient & Space Radio',
-    network: 'TBD',
-    tagline: 'Looking for a reliably playable ambient/space stream',
-    genre: 'Ambient / Space',
-    category: 'COSMIC AMBIENT',
-    streamUrl: '',
-    badge: '∞',
-    badgeColor: '#3a3a3a',
-  },
-
-  // Consciousness & Fringe — no free public stream exists yet; honest placeholder
-  {
-    id: 'coast-to-coast',
-    name: 'Coast to Coast AM',
-    network: 'Premiere Networks',
-    tagline: 'Late-night paranormal, consciousness & unexplained phenomena',
-    genre: 'Talk / Late-Night',
-    category: 'CONSCIOUSNESS & FRINGE',
-    streamUrl: '',
-    badge: 'C2C',
-    badgeColor: '#3a3a3a',
-  },
-
-  // Gnostic & Ancient — honest placeholders (the real Aeon Byte content already lives in Pods)
-  {
-    id: 'aeon-byte-gnostic',
-    name: 'Aeon Byte Radio',
-    network: 'Gnostic Network',
-    tagline: 'Heretical history, Nag Hammadi & cosmic myths — full episodes in Pods',
-    genre: 'Talk / Gnostic',
-    category: 'GNOSTIC & ANCIENT',
-    streamUrl: '',
-    badge: 'AB',
-    badgeColor: '#3a3a3a',
-  },
-  {
-    id: 'ancient-cosmology',
-    name: 'Ancient Cosmology & Chronicles',
-    network: 'Lore Vault',
-    tagline: 'Precession, sacred geometry & lost civilizations',
-    genre: 'Talk / Ancient History',
-    category: 'GNOSTIC & ANCIENT',
-    streamUrl: '',
-    badge: 'ACC',
-    badgeColor: '#3a3a3a',
-  },
-
-  // Stoic & Wisdom — honest placeholder
-  {
-    id: 'stoic-spectrum',
-    name: 'The Stoic Spectrum',
-    network: 'Mind & Virtue Radio',
-    tagline: 'Marcus Aurelius, Epictetus & practical ancient philosophy',
-    genre: 'Talk / Philosophy',
-    category: 'STOIC & WISDOM',
-    streamUrl: '',
-    badge: 'STO',
-    badgeColor: '#3a3a3a',
-  },
-];
-
-type Status = 'idle' | 'loading' | 'playing' | 'error';
+import { CATEGORIES, RADIO_STATIONS, type RadioStation } from '@/lib/radioStations';
+import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 
 export default function RadioStreams() {
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeStationId, setActiveStationId] = useState<string | null>(null);
-  const [status, setStatus] = useState<Status>('idle');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { station: playingStation, status, playStation, togglePlayPause } = useRadioPlayer();
 
-  const togglePlay = (station: RadioStation) => {
-    const audio = audioRef.current;
-    if (!audio || !station.streamUrl) return;
-
-    if (activeStationId === station.id && status === 'playing') {
-      audio.pause();
-      setStatus('idle');
+  const handleTuneIn = (station: RadioStation) => {
+    if (playingStation?.id === station.id) {
+      togglePlayPause();
       return;
     }
-
-    setActiveStationId(station.id);
-    setStatus('loading');
-    audio.src = station.streamUrl;
-    audio.play().catch(() => setStatus('error'));
+    playStation(station);
   };
-
-  useEffect(() => {
-    return () => { audioRef.current?.pause(); };
-  }, []);
 
   const query = searchQuery.trim().toLowerCase();
 
-  const filteredStations = STATIONS.filter((s) => {
+  const filteredStations = RADIO_STATIONS.filter((s) => {
     const matchesCategory = activeCategory === 'ALL' || s.category === activeCategory;
     const matchesSearch =
       !query || s.name.toLowerCase().includes(query) || s.tagline.toLowerCase().includes(query);
@@ -149,14 +29,6 @@ export default function RadioStreams() {
 
   return (
     <div className="w-full h-full p-8 overflow-y-auto bg-[#0a0a0c]">
-      <audio
-        ref={audioRef}
-        onPlaying={() => setStatus('playing')}
-        onWaiting={() => setStatus('loading')}
-        onError={() => setStatus('error')}
-        onPause={() => setStatus((s) => (s === 'error' ? s : 'idle'))}
-      />
-
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase">
@@ -192,45 +64,10 @@ export default function RadioStreams() {
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {filteredStations.map((station) => {
-            const isComingSoon = !station.streamUrl;
-            const isActiveStation = activeStationId === station.id;
+            const isActiveStation = playingStation?.id === station.id;
             const isPlaying = isActiveStation && status === 'playing';
             const isLoading = isActiveStation && status === 'loading';
             const isError = isActiveStation && status === 'error';
-
-            if (isComingSoon) {
-              return (
-                <div
-                  key={station.id}
-                  className="relative flex flex-col justify-between p-4 space-y-4 border border-dashed rounded-xl bg-slate-900/30 border-neutral-700"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono tracking-wider uppercase text-slate-600">
-                      {station.genre}
-                    </span>
-                    <span className="px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded bg-white/5 text-white/70 border-neutral-700">
-                      Coming Soon
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-12 h-12 text-xs font-mono font-black tracking-wider rounded shrink-0 bg-slate-800/60 text-slate-500">
-                      {station.badge}
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-bold truncate text-slate-400">{station.name}</h3>
-                      <p className="text-xs truncate text-slate-600">{station.tagline}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
-                    <span className="h-8 px-3 flex items-center text-[11px] font-mono uppercase tracking-wide text-slate-600">
-                      Reserved
-                    </span>
-                  </div>
-                </div>
-              );
-            }
 
             return (
               <div
@@ -278,7 +115,7 @@ export default function RadioStreams() {
 
                 <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
                   <button
-                    onClick={() => togglePlay(station)}
+                    onClick={() => handleTuneIn(station)}
                     className={`h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition ${
                       isPlaying
                         ? 'bg-white text-black border-neutral-700 font-bold hover:bg-neutral-200'

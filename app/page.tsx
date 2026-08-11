@@ -9,42 +9,50 @@ import CosmicVaultAuth from '@/components/CosmicVaultAuth';
 import AiOneHome from '@/components/AiOneHome';
 import RadioStreams from '@/components/RadioStreams';
 import SiteFooter from '@/components/SiteFooter';
+import { RadioPlayerProvider } from '@/components/radio/RadioPlayerContext';
+import GlobalPlayerBar from '@/components/radio/GlobalPlayerBar';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<string>('aione');
 useContextMenuShare();
   return (
-    <main className="flex h-screen w-screen overflow-hidden bg-[#0a0a0c]">
-      <LeftNav activeTab={activeTab} setActiveTab={setActiveTab} />
+    <RadioPlayerProvider>
+      <main className="flex h-screen w-screen overflow-hidden bg-[#0a0a0c]">
+        <LeftNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <TopHeader activeTab={activeTab} />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <TopHeader activeTab={activeTab} />
 
-        <div className="relative flex-1 overflow-hidden">
-          {activeTab === 'radio' && <RadioStreams />}
+          <div className="relative flex-1 overflow-hidden">
+            {activeTab === 'radio' && <RadioStreams />}
 
-          {activeTab === 'vault' && <CosmicVaultAuth />}
+            {activeTab === 'vault' && <CosmicVaultAuth />}
 
-          {activeTab === 'aione' && <AiOneHome />}
+            {activeTab === 'aione' && <AiOneHome />}
 
-          {activeTab === 'fact-checker' && (
-            <div className="w-full h-full p-6 overflow-auto">
-              <FactChecker />
+            {activeTab === 'fact-checker' && (
+              <div className="w-full h-full p-6 overflow-auto">
+                <FactChecker />
+              </div>
+            )}
+
+            {/* Pods stays mounted (just hidden) instead of unmounting on tab
+                switch — it holds local file uploads as in-memory blob URLs,
+                which die the instant the component unmounts. Unlike a real
+                page reload (where blob URLs are gone regardless), switching
+                tabs within this single-page app doesn't need to destroy them. */}
+            <div className={activeTab === 'pods' ? 'w-full h-full' : 'hidden'}>
+              <PodsModule />
             </div>
-          )}
-
-          {/* Pods stays mounted (just hidden) instead of unmounting on tab
-              switch — it holds local file uploads as in-memory blob URLs,
-              which die the instant the component unmounts. Unlike a real
-              page reload (where blob URLs are gone regardless), switching
-              tabs within this single-page app doesn't need to destroy them. */}
-          <div className={activeTab === 'pods' ? 'w-full h-full' : 'hidden'}>
-            <PodsModule />
           </div>
-        </div>
 
-        <SiteFooter />
-      </div>
-    </main>
+          {/* Always mounted (renders nothing until a station is playing) so
+              radio playback survives switching tabs, not scoped to the Radio
+              tab's own lifecycle the way everything but Pods currently is. */}
+          <GlobalPlayerBar />
+          <SiteFooter />
+        </div>
+      </main>
+    </RadioPlayerProvider>
   );
 }

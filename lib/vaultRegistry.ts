@@ -22,6 +22,7 @@ export interface VaultTrack {
   fileUrl: string;
   sizeBytes: number;
   durationSeconds?: number;
+  weight?: number;
 }
 
 export interface VaultProduct {

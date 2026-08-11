@@ -3,6 +3,7 @@ import dbConnect from '@/lib/dbConnect';
 import VaultProduct, { type VaultProductDoc } from '@/lib/models/VaultProduct';
 import { ensureVaultBucket, getSupabaseAdmin, VAULT_BUCKET } from '@/lib/supabaseAdmin';
 import { VAULT_DRAWERS, type VaultDrawer } from '@/lib/vaultRegistry';
+import { mapWithConcurrency } from '@/lib/concurrency';
 
 export const runtime = 'nodejs';
 
@@ -23,22 +24,6 @@ interface TrackUploadFailure {
   file: File;
   ok: false;
   error: string;
-}
-
-// Runs `task` across `items` with at most `limit` in flight at once — plain
-// Promise.all would fire every file in the batch simultaneously, which is
-// unnecessary load for something like a 30-track folder upload.
-async function mapWithConcurrency<T, R>(items: T[], limit: number, task: (item: T, index: number) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    while (next < items.length) {
-      const i = next++;
-      results[i] = await task(items[i], i);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
 }
 
 export async function POST(request: Request) {
@@ -163,7 +148,7 @@ export async function POST(request: Request) {
     const trackUrls = await Promise.all(
       doc.tracks.map(async (t) => {
         const { data: signed, error } = await admin.storage.from(VAULT_BUCKET).createSignedUrl(t.storagePath, 60 * 60);
-        return { filename: t.filename, fileUrl: error ? '' : signed.signedUrl, sizeBytes: t.sizeBytes, durationSeconds: t.durationSeconds };
+        return { filename: t.filename, fileUrl: error ? '' : signed.signedUrl, sizeBytes: t.sizeBytes, durationSeconds: t.durationSeconds, weight: t.weight ?? 1 };
       })
     );
 

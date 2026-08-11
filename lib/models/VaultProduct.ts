@@ -9,6 +9,9 @@ export interface VaultTrackSub {
   storagePath: string;
   sizeBytes: number;
   durationSeconds?: number;
+  // Relative rotation weight for radio queue generation — higher plays more
+  // often. Absent/1 is normal weight; set via PATCH /api/radio/weights.
+  weight?: number;
 }
 
 const VaultTrackSchema = new Schema<VaultTrackSub>(
@@ -17,6 +20,7 @@ const VaultTrackSchema = new Schema<VaultTrackSub>(
     storagePath: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
     durationSeconds: { type: Number },
+    weight: { type: Number, default: 1 },
   },
   { _id: false }
 );

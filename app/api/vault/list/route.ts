@@ -31,6 +31,7 @@ export async function GET() {
               fileUrl: error ? '' : signed.signedUrl,
               sizeBytes: t.sizeBytes,
               durationSeconds: t.durationSeconds,
+              weight: t.weight ?? 1,
             };
           })
         );
