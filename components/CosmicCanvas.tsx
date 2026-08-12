@@ -98,19 +98,13 @@ export default function CosmicCanvas() {
           <main className="relative flex items-center justify-center flex-1 p-6">
             <div className="relative w-full max-w-[480px] aspect-square flex items-center justify-center">
 
-              {/* Tilted Axial Assembly (23.4° Earth axis) */}
+              {/* Earth sphere mesh — 23.4° axial tilt kept as a real detail
+                  of the globe itself, not part of the (now removed) HUD
+                  vector overlay. */}
               <div className="absolute inset-0 flex items-center justify-center transform -rotate-[23.4deg]">
-                {/* Precession Wobble Ring — stationary in screen space, part of
-                    the fixed HUD overlay */}
-                <div className="absolute top-[8%] w-[45%] h-[10%] border border-dashed rounded-full border-white/70" />
-
-                {/* Earth Rotational Axis Vector (HUD axis pin) — stationary */}
-                <div className="absolute w-[1px] h-[96%] bg-gradient-to-b from-red-500 via-white/80 to-red-500 shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
-
                 {/* Rotating Earth: real NASA Blue Marble photo (public domain),
                     panned via a CSS animation (120s per revolution, linear,
-                    infinite) — west-to-east, independent of the fixed HUD
-                    overlay around it. */}
+                    infinite) — west-to-east. */}
                 <div className="relative z-10 w-[62%] aspect-square rounded-full overflow-hidden shadow-[inset_0_0_35px_rgba(0,0,0,0.9),0_0_20px_rgba(255,255,255,0.15)]">
                   <div
                     className="absolute inset-0 animate-earth-spin"
@@ -127,25 +121,13 @@ export default function CosmicCanvas() {
                 </div>
               </div>
 
-              {/* Orbital dashed rings — stationary, part of the fixed HUD overlay */}
-              <div className="absolute inset-0 border border-dashed rounded-full border-white/20">
-                <svg className="w-full h-full transform -rotate-45" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="48" fill="none" stroke="#ffffff" strokeWidth="0.3" strokeDasharray="10 80" strokeLinecap="round" />
-                </svg>
+              {/* Crescent moon, fixed in the top-right corner of the canvas —
+                  two overlapping circles: the outer one is the moon body,
+                  the inner one is filled with the canvas's own background
+                  color to "cut" the crescent shape out of it. */}
+              <div className="absolute w-5 h-5 overflow-hidden rounded-full top-8 right-2 bg-gradient-to-br from-white via-slate-200 to-slate-400 shadow-[0_0_8px_rgba(255,255,255,0.35)]">
+                <div className="absolute w-5 h-5 rounded-full bg-[#0a0a0c] -top-1 -right-2" />
               </div>
-
-              <div className="absolute rounded-full inset-[8%] border border-white/10">
-                <svg className="w-full h-full" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="44" fill="none" stroke="#ffffff" strokeWidth="0.4" strokeDasharray="15 65" strokeLinecap="round" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Orbital arc segment, anchored to the bottom of the canvas —
-                stationary, part of the fixed HUD overlay */}
-            <div className="absolute inset-x-0 bottom-0 h-8 overflow-hidden pointer-events-none">
-              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] bg-slate-900" />
-              <div className="absolute top-1/2 -translate-y-1/2 h-[2px] w-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent shadow-[0_0_6px_rgba(255,255,255,0.15)]" />
             </div>
           </main>
         </>
