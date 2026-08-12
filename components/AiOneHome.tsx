@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import CosmicCanvas from './CosmicCanvas';
 import SignUpModal from './SignUpModal';
 import DonationButton from './DonationButton';
+import PricingPlans from './PricingPlans';
 import { supabase } from '@/lib/supabase';
 
 export default function AiOneHome() {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<'home' | 'pricing'>('home');
 
   useEffect(() => {
     // Supabase's default email template sends a magic link, not a 6-digit
@@ -53,12 +56,12 @@ export default function AiOneHome() {
           Products
         </span>
 
-        <span
-          className="cursor-default text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
-          title="Pricing — coming soon"
+        <button
+          onClick={() => setActiveSection('pricing')}
+          className="text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
         >
           Pricing
-        </span>
+        </button>
 
         <button
           onClick={() => setIsSignUpOpen(true)}
@@ -72,14 +75,31 @@ export default function AiOneHome() {
 
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} />
 
-      {/* MAIN CONTENT VIEW: Cosmic Clock centerpiece, replacing the old video monitor */}
-      <div className="flex-1 w-full max-w-6xl px-6 py-10 mx-auto">
-        <div className="w-full overflow-hidden border shadow-2xl bg-slate-950 border-slate-800 rounded-2xl">
-          <div className="relative w-full aspect-video">
-            <CosmicCanvas />
+      {activeSection === 'pricing' ? (
+        <div className="flex flex-col flex-1 min-h-0">
+          <div className="px-6 pt-4 shrink-0">
+            <button
+              onClick={() => setActiveSection('home')}
+              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Back
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            <PricingPlans />
           </div>
         </div>
-      </div>
+      ) : (
+        /* MAIN CONTENT VIEW: Cosmic Clock centerpiece, replacing the old video monitor */
+        <div className="flex-1 w-full max-w-6xl px-6 py-10 mx-auto">
+          <div className="w-full overflow-hidden border shadow-2xl bg-slate-950 border-slate-800 rounded-2xl">
+            <div className="relative w-full aspect-video">
+              <CosmicCanvas />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
