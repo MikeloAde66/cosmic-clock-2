@@ -98,20 +98,15 @@ export default function CosmicCanvas() {
           <main className="relative flex items-center justify-center flex-1 p-6">
             <div className="relative w-full max-w-[480px] aspect-square flex items-center justify-center">
 
-              {/* Tilted Axial Assembly (23.4° Earth axis) */}
-              <div className="absolute inset-0 flex items-center justify-center transform -rotate-[23.4deg]">
-                {/* Precession Wobble Ring — stationary in screen space, part of
-                    the fixed HUD overlay */}
-                <div className="absolute top-[8%] w-[45%] h-[10%] border border-dashed rounded-full border-white/70" />
-
-                {/* Earth Rotational Axis Vector (HUD axis pin) — stationary */}
-                <div className="absolute w-[1px] h-[96%] bg-gradient-to-b from-red-500 via-white/80 to-red-500 shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
-
-                {/* Rotating Earth: real NASA Blue Marble photo (public domain),
-                    panned via a CSS animation (120s per revolution, linear,
-                    infinite) — west-to-east, independent of the fixed HUD
-                    overlay around it. */}
-                <div className="relative z-10 w-[62%] aspect-square rounded-full overflow-hidden shadow-[inset_0_0_35px_rgba(0,0,0,0.9),0_0_20px_rgba(255,255,255,0.15)]">
+              {/* Earth mesh layer: the only thing in this composition that
+                  animates. Its own 23.4° tilt is applied directly here (not
+                  inherited from a shared wrapper) so this layer carries zero
+                  dependency on the HUD overlay below, and vice versa. */}
+              <div className="absolute z-10 flex items-center justify-center inset-0 transform -rotate-[23.4deg]">
+                <div className="relative w-[62%] aspect-square rounded-full overflow-hidden shadow-[inset_0_0_35px_rgba(0,0,0,0.9),0_0_20px_rgba(255,255,255,0.15)]">
+                  {/* Rotating Earth: real NASA Blue Marble photo (public
+                      domain), panned via a CSS animation (120s per
+                      revolution, linear, infinite) — west-to-east. */}
                   <div
                     className="absolute inset-0 animate-earth-spin"
                     style={{
@@ -127,18 +122,47 @@ export default function CosmicCanvas() {
                 </div>
               </div>
 
-              {/* Orbital dashed rings — stationary, part of the fixed HUD overlay */}
-              <div className="absolute inset-0 border border-dashed rounded-full border-white/20">
-                <svg className="w-full h-full transform -rotate-45" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="48" fill="none" stroke="#ffffff" strokeWidth="0.3" strokeDasharray="10 80" strokeLinecap="round" />
-                </svg>
-              </div>
+              {/* Fixed HUD telemetry overlay: one static SVG layered above
+                  the Earth mesh, with no animation of its own — the capsule
+                  outline and axis line carry their own 23.4° tilt (matching
+                  the Earth layer's, so the two stay visually aligned despite
+                  being fully independent layers); the orbital rings don't. */}
+              <svg
+                className="absolute inset-0 z-20 w-full h-full pointer-events-none"
+                viewBox="0 0 100 100"
+              >
+                <defs>
+                  <linearGradient id="hud-axis-gradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ef4444" />
+                    <stop offset="50%" stopColor="rgba(255,255,255,0.8)" />
+                    <stop offset="100%" stopColor="#ef4444" />
+                  </linearGradient>
+                </defs>
 
-              <div className="absolute rounded-full inset-[8%] border border-white/10">
-                <svg className="w-full h-full" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="44" fill="none" stroke="#ffffff" strokeWidth="0.4" strokeDasharray="15 65" strokeLinecap="round" />
-                </svg>
-              </div>
+                <g transform="rotate(-23.4 50 50)">
+                  {/* Top pill capsule outline (precession wobble ring) */}
+                  <ellipse
+                    cx="50" cy="13" rx="22.5" ry="5"
+                    fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="0.4" strokeDasharray="2 2"
+                  />
+                  {/* Red axis line */}
+                  <line
+                    x1="50" y1="2" x2="50" y2="98"
+                    stroke="url(#hud-axis-gradient)" strokeWidth="0.4"
+                  />
+                </g>
+
+                {/* Dashed orbital rings / white arc segments */}
+                <circle
+                  cx="50" cy="50" r="48"
+                  fill="none" stroke="#ffffff" strokeWidth="0.3" strokeDasharray="10 80" strokeLinecap="round"
+                  transform="rotate(-45 50 50)"
+                />
+                <circle
+                  cx="50" cy="50" r="44"
+                  fill="none" stroke="#ffffff" strokeWidth="0.4" strokeDasharray="15 65" strokeLinecap="round"
+                />
+              </svg>
             </div>
 
             {/* Orbital arc segment, anchored to the bottom of the canvas —
