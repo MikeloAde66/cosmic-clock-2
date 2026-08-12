@@ -1,52 +1,42 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, CloudSun, Compass } from 'lucide-react';
 import NoaaWidget from './NoaaWidget';
 import AiOneChat from './AiOneChat';
 
-// Real Earth's actual rotation: 360° every 24 hours, computed from the true
-// current time rather than an animation clock — so it always shows the
-// correct face of the planet, even after the tab has been closed and
-// reopened, and moves too slowly to perceive within a normal viewing
-// session (as it should).
-// Sparse, static star positions — a light scattering, not a dense field, so
-// it never competes with the Earth for attention.
-const STARS = [
-  { top: '12%', left: '8%', size: '1px', delay: '0s', duration: '3s' },
-  { top: '22%', left: '88%', size: '2px', delay: '1.2s', duration: '4s' },
-  { top: '15%', left: '72%', size: '1px', delay: '0.5s', duration: '2.5s' },
-  { top: '82%', left: '14%', size: '1px', delay: '2.1s', duration: '3.5s' },
-  { top: '75%', left: '82%', size: '2px', delay: '0.8s', duration: '4.2s' },
-  { top: '35%', left: '12%', size: '1.5px', delay: '1.7s', duration: '3.1s' },
-  { top: '68%', left: '92%', size: '1px', delay: '2.4s', duration: '2.8s' },
-  { top: '88%', left: '48%', size: '1px', delay: '0.3s', duration: '3.8s' },
-  { top: '18%', left: '42%', size: '1.5px', delay: '1.9s', duration: '4.5s' },
-  { top: '48%', left: '94%', size: '1px', delay: '1.1s', duration: '3.2s' },
-  { top: '58%', left: '6%', size: '2px', delay: '2.7s', duration: '3.9s' },
-  { top: '28%', left: '24%', size: '1px', delay: '0.4s', duration: '2.9s' },
-  { top: '78%', left: '32%', size: '1px', delay: '1.6s', duration: '4.1s' },
-  { top: '8%', left: '55%', size: '1.5px', delay: '2.2s', duration: '3.3s' },
-  { top: '85%', left: '70%', size: '1px', delay: '0.9s', duration: '2.7s' },
-  { top: '42%', left: '82%', size: '1px', delay: '1.5s', duration: '3.6s' },
-];
-
-function useRealTimeEarthRotation() {
-  const [offsetPercent, setOffsetPercent] = useState(0);
-
-  useEffect(() => {
-    const update = () => {
-      const now = new Date();
-      const hours = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600;
-      setOffsetPercent((hours / 24) * 100);
-    };
-    update();
-    const interval = setInterval(update, 15000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return offsetPercent;
+// Deterministic PRNG (mulberry32), not Math.random() — this component is
+// server-rendered before hydration, and Math.random() would produce a
+// different star field on the server than on the client, causing a
+// hydration mismatch. A fixed seed makes both renders identical while
+// still looking scattered/randomized.
+function mulberry32(seed: number) {
+  return function () {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
+
+// Randomized starfield: sparse enough to stay in the background, dense
+// enough to not read as bare. ~20% twinkle (via the shared keyframe below);
+// the rest sit at a fixed size/opacity for depth without visual noise.
+const STAR_COUNT = 135;
+const randomStar = mulberry32(20260812);
+const STARS = Array.from({ length: STAR_COUNT }, () => {
+  const twinkles = randomStar() < 0.2;
+  return {
+    top: `${(randomStar() * 100).toFixed(2)}%`,
+    left: `${(randomStar() * 100).toFixed(2)}%`,
+    size: `${(1 + randomStar() * 1.5).toFixed(2)}px`,
+    opacity: 0.15 + randomStar() * 0.7,
+    twinkles,
+    delay: `${(randomStar() * 4).toFixed(2)}s`,
+    duration: `${(2.5 + randomStar() * 2.5).toFixed(2)}s`,
+  };
+});
 
 function BackButton({ onClick }: { onClick: () => void }) {
   return (
@@ -62,23 +52,22 @@ function BackButton({ onClick }: { onClick: () => void }) {
 
 export default function CosmicCanvas() {
   const [activeView, setActiveView] = useState<'clock' | 'weather' | 'kali'>('clock');
-  const earthOffsetPercent = useRealTimeEarthRotation();
-
   return (
     <div className="relative flex flex-col w-full h-full overflow-hidden bg-[#0a0a0c]">
-      {/* Sparse twinkling starfield, behind everything else */}
+      {/* Randomized starfield, behind everything else — only ~20% twinkle */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         {STARS.map((star, idx) => (
           <div
             key={idx}
-            className="absolute rounded-full bg-white animate-twinkle shadow-[0_0_4px_#ffffff]"
+            className={`absolute rounded-full bg-white shadow-[0_0_4px_#ffffff] ${star.twinkles ? 'animate-twinkle' : ''}`}
             style={{
               top: star.top,
               left: star.left,
               width: star.size,
               height: star.size,
-              animationDelay: star.delay,
-              animationDuration: star.duration,
+              opacity: star.twinkles ? undefined : star.opacity,
+              animationDelay: star.twinkles ? star.delay : undefined,
+              animationDuration: star.twinkles ? star.duration : undefined,
             }}
           />
         ))}
@@ -111,24 +100,24 @@ export default function CosmicCanvas() {
 
               {/* Tilted Axial Assembly (23.4° Earth axis) */}
               <div className="absolute inset-0 flex items-center justify-center transform -rotate-[23.4deg]">
-                {/* Precession Wobble Ring */}
-                <div className="absolute top-[8%] w-[45%] h-[10%] border border-dashed rounded-full border-white/70 animate-[spin_26s_linear_infinite]" />
+                {/* Precession Wobble Ring — stationary in screen space, part of
+                    the fixed HUD overlay */}
+                <div className="absolute top-[8%] w-[45%] h-[10%] border border-dashed rounded-full border-white/70" />
 
-                {/* Earth Rotational Axis Vector */}
+                {/* Earth Rotational Axis Vector (HUD axis pin) — stationary */}
                 <div className="absolute w-[1px] h-[96%] bg-gradient-to-b from-red-500 via-white/80 to-red-500 shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
 
                 {/* Rotating Earth: real NASA Blue Marble photo (public domain),
-                    panned at the true 24-hour rotation rate computed from real
-                    time above — not a drawn approximation, not a fast decorative
-                    spin. */}
+                    panned via a CSS animation (120s per revolution, linear,
+                    infinite) — west-to-east, independent of the fixed HUD
+                    overlay around it. */}
                 <div className="relative z-10 w-[62%] aspect-square rounded-full overflow-hidden shadow-[inset_0_0_35px_rgba(0,0,0,0.9),0_0_20px_rgba(255,255,255,0.15)]">
                   <div
-                    className="absolute inset-0"
+                    className="absolute inset-0 animate-earth-spin"
                     style={{
                       backgroundImage: 'url(/earth/blue-marble.jpg)',
                       backgroundSize: '200% 100%',
                       backgroundRepeat: 'repeat-x',
-                      backgroundPositionX: `${earthOffsetPercent}%`,
                     }}
                   />
                   {/* Subtle spherical shading */}
@@ -138,24 +127,25 @@ export default function CosmicCanvas() {
                 </div>
               </div>
 
-              {/* Counter-Rotating Outer Rings */}
-              <div className="absolute inset-0 border border-dashed rounded-full border-white/20 animate-[spin_40s_linear_infinite]">
+              {/* Orbital dashed rings — stationary, part of the fixed HUD overlay */}
+              <div className="absolute inset-0 border border-dashed rounded-full border-white/20">
                 <svg className="w-full h-full transform -rotate-45" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="48" fill="none" stroke="#ffffff" strokeWidth="0.3" strokeDasharray="10 80" strokeLinecap="round" />
                 </svg>
               </div>
 
-              <div className="absolute rounded-full inset-[8%] border border-white/10 animate-[spin_28s_linear_infinite_reverse]">
+              <div className="absolute rounded-full inset-[8%] border border-white/10">
                 <svg className="w-full h-full" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="44" fill="none" stroke="#ffffff" strokeWidth="0.4" strokeDasharray="15 65" strokeLinecap="round" />
                 </svg>
               </div>
             </div>
 
-            {/* Sweeping horizon vector, anchored to the bottom of the canvas */}
+            {/* Orbital arc segment, anchored to the bottom of the canvas —
+                stationary, part of the fixed HUD overlay */}
             <div className="absolute inset-x-0 bottom-0 h-8 overflow-hidden pointer-events-none">
               <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] bg-slate-900" />
-              <div className="absolute top-1/2 -translate-y-1/2 h-[2px] w-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent shadow-[0_0_6px_rgba(255,255,255,0.15)] animate-[sweepEast_9s_linear_infinite]" />
+              <div className="absolute top-1/2 -translate-y-1/2 h-[2px] w-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent shadow-[0_0_6px_rgba(255,255,255,0.15)]" />
             </div>
           </main>
         </>
@@ -203,16 +193,22 @@ export default function CosmicCanvas() {
       )}
 
       <style jsx>{`
-        @keyframes sweepEast {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(200%); }
-        }
         @keyframes twinkle {
           0%, 100% { opacity: 0.15; transform: scale(0.8); }
           50% { opacity: 0.85; transform: scale(1.2); }
         }
         .animate-twinkle {
           animation-name: twinkle;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
+        @keyframes earthSpin {
+          from { background-position-x: 0%; }
+          to { background-position-x: 100%; }
+        }
+        .animate-earth-spin {
+          animation-name: earthSpin;
+          animation-duration: 120s;
           animation-timing-function: linear;
           animation-iteration-count: infinite;
         }
