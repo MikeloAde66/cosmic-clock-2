@@ -6,18 +6,24 @@ export type VaultDrawer =
   | 'ADMIN'
   | 'MUSIC'
   | 'ANIMATIONS'
+  | 'AUTOMATIONS'
+  | 'DEMOS'
   | 'PROTOTYPES'
   | 'DOCS'
   | 'TEMPLATES'
+  | 'PLANNERS'
   | 'PHOTOS';
 
 export const VAULT_DRAWERS: VaultDrawer[] = [
   'ADMIN',
   'MUSIC',
   'ANIMATIONS',
+  'AUTOMATIONS',
+  'DEMOS',
   'PROTOTYPES',
   'DOCS',
   'TEMPLATES',
+  'PLANNERS',
   'PHOTOS',
 ];
 

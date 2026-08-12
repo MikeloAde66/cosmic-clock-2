@@ -37,6 +37,7 @@ export async function createCheckoutSession(formData: FormData) {
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     line_items: [{ price: priceId, quantity: 1 }],
+    subscription_data: { trial_period_days: 14 },
     success_url: `${origin}/?subscribed=success`,
     cancel_url: `${origin}/?subscribed=cancelled`,
     customer_email: typeof userEmail === 'string' && userEmail ? userEmail : undefined,
@@ -71,4 +72,33 @@ export async function createCheckoutSession(formData: FormData) {
   }
 
   redirect(session.url);
+}
+
+// The Hobby tier is genuinely free, not a $0 Stripe subscription — skipping
+// Stripe entirely avoids collecting a payment method for a plan that will
+// never be charged. Mirrors createCheckoutSession's pending-row pattern so
+// the account shows up the same way in the subscriptions table, just with
+// status 'active' immediately instead of waiting on a webhook.
+export async function activateFreeTier(formData: FormData) {
+  const userId = formData.get('userId');
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
+    throw new Error('Supabase is not configured.');
+  }
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from('subscriptions').insert({
+    user_id: typeof userId === 'string' && userId ? userId : null,
+    // No real Stripe session exists for a free-tier activation — synthesize
+    // a unique id so this still satisfies the column's not-null/unique
+    // constraint without colliding with real Stripe session ids.
+    stripe_checkout_session_id: `free_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+    tier: 'hobby',
+    billing_interval: 'month',
+    status: 'active',
+  });
+  if (error) {
+    throw new Error(`Failed to activate free tier: ${error.message}`);
+  }
+
+  redirect('/?subscribed=success');
 }

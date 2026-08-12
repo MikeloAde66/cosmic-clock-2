@@ -8,6 +8,11 @@ export interface PricingTier {
   description: string;
   features: string[];
   featured?: boolean;
+  recommendedNote?: string;
+  // Hobby is genuinely free, not a Stripe-billed $0 price — the checkout
+  // form skips Stripe entirely for this tier (see app/actions/checkout.ts's
+  // activateFreeTier) and monthly/yearlyPriceId below are unused for it.
+  isFree?: boolean;
   monthlyPriceId: string;
   monthlyAmount: number; // cents
   yearlyPriceId: string;
@@ -20,10 +25,11 @@ export const PRICING_TIERS: PricingTier[] = [
     name: 'Hobby',
     description: 'All the basics for starting a new project.',
     features: ['1 broadcast channel', 'Community support', 'Basic Vault storage'],
+    isFree: true,
     monthlyPriceId: 'price_1U3cHF6YqqBfIrut7OdSX6a5',
-    monthlyAmount: 1200,
+    monthlyAmount: 0,
     yearlyPriceId: 'price_1U3cHF6YqqBfIrutJvtBewQb',
-    yearlyAmount: 12000,
+    yearlyAmount: 0,
   },
   {
     id: 'freelancer',
@@ -31,6 +37,7 @@ export const PRICING_TIERS: PricingTier[] = [
     description: 'For solo creators ready to grow.',
     features: ['5 broadcast channels', 'Priority support', 'Expanded Vault storage', 'Custom radio stations'],
     featured: true,
+    recommendedNote: 'Recommended: Freelance Plan for active project workflows.',
     monthlyPriceId: 'price_1U3cHF6YqqBfIrutfYyhnW8I',
     monthlyAmount: 2400,
     yearlyPriceId: 'price_1U3cHG6YqqBfIrutbGlDwxIl',

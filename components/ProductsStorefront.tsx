@@ -84,13 +84,19 @@ export default function ProductsStorefront() {
                     <p className="text-xs text-slate-400">{product.description}</p>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 mt-auto border-t border-slate-800/80">
+                  <div className="pt-2 mt-auto space-y-2 border-t border-slate-800/80">
                     <span className="text-lg font-bold text-white">${formatPrice(product.amount)}</span>
-                    <form action={createProductCheckout}>
+                    <form action={createProductCheckout} className="flex items-center gap-2">
                       <input type="hidden" name="productId" value={product.id} />
+                      <input
+                        type="text"
+                        name="promoCode"
+                        placeholder="Promo code"
+                        className="w-0 flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono border rounded-lg bg-slate-950 border-slate-800 text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-white/50"
+                      />
                       <button
                         type="submit"
-                        className="px-3 py-1.5 text-[11px] font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition"
+                        className="px-3 py-1.5 text-[11px] font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition shrink-0"
                       >
                         Buy Now
                       </button>

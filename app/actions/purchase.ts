@@ -32,6 +32,24 @@ export async function createProductCheckout(formData: FormData) {
   // to — digital items skip this collection step entirely.
   const isPhysical = product.productType === 'apparel' || product.productType === 'print_collateral';
 
+  // A code typed into our own field is applied directly as a discount (and
+  // validated up front, so a bad code fails loudly here instead of silently
+  // at Stripe); Stripe's own promo field is also left on so a code can still
+  // be entered on the hosted page for anyone who skips ours (e.g. arriving
+  // straight from a QR code). The two are mutually exclusive per checkout
+  // session, so only one is set.
+  const promoCodeRaw = formData.get('promoCode');
+  const promoCode = typeof promoCodeRaw === 'string' ? promoCodeRaw.trim() : '';
+  let discounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined;
+  if (promoCode) {
+    const matches = await stripe.promotionCodes.list({ code: promoCode, active: true, limit: 1 });
+    const promo = matches.data[0];
+    if (!promo) {
+      throw new Error(`Promo code "${promoCode}" is invalid or expired.`);
+    }
+    discounts = [{ promotion_code: promo.id }];
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
     line_items: [
@@ -49,6 +67,7 @@ export async function createProductCheckout(formData: FormData) {
       },
     ],
     ...(isPhysical ? { shipping_address_collection: { allowed_countries: ['US', 'CA', 'GB', 'AU'] } } : {}),
+    ...(discounts ? { discounts } : { allow_promotion_codes: true }),
     success_url: `${origin}/?purchase=success`,
     cancel_url: `${origin}/?purchase=cancelled`,
     metadata: { productId: product.id, product_type: product.productType },
