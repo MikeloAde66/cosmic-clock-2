@@ -27,6 +27,36 @@ export type RadioStation = LiveRadioStation | VaultRadioStation;
 
 export const CATEGORIES = ['ALL', 'CURRENT AFFAIRS', 'VAULT STATIONS'];
 
+export interface OutkastLink {
+  label: string;
+  // Placeholder destinations — swap for the real URLs once they exist, same
+  // convention as SiteFooter's SOCIAL_LINKS.
+  href: string;
+}
+
+export interface OutkastComingSoon {
+  label: string;
+}
+
+// OUTKAST isn't a station filter — it's a dropdown hub of community/social
+// action gates, rendered as its own button alongside the category filters.
+export const OUTKAST_LINKS: OutkastLink[] = [
+  { label: 'Discord', href: 'https://discord.gg/your-invite' },
+  { label: 'WhatsApp', href: 'https://wa.me/your-number' },
+  { label: 'Spotify', href: 'https://open.spotify.com/your-profile' },
+  { label: 'iTunes', href: 'https://music.apple.com/your-page' },
+];
+
+// No backend exists for any of these yet (no trivia UI, no scavenger/
+// innovation-hunt/Astro Challenge feature anywhere in the app) — honest
+// "coming soon" entries rather than fabricated working links.
+export const OUTKAST_COMING_SOON: OutkastComingSoon[] = [
+  { label: 'Trivia' },
+  { label: 'Scavenger Hunt' },
+  { label: 'Prototype Innovation Hunt' },
+  { label: 'Astro Challenges' },
+];
+
 // Curated, not auto-generated: hand-mapped to whichever real Vault packs
 // currently hold this content. If a pack's sku changes (re-uploaded under a
 // new sku) or a new themed station is wanted, add/edit an entry here.

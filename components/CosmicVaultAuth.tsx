@@ -59,7 +59,7 @@ export default function CosmicVaultAuth() {
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
   const [uploadTitle, setUploadTitle] = useState<string>('');
   const [uploadSku, setUploadSku] = useState<string>('');
-  const [uploadDrawer, setUploadDrawer] = useState<VaultDrawer>('PODS');
+  const [uploadDrawer, setUploadDrawer] = useState<VaultDrawer>('MUSIC');
   const [uploadDescription, setUploadDescription] = useState<string>('');
   const [uploadReadme, setUploadReadme] = useState<string>('');
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -126,7 +126,7 @@ export default function CosmicVaultAuth() {
   const resetUploadForm = () => {
     setUploadTitle('');
     setUploadSku('');
-    setUploadDrawer('PODS');
+    setUploadDrawer('MUSIC');
     setUploadDescription('');
     setUploadReadme('');
     setUploadFiles([]);

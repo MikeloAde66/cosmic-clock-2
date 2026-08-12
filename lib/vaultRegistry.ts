@@ -1,5 +1,9 @@
 export type VaultDrawer =
-  | 'PODS'
+  // Protected drawer for system credentials, API stack documentation, bug
+  // fixes, terms, readmes, deployment specs, and security firewalls — not
+  // a general-purpose category, and unrelated to the sidebar's PodsModule
+  // audio/podcast hub tab.
+  | 'ADMIN'
   | 'MUSIC'
   | 'ANIMATIONS'
   | 'PROTOTYPES'
@@ -8,7 +12,7 @@ export type VaultDrawer =
   | 'PHOTOS';
 
 export const VAULT_DRAWERS: VaultDrawer[] = [
-  'PODS',
+  'ADMIN',
   'MUSIC',
   'ANIMATIONS',
   'PROTOTYPES',

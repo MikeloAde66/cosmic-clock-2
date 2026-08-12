@@ -42,7 +42,7 @@ const VaultProductSchema = new Schema<VaultProductDoc>({
   sku: { type: String, required: true, index: true },
   drawer: {
     type: String,
-    enum: ['PODS', 'MUSIC', 'ANIMATIONS', 'PROTOTYPES', 'DOCS', 'TEMPLATES', 'PHOTOS'],
+    enum: ['ADMIN', 'MUSIC', 'ANIMATIONS', 'PROTOTYPES', 'DOCS', 'TEMPLATES', 'PHOTOS'],
     required: true,
     index: true,
   },

@@ -1,14 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
-import { CATEGORIES, RADIO_STATIONS, type RadioStation } from '@/lib/radioStations';
+import { CATEGORIES, OUTKAST_COMING_SOON, OUTKAST_LINKS, RADIO_STATIONS, type RadioStation } from '@/lib/radioStations';
 import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 
 export default function RadioStreams() {
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [showOutkastMenu, setShowOutkastMenu] = useState<boolean>(false);
+  const outkastMenuRef = useRef<HTMLDivElement | null>(null);
   const { station: playingStation, status, playStation, togglePlayPause } = useRadioPlayer();
+
+  useEffect(() => {
+    if (!showOutkastMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (outkastMenuRef.current && !outkastMenuRef.current.contains(e.target as Node)) {
+        setShowOutkastMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showOutkastMenu]);
 
   const handleTuneIn = (station: RadioStation) => {
     if (playingStation?.id === station.id) {
@@ -60,6 +73,51 @@ export default function RadioStreams() {
               {cat}
             </button>
           ))}
+
+          <div className="relative" ref={outkastMenuRef}>
+            <button
+              onClick={() => setShowOutkastMenu((v) => !v)}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono uppercase tracking-wide transition whitespace-nowrap border ${
+                showOutkastMenu
+                  ? 'bg-white/20 text-white border-neutral-700'
+                  : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              OUTKAST ▾
+            </button>
+
+            {showOutkastMenu && (
+              <div className="absolute left-0 z-50 py-1 mt-2 border rounded-md shadow-lg w-56 bg-slate-900 border-neutral-700">
+                <div className="px-3 pt-2 pb-1 text-[10px] font-mono tracking-wider uppercase text-slate-500">
+                  Community
+                </div>
+                {OUTKAST_LINKS.map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full px-3 py-1.5 text-left text-[11px] font-mono text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+
+                <div className="px-3 pt-2 pb-1 mt-1 text-[10px] font-mono tracking-wider uppercase border-t text-slate-500 border-slate-800">
+                  Challenges
+                </div>
+                {OUTKAST_COMING_SOON.map((entry) => (
+                  <div
+                    key={entry.label}
+                    className="flex items-center justify-between w-full px-3 py-1.5 text-[11px] font-mono text-slate-600"
+                  >
+                    <span>{entry.label}</span>
+                    <span className="text-[9px] uppercase tracking-wider text-slate-700">Soon</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
