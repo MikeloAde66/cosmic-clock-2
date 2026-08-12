@@ -39,6 +39,13 @@ function buildQueue<T>(items: T[], count: number, weightOf: (item: T) => number)
   return queue;
 }
 
+// The pack that supplies ad/station-ID breaks for MUSIC-drawer stations —
+// the same Vault pack the curated "Commercials & Ads Loop" station itself
+// plays from. Interleaved into music queues, not applied to that station.
+const AD_BREAK_SKU = 'Anime-radio-01';
+const AD_BREAK_DRAWER = 'ANIMATIONS';
+const TRACKS_PER_AD_BREAK = 3;
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const stationId = url.searchParams.get('station');
@@ -65,11 +72,29 @@ export async function GET(request: Request) {
     }
 
     const count = countParam ? Math.max(1, Math.min(500, parseInt(countParam, 10))) : doc.tracks.length;
-    const ordered = buildQueue(doc.tracks, count, (t: VaultTrackSub) => t.weight ?? 1);
+    const musicOrdered = buildQueue(doc.tracks, count, (t: VaultTrackSub) => t.weight ?? 1);
+
+    // Interleave ad/station-ID breaks for music stations only — the ads
+    // station itself shouldn't get ads spliced into its own ad rotation,
+    // and this quietly no-ops if the ad pack is missing or empty.
+    let sequence: { track: VaultTrackSub; isAd: boolean }[] = musicOrdered.map((t) => ({ track: t, isAd: false }));
+    if (station.drawer === 'MUSIC') {
+      const adDoc = await VaultProduct.findOne({ sku: AD_BREAK_SKU, drawer: AD_BREAK_DRAWER }).lean();
+      if (adDoc && adDoc.tracks.length > 0) {
+        const withAds: { track: VaultTrackSub; isAd: boolean }[] = [];
+        musicOrdered.forEach((t, i) => {
+          withAds.push({ track: t, isAd: false });
+          if ((i + 1) % TRACKS_PER_AD_BREAK === 0) {
+            withAds.push({ track: weightedRandomPick(adDoc.tracks, (a: VaultTrackSub) => a.weight ?? 1), isAd: true });
+          }
+        });
+        sequence = withAds;
+      }
+    }
 
     const admin = getSupabaseAdmin();
     const tracks = await Promise.all(
-      ordered.map(async (t, i) => {
+      sequence.map(async ({ track: t, isAd }, i) => {
         const { data: signed, error } = await admin.storage
           .from(VAULT_BUCKET)
           .createSignedUrl(t.storagePath, 6 * 60 * 60); // 6 hours — a queue can be listened to for a while
@@ -81,6 +106,7 @@ export async function GET(request: Request) {
           fileUrl: error ? '' : signed.signedUrl,
           durationSeconds: t.durationSeconds,
           weight: t.weight ?? 1,
+          isAd,
         };
       })
     );

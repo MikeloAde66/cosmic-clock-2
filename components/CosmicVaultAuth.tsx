@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { Pencil, Trash2, X } from 'lucide-react';
 import { VAULT_DRAWERS, type VaultDrawer, type VaultProduct } from '@/lib/vaultRegistry';
 
 function formatBytes(bytes: number) {
@@ -55,6 +56,11 @@ export default function CosmicVaultAuth() {
   const [products, setProducts] = useState<VaultProduct[]>([]);
   const [isLoadingInventory, setIsLoadingInventory] = useState<boolean>(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [deletingPackIds, setDeletingPackIds] = useState<Set<string>>(new Set());
+  const [deletingTrackKeys, setDeletingTrackKeys] = useState<Set<string>>(new Set());
+  const [editingTrackKey, setEditingTrackKey] = useState<string | null>(null);
+  const [editWeightValue, setEditWeightValue] = useState<string>('');
+  const [trackActionError, setTrackActionError] = useState<string>('');
 
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
   const [uploadTitle, setUploadTitle] = useState<string>('');
@@ -74,6 +80,92 @@ export default function CosmicVaultAuth() {
       else next.add(id);
       return next;
     });
+  };
+
+  const handleDeletePack = async (item: VaultProduct) => {
+    if (!window.confirm(`Delete "${item.title}" and all ${item.tracks?.length ?? 0} file(s) inside it? This can't be undone.`)) {
+      return;
+    }
+    setTrackActionError('');
+    setDeletingPackIds((prev) => new Set(prev).add(item.id));
+    try {
+      const res = await fetch('/api/vault/product', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: securityPin.trim(), sku: item.sku, drawer: item.drawer }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setProducts((prev) => prev.filter((p) => p.id !== item.id));
+    } catch (err) {
+      setTrackActionError(err instanceof Error ? err.message : 'Failed to delete pack.');
+    } finally {
+      setDeletingPackIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  };
+
+  const handleDeleteTrack = async (item: VaultProduct, filename: string) => {
+    if (!window.confirm(`Delete "${filename}"? This can't be undone.`)) return;
+    const key = `${item.id}:${filename}`;
+    setTrackActionError('');
+    setDeletingTrackKeys((prev) => new Set(prev).add(key));
+    try {
+      const res = await fetch('/api/vault/track', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: securityPin.trim(), sku: item.sku, drawer: item.drawer, filename }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data: { product: VaultProduct | null; deleted: boolean } = await res.json();
+      setProducts((prev) =>
+        data.product
+          ? prev.map((p) => (p.id === item.id ? (data.product as VaultProduct) : p))
+          : prev.filter((p) => p.id !== item.id)
+      );
+    } catch (err) {
+      setTrackActionError(err instanceof Error ? err.message : 'Failed to delete file.');
+    } finally {
+      setDeletingTrackKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const startEditWeight = (item: VaultProduct, filename: string, currentWeight: number) => {
+    setEditingTrackKey(`${item.id}:${filename}`);
+    setEditWeightValue(String(currentWeight));
+    setTrackActionError('');
+  };
+
+  const cancelEditWeight = () => {
+    setEditingTrackKey(null);
+    setEditWeightValue('');
+  };
+
+  const saveEditWeight = async (item: VaultProduct, filename: string) => {
+    const weight = Number(editWeightValue);
+    if (!Number.isFinite(weight) || weight < 0) {
+      setTrackActionError('Weight must be a non-negative number.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/vault/track', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: securityPin.trim(), sku: item.sku, drawer: item.drawer, filename, weight }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data: { product: VaultProduct } = await res.json();
+      setProducts((prev) => prev.map((p) => (p.id === item.id ? data.product : p)));
+      cancelEditWeight();
+    } catch (err) {
+      setTrackActionError(err instanceof Error ? err.message : 'Failed to update weight.');
+    }
   };
 
   // Folder selects (webkitdirectory) can include OS junk files — drop them
@@ -292,7 +384,17 @@ export default function CosmicVaultAuth() {
                           <span className="px-2 py-0.5 bg-neutral-800/80 border border-neutral-700 text-white rounded">
                             {item.drawer}
                           </span>
-                          <span className="text-slate-500">{item.dateAdded}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-500">{item.dateAdded}</span>
+                            <button
+                              onClick={() => handleDeletePack(item)}
+                              disabled={deletingPackIds.has(item.id)}
+                              title="Delete entire pack"
+                              className="flex items-center justify-center w-5 h-5 text-slate-500 transition rounded hover:text-rose-400 hover:bg-white/10 disabled:opacity-40"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
 
                         <h3 className="text-base font-bold text-slate-100">{item.title}</h3>
@@ -316,25 +418,80 @@ export default function CosmicVaultAuth() {
 
                         {isExpanded && (
                           <div className="pt-2 space-y-1.5 border-t border-slate-800">
-                            {tracks.map((t, i) => (
-                              <div key={`${t.filename}-${i}`} className="flex items-center justify-between gap-2">
-                                <span className="font-mono text-xs truncate text-slate-300">{t.filename}</span>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <span className="text-[10px] font-mono text-slate-500">
-                                    {formatBytes(t.sizeBytes)}
-                                    {t.durationSeconds ? ` • ${formatDuration(t.durationSeconds)}` : ''}
-                                  </span>
-                                  <a
-                                    href={t.fileUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-mono text-[10px] uppercase underline text-white/70 hover:text-white"
-                                  >
-                                    Download
-                                  </a>
+                            {trackActionError && (
+                              <p className="font-mono text-[10px] text-rose-400">{trackActionError}</p>
+                            )}
+                            {tracks.map((t, i) => {
+                              const trackKey = `${item.id}:${t.filename}`;
+                              const isEditing = editingTrackKey === trackKey;
+                              const isDeleting = deletingTrackKeys.has(trackKey);
+
+                              return (
+                                <div key={`${t.filename}-${i}`} className="flex items-center justify-between gap-2">
+                                  <span className="font-mono text-xs truncate text-slate-300">{t.filename}</span>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {isEditing ? (
+                                      <>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step={0.5}
+                                          value={editWeightValue}
+                                          onChange={(e) => setEditWeightValue(e.target.value)}
+                                          className="w-14 px-1.5 py-0.5 text-[10px] font-mono text-right border rounded bg-slate-950 border-neutral-700 text-white focus:outline-none focus:border-white/50"
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={() => saveEditWeight(item, t.filename)}
+                                          title="Save weight"
+                                          className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300"
+                                        >
+                                          ✓
+                                        </button>
+                                        <button
+                                          onClick={cancelEditWeight}
+                                          title="Cancel"
+                                          className="text-[10px] font-mono text-slate-500 hover:text-white"
+                                        >
+                                          ✕
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="text-[10px] font-mono text-slate-500">
+                                          {formatBytes(t.sizeBytes)}
+                                          {t.durationSeconds ? ` • ${formatDuration(t.durationSeconds)}` : ''}
+                                          {` • W:${t.weight ?? 1}`}
+                                        </span>
+                                        <a
+                                          href={t.fileUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="font-mono text-[10px] uppercase underline text-white/70 hover:text-white"
+                                        >
+                                          Download
+                                        </a>
+                                        <button
+                                          onClick={() => startEditWeight(item, t.filename, t.weight ?? 1)}
+                                          title="Edit rotation weight"
+                                          className="text-slate-500 hover:text-white"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteTrack(item, t.filename)}
+                                          disabled={isDeleting}
+                                          title="Delete file"
+                                          className="text-slate-500 hover:text-rose-400 disabled:opacity-40"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>

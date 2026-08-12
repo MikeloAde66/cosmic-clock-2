@@ -27,8 +27,15 @@ export default function GlobalPlayerBar() {
     <div className="flex items-center gap-4 px-4 py-2 border-t shrink-0 bg-[#04060A] border-slate-800/80">
       <div className="w-40 min-w-0 sm:w-56">
         <p className="text-xs font-bold text-white truncate">{station.name}</p>
-        <p className="text-[10px] text-slate-500 truncate font-mono">
-          {currentTrack ? currentTrack.filename : station.kind === 'live' ? 'Live Stream' : ''}
+        <p className="text-[10px] text-slate-500 truncate font-mono flex items-center gap-1.5">
+          {currentTrack?.isAd && (
+            <span className="px-1 py-px text-[8px] font-bold uppercase tracking-wider text-white bg-red-600 rounded-sm shrink-0">
+              AD
+            </span>
+          )}
+          <span className="truncate">
+            {currentTrack ? currentTrack.filename : station.kind === 'live' ? 'Live Stream' : ''}
+          </span>
         </p>
       </div>
 

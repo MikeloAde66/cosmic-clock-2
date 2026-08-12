@@ -9,6 +9,7 @@ export interface QueueTrack {
   fileUrl: string;
   durationSeconds?: number;
   weight: number;
+  isAd?: boolean;
 }
 
 type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'error';
