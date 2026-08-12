@@ -6,11 +6,12 @@ import CosmicCanvas from './CosmicCanvas';
 import SignUpModal from './SignUpModal';
 import DonationButton from './DonationButton';
 import PricingPlans from './PricingPlans';
+import ProductsStorefront from './ProductsStorefront';
 import { supabase } from '@/lib/supabase';
 
 export default function AiOneHome() {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<'home' | 'pricing'>('home');
+  const [activeSection, setActiveSection] = useState<'home' | 'pricing' | 'products'>('home');
 
   useEffect(() => {
     // Supabase's default email template sends a magic link, not a 6-digit
@@ -49,12 +50,12 @@ export default function AiOneHome() {
 
       {/* SUB-NAV: lightweight inline menu text, not pill buttons */}
       <div className="flex items-center justify-center w-full py-3 space-x-8 text-xs font-mono tracking-widest uppercase border-b border-slate-800/80 bg-[#0b1326] shrink-0">
-        <span
-          className="cursor-default text-slate-600"
-          title="Products — coming soon"
+        <button
+          onClick={() => setActiveSection('products')}
+          className="text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
         >
           Products
-        </span>
+        </button>
 
         <button
           onClick={() => setActiveSection('pricing')}
@@ -75,7 +76,7 @@ export default function AiOneHome() {
 
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} />
 
-      {activeSection === 'pricing' ? (
+      {activeSection !== 'home' ? (
         <div className="flex flex-col flex-1 min-h-0">
           <div className="px-6 pt-4 shrink-0">
             <button
@@ -87,7 +88,8 @@ export default function AiOneHome() {
             </button>
           </div>
           <div className="flex-1 min-h-0">
-            <PricingPlans />
+            {activeSection === 'pricing' && <PricingPlans />}
+            {activeSection === 'products' && <ProductsStorefront />}
           </div>
         </div>
       ) : (
