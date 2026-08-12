@@ -132,7 +132,11 @@ export default function CosmicCanvas() {
                 viewBox="0 0 100 100"
               >
                 <defs>
-                  <linearGradient id="hud-axis-gradient" x1="0" y1="0" x2="0" y2="1">
+                  {/* userSpaceOnUse, not the objectBoundingBox default — the
+                      axis line is perfectly vertical (zero-width bounding
+                      box), which makes an objectBoundingBox gradient
+                      degenerate and silently fails to paint the stroke. */}
+                  <linearGradient id="hud-axis-gradient" gradientUnits="userSpaceOnUse" x1="50" y1="2" x2="50" y2="98">
                     <stop offset="0%" stopColor="#ef4444" />
                     <stop offset="50%" stopColor="rgba(255,255,255,0.8)" />
                     <stop offset="100%" stopColor="#ef4444" />
@@ -165,11 +169,22 @@ export default function CosmicCanvas() {
               </svg>
             </div>
 
-            {/* Orbital arc segment, anchored to the bottom of the canvas —
-                stationary, part of the fixed HUD overlay */}
+            {/* White arc segment, anchored to the bottom of the canvas —
+                also part of the fixed HUD vector overlay, same static SVG
+                treatment as the rest, just its own layer since it lives
+                outside the globe's own coordinate space. */}
             <div className="absolute inset-x-0 bottom-0 h-8 overflow-hidden pointer-events-none">
-              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] bg-slate-900" />
-              <div className="absolute top-1/2 -translate-y-1/2 h-[2px] w-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent shadow-[0_0_6px_rgba(255,255,255,0.15)]" />
+              <svg className="w-full h-full" viewBox="0 0 100 8" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="hud-sweep-gradient">
+                    <stop offset="0%" stopColor="rgba(255,255,255,0)" />
+                    <stop offset="50%" stopColor="rgba(255,255,255,0.1)" />
+                    <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                  </linearGradient>
+                </defs>
+                <line x1="0" y1="4" x2="100" y2="4" stroke="#0f172a" strokeWidth="0.5" />
+                <line x1="0" y1="4" x2="50" y2="4" stroke="url(#hud-sweep-gradient)" strokeWidth="0.6" />
+              </svg>
             </div>
           </main>
         </>
