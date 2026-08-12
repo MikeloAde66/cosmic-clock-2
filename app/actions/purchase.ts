@@ -28,6 +28,10 @@ export async function createProductCheckout(formData: FormData) {
   const headersList = await headers();
   const origin = headersList.get('origin') || `http://${headersList.get('host') ?? 'localhost:3000'}`;
 
+  // Physical items need a real shipping address for Printful/Gelato to ship
+  // to — digital items skip this collection step entirely.
+  const isPhysical = product.productType === 'apparel' || product.productType === 'print_collateral';
+
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
     line_items: [
@@ -44,9 +48,10 @@ export async function createProductCheckout(formData: FormData) {
         quantity: 1,
       },
     ],
+    ...(isPhysical ? { shipping_address_collection: { allowed_countries: ['US', 'CA', 'GB', 'AU'] } } : {}),
     success_url: `${origin}/?purchase=success`,
     cancel_url: `${origin}/?purchase=cancelled`,
-    metadata: { productId: product.id },
+    metadata: { productId: product.id, product_type: product.productType },
   });
 
   if (!session.url) {

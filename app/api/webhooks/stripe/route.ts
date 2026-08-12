@@ -1,12 +1,148 @@
 import Stripe from 'stripe';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { findProduct } from '@/lib/products';
+import { createPrintfulOrder } from '@/lib/fulfillment/printful';
+import { createGelatoOrder } from '@/lib/fulfillment/gelato';
 
 export const runtime = 'nodejs';
 
-// Completes the loop the checkout Server Action starts: it inserts an
-// 'incomplete' row keyed by the Checkout Session id before redirecting to
-// Stripe; this endpoint fills in the real subscription/customer ids and
-// status once Stripe confirms what actually happened. Requires a webhook
+type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;
+
+async function updateOrder(admin: SupabaseAdmin, sessionId: string, fields: Record<string, unknown>) {
+  const { error } = await admin
+    .from('orders')
+    .update({ ...fields, updated_at: new Date().toISOString() })
+    .eq('stripe_checkout_session_id', sessionId);
+  if (error) console.error('Failed to update order row:', error);
+}
+
+// One-time product purchases (mode: 'payment') -- routes physical items to
+// Printful/Gelato based on product_type, skips fulfillment entirely for
+// digital items. Never throws: a failed fulfillment call marks the order
+// 'failed' rather than crashing the webhook (Stripe would just retry
+// delivery of the same event, which won't fix a downstream API problem).
+async function handleProductOrderCompleted(session: Stripe.Checkout.Session, admin: SupabaseAdmin) {
+  const productId = session.metadata?.productId;
+  const productType = session.metadata?.product_type;
+  if (!productId || !productType) return;
+
+  const shipping = session.collected_information?.shipping_details;
+  const customerEmail = session.customer_details?.email ?? undefined;
+
+  const { error: insertError } = await admin.from('orders').insert({
+    stripe_checkout_session_id: session.id,
+    product_id: productId,
+    product_type: productType,
+    amount: session.amount_total ?? 0,
+    shipping_address: shipping ? { name: shipping.name, ...shipping.address } : null,
+    fulfillment_status: 'pending',
+  });
+  if (insertError) {
+    console.error('Failed to record order (continuing to attempt fulfillment regardless):', insertError);
+  }
+
+  if (productType === 'digital') {
+    // No physical shipment — mark delivered immediately. (Actually gating
+    // download access behind purchase status is a separate, not-yet-built
+    // piece; this only reflects fulfillment state.)
+    await updateOrder(admin, session.id, { fulfillment_status: 'delivered' });
+    return;
+  }
+
+  const product = findProduct(productId);
+  if (!product) {
+    await updateOrder(admin, session.id, { fulfillment_status: 'unmapped' });
+    return;
+  }
+
+  if (productType === 'apparel') {
+    if (!product.printfulVariantId || !shipping) {
+      // No real Printful catalog variant mapped to this demo product (or no
+      // shipping address collected) -- report honestly rather than guessing.
+      await updateOrder(admin, session.id, { fulfillment_provider: 'printful', fulfillment_status: 'unmapped' });
+      return;
+    }
+    try {
+      const result = await createPrintfulOrder(
+        {
+          name: shipping.name,
+          address1: shipping.address.line1 ?? '',
+          address2: shipping.address.line2 ?? undefined,
+          city: shipping.address.city ?? '',
+          state_code: shipping.address.state ?? undefined,
+          country_code: shipping.address.country ?? '',
+          zip: shipping.address.postal_code ?? '',
+          email: customerEmail,
+        },
+        [
+          {
+            variant_id: product.printfulVariantId,
+            quantity: 1,
+            retail_price: (product.amount / 100).toFixed(2),
+            // Real print artwork URL goes here once a real catalog exists.
+            files: [],
+          },
+        ]
+      );
+      await updateOrder(admin, session.id, {
+        fulfillment_provider: 'printful',
+        fulfillment_order_id: String(result.id),
+        fulfillment_status: 'submitted',
+      });
+    } catch (err) {
+      console.error('Printful order creation failed:', err);
+      await updateOrder(admin, session.id, { fulfillment_provider: 'printful', fulfillment_status: 'failed' });
+    }
+    return;
+  }
+
+  if (productType === 'print_collateral') {
+    if (!product.gelatoProductUid || !shipping) {
+      await updateOrder(admin, session.id, { fulfillment_provider: 'gelato', fulfillment_status: 'unmapped' });
+      return;
+    }
+    try {
+      const [firstName, ...rest] = shipping.name.split(' ');
+      const result = await createGelatoOrder(
+        session.id,
+        [
+          {
+            itemReferenceId: product.id,
+            productUid: product.gelatoProductUid,
+            // Real print artwork URL goes here once a real catalog exists.
+            files: [],
+            quantity: 1,
+          },
+        ],
+        {
+          firstName: firstName || shipping.name,
+          lastName: rest.join(' ') || '-',
+          addressLine1: shipping.address.line1 ?? '',
+          addressLine2: shipping.address.line2 ?? undefined,
+          city: shipping.address.city ?? '',
+          state: shipping.address.state ?? undefined,
+          postCode: shipping.address.postal_code ?? '',
+          country: shipping.address.country ?? '',
+          email: customerEmail,
+        }
+      );
+      await updateOrder(admin, session.id, {
+        fulfillment_provider: 'gelato',
+        fulfillment_order_id: result.id,
+        fulfillment_status: 'submitted',
+      });
+    } catch (err) {
+      console.error('Gelato order creation failed:', err);
+      await updateOrder(admin, session.id, { fulfillment_provider: 'gelato', fulfillment_status: 'failed' });
+    }
+  }
+}
+
+// Completes the loop the checkout Server Actions start: they each insert a
+// pending row (in `subscriptions` for Pricing, `orders` for Products)
+// keyed by the Checkout Session id before redirecting to Stripe; this
+// endpoint fills in what actually happened once Stripe confirms it, and for
+// product orders, triggers physical fulfillment. Requires a webhook
 // endpoint configured in the Stripe dashboard (or `stripe listen --forward-to
 // .../api/webhooks/stripe` for local dev) pointed here, with its signing
 // secret set as STRIPE_WEBHOOK_SECRET.
@@ -37,15 +173,20 @@ export async function POST(request: Request) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        await admin
-          .from('subscriptions')
-          .update({
-            stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
-            stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
-            status: 'active',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('stripe_checkout_session_id', session.id);
+
+        if (session.mode === 'subscription') {
+          await admin
+            .from('subscriptions')
+            .update({
+              stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
+              stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
+              status: 'active',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('stripe_checkout_session_id', session.id);
+        } else if (session.mode === 'payment') {
+          await handleProductOrderCompleted(session, admin);
+        }
         break;
       }
 
