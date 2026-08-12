@@ -3,6 +3,7 @@ import dbConnect from '@/lib/dbConnect';
 import VaultProduct, { type VaultProductDoc } from '@/lib/models/VaultProduct';
 import { getSupabaseAdmin, VAULT_BUCKET } from '@/lib/supabaseAdmin';
 import { VAULT_DRAWERS, type VaultDrawer } from '@/lib/vaultRegistry';
+import { requireAdmin, AdminAuthError } from '@/lib/adminAuth';
 
 export const runtime = 'nodejs';
 
@@ -32,7 +33,7 @@ async function buildProductResponse(doc: VaultProductDoc) {
   };
 }
 
-// Human-facing, PIN-gated single-track operations from the Vault UI's
+// Human-facing, admin-gated single-track operations from the Vault UI's
 // Inspect Contents view — separate from the n8n-facing, secret-gated
 // PATCH /api/radio/weights, which exists for unattended automation instead.
 export async function DELETE(request: Request) {
@@ -40,16 +41,20 @@ export async function DELETE(request: Request) {
     return new Response('Vault backend is not configured.', { status: 500 });
   }
 
-  let body: { pin?: string; sku?: string; drawer?: string; filename?: string };
+  try {
+    await requireAdmin(request);
+  } catch (err) {
+    if (err instanceof AdminAuthError) return new Response(err.message, { status: err.status });
+    throw err;
+  }
+
+  let body: { sku?: string; drawer?: string; filename?: string };
   try {
     body = await request.json();
   } catch {
     return new Response('Invalid JSON body.', { status: 400 });
   }
 
-  if (body.pin !== '432') {
-    return new Response('Invalid vault key.', { status: 401 });
-  }
   const { sku, drawer, filename } = body;
   if (!sku?.trim() || !drawer || !VAULT_DRAWERS.includes(drawer as VaultDrawer) || !filename?.trim()) {
     return new Response('sku, drawer, and filename are required.', { status: 400 });

@@ -47,4 +47,18 @@ export interface VaultProduct {
   // upload is just a one-track pack. There's no placeholder/empty state:
   // a product only exists once something has actually been uploaded to it.
   tracks: VaultTrack[];
+  priceCents?: number;
+  isPublished?: boolean;
+}
+
+// Public-facing shape returned by GET /api/vault/published — no storage
+// internals (track filenames, signed URLs) leak into this, since that
+// endpoint is reachable by anyone browsing the storefront, not just admins.
+export interface PublishedVaultProduct {
+  id: string;
+  sku: string;
+  drawer: VaultDrawer;
+  title: string;
+  description: string;
+  priceCents: number;
 }

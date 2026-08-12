@@ -36,6 +36,14 @@ export interface VaultProductDoc extends Document {
   // is just a pack with tracks.length === 1. Uploading again with the same
   // sku+drawer appends to this array rather than creating a new card.
   tracks: Types.DocumentArray<VaultTrackSub>;
+  // Retail price for the public storefront, in cents. Only meaningful when
+  // isPublished is true — a pack can carry a price while still unpublished
+  // (e.g. being priced before launch).
+  priceCents?: number;
+  // Gates whether this pack is exposed via GET /api/vault/published (the
+  // storefront's only vault-facing endpoint). Defaults to false so nothing
+  // is public until an admin explicitly opts it in.
+  isPublished: boolean;
 }
 
 const VaultProductSchema = new Schema<VaultProductDoc>({
@@ -50,6 +58,8 @@ const VaultProductSchema = new Schema<VaultProductDoc>({
   description: { type: String, default: '' },
   readmeGuide: { type: String, default: '' },
   tracks: { type: [VaultTrackSchema], default: [] },
+  priceCents: { type: Number },
+  isPublished: { type: Boolean, default: false, index: true },
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Archive, Image as ImageIcon, Music, Shirt } from 'lucide-react';
 import { PRODUCT_CATEGORIES, PRODUCTS, type ProductCategory } from '@/lib/products';
+import type { PublishedVaultProduct } from '@/lib/vaultRegistry';
 import { createProductCheckout } from '@/app/actions/purchase';
 
 const CATEGORY_ICONS: Record<ProductCategory, React.ComponentType<{ className?: string }>> = {
@@ -16,10 +17,52 @@ function formatPrice(cents: number) {
   return (cents / 100).toFixed(2);
 }
 
+// Unifies the static demo catalog (lib/products.ts) with admin-published
+// Vault packs (GET /api/vault/published) into one shape the grid can render
+// without caring which system a given card came from.
+interface DisplayProduct {
+  id: string;
+  name: string;
+  category: ProductCategory;
+  description: string;
+  amount: number;
+  isDemo: boolean;
+}
+
 export default function ProductsStorefront() {
   const [activeCategory, setActiveCategory] = useState<'ALL' | ProductCategory>('ALL');
+  const [vaultProducts, setVaultProducts] = useState<PublishedVaultProduct[]>([]);
 
-  const visibleProducts = PRODUCTS.filter(
+  useEffect(() => {
+    fetch('/api/vault/published')
+      .then((res) => res.json())
+      .then((data: { products: PublishedVaultProduct[] }) => setVaultProducts(data.products || []))
+      .catch((err) => console.error('Failed to load published Vault items:', err));
+  }, []);
+
+  const allProducts: DisplayProduct[] = [
+    ...PRODUCTS.map((p) => ({
+      id: p.id,
+      name: p.name,
+      category: p.category,
+      description: p.description,
+      amount: p.amount,
+      isDemo: true,
+    })),
+    // Vault-origin items (templates, automations, planners, etc.) an admin
+    // has explicitly priced and published — always real, never demo. The id
+    // is prefixed so createProductCheckout can tell the two catalogs apart.
+    ...vaultProducts.map((v) => ({
+      id: `vault:${v.drawer}:${v.sku}`,
+      name: v.title,
+      category: 'Vault Items' as ProductCategory,
+      description: v.description,
+      amount: v.priceCents,
+      isDemo: false,
+    })),
+  ];
+
+  const visibleProducts = allProducts.filter(
     (p) => activeCategory === 'ALL' || p.category === activeCategory
   );
 
@@ -70,9 +113,11 @@ export default function ProductsStorefront() {
                 {/* Placeholder image frame — no real product photography yet */}
                 <div className="relative flex items-center justify-center border-b aspect-square bg-slate-900/60 border-slate-800">
                   <Icon className="w-10 h-10 text-slate-600" />
-                  <span className="absolute px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded top-2 right-2 bg-black/60 text-slate-400 border-slate-700">
-                    Demo
-                  </span>
+                  {product.isDemo && (
+                    <span className="absolute px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded top-2 right-2 bg-black/60 text-slate-400 border-slate-700">
+                      Demo
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex flex-col flex-1 p-4 space-y-3">

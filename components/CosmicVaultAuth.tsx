@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Pencil, Trash2, X } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import { VAULT_DRAWERS, type VaultDrawer, type VaultProduct } from '@/lib/vaultRegistry';
 
 function formatBytes(bytes: number) {
@@ -53,6 +54,31 @@ export default function CosmicVaultAuth() {
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
+  // Real RBAC layer on top of the PIN: the PIN just gets you into the Vault
+  // view (read-only browsing); Upload and Delete additionally require a
+  // signed-in Supabase session whose app_metadata.role is 'admin'. That
+  // field can only be set with the service-role key, so a signed-in user
+  // can never grant it to themselves.
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setIsAdmin(data.user?.app_metadata?.role === 'admin');
+    });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAdmin(session?.user?.app_metadata?.role === 'admin');
+    });
+    return () => subscription.subscription.unsubscribe();
+  }, []);
+
+  // Every admin-only request needs this alongside the PIN — the PIN can't
+  // prove *who* is asking, only that they know a shared string.
+  const getAuthHeader = async (): Promise<HeadersInit> => {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
   const [products, setProducts] = useState<VaultProduct[]>([]);
   const [isLoadingInventory, setIsLoadingInventory] = useState<boolean>(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -68,6 +94,8 @@ export default function CosmicVaultAuth() {
   const [uploadDrawer, setUploadDrawer] = useState<VaultDrawer>('MUSIC');
   const [uploadDescription, setUploadDescription] = useState<string>('');
   const [uploadReadme, setUploadReadme] = useState<string>('');
+  const [uploadPrice, setUploadPrice] = useState<string>('');
+  const [uploadPublish, setUploadPublish] = useState<boolean>(false);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [fileDurations, setFileDurations] = useState<Map<File, number>>(new Map());
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -91,8 +119,8 @@ export default function CosmicVaultAuth() {
     try {
       const res = await fetch('/api/vault/product', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: securityPin.trim(), sku: item.sku, drawer: item.drawer }),
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({ sku: item.sku, drawer: item.drawer }),
       });
       if (!res.ok) throw new Error(await res.text());
       setProducts((prev) => prev.filter((p) => p.id !== item.id));
@@ -115,8 +143,8 @@ export default function CosmicVaultAuth() {
     try {
       const res = await fetch('/api/vault/track', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: securityPin.trim(), sku: item.sku, drawer: item.drawer, filename }),
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({ sku: item.sku, drawer: item.drawer, filename }),
       });
       if (!res.ok) throw new Error(await res.text());
       const data: { product: VaultProduct | null; deleted: boolean } = await res.json();
@@ -221,6 +249,8 @@ export default function CosmicVaultAuth() {
     setUploadDrawer('MUSIC');
     setUploadDescription('');
     setUploadReadme('');
+    setUploadPrice('');
+    setUploadPublish(false);
     setUploadFiles([]);
     setFileDurations(new Map());
     setUploadError('');
@@ -232,21 +262,26 @@ export default function CosmicVaultAuth() {
       setUploadError('Choose at least one file to upload.');
       return;
     }
+    if (uploadPublish && (!uploadPrice.trim() || Number(uploadPrice) <= 0)) {
+      setUploadError('A price is required to publish to the public storefront.');
+      return;
+    }
     setIsUploading(true);
     setUploadError('');
 
     const form = new FormData();
-    form.set('pin', securityPin.trim());
     uploadFiles.forEach((file) => form.append('file', file));
     form.set('title', uploadTitle);
     form.set('sku', uploadSku);
     form.set('drawer', uploadDrawer);
     form.set('description', uploadDescription);
     form.set('readmeGuide', uploadReadme);
+    if (uploadPrice.trim()) form.set('priceCents', String(Math.round(Number(uploadPrice) * 100)));
+    form.set('isPublished', String(uploadPublish));
     form.set('durations', JSON.stringify(uploadFiles.map((f) => fileDurations.get(f) ?? null)));
 
     try {
-      const res = await fetch('/api/vault/upload', { method: 'POST', body: form });
+      const res = await fetch('/api/vault/upload', { method: 'POST', headers: await getAuthHeader(), body: form });
       if (!res.ok) {
         setUploadError(await res.text());
         return;
@@ -319,12 +354,14 @@ export default function CosmicVaultAuth() {
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <h2 className="text-2xl font-bold text-white">Automated Asset Drawers</h2>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="px-3 py-1.5 text-xs font-mono uppercase bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 rounded transition"
-                >
-                  + Upload File
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="px-3 py-1.5 text-xs font-mono uppercase bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 rounded transition"
+                  >
+                    + Upload File
+                  </button>
+                )}
                 <button
                   onClick={() => setIsUnlocked(false)}
                   className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 rounded font-mono"
@@ -386,14 +423,16 @@ export default function CosmicVaultAuth() {
                           </span>
                           <div className="flex items-center gap-2">
                             <span className="text-slate-500">{item.dateAdded}</span>
-                            <button
-                              onClick={() => handleDeletePack(item)}
-                              disabled={deletingPackIds.has(item.id)}
-                              title="Delete entire pack"
-                              className="flex items-center justify-center w-5 h-5 text-slate-500 transition rounded hover:text-rose-400 hover:bg-white/10 disabled:opacity-40"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => handleDeletePack(item)}
+                                disabled={deletingPackIds.has(item.id)}
+                                title="Delete entire pack"
+                                className="flex items-center justify-center w-5 h-5 text-slate-500 transition rounded hover:text-rose-400 hover:bg-white/10 disabled:opacity-40"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -478,14 +517,16 @@ export default function CosmicVaultAuth() {
                                         >
                                           <Pencil className="w-3 h-3" />
                                         </button>
-                                        <button
-                                          onClick={() => handleDeleteTrack(item, t.filename)}
-                                          disabled={isDeleting}
-                                          title="Delete file"
-                                          className="text-slate-500 hover:text-rose-400 disabled:opacity-40"
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                        </button>
+                                        {isAdmin && (
+                                          <button
+                                            onClick={() => handleDeleteTrack(item, t.filename)}
+                                            disabled={isDeleting}
+                                            title="Delete file"
+                                            className="text-slate-500 hover:text-rose-400 disabled:opacity-40"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </button>
+                                        )}
                                       </>
                                     )}
                                   </div>
@@ -530,7 +571,11 @@ export default function CosmicVaultAuth() {
             />
             <select
               value={uploadDrawer}
-              onChange={(e) => setUploadDrawer(e.target.value as VaultDrawer)}
+              onChange={(e) => {
+                const next = e.target.value as VaultDrawer;
+                setUploadDrawer(next);
+                if (next === 'ADMIN') setUploadPublish(false);
+              }}
               className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
             >
               {VAULT_DRAWERS.map((drawer) => (
@@ -553,6 +598,30 @@ export default function CosmicVaultAuth() {
               rows={2}
               className="w-full p-3 font-mono text-sm border rounded-lg resize-none bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
             />
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              placeholder="Retail price (USD) — required to publish"
+              value={uploadPrice}
+              onChange={(e) => setUploadPrice(e.target.value)}
+              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+            />
+            {uploadDrawer === 'ADMIN' ? (
+              <p className="font-mono text-[10px] text-slate-500">
+                ADMIN drawer items can&apos;t be published — they&apos;re for internal credentials and system files only.
+              </p>
+            ) : (
+              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={uploadPublish}
+                  onChange={(e) => setUploadPublish(e.target.checked)}
+                  className="w-4 h-4 rounded accent-white"
+                />
+                Publish to public storefront
+              </label>
+            )}
             <div className="flex gap-2">
               <label className="flex-1 px-3 py-2 text-xs font-mono text-center text-white uppercase transition border rounded-lg cursor-pointer bg-neutral-800 hover:bg-neutral-700 border-neutral-700">
                 + Add Files

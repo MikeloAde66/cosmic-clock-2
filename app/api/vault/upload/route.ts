@@ -4,6 +4,7 @@ import VaultProduct, { type VaultProductDoc } from '@/lib/models/VaultProduct';
 import { ensureVaultBucket, getSupabaseAdmin, VAULT_BUCKET } from '@/lib/supabaseAdmin';
 import { VAULT_DRAWERS, type VaultDrawer } from '@/lib/vaultRegistry';
 import { mapWithConcurrency } from '@/lib/concurrency';
+import { requireAdmin, AdminAuthError } from '@/lib/adminAuth';
 
 export const runtime = 'nodejs';
 
@@ -34,17 +35,21 @@ export async function POST(request: Request) {
     return new Response('SUPABASE_URL / SUPABASE_KEY are not configured yet.', { status: 500 });
   }
 
-  const form = await request.formData();
-
-  // Matches the same PIN CosmicVaultAuth gates entry with client-side — not
-  // real auth (it's a static string, trivially readable in source), just a
-  // minimal server-side check so the upload endpoint isn't wide open to
-  // anyone who finds the URL. Worth replacing with real Supabase Auth-based
-  // authorization if the Vault ever needs to be more than single-operator.
-  const pin = form.get('pin');
-  if (pin !== '432') {
-    return new Response('Invalid vault key.', { status: 401 });
+  // The PIN still gates entry to the Vault view client-side; this checks
+  // the thing that actually matters server-side — a real Supabase session
+  // belonging to an account with app_metadata.role === 'admin'. Unlike the
+  // PIN (a static string, trivially readable in source), this can't be
+  // bypassed by anyone who just finds the URL. Checked before touching the
+  // body so a bad/missing token fails fast with a clean 401/403 rather than
+  // a formData parse error on whatever was (or wasn't) sent.
+  try {
+    await requireAdmin(request);
+  } catch (err) {
+    if (err instanceof AdminAuthError) return new Response(err.message, { status: err.status });
+    throw err;
   }
+
+  const form = await request.formData();
 
   // Folder/batch selects (webkitdirectory) can include OS junk files
   // (.DS_Store, Thumbs.db) — drop dotfiles before they become tracks.
@@ -54,6 +59,12 @@ export async function POST(request: Request) {
   const drawer = form.get('drawer');
   const description = String(form.get('description') ?? '');
   const readmeGuide = String(form.get('readmeGuide') ?? '');
+  const priceCentsRaw = form.get('priceCents');
+  const priceCents = typeof priceCentsRaw === 'string' && priceCentsRaw.trim() ? Number(priceCentsRaw) : undefined;
+  // The ADMIN drawer holds system credentials/backups — never publishable,
+  // regardless of what the client sends, so this is re-checked server-side
+  // rather than trusted from the form.
+  const isPublished = form.get('isPublished') === 'true' && drawer !== 'ADMIN';
 
   // Optional: client-probed audio durations, positionally aligned with the
   // `file` entries in the order they were appended (FormData preserves
@@ -82,6 +93,9 @@ export async function POST(request: Request) {
   }
   if (typeof drawer !== 'string' || !VAULT_DRAWERS.includes(drawer as VaultDrawer)) {
     return new Response(`drawer must be one of: ${VAULT_DRAWERS.join(', ')}`, { status: 400 });
+  }
+  if (isPublished && (priceCents === undefined || !Number.isFinite(priceCents) || priceCents <= 0)) {
+    return new Response('A price is required to publish to the public storefront.', { status: 400 });
   }
 
   try {
@@ -134,7 +148,13 @@ export async function POST(request: Request) {
     // existing pack (and refreshes its metadata) instead of spawning a
     // duplicate card.
     const update: UpdateQuery<VaultProductDoc> = {
-      $set: { title: title.trim(), description, readmeGuide },
+      $set: {
+        title: title.trim(),
+        description,
+        readmeGuide,
+        isPublished,
+        ...(priceCents !== undefined ? { priceCents } : {}),
+      },
       $push: { tracks: { $each: newTracks } },
       $setOnInsert: { createdAt: new Date() },
     };
@@ -162,6 +182,8 @@ export async function POST(request: Request) {
         readmeGuide: doc.readmeGuide,
         dateAdded: doc.createdAt.toISOString().slice(0, 10),
         tracks: trackUrls,
+        priceCents: doc.priceCents,
+        isPublished: doc.isPublished,
       },
       errors,
     });
