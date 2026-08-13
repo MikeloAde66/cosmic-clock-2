@@ -1,9 +1,51 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ArrowUpDown, Camera, Sparkles, Trash2 } from 'lucide-react';
 import CosmicVisualizer from './CosmicVisualizer';
+
+// Minimal surface of the YouTube IFrame Player API actually used here — no
+// @types/youtube dependency for a handful of methods.
+interface YouTubePlayer {
+  getCurrentTime: () => number;
+  getDuration: () => number;
+  loadVideoById: (videoId: string) => void;
+  loadPlaylist: (options: { list: string }) => void;
+  pauseVideo: () => void;
+  destroy: () => void;
+}
+
+interface YouTubePlayerEvent {
+  data: number;
+  target: YouTubePlayer;
+}
+
+declare global {
+  interface Window {
+    YT?: {
+      Player: new (
+        elementId: string,
+        options: {
+          videoId?: string;
+          playerVars?: Record<string, string | number>;
+          events?: {
+            onReady?: (event: YouTubePlayerEvent) => void;
+            onStateChange?: (event: YouTubePlayerEvent) => void;
+          };
+        }
+      ) => YouTubePlayer;
+      PlayerState: { PLAYING: number; PAUSED: number; ENDED: number };
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+interface ContentSegment {
+  // Seconds into playback when this segment becomes the active one.
+  time: number;
+  text: string;
+}
 
 interface Track {
   id: string;
@@ -16,6 +58,12 @@ interface Track {
   isLocal?: boolean;
   embedUrl?: string;
   watchUrl?: string;
+  // Optional — when present, the Reading Material pane renders these as
+  // individually-scrollable blocks and auto-scrolls/highlights whichever one
+  // matches the current playback time instead of showing contentToRead as a
+  // single static blob. No current track has this authored yet; it's inert
+  // (falls back to contentToRead) until segment data exists for a track.
+  contentSegments?: ContentSegment[];
 }
 
 interface Playlist {
@@ -87,7 +135,32 @@ const formatTime = (seconds: number) => {
   return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
 };
 
-export default function PodsModule() {
+// Pulls the bits the YouTube Player API needs out of the embed URLs already
+// built by selectTrack/loadMedia (e.g. "https://www.youtube.com/embed/ID" or
+// ".../embed/videoseries?list=LISTID&autoplay=1") rather than threading a
+// separate videoId/listId through the whole track-selection flow.
+function parseYouTubeEmbed(embedUrl: string): { videoId?: string; listId?: string; autoplay: boolean } {
+  try {
+    const url = new URL(embedUrl);
+    const listId = url.searchParams.get('list') || undefined;
+    const autoplay = url.searchParams.get('autoplay') === '1';
+    const videoId = url.pathname.match(/\/embed\/([\w-]+)/)?.[1];
+    return { videoId, listId, autoplay };
+  } catch {
+    return { autoplay: false };
+  }
+}
+
+interface PodsModuleProps {
+  // False whenever app/page.tsx's activeTab isn't 'pods'. PodsModule stays
+  // mounted (not conditionally rendered) even when inactive, so local
+  // uploads' in-memory blob URLs survive tab switches — this prop is how it
+  // knows to actually pause playback instead, rather than fully unmounting
+  // (which would kill those blob URLs and lose in-progress uploads).
+  isActive: boolean;
+}
+
+export default function PodsModule({ isActive }: PodsModuleProps) {
   const [playlists, setPlaylists] = useState<Playlist[]>(DEFAULT_PLAYLISTS);
   const [activePlaylistId, setActivePlaylistId] = useState<string>('pods');
   const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
@@ -113,6 +186,10 @@ export default function PodsModule() {
   const [activeEmbedUrl, setActiveEmbedUrl] = useState<string>('');
   const [localVideoUrl, setLocalVideoUrl] = useState<string>('');
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
+  // Shared between the local-upload and direct-mp4/webm-embed <video>
+  // elements — only one of those two branches is ever rendered at a time,
+  // so a single ref safely tracks whichever is actually mounted.
+  const broadcastVideoRef = useRef<HTMLVideoElement | null>(null);
 
   // EQ Audio Nodes
   const [eqGains, setEqGains] = useState<{ [freq: string]: number }>({
@@ -405,6 +482,166 @@ export default function PodsModule() {
     }
   };
 
+  // YouTube IFrame Player API bridge — the only way to read currentTime out
+  // of a YouTube embed, since a plain <iframe src=...> is cross-origin and
+  // exposes nothing. isYouTubeEmbed is intentionally NOT keyed on
+  // activeEmbedUrl's exact value, so the player container (and the YT.Player
+  // instance bound to it) survives switching between YouTube tracks —
+  // switching videos calls loadVideoById/loadPlaylist on the existing
+  // player rather than tearing down and recreating it.
+  const isYouTubeEmbed = !!activeEmbedUrl && !activeEmbedUrl.endsWith('.mp4') && !activeEmbedUrl.endsWith('.webm');
+  const ytPlayerRef = useRef<YouTubePlayer | null>(null);
+  const ytPollIntervalRef = useRef<number | null>(null);
+  // The Player object returned by `new YT.Player(...)` exists immediately,
+  // but its methods (loadVideoById, getCurrentTime, ...) aren't attached
+  // until the iframe finishes its own handshake and fires onReady — calling
+  // them before that throws "is not a function". Dev-mode React Strict
+  // Mode's double-invoked effects hit this reliably (bind, then immediately
+  // bind again before the first one's ready), so any load requested before
+  // onReady has to be queued rather than called directly.
+  const ytPlayerReadyRef = useRef(false);
+  const ytPendingLoadRef = useRef<{ videoId?: string; listId?: string } | null>(null);
+
+  useEffect(() => {
+    if (!isYouTubeEmbed) return;
+    const { videoId, listId, autoplay } = parseYouTubeEmbed(activeEmbedUrl);
+    if (!videoId && !listId) return;
+
+    const applyLoad = (target: { videoId?: string; listId?: string }) => {
+      const player = ytPlayerRef.current;
+      if (!player) return;
+      if (target.videoId) player.loadVideoById(target.videoId);
+      else if (target.listId) player.loadPlaylist({ list: target.listId });
+    };
+
+    const bindPlayer = () => {
+      if (ytPlayerRef.current) {
+        if (ytPlayerReadyRef.current) applyLoad({ videoId, listId });
+        else ytPendingLoadRef.current = { videoId, listId };
+        return;
+      }
+      ytPlayerRef.current = new window.YT!.Player('pods-youtube-player', {
+        videoId,
+        playerVars: {
+          autoplay: autoplay ? 1 : 0,
+          ...(listId ? { listType: 'playlist', list: listId } : {}),
+        },
+        events: {
+          onReady: () => {
+            ytPlayerReadyRef.current = true;
+            if (ytPendingLoadRef.current) {
+              const pending = ytPendingLoadRef.current;
+              ytPendingLoadRef.current = null;
+              applyLoad(pending);
+            }
+          },
+          onStateChange: (event) => {
+            if (ytPollIntervalRef.current !== null) {
+              window.clearInterval(ytPollIntervalRef.current);
+              ytPollIntervalRef.current = null;
+            }
+            // Poll while actually playing — the API has no native
+            // timeupdate event, so this is the only way to feed
+            // currentTime into the same state <audio>/<video> already use.
+            if (event.data === window.YT!.PlayerState.PLAYING) {
+              setIsPlaying(true);
+              ytPollIntervalRef.current = window.setInterval(() => {
+                const player = ytPlayerRef.current;
+                if (!player) return;
+                setCurrentTime(player.getCurrentTime());
+                setDuration(player.getDuration() || 0);
+              }, 100);
+            } else if (
+              event.data === window.YT!.PlayerState.PAUSED ||
+              event.data === window.YT!.PlayerState.ENDED
+            ) {
+              setIsPlaying(false);
+            }
+          },
+        },
+      });
+    };
+
+    if (window.YT?.Player) {
+      bindPlayer();
+    } else {
+      const previousCallback = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        previousCallback?.();
+        bindPlayer();
+      };
+      if (!document.getElementById('youtube-iframe-api-script')) {
+        const script = document.createElement('script');
+        script.id = 'youtube-iframe-api-script';
+        script.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(script);
+      }
+    }
+  }, [isYouTubeEmbed, activeEmbedUrl]);
+
+  // Tear the player down when leaving the YouTube branch entirely (switched
+  // to plain video/audio, or cleared media) — and on unmount.
+  useEffect(() => {
+    if (isYouTubeEmbed) return;
+    if (ytPollIntervalRef.current !== null) {
+      window.clearInterval(ytPollIntervalRef.current);
+      ytPollIntervalRef.current = null;
+    }
+    if (ytPlayerRef.current) {
+      ytPlayerRef.current.destroy();
+      ytPlayerRef.current = null;
+    }
+    ytPlayerReadyRef.current = false;
+    ytPendingLoadRef.current = null;
+  }, [isYouTubeEmbed]);
+
+  useEffect(() => {
+    return () => {
+      if (ytPollIntervalRef.current !== null) window.clearInterval(ytPollIntervalRef.current);
+      ytPlayerRef.current?.destroy();
+    };
+  }, []);
+
+  // Pods stays mounted (not conditionally rendered) when its tab isn't
+  // active, so blob-URL uploads survive tab switches — but that also means
+  // nothing stops playback on its own when the user navigates away.
+  // Without this, audio/video kept playing underneath Home/Radio/Vault.
+  // Pauses rather than unmounting, so the pack/upload state is untouched
+  // and playback simply resumes paused when the user comes back.
+  useEffect(() => {
+    if (isActive) return;
+    // isPlaying itself updates via each element's own onPause/onStateChange
+    // callback (below), not here — these just trigger the pause.
+    audioRef.current?.pause();
+    broadcastVideoRef.current?.pause();
+    ytPlayerRef.current?.pauseVideo();
+  }, [isActive]);
+
+  // Pods Context Sync: which contentSegment (if any) matches the current
+  // playback time — the last segment whose timestamp has been reached.
+  // -1 means no segments exist for this track (reading pane falls back to
+  // the plain contentToRead block) or playback hasn't reached the first one.
+  const activeSegmentIndex = useMemo(() => {
+    const segments = activeTrack?.contentSegments;
+    if (!segments || segments.length === 0) return -1;
+    let idx = -1;
+    for (let i = 0; i < segments.length; i++) {
+      if (segments[i].time <= currentTime) idx = i;
+      else break;
+    }
+    return idx;
+  }, [activeTrack, currentTime]);
+
+  const segmentRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Locks the Reading Material pane to the active segment: scrolls it into
+  // view whenever the computed index actually changes (not on every
+  // timeupdate tick — most ticks land inside the same segment).
+  useEffect(() => {
+    if (activeSegmentIndex === -1) return;
+    segmentRefs.current[activeSegmentIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [activeSegmentIndex]);
+
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
     if (audioRef.current) {
@@ -449,10 +686,10 @@ export default function PodsModule() {
       setActiveEmbedUrl(`https://www.youtube.com/embed/videoseries?list=${listId}`);
     } else if (input.includes('watch?v=')) {
       const videoId = input.split('v=')[1]?.split('&')[0];
-      setActiveEmbedUrl(`https://www.youtube.com/embed/${videoId}?autoplay=1`);
+      setActiveEmbedUrl(`https://www.youtube.com/embed/${videoId}`);
     } else if (input.includes('youtu.be/')) {
       const videoId = input.split('youtu.be/')[1]?.split('?')[0];
-      setActiveEmbedUrl(`https://www.youtube.com/embed/${videoId}?autoplay=1`);
+      setActiveEmbedUrl(`https://www.youtube.com/embed/${videoId}`);
     } else {
       setActiveEmbedUrl(input);
     }
@@ -683,6 +920,7 @@ export default function PodsModule() {
         ref={audioRef}
         src={activeTrack?.src || undefined}
         onPlay={initAudioContext}
+        onPause={() => setIsPlaying(false)}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleTimeUpdate}
         onEnded={handleTrackEnd}
@@ -1144,18 +1382,36 @@ export default function PodsModule() {
 
               <div className="relative flex items-center justify-center overflow-hidden border rounded-lg aspect-video bg-slate-900 border-slate-800">
                 {localVideoUrl ? (
-                  <video src={localVideoUrl} controls autoPlay className="w-full h-full object-cover" />
+                  <video
+                    ref={broadcastVideoRef}
+                    src={localVideoUrl}
+                    controls
+                    autoPlay
+                    className="w-full h-full object-cover"
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                    onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+                  />
                 ) : activeEmbedUrl ? (
                   activeEmbedUrl.endsWith('.mp4') || activeEmbedUrl.endsWith('.webm') ? (
-                    <video src={activeEmbedUrl} controls className="w-full h-full object-cover" />
-                  ) : (
-                    <iframe
+                    <video
+                      ref={broadcastVideoRef}
                       src={activeEmbedUrl}
-                      title="Broadcast Monitor Video Embed"
-                      className="w-full h-full border-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
+                      controls
+                      className="w-full h-full object-cover"
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                      onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
                     />
+                  ) : (
+                    // The YouTube IFrame Player API takes ownership of this
+                    // container (replaces it with its own iframe on first
+                    // mount) — see the ytPlayerRef effect below. A plain
+                    // <iframe src=...> has no postMessage access to
+                    // currentTime, which is what Pods Context Sync needs.
+                    <div key="youtube-player-container" id="pods-youtube-player" className="w-full h-full" />
                   )
                 ) : (
                   <>
@@ -1197,10 +1453,26 @@ export default function PodsModule() {
                 <span className="font-mono text-xs text-slate-500">FORMAT: LORE / TEXT</span>
               </div>
 
-              <div className="space-y-4 text-sm leading-relaxed prose prose-invert prose-amber max-w-none text-slate-300">
-                <ReactMarkdown>
-                  {activeTrack?.contentToRead || 'Select a track to read its synchronized notes.'}
-                </ReactMarkdown>
+              <div className="space-y-4 overflow-y-auto text-sm leading-relaxed prose prose-invert max-w-none text-slate-300 max-h-64">
+                {activeTrack?.contentSegments && activeTrack.contentSegments.length > 0 ? (
+                  activeTrack.contentSegments.map((segment, i) => (
+                    <div
+                      key={`${activeTrack.id}-${i}`}
+                      ref={(el) => {
+                        segmentRefs.current[i] = el;
+                      }}
+                      className={`rounded px-2 -mx-2 py-1 transition-colors duration-500 ${
+                        i === activeSegmentIndex ? 'bg-white/10 text-white' : ''
+                      }`}
+                    >
+                      <ReactMarkdown>{segment.text}</ReactMarkdown>
+                    </div>
+                  ))
+                ) : (
+                  <ReactMarkdown>
+                    {activeTrack?.contentToRead || 'Select a track to read its synchronized notes.'}
+                  </ReactMarkdown>
+                )}
               </div>
             </div>
 
