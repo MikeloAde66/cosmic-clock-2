@@ -38,6 +38,11 @@ export interface Product {
   // order with a fabricated id.
   printfulVariantId?: number;
   gelatoProductUid?: string;
+  // Real mockup/photography URLs, when they exist — still isDemo (no
+  // fulfillment mapping yet) even once a product has real images; those are
+  // two separate things. Only the first is shown on the storefront card
+  // (a flat grid, not a per-product detail page with a gallery).
+  imageUrls?: string[];
 }
 
 function makeProduct(p: Omit<Product, 'productType' | 'isDemo'>): Product {
@@ -96,10 +101,15 @@ export const PRODUCTS: Product[] = [
   }),
   makeProduct({
     id: 'vault-founders-bundle',
-    name: "Founder's Vault Bundle",
+    name: 'Spiritual Awakening Pack',
     category: 'Vault Items',
     description: 'Early-access bundle across multiple Vault drawers.',
     amount: 6000,
+    imageUrls: [
+      'https://files.cdn.printful.com/upload/media-library-fthumb/2e/2e9e17fc1266010cd4b5b4711e7e73bd_t?v=o7P4iLTuJE',
+      'https://files.cdn.printful.com/o/upload/variant-image/b7/b718af75ef739a3bf4ed7b3e6c9bd1ef_t',
+      'https://files.cdn.printful.com/o/upload/variant-image-jpg/24/24a4265908d1c04185a6e75fdf916e95_t',
+    ],
   }),
 ];
 

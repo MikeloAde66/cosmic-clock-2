@@ -33,6 +33,9 @@ interface DisplayProduct {
   // dropdown on one product page (this storefront has no per-product
   // detail page to put a selector on).
   variantBadge?: string;
+  // Real mockup/photography, when it exists — only the first is shown per
+  // card (a flat grid, no per-product detail page for a full gallery).
+  imageUrl?: string;
 }
 
 export default function ProductsStorefront() {
@@ -54,6 +57,7 @@ export default function ProductsStorefront() {
       description: p.description,
       amount: p.amount,
       isDemo: true,
+      imageUrl: p.imageUrls?.[0],
     })),
     // Vault-origin items (templates, automations, planners, etc.) an admin
     // has explicitly priced and published — always real, never demo. Use
@@ -119,9 +123,13 @@ export default function ProductsStorefront() {
                 key={product.id}
                 className="flex flex-col overflow-hidden transition border rounded-xl bg-[#0B0E14]/80 backdrop-blur-sm border-slate-800 hover:border-slate-700 hover:shadow-[0_0_16px_rgba(255,255,255,0.06)]"
               >
-                {/* Placeholder image frame — no real product photography yet */}
                 <div className="relative flex items-center justify-center border-b aspect-square bg-slate-900/60 border-slate-800">
-                  <Icon className="w-10 h-10 text-slate-600" />
+                  {product.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- external Printful CDN URL, not a local asset
+                    <img src={product.imageUrl} alt={product.name} className="object-contain w-full h-full p-4" />
+                  ) : (
+                    <Icon className="w-10 h-10 text-slate-600" />
+                  )}
                   {product.isDemo && (
                     <span className="absolute px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded top-2 right-2 bg-black/60 text-slate-400 border-slate-700">
                       Demo
