@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Archive, Image as ImageIcon, Music, Shirt } from 'lucide-react';
+import { Archive, Check, Image as ImageIcon, Music, Shirt } from 'lucide-react';
 import { PRODUCT_CATEGORIES, PRODUCTS, type ProductCategory } from '@/lib/products';
 import type { PublishedVaultProduct } from '@/lib/vaultRegistry';
-import { createProductCheckout } from '@/app/actions/purchase';
+import { useCart } from '@/lib/cart';
 
 const CATEGORY_ICONS: Record<ProductCategory, React.ComponentType<{ className?: string }>> = {
   Apparel: Shirt,
@@ -41,6 +41,8 @@ interface DisplayProduct {
 export default function ProductsStorefront() {
   const [activeCategory, setActiveCategory] = useState<'ALL' | ProductCategory>('ALL');
   const [vaultProducts, setVaultProducts] = useState<PublishedVaultProduct[]>([]);
+  const [addedId, setAddedId] = useState<string | null>(null);
+  const { addItem } = useCart();
 
   useEffect(() => {
     fetch('/api/vault/published')
@@ -123,10 +125,21 @@ export default function ProductsStorefront() {
                 key={product.id}
                 className="flex flex-col overflow-hidden transition border rounded-xl bg-[#0B0E14]/80 backdrop-blur-sm border-slate-800 hover:border-slate-700 hover:shadow-[0_0_16px_rgba(255,255,255,0.06)]"
               >
-                <div className="relative flex items-center justify-center border-b aspect-square bg-slate-900/60 border-slate-800">
+                <div className="relative flex items-center justify-center overflow-hidden border-b aspect-[3/4] bg-slate-900/60 border-slate-800">
                   {product.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- external Printful CDN URL, not a local asset
-                    <img src={product.imageUrl} alt={product.name} className="object-contain w-full h-full p-4" />
+                    product.imageUrl.endsWith('.mp4') ? (
+                      <video
+                        src={product.imageUrl}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="object-cover w-full h-full pointer-events-none"
+                      />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element -- mix of local /public assets and external Printful CDN URLs
+                      <img src={product.imageUrl} alt={product.name} className="object-cover w-full h-full" />
+                    )
                   ) : (
                     <Icon className="w-10 h-10 text-slate-600" />
                   )}
@@ -153,21 +166,24 @@ export default function ProductsStorefront() {
 
                   <div className="pt-2 mt-auto space-y-2 border-t border-slate-800/80">
                     <span className="text-lg font-bold text-white">${formatPrice(product.amount)}</span>
-                    <form action={createProductCheckout} className="flex items-center gap-2">
-                      <input type="hidden" name="productId" value={product.id} />
-                      <input
-                        type="text"
-                        name="promoCode"
-                        placeholder="Promo code"
-                        className="w-0 flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono border rounded-lg bg-slate-950 border-slate-800 text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-white/50"
-                      />
-                      <button
-                        type="submit"
-                        className="px-3 py-1.5 text-[11px] font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition shrink-0"
-                      >
-                        Buy Now
-                      </button>
-                    </form>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addItem({ productId: product.id, name: product.name, amount: product.amount, imageUrl: product.imageUrl });
+                        setAddedId(product.id);
+                        setTimeout(() => setAddedId((current) => (current === product.id ? null : current)), 1500);
+                      }}
+                      className="flex items-center justify-center w-full gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition"
+                    >
+                      {addedId === product.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          Added
+                        </>
+                      ) : (
+                        'Add to Cart'
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>

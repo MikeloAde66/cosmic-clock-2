@@ -71,22 +71,57 @@ async function resolveCheckoutItem(productId: string): Promise<CheckoutItem | nu
   return { id: product.id, name: product.name, description: product.description, amount: product.amount, productType: product.productType };
 }
 
+export interface CartLineItem {
+  productId: string;
+  quantity: number;
+}
+
+export interface CartCheckoutState {
+  error: string | null;
+}
+
 // One-time purchase, not a subscription — mode: 'payment' with inline
-// price_data rather than a pre-created Stripe Price. Demo products have no
-// real inventory, so there's nothing worth provisioning as a persistent
-// Stripe object for those; Vault-origin products are real but still don't
-// need a persistent Stripe Price since their own price can change per pack.
-export async function createProductCheckout(formData: FormData) {
-  const productId = formData.get('productId');
-  if (typeof productId !== 'string') {
-    throw new Error('Missing productId.');
+// price_data per cart line rather than pre-created Stripe Prices. Demo
+// products have no real inventory, so there's nothing worth provisioning as
+// a persistent Stripe object for those; Vault-origin products are real but
+// still don't need a persistent Stripe Price since their own price can
+// change per pack. Each line's product_data carries its own productId/
+// product_type in metadata (rather than a single session-level metadata
+// field) because a cart checkout can mix multiple products with different
+// fulfillment paths in one Stripe session — the webhook reads it back per
+// line via listLineItems to fulfill each item correctly.
+//
+// Takes (prevState, formData) rather than plain args so the calling
+// component can drive it with useActionState — this Next version's own docs
+// say to return validation failures from the action rather than throw a
+// plain Error, and to call redirect() outside any try/catch, so failures
+// (bad promo code, a since-unpublished item) come back as { error } for the
+// Cart view to render, while success still falls through to a real redirect.
+export async function createCartCheckout(_prevState: CartCheckoutState, formData: FormData): Promise<CartCheckoutState> {
+  let items: CartLineItem[];
+  try {
+    items = JSON.parse(String(formData.get('items') ?? '[]'));
+  } catch {
+    return { error: 'Cart data was corrupted — try refreshing the page.' };
   }
-  const item = await resolveCheckoutItem(productId);
-  if (!item) {
-    throw new Error('Unknown product.');
+  if (!Array.isArray(items) || items.length === 0) {
+    return { error: 'Your cart is empty.' };
   }
   if (!process.env.STRIPE_SECRET_KEY) {
-    throw new Error('Stripe is not configured.');
+    return { error: 'Stripe is not configured.' };
+  }
+
+  let resolved: (CheckoutItem & { quantity: number })[];
+  try {
+    resolved = await Promise.all(
+      items.map(async (i) => {
+        const item = await resolveCheckoutItem(i.productId);
+        if (!item) throw new Error(`This item is no longer available: ${i.productId}`);
+        return { ...item, quantity: Math.min(Math.max(1, Math.floor(i.quantity)), 99) };
+      })
+    );
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'One of the items in your cart is no longer available.' };
   }
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -95,54 +130,52 @@ export async function createProductCheckout(formData: FormData) {
 
   // Physical items need a real shipping address — for apparel/print_collateral
   // that's Printful/Gelato to ship to; for vault_shipment it's the seller,
-  // fulfilling a one-of-a-kind original by hand. Digital items skip this
-  // collection step entirely.
-  const isPhysical =
-    item.productType === 'apparel' || item.productType === 'print_collateral' || item.productType === 'vault_shipment';
+  // fulfilling a one-of-a-kind original by hand. Digital-only carts skip
+  // this collection step entirely.
+  const isPhysical = resolved.some(
+    (item) => item.productType === 'apparel' || item.productType === 'print_collateral' || item.productType === 'vault_shipment'
+  );
 
   // A code typed into our own field is applied directly as a discount (and
   // validated up front, so a bad code fails loudly here instead of silently
   // at Stripe); Stripe's own promo field is also left on so a code can still
   // be entered on the hosted page for anyone who skips ours (e.g. arriving
   // straight from a QR code). The two are mutually exclusive per checkout
-  // session, so only one is set.
-  const promoCodeRaw = formData.get('promoCode');
-  const promoCode = typeof promoCodeRaw === 'string' ? promoCodeRaw.trim() : '';
+  // session, so only one is set. Applies once to the whole cart, not per item.
+  const trimmedPromoCode = String(formData.get('promoCode') ?? '').trim();
   let discounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined;
-  if (promoCode) {
-    const matches = await stripe.promotionCodes.list({ code: promoCode, active: true, limit: 1 });
+  if (trimmedPromoCode) {
+    const matches = await stripe.promotionCodes.list({ code: trimmedPromoCode, active: true, limit: 1 });
     const promo = matches.data[0];
     if (!promo) {
-      throw new Error(`Promo code "${promoCode}" is invalid or expired.`);
+      return { error: `Promo code "${trimmedPromoCode}" is invalid or expired.` };
     }
     discounts = [{ promotion_code: promo.id }];
   }
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
-    line_items: [
-      {
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: item.name,
-            description: item.description,
-            metadata: { productId: item.id },
-          },
-          unit_amount: item.amount,
+    line_items: resolved.map((item) => ({
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: item.name,
+          description: item.description,
+          metadata: { productId: item.id, product_type: item.productType },
         },
-        quantity: 1,
+        unit_amount: item.amount,
       },
-    ],
+      quantity: item.quantity,
+    })),
     ...(isPhysical ? { shipping_address_collection: { allowed_countries: ['US', 'CA', 'GB', 'AU'] } } : {}),
     ...(discounts ? { discounts } : { allow_promotion_codes: true }),
     success_url: `${origin}/?purchase=success`,
     cancel_url: `${origin}/?purchase=cancelled`,
-    metadata: { productId: item.id, product_type: item.productType },
+    metadata: { cart: 'true', item_count: String(resolved.length) },
   });
 
   if (!session.url) {
-    throw new Error('Stripe did not return a checkout URL.');
+    return { error: 'Stripe did not return a checkout URL.' };
   }
   redirect(session.url);
 }

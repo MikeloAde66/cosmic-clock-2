@@ -49,6 +49,15 @@ function makeProduct(p: Omit<Product, 'productType' | 'isDemo'>): Product {
   return { ...p, productType: CATEGORY_TO_PRODUCT_TYPE[p.category], isDemo: true };
 }
 
+// Placeholder card art for demo products with no real photography yet — the
+// only local asset actually verified clean (no watermark, not someone
+// else's branding/screenshot). Reused across multiple cards on purpose
+// rather than raiding the rest of public/assets/, which turned out to be a
+// grab-bag of unrelated files (other projects' screenshots, watermarked
+// stock photos) unsuitable for a live storefront. Swap for real per-product
+// photography as it becomes available.
+const PLACEHOLDER_IMAGE = '/assets/products/yuga-cycle-diagram.png';
+
 export const PRODUCTS: Product[] = [
   makeProduct({
     id: 'apparel-cosmic-tee',
@@ -56,6 +65,7 @@ export const PRODUCTS: Product[] = [
     category: 'Apparel',
     description: 'Minimal white-on-black print, cosmic clock motif.',
     amount: 2800,
+    imageUrls: [PLACEHOLDER_IMAGE],
   }),
   makeProduct({
     id: 'apparel-kali-hoodie',
@@ -63,6 +73,7 @@ export const PRODUCTS: Product[] = [
     category: 'Apparel',
     description: 'Heavyweight fleece, embroidered epoch marker.',
     amount: 5800,
+    imageUrls: [PLACEHOLDER_IMAGE],
   }),
   makeProduct({
     id: 'art-sacred-geometry',
@@ -70,6 +81,7 @@ export const PRODUCTS: Product[] = [
     category: 'Art Prints',
     description: '18x24 archival print, museum-grade paper.',
     amount: 4500,
+    imageUrls: [PLACEHOLDER_IMAGE],
   }),
   makeProduct({
     id: 'art-flammarion',
@@ -77,6 +89,7 @@ export const PRODUCTS: Product[] = [
     category: 'Art Prints',
     description: 'Classic engraving, reproduced on matte fine art stock.',
     amount: 3800,
+    imageUrls: [PLACEHOLDER_IMAGE],
   }),
   makeProduct({
     id: 'audio-432-meditation',
@@ -84,6 +97,7 @@ export const PRODUCTS: Product[] = [
     category: 'Audio/Digital',
     description: 'Digital download — 6 tuned ambient tracks.',
     amount: 1500,
+    imageUrls: [PLACEHOLDER_IMAGE],
   }),
   makeProduct({
     id: 'audio-ambient-loop-kit',
@@ -91,6 +105,7 @@ export const PRODUCTS: Product[] = [
     category: 'Audio/Digital',
     description: 'Digital download — royalty-free loop pack for producers.',
     amount: 2200,
+    imageUrls: [PLACEHOLDER_IMAGE],
   }),
   makeProduct({
     id: 'vault-access-pass',
@@ -98,6 +113,7 @@ export const PRODUCTS: Product[] = [
     category: 'Vault Items',
     description: 'One-time unlock for a curated Vault drawer.',
     amount: 1200,
+    imageUrls: [PLACEHOLDER_IMAGE],
   }),
   makeProduct({
     id: 'vault-founders-bundle',
@@ -106,6 +122,7 @@ export const PRODUCTS: Product[] = [
     description: 'Early-access bundle across multiple Vault drawers.',
     amount: 6000,
     imageUrls: [
+      '/assets/videos/spiritual-awakening-pack.mp4',
       'https://files.cdn.printful.com/upload/media-library-fthumb/2e/2e9e17fc1266010cd4b5b4711e7e73bd_t?v=o7P4iLTuJE',
       'https://files.cdn.printful.com/o/upload/variant-image/b7/b718af75ef739a3bf4ed7b3e6c9bd1ef_t',
       'https://files.cdn.printful.com/o/upload/variant-image-jpg/24/24a4265908d1c04185a6e75fdf916e95_t',
