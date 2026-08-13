@@ -3,6 +3,7 @@
 import React from 'react';
 import { Pause, Play, SkipBack, SkipForward, Volume2, X } from 'lucide-react';
 import { useRadioPlayer } from './RadioPlayerContext';
+import PlayerSpectrum from './PlayerSpectrum';
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds)) return '--:--';
@@ -15,7 +16,7 @@ function formatTime(seconds: number) {
 // until a station is selected) — this is what makes playback persist across
 // tab switches instead of stopping when Radio unmounts.
 export default function GlobalPlayerBar() {
-  const { station, queue, currentIndex, status, currentTime, duration, volume, togglePlayPause, next, prev, seek, setVolume, stop } =
+  const { station, queue, currentIndex, status, currentTime, duration, volume, analyserRef, togglePlayPause, next, prev, seek, setVolume, stop } =
     useRadioPlayer();
 
   if (!station) return null;
@@ -25,18 +26,21 @@ export default function GlobalPlayerBar() {
 
   return (
     <div className="flex items-center gap-4 px-4 py-2 border-t shrink-0 bg-[#04060A] border-slate-800/80">
-      <div className="w-40 min-w-0 sm:w-56">
-        <p className="text-xs font-bold text-white truncate">{station.name}</p>
-        <p className="text-[10px] text-slate-500 truncate font-mono flex items-center gap-1.5">
-          {currentTrack?.isAd && (
-            <span className="px-1 py-px text-[8px] font-bold uppercase tracking-wider text-white bg-red-600 rounded-sm shrink-0">
-              AD
+      <div className="flex items-center min-w-0 gap-2 w-40 sm:w-56">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-white truncate">{station.name}</p>
+          <p className="text-[10px] text-slate-500 truncate font-mono flex items-center gap-1.5">
+            {currentTrack?.isAd && (
+              <span className="px-1 py-px text-[8px] font-bold uppercase tracking-wider text-white bg-red-600 rounded-sm shrink-0">
+                AD
+              </span>
+            )}
+            <span className="truncate">
+              {currentTrack ? currentTrack.filename : station.kind === 'live' ? 'Live Stream' : ''}
             </span>
-          )}
-          <span className="truncate">
-            {currentTrack ? currentTrack.filename : station.kind === 'live' ? 'Live Stream' : ''}
-          </span>
-        </p>
+          </p>
+        </div>
+        <PlayerSpectrum analyserRef={analyserRef} isPlaying={status === 'playing'} />
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
