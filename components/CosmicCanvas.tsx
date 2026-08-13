@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, CloudSun, Compass, X } from 'lucide-react';
 import NoaaWidget from './NoaaWidget';
 import AiOneChat from './AiOneChat';
+import AncientGlyphRain from './AncientGlyphRain';
 import { useRadioPlayer } from './radio/RadioPlayerContext';
 import { RADIO_STATIONS } from '@/lib/radioStations';
 import { GLOBE_NODES, type GlobeMarker } from '@/lib/globeMarkers';
@@ -277,21 +278,39 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer }: CosmicCanvasPr
             <BackButton onClick={() => setActiveView('clock')} />
           </div>
 
-          <div className="flex flex-col flex-1 min-h-0 max-w-lg mx-auto w-full border rounded-lg shadow-2xl p-4 border-slate-800 bg-slate-950/95 backdrop-blur-md">
-            <div className="shrink-0">
-              <span className="text-[10px] font-mono tracking-widest text-white/70 uppercase">
-                Current Epoch
-              </span>
-              <h2 className="text-2xl font-bold tracking-wider text-[#ffffff]">KALI YUGA</h2>
-              <p className="text-xs font-mono text-slate-100 mt-1">YEAR 5,128 / 432,000</p>
-              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[#2a2a30]">
-                <div className="h-full w-[1.18%] bg-[#ffffff]" />
-              </div>
-              <span className="mt-1 block text-[9px] font-mono text-slate-500">PROGRESS: 1.1870%</span>
-            </div>
+          <div className="relative flex flex-col flex-1 min-h-0 max-w-lg mx-auto w-full overflow-hidden rounded-lg border border-cyan-500/30 bg-black/20 p-4 shadow-[0_0_30px_rgba(0,240,255,0.1)] backdrop-blur-md">
+            <AncientGlyphRain />
 
-            <div className="flex-1 min-h-0 pt-3 mt-3 border-t border-slate-800">
-              <AiOneChat />
+            <div className="relative z-10 flex flex-col flex-1 min-h-0">
+              <div className="shrink-0">
+                <span className="text-[10px] font-mono tracking-widest text-cyan-400/80 uppercase">
+                  Current Epoch
+                </span>
+                <h2 className="text-2xl font-bold tracking-wider text-white">KALI YUGA</h2>
+                <p className="text-xs font-mono text-cyan-100 mt-1">YEAR 5,128 / 432,000</p>
+                <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/40">
+                  <div className="h-full w-[1.18%] bg-cyan-400" />
+                </div>
+                <span className="mt-1 block text-[9px] font-mono text-cyan-500/70">PROGRESS: 1.1870%</span>
+
+                {/* The same orthographic projection this globe's own marker
+                    system uses (see projectMarker above) — restated in
+                    standard 3D spherical-to-Cartesian form rather than the
+                    screen-space x/y + depth-check form projectMarker
+                    actually computes in. */}
+                <div className="mt-3 space-y-1 rounded border border-cyan-500/10 bg-black/40 p-3 font-mono text-[11px] text-cyan-400">
+                  <div className="text-[10px] uppercase tracking-wider text-cyan-500/70">
+                    Orthographic Projection Math
+                  </div>
+                  <div>x = R · cos(lat) · cos(lng)</div>
+                  <div>y = R · sin(lat)</div>
+                  <div>z = -R · cos(lat) · sin(lng)</div>
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-0 pt-3 mt-3 border-t border-cyan-500/20">
+                <AiOneChat />
+              </div>
             </div>
           </div>
         </div>
