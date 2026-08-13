@@ -3,7 +3,24 @@
 import React, { useEffect, useState } from 'react';
 import { Pencil, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { VAULT_DRAWERS, type VaultDrawer, type VaultProduct } from '@/lib/vaultRegistry';
+import {
+  VAULT_DRAWERS,
+  type VaultDrawer,
+  type VaultProduct,
+  type VaultProductVariant,
+  type VaultVariantFulfillmentType,
+  type VaultVariantProductType,
+} from '@/lib/vaultRegistry';
+
+const VARIANT_PRODUCT_TYPES: VaultVariantProductType[] = [
+  'physical_original',
+  'limited_print',
+  'digital_download',
+  'non_exclusive_license',
+  'exclusive_license',
+  'streaming_only',
+];
+const VARIANT_FULFILLMENT_TYPES: VaultVariantFulfillmentType[] = ['shipment', 'digital_delivery', 'license_grant'];
 
 function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
@@ -111,6 +128,95 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
   const [fileDurations, setFileDurations] = useState<Map<File, number>>(new Map());
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string>('');
+
+  // Variant manager — a pack can generate several separately priced/
+  // fulfilled storefront listings from the same underlying files (e.g. a
+  // physical original + a digital license) instead of just one.
+  const [variantEditorPack, setVariantEditorPack] = useState<VaultProduct | null>(null);
+  const [editingVariants, setEditingVariants] = useState<VaultProductVariant[]>([]);
+  const [variantError, setVariantError] = useState<string>('');
+  const [isSavingVariants, setIsSavingVariants] = useState<boolean>(false);
+  const [newVariantTitle, setNewVariantTitle] = useState<string>('');
+  const [newVariantProductType, setNewVariantProductType] = useState<VaultVariantProductType>('digital_download');
+  const [newVariantFulfillmentType, setNewVariantFulfillmentType] =
+    useState<VaultVariantFulfillmentType>('digital_delivery');
+  const [newVariantPrice, setNewVariantPrice] = useState<string>('');
+  const [newVariantInventory, setNewVariantInventory] = useState<string>('');
+
+  const openVariantEditor = (item: VaultProduct) => {
+    setVariantEditorPack(item);
+    setEditingVariants(item.productVariants ?? []);
+    setVariantError('');
+    setNewVariantTitle('');
+    setNewVariantProductType('digital_download');
+    setNewVariantFulfillmentType('digital_delivery');
+    setNewVariantPrice('');
+    setNewVariantInventory('');
+  };
+
+  const addVariantRow = () => {
+    if (!newVariantTitle.trim()) {
+      setVariantError('Variant title is required.');
+      return;
+    }
+    const priceCents = Math.round(Number(newVariantPrice) * 100);
+    if (!newVariantPrice.trim() || !Number.isFinite(priceCents) || priceCents <= 0) {
+      setVariantError('Variant price must be greater than zero.');
+      return;
+    }
+    const inventoryCount = newVariantInventory.trim() ? Number(newVariantInventory) : undefined;
+    if (inventoryCount !== undefined && (!Number.isFinite(inventoryCount) || inventoryCount < 0)) {
+      setVariantError('Inventory count must be a non-negative number.');
+      return;
+    }
+    setVariantError('');
+    setEditingVariants((prev) => [
+      ...prev,
+      {
+        id: `${newVariantProductType}-${Date.now()}`,
+        listingTitle: newVariantTitle.trim(),
+        productType: newVariantProductType,
+        fulfillmentType: newVariantFulfillmentType,
+        priceCents,
+        inventoryCount,
+        isAvailable: true,
+      },
+    ]);
+    setNewVariantTitle('');
+    setNewVariantPrice('');
+    setNewVariantInventory('');
+  };
+
+  const removeVariantRow = (id: string) => {
+    setEditingVariants((prev) => prev.filter((v) => v.id !== id));
+  };
+
+  const saveVariants = async () => {
+    if (!variantEditorPack) return;
+    setIsSavingVariants(true);
+    setVariantError('');
+    try {
+      const res = await fetch('/api/vault/product', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({
+          sku: variantEditorPack.sku,
+          drawer: variantEditorPack.drawer,
+          productVariants: editingVariants,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data: { productVariants: VaultProductVariant[] } = await res.json();
+      setProducts((prev) =>
+        prev.map((p) => (p.id === variantEditorPack.id ? { ...p, productVariants: data.productVariants } : p))
+      );
+      setVariantEditorPack(null);
+    } catch (err) {
+      setVariantError(err instanceof Error ? err.message : 'Failed to save variants.');
+    } finally {
+      setIsSavingVariants(false);
+    }
+  };
 
   const toggleExpanded = (id: string) => {
     setExpandedIds((prev) => {
@@ -462,6 +568,16 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
                         <h3 className="text-base font-bold text-slate-100">{item.title}</h3>
                         <p className="text-xs text-slate-400">{item.description}</p>
                         <p className="font-mono text-[10px] text-slate-600">SKU: {item.sku}</p>
+                        {isAdmin && (
+                          <button
+                            onClick={() => openVariantEditor(item)}
+                            className="font-mono text-[10px] uppercase text-white/70 hover:text-white"
+                          >
+                            {item.productVariants && item.productVariants.length > 0
+                              ? `${item.productVariants.length} Product Variant${item.productVariants.length !== 1 ? 's' : ''} →`
+                              : '+ Add Product Variants'}
+                          </button>
+                        )}
                         {item.tags && item.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {item.tags.map((tag) => (
@@ -756,6 +872,143 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {variantEditorPack && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg p-6 space-y-4 border shadow-2xl bg-slate-900 border-neutral-700 rounded-xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-white">Product Variants</h3>
+                <p className="font-mono text-[10px] text-slate-500">
+                  {variantEditorPack.title} · SKU: {variantEditorPack.sku}
+                </p>
+              </div>
+              <button
+                onClick={() => setVariantEditorPack(null)}
+                className="text-slate-500 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Sell this same source item as several separate storefront listings — e.g. a physical original and a
+              digital license — each with its own price, type, and fulfillment. Leave empty to keep selling it as one
+              plain listing via the price field above instead.
+            </p>
+
+            {editingVariants.length > 0 && (
+              <div className="space-y-2">
+                {editingVariants.map((variant) => (
+                  <div
+                    key={variant.id}
+                    className="flex items-center justify-between gap-2 p-2.5 border rounded-lg bg-slate-950/60 border-slate-800"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{variant.listingTitle}</p>
+                      <p className="font-mono text-[10px] text-slate-500">
+                        {variant.productType.replace(/_/g, ' ')} · {variant.fulfillmentType.replace(/_/g, ' ')} · $
+                        {(variant.priceCents / 100).toFixed(2)}
+                        {variant.inventoryCount !== undefined ? ` · qty ${variant.inventoryCount}` : ''}
+                        {!variant.isAvailable ? ' · SOLD OUT' : ''}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => removeVariantRow(variant.id)}
+                      title="Remove variant"
+                      className="text-slate-500 hover:text-rose-400 shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="p-3 space-y-2 border rounded-lg border-slate-800 bg-slate-950/40">
+              <p className="font-mono text-[10px] uppercase tracking-wide text-slate-500">Add a variant</p>
+              <input
+                type="text"
+                placeholder="Listing title (e.g. Original Canvas, 1-of-1)"
+                value={newVariantTitle}
+                onChange={(e) => setNewVariantTitle(e.target.value)}
+                className="w-full p-2.5 font-mono text-xs border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={newVariantProductType}
+                  onChange={(e) => setNewVariantProductType(e.target.value as VaultVariantProductType)}
+                  className="w-full p-2.5 font-mono text-xs border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+                >
+                  {VARIANT_PRODUCT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={newVariantFulfillmentType}
+                  onChange={(e) => setNewVariantFulfillmentType(e.target.value as VaultVariantFulfillmentType)}
+                  className="w-full p-2.5 font-mono text-xs border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+                >
+                  {VARIANT_FULFILLMENT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  placeholder="Price (USD)"
+                  value={newVariantPrice}
+                  onChange={(e) => setNewVariantPrice(e.target.value)}
+                  className="w-full p-2.5 font-mono text-xs border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  placeholder="Qty (blank = unlimited)"
+                  value={newVariantInventory}
+                  onChange={(e) => setNewVariantInventory(e.target.value)}
+                  className="w-full p-2.5 font-mono text-xs border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={addVariantRow}
+                className="w-full py-2 font-mono text-xs font-bold uppercase transition border rounded-lg text-white/80 border-neutral-700 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+              >
+                + Add Variant
+              </button>
+            </div>
+
+            {variantError && <p className="font-mono text-xs text-rose-400">{variantError}</p>}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setVariantEditorPack(null)}
+                className="px-4 py-2 font-mono text-xs text-slate-400 hover:text-slate-200"
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                onClick={saveVariants}
+                disabled={isSavingVariants}
+                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-white text-black hover:bg-neutral-200 disabled:opacity-50"
+              >
+                {isSavingVariants ? 'SAVING…' : 'SAVE VARIANTS'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

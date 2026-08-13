@@ -27,6 +27,12 @@ interface DisplayProduct {
   description: string;
   amount: number;
   isDemo: boolean;
+  // Set only for Vault-variant listings (e.g. "PHYSICAL ORIGINAL",
+  // "DIGITAL DOWNLOAD") — a single Vault master item can generate several
+  // of these side by side, each its own card/listing here rather than a
+  // dropdown on one product page (this storefront has no per-product
+  // detail page to put a selector on).
+  variantBadge?: string;
 }
 
 export default function ProductsStorefront() {
@@ -50,15 +56,18 @@ export default function ProductsStorefront() {
       isDemo: true,
     })),
     // Vault-origin items (templates, automations, planners, etc.) an admin
-    // has explicitly priced and published — always real, never demo. The id
-    // is prefixed so createProductCheckout can tell the two catalogs apart.
+    // has explicitly priced and published — always real, never demo. Use
+    // the id GET /api/vault/published already built rather than
+    // reconstructing it here — a pack with multiple variants returns one
+    // row per variant, each needing its own distinct id.
     ...vaultProducts.map((v) => ({
-      id: `vault:${v.drawer}:${v.sku}`,
+      id: v.id,
       name: v.title,
       category: 'Vault Items' as ProductCategory,
       description: v.description,
       amount: v.priceCents,
       isDemo: false,
+      variantBadge: v.productType?.replace(/_/g, ' '),
     })),
   ];
 
@@ -127,6 +136,11 @@ export default function ProductsStorefront() {
                     </span>
                     <h3 className="text-sm font-bold text-white">{product.name}</h3>
                     <p className="text-xs text-slate-400">{product.description}</p>
+                    {product.variantBadge && (
+                      <span className="inline-block px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded bg-slate-900/80 text-slate-400 border-slate-700">
+                        {product.variantBadge}
+                      </span>
+                    )}
                   </div>
 
                   <div className="pt-2 mt-auto space-y-2 border-t border-slate-800/80">

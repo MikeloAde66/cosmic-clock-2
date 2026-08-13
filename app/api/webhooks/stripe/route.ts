@@ -3,6 +3,9 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { findProduct } from '@/lib/products';
 import { createPrintfulOrder } from '@/lib/fulfillment/printful';
 import { createGelatoOrder } from '@/lib/fulfillment/gelato';
+import dbConnect from '@/lib/dbConnect';
+import VaultProduct from '@/lib/models/VaultProduct';
+import type { VaultDrawer } from '@/lib/vaultRegistry';
 
 export const runtime = 'nodejs';
 
@@ -14,6 +17,44 @@ async function updateOrder(admin: SupabaseAdmin, sessionId: string, fields: Reco
     .update({ ...fields, updated_at: new Date().toISOString() })
     .eq('stripe_checkout_session_id', sessionId);
   if (error) console.error('Failed to update order row:', error);
+}
+
+// Parses "vault:<drawer>:<sku>:<variantId>" ids (see resolveCheckoutItem in
+// app/actions/purchase.ts) — returns null for legacy pack-level listings
+// (no trailing :variantId) and for non-vault productIds.
+function parseVaultVariantProductId(productId: string): { drawer: string; sku: string; variantId: string } | null {
+  if (!productId.startsWith('vault:')) return null;
+  const rest = productId.slice('vault:'.length);
+  const sep = rest.indexOf(':');
+  if (sep === -1) return null;
+  const drawer = rest.slice(0, sep);
+  const skuAndVariant = rest.slice(sep + 1);
+  const lastSep = skuAndVariant.lastIndexOf(':');
+  if (lastSep === -1) return null;
+  return { drawer, sku: skuAndVariant.slice(0, lastSep), variantId: skuAndVariant.slice(lastSep + 1) };
+}
+
+// Decrements a purchased variant's inventoryCount, marking it unavailable
+// once it hits zero — a 1-of-1 physical original (or any other finite-stock
+// variant) shouldn't still show as buyable on the storefront after it's
+// actually sold.
+async function decrementVaultVariantInventoryIfApplicable(productId: string) {
+  const parsed = parseVaultVariantProductId(productId);
+  if (!parsed || !process.env.MONGODB_URI) return;
+  const { drawer, sku, variantId } = parsed;
+
+  try {
+    await dbConnect();
+    const doc = await VaultProduct.findOne({ sku, drawer: drawer as VaultDrawer });
+    const variant = doc?.productVariants?.find((v) => v.id === variantId);
+    if (!doc || !variant || variant.inventoryCount === undefined) return;
+    const nextCount = Math.max(0, variant.inventoryCount - 1);
+    variant.inventoryCount = nextCount;
+    if (nextCount === 0) variant.isAvailable = false;
+    await doc.save();
+  } catch (err) {
+    console.error('Failed to decrement Vault variant inventory:', err);
+  }
 }
 
 // One-time product purchases (mode: 'payment') -- routes physical items to
@@ -28,10 +69,16 @@ async function handleProductOrderCompleted(session: Stripe.Checkout.Session, adm
 
   const shipping = session.collected_information?.shipping_details;
   const customerEmail = session.customer_details?.email ?? undefined;
+  // product_id already carries the variant as part of its own composite
+  // form (vault:<drawer>:<sku>:<variantId>), but a dedicated column is far
+  // more useful for querying/reporting than re-parsing that string every
+  // time — e.g. "every order for this variant across packs."
+  const variantId = parseVaultVariantProductId(productId)?.variantId ?? null;
 
   const { error: insertError } = await admin.from('orders').insert({
     stripe_checkout_session_id: session.id,
     product_id: productId,
+    variant_id: variantId,
     product_type: productType,
     amount: session.amount_total ?? 0,
     shipping_address: shipping ? { name: shipping.name, ...shipping.address } : null,
@@ -46,6 +93,18 @@ async function handleProductOrderCompleted(session: Stripe.Checkout.Session, adm
     // download access behind purchase status is a separate, not-yet-built
     // piece; this only reflects fulfillment state.)
     await updateOrder(admin, session.id, { fulfillment_status: 'delivered' });
+    await decrementVaultVariantInventoryIfApplicable(productId);
+    return;
+  }
+
+  if (productType === 'vault_shipment') {
+    // A Vault-sourced physical original already exists as a real object —
+    // there's no Printful/Gelato print-on-demand order to place. The seller
+    // has to pack and ship it themselves; this just records that a real
+    // sale happened and is waiting on that, with the shipping address
+    // already captured in the insert above.
+    await updateOrder(admin, session.id, { fulfillment_status: 'awaiting_manual_fulfillment' });
+    await decrementVaultVariantInventoryIfApplicable(productId);
     return;
   }
 

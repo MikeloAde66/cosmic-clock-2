@@ -16,22 +16,52 @@ interface CheckoutItem {
   productType: ProductType;
 }
 
-// Vault-origin ids are "vault:<drawer>:<sku>" (see ProductsStorefront's
-// merge of GET /api/vault/published into the catalog) — resolved against
-// Mongo here rather than trusted from the form, and re-checked for
-// isPublished so unpublishing a pack takes it off the storefront
-// immediately even if a stale page still has it in the DOM. Everything
-// vault-origin is a digital good; there's no physical vault catalog.
+// Vault-origin ids are "vault:<drawer>:<sku>" for a pack's single legacy
+// listing, or "vault:<drawer>:<sku>:<variantId>" for one of its
+// productVariants (see ProductsStorefront's merge of GET
+// /api/vault/published into the catalog) — resolved against Mongo here
+// rather than trusted from the form, and re-checked for
+// isPublished/isAvailable so unpublishing a pack or a single variant takes
+// it off the storefront immediately even if a stale page still has it in
+// the DOM.
 async function resolveCheckoutItem(productId: string): Promise<CheckoutItem | null> {
   if (productId.startsWith('vault:')) {
     const rest = productId.slice('vault:'.length);
     const sep = rest.indexOf(':');
     if (sep === -1 || !process.env.MONGODB_URI) return null;
     const drawer = rest.slice(0, sep);
-    const sku = rest.slice(sep + 1);
+    const skuAndMaybeVariant = rest.slice(sep + 1);
 
     await dbConnect();
-    const doc = await VaultProduct.findOne({ sku, drawer: drawer as VaultDrawer, isPublished: true });
+
+    // Try "sku:variantId" first, falling back to treating the whole
+    // remainder as a plain sku (the legacy single-listing form) if no
+    // matching variant is found — keeps this correct even for a sku that
+    // happens to contain its own colon.
+    const lastSep = skuAndMaybeVariant.lastIndexOf(':');
+    if (lastSep !== -1) {
+      const sku = skuAndMaybeVariant.slice(0, lastSep);
+      const variantId = skuAndMaybeVariant.slice(lastSep + 1);
+      const doc = await VaultProduct.findOne({ sku, drawer: drawer as VaultDrawer });
+      const variant = doc?.productVariants?.find((v) => v.id === variantId && v.isAvailable);
+      if (doc && variant) {
+        // A Vault-sourced physical original already exists as a real
+        // object — it needs the seller to ship it themselves, not a
+        // Printful/Gelato print-on-demand order (see 'vault_shipment' in
+        // lib/products.ts). Everything else (digital_delivery,
+        // license_grant) skips physical fulfillment like plain digital.
+        const productType: ProductType = variant.fulfillmentType === 'shipment' ? 'vault_shipment' : 'digital';
+        return {
+          id: productId,
+          name: variant.listingTitle,
+          description: doc.description,
+          amount: variant.priceCents,
+          productType,
+        };
+      }
+    }
+
+    const doc = await VaultProduct.findOne({ sku: skuAndMaybeVariant, drawer: drawer as VaultDrawer, isPublished: true });
     if (!doc || !doc.priceCents) return null;
     return { id: productId, name: doc.title, description: doc.description, amount: doc.priceCents, productType: 'digital' };
   }
@@ -63,9 +93,12 @@ export async function createProductCheckout(formData: FormData) {
   const headersList = await headers();
   const origin = headersList.get('origin') || `http://${headersList.get('host') ?? 'localhost:3000'}`;
 
-  // Physical items need a real shipping address for Printful/Gelato to ship
-  // to — digital items skip this collection step entirely.
-  const isPhysical = item.productType === 'apparel' || item.productType === 'print_collateral';
+  // Physical items need a real shipping address — for apparel/print_collateral
+  // that's Printful/Gelato to ship to; for vault_shipment it's the seller,
+  // fulfilling a one-of-a-kind original by hand. Digital items skip this
+  // collection step entirely.
+  const isPhysical =
+    item.productType === 'apparel' || item.productType === 'print_collateral' || item.productType === 'vault_shipment';
 
   // A code typed into our own field is applied directly as a discount (and
   // validated up front, so a bad code fails loudly here instead of silently

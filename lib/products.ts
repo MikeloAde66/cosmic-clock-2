@@ -9,9 +9,12 @@ export const PRODUCT_CATEGORIES: ProductCategory[] = ['Apparel', 'Art Prints', '
 
 // Drives fulfillment routing (see app/api/webhooks/stripe/route.ts):
 // apparel -> Printful, print_collateral -> Gelato, digital -> no physical
-// shipment. Passed through as Stripe Checkout metadata at purchase time so
-// the webhook doesn't need a second lookup.
-export type ProductType = 'apparel' | 'print_collateral' | 'digital';
+// shipment, vault_shipment -> no dropship API (a Vault-sourced physical
+// original already exists as a real object; it needs the seller to pack
+// and ship it themselves, not a print-on-demand order). Passed through as
+// Stripe Checkout metadata at purchase time so the webhook doesn't need a
+// second lookup.
+export type ProductType = 'apparel' | 'print_collateral' | 'digital' | 'vault_shipment';
 
 const CATEGORY_TO_PRODUCT_TYPE: Record<ProductCategory, ProductType> = {
   Apparel: 'apparel',

@@ -1,5 +1,5 @@
 import mongoose, { Schema, type Document, type Model, type Types } from 'mongoose';
-import type { VaultDrawer } from '@/lib/vaultRegistry';
+import type { VaultDrawer, VaultVariantFulfillmentType, VaultVariantProductType } from '@/lib/vaultRegistry';
 
 export interface VaultTrackSub {
   filename: string;
@@ -21,6 +21,39 @@ const VaultTrackSchema = new Schema<VaultTrackSub>(
     sizeBytes: { type: Number, required: true },
     durationSeconds: { type: Number },
     weight: { type: Number, default: 1 },
+  },
+  { _id: false }
+);
+
+export interface VaultProductVariantSub {
+  id: string;
+  listingTitle: string;
+  productType: VaultVariantProductType;
+  fulfillmentType: VaultVariantFulfillmentType;
+  priceCents: number;
+  inventoryCount?: number;
+  isAvailable: boolean;
+}
+
+const VARIANT_PRODUCT_TYPES: VaultVariantProductType[] = [
+  'physical_original',
+  'limited_print',
+  'digital_download',
+  'non_exclusive_license',
+  'exclusive_license',
+  'streaming_only',
+];
+const VARIANT_FULFILLMENT_TYPES: VaultVariantFulfillmentType[] = ['shipment', 'digital_delivery', 'license_grant'];
+
+const VaultProductVariantSchema = new Schema<VaultProductVariantSub>(
+  {
+    id: { type: String, required: true },
+    listingTitle: { type: String, required: true },
+    productType: { type: String, enum: VARIANT_PRODUCT_TYPES, required: true },
+    fulfillmentType: { type: String, enum: VARIANT_FULFILLMENT_TYPES, required: true },
+    priceCents: { type: Number, required: true },
+    inventoryCount: { type: Number },
+    isAvailable: { type: Boolean, default: true },
   },
   { _id: false }
 );
@@ -50,6 +83,12 @@ export interface VaultProductDoc extends Document {
   // Free-form key/value facts (e.g. { frequency: '432Hz', resolution: '4K' })
   // — not used by search or the storefront, just carried through for display.
   metadata?: Record<string, string | number | boolean>;
+  // Optional — when present, GET /api/vault/published lists each available
+  // variant as its own storefront listing instead of the pack's single
+  // priceCents/isPublished pair. See lib/vaultRegistry.ts for the full
+  // rationale (one master asset, several separately-priced/fulfilled
+  // listings without duplicating the underlying files).
+  productVariants?: Types.DocumentArray<VaultProductVariantSub>;
 }
 
 const VaultProductSchema = new Schema<VaultProductDoc>({
@@ -68,6 +107,7 @@ const VaultProductSchema = new Schema<VaultProductDoc>({
   isPublished: { type: Boolean, default: false, index: true },
   tags: { type: [String], default: [], index: true },
   metadata: { type: Schema.Types.Mixed },
+  productVariants: { type: [VaultProductVariantSchema], default: [] },
   createdAt: { type: Date, default: Date.now },
 });
 

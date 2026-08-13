@@ -49,6 +49,7 @@ export async function GET() {
           isPublished: doc.isPublished,
           tags: doc.tags,
           metadata: doc.metadata,
+          productVariants: doc.productVariants,
         };
       })
     );
