@@ -315,13 +315,19 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
   }, []);
 
   // Keep the Broadcast Monitor in sync with the active track whenever it's video-backed
-  // (covers initial mount and localStorage restore, not just clicks handled by selectTrack)
+  // (covers initial mount and localStorage restore, not just clicks handled by selectTrack).
+  // Gated on isActive: Pods stays mounted (hidden) even on other tabs, and
+  // without this gate this effect would set activeEmbedUrl the instant the
+  // app loads — regardless of which tab is showing — which in turn
+  // constructs the YouTube IFrame Player (script injection, real iframe,
+  // network requests) for a view the user hasn't even opened yet.
   useEffect(() => {
+    if (!isActive) return;
     if (activeTrack?.embedUrl) {
       setMediaUrl(activeTrack.watchUrl || '');
       setActiveEmbedUrl(activeTrack.embedUrl);
     }
-  }, [activeTrack]);
+  }, [activeTrack, isActive]);
 
   const triggerSave = () => {
     // Exclude ephemeral blob URLs when persisting state to localStorage
