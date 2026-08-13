@@ -8,8 +8,13 @@ import DonationButton from './DonationButton';
 import PricingPlans from './PricingPlans';
 import ProductsStorefront from './ProductsStorefront';
 import { supabase } from '@/lib/supabase';
+import type { VaultDrawer } from '@/lib/vaultRegistry';
 
-export default function AiOneHome() {
+interface AiOneHomeProps {
+  onNavigateToVaultDrawer: (drawer: VaultDrawer) => void;
+}
+
+export default function AiOneHome({ onNavigateToVaultDrawer }: AiOneHomeProps) {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'home' | 'pricing' | 'products'>('home');
 
@@ -97,7 +102,7 @@ export default function AiOneHome() {
         <div className="flex-1 w-full max-w-6xl px-6 py-10 mx-auto">
           <div className="w-full overflow-hidden border shadow-2xl bg-slate-950 border-slate-800 rounded-2xl">
             <div className="relative w-full aspect-video">
-              <CosmicCanvas />
+              <CosmicCanvas onNavigateToVaultDrawer={onNavigateToVaultDrawer} />
             </div>
           </div>
         </div>

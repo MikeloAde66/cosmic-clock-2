@@ -47,12 +47,21 @@ function probeAudioDuration(file: File): Promise<number | undefined> {
   });
 }
 
-export default function CosmicVaultAuth() {
+interface CosmicVaultAuthProps {
+  // Set when arriving here via a Home globe Vault marker's "Open Drawer"
+  // link — pre-selects that drawer's filter tab. Only read once, as this
+  // state's initial value: the component fully remounts each time the
+  // Vault tab is switched back into (see the isUnlocked reset below), so a
+  // fresh mount always picks up whatever the prop currently is.
+  initialDrawer?: VaultDrawer;
+}
+
+export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps = {}) {
   // Security Key 432 Lock State
   const [securityPin, setSecurityPin] = useState<string>('');
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialDrawer ?? 'ALL');
 
   // Real RBAC layer on top of the PIN: the PIN just gets you into the Vault
   // view (read-only browsing); Upload and Delete additionally require a

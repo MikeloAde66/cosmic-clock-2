@@ -1,9 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ArrowLeft, CloudSun, Compass } from 'lucide-react';
+import { ArrowLeft, CloudSun, Compass, X } from 'lucide-react';
 import NoaaWidget from './NoaaWidget';
 import AiOneChat from './AiOneChat';
+import { useRadioPlayer } from './radio/RadioPlayerContext';
+import { RADIO_STATIONS } from '@/lib/radioStations';
+import { GLOBE_NODES, type GlobeMarker } from '@/lib/globeMarkers';
+import type { VaultDrawer, VaultProduct } from '@/lib/vaultRegistry';
 
 // Deterministic PRNG (mulberry32), not Math.random() — this component is
 // server-rendered before hydration, and Math.random() would produce a
@@ -38,6 +42,29 @@ const STARS = Array.from({ length: STAR_COUNT }, () => {
   };
 });
 
+// The globe is a flat CSS illusion (a Blue Marble background-image panned
+// sideways behind a circular mask), not a real 3D projection — so there's
+// no camera/sphere to hook marker placement into. This approximates one:
+// a standard orthographic projection onto the visible disc, treating the
+// viewer as always facing 0° longitude. Markers on the back hemisphere
+// (cosC < 0) return null and aren't rendered; markers near the limb shrink
+// via `scale` for a mild curvature illusion.
+function projectMarker(lat: number, lng: number): { xPct: number; yPct: number; scale: number } | null {
+  const latRad = (lat * Math.PI) / 180;
+  const lngRad = (lng * Math.PI) / 180;
+  const cosC = Math.cos(latRad) * Math.cos(lngRad);
+  if (cosC < 0.05) return null;
+
+  const x = Math.cos(latRad) * Math.sin(lngRad); // -1..1
+  const y = -Math.sin(latRad); // -1..1, screen-up is negative
+
+  return {
+    xPct: 50 + x * 50,
+    yPct: 50 + y * 50,
+    scale: Math.max(0.55, cosC),
+  };
+}
+
 function BackButton({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -50,8 +77,42 @@ function BackButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export default function CosmicCanvas() {
+interface CosmicCanvasProps {
+  onNavigateToVaultDrawer: (drawer: VaultDrawer) => void;
+}
+
+export default function CosmicCanvas({ onNavigateToVaultDrawer }: CosmicCanvasProps) {
   const [activeView, setActiveView] = useState<'clock' | 'weather' | 'kali'>('clock');
+  const { station, playStation } = useRadioPlayer();
+  const [previewMarker, setPreviewMarker] = useState<GlobeMarker | null>(null);
+  const [drawerCount, setDrawerCount] = useState<number | null>(null);
+  const [loadingCount, setLoadingCount] = useState(false);
+
+  const handleMarkerClick = (marker: GlobeMarker) => {
+    if (marker.type === 'radio') {
+      const target = RADIO_STATIONS.find((s) => s.id === marker.stationId);
+      if (target) playStation(target);
+      return;
+    }
+
+    // Vault marker — show a small preview (title + file count) rather than
+    // navigating immediately; "Open Drawer" inside it does the actual jump.
+    setPreviewMarker(marker);
+    setDrawerCount(null);
+    if (!marker.drawer) return;
+    setLoadingCount(true);
+    fetch('/api/vault/list')
+      .then((res) => res.json())
+      .then((data: { products: VaultProduct[] }) => {
+        const count = (data.products || [])
+          .filter((p) => p.drawer === marker.drawer)
+          .reduce((sum, p) => sum + (p.tracks?.length ?? 0), 0);
+        setDrawerCount(count);
+      })
+      .catch((err) => console.error('Failed to load drawer file count:', err))
+      .finally(() => setLoadingCount(false));
+  };
+
   return (
     <div className="relative flex flex-col w-full h-full overflow-hidden bg-[#0a0a0c]">
       {/* Randomized starfield, behind everything else — only ~20% twinkle */}
@@ -118,8 +179,70 @@ export default function CosmicCanvas() {
                   <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_35%_35%,transparent_35%,rgba(0,0,0,0.55)_100%)]" />
                   {/* Day/night terminator */}
                   <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-black/35 to-black/85" />
+
+                  {/* Station/Vault markers — orthographically projected onto
+                      the disc (see projectMarker), nested here so the same
+                      23.4° tilt transform applies to them automatically. */}
+                  {GLOBE_NODES.map((marker) => {
+                    const projected = projectMarker(marker.lat, marker.lng);
+                    if (!projected) return null;
+                    const isActiveStation = marker.type === 'radio' && station?.id === marker.stationId;
+                    return (
+                      <button
+                        key={marker.id}
+                        type="button"
+                        title={marker.title}
+                        onClick={() => handleMarkerClick(marker)}
+                        className="absolute z-20 flex items-center justify-center -translate-x-1/2 -translate-y-1/2 rounded-full cursor-pointer group"
+                        style={{
+                          left: `${projected.xPct}%`,
+                          top: `${projected.yPct}%`,
+                          width: `${14 * projected.scale}px`,
+                          height: `${14 * projected.scale}px`,
+                        }}
+                      >
+                        <span
+                          className={`absolute inset-0 rounded-full ${isActiveStation ? 'animate-marker-pulse' : ''}`}
+                          style={{ backgroundColor: marker.color, opacity: 0.35 }}
+                        />
+                        <span
+                          className="relative w-1.5 h-1.5 rounded-full shadow-[0_0_6px_currentColor] transition-transform group-hover:scale-150"
+                          style={{ backgroundColor: marker.color, color: marker.color }}
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
+
+              {/* Vault marker preview — small anchored card, not a full
+                  modal: a lightweight "what's in here" peek before the
+                  explicit Open Drawer action actually navigates away. */}
+              {previewMarker && previewMarker.type === 'vault' && (
+                <div className="absolute z-40 w-56 p-3 space-y-2 border rounded-lg shadow-2xl bottom-2 left-1/2 -translate-x-1/2 bg-slate-950/95 backdrop-blur-md border-neutral-700">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="text-xs font-bold text-white">{previewMarker.title}</h4>
+                    <button
+                      onClick={() => setPreviewMarker(null)}
+                      className="text-slate-500 hover:text-white shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <p className="font-mono text-[10px] text-slate-400">
+                    {loadingCount ? 'Loading…' : `${drawerCount ?? 0} file${drawerCount === 1 ? '' : 's'} in this drawer`}
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (previewMarker.drawer) onNavigateToVaultDrawer(previewMarker.drawer);
+                      setPreviewMarker(null);
+                    }}
+                    className="w-full py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-white text-black hover:bg-neutral-200 transition"
+                  >
+                    Open Drawer →
+                  </button>
+                </div>
+              )}
 
               {/* Crescent moon, fixed in the top-right corner of the canvas —
                   two overlapping circles: the outer one is the moon body,
@@ -193,6 +316,13 @@ export default function CosmicCanvas() {
           animation-duration: 120s;
           animation-timing-function: linear;
           animation-iteration-count: infinite;
+        }
+        @keyframes markerPulse {
+          0% { transform: scale(1); opacity: 0.5; }
+          100% { transform: scale(2.4); opacity: 0; }
+        }
+        .animate-marker-pulse {
+          animation: markerPulse 1.5s ease-out infinite;
         }
       `}</style>
     </div>

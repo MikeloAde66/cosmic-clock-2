@@ -11,9 +11,17 @@ import RadioStreams from '@/components/RadioStreams';
 import SiteFooter from '@/components/SiteFooter';
 import { RadioPlayerProvider } from '@/components/radio/RadioPlayerContext';
 import GlobalPlayerBar from '@/components/radio/GlobalPlayerBar';
+import type { VaultDrawer } from '@/lib/vaultRegistry';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<string>('aione');
+  // Set by a Home globe Vault marker's "Open Drawer" link, consumed once as
+  // CosmicVaultAuth's initial filter — see that component's initialDrawer prop.
+  const [pendingVaultDrawer, setPendingVaultDrawer] = useState<VaultDrawer | null>(null);
+  const navigateToVaultDrawer = (drawer: VaultDrawer) => {
+    setPendingVaultDrawer(drawer);
+    setActiveTab('vault');
+  };
 useContextMenuShare();
   return (
     <RadioPlayerProvider>
@@ -26,9 +34,9 @@ useContextMenuShare();
           <div className="relative flex-1 overflow-hidden">
             {activeTab === 'radio' && <RadioStreams />}
 
-            {activeTab === 'vault' && <CosmicVaultAuth />}
+            {activeTab === 'vault' && <CosmicVaultAuth initialDrawer={pendingVaultDrawer ?? undefined} />}
 
-            {activeTab === 'aione' && <AiOneHome />}
+            {activeTab === 'aione' && <AiOneHome onNavigateToVaultDrawer={navigateToVaultDrawer} />}
 
             {activeTab === 'fact-checker' && (
               <div className="w-full h-full p-6 overflow-auto">
