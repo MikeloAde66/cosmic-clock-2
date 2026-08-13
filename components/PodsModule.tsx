@@ -25,7 +25,9 @@ declare global {
   interface Window {
     YT?: {
       Player: new (
-        elementId: string,
+        // A real HTMLElement, not just an id string — see ytContainerRef's
+        // effect below for why an imperatively-created element is used.
+        elementId: string | HTMLElement,
         options: {
           videoId?: string;
           playerVars?: Record<string, string | number>;
@@ -496,6 +498,18 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
   // switching videos calls loadVideoById/loadPlaylist on the existing
   // player rather than tearing down and recreating it.
   const isYouTubeEmbed = !!activeEmbedUrl && !activeEmbedUrl.endsWith('.mp4') && !activeEmbedUrl.endsWith('.webm');
+  // React renders and owns this wrapper, but never puts any JSX children
+  // inside it — YT.Player replaces whatever element it's given with its own
+  // <iframe>, entirely outside React's reconciliation. Handing it an id
+  // that's part of React's own JSX output (as an earlier version of this
+  // did) means React still believes it owns that node; the first re-render
+  // after YT.Player has swapped it for an iframe then throws "Failed to
+  // execute 'removeChild': the node to be removed is not a child of this
+  // node" trying to clean up a node that's no longer where React left it.
+  // Appending a plain, imperatively-created div (below) that React's JSX
+  // never declared sidesteps this — React has zero expectations about that
+  // node's presence, so it never tries to touch it.
+  const ytContainerRef = useRef<HTMLDivElement | null>(null);
   const ytPlayerRef = useRef<YouTubePlayer | null>(null);
   const ytPollIntervalRef = useRef<number | null>(null);
   // The Player object returned by `new YT.Player(...)` exists immediately,
@@ -526,7 +540,12 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         else ytPendingLoadRef.current = { videoId, listId };
         return;
       }
-      ytPlayerRef.current = new window.YT!.Player('pods-youtube-player', {
+      if (!ytContainerRef.current) return;
+      const playerHost = document.createElement('div');
+      playerHost.style.width = '100%';
+      playerHost.style.height = '100%';
+      ytContainerRef.current.appendChild(playerHost);
+      ytPlayerRef.current = new window.YT!.Player(playerHost, {
         videoId,
         playerVars: {
           autoplay: autoplay ? 1 : 0,
@@ -597,14 +616,21 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       ytPlayerRef.current.destroy();
       ytPlayerRef.current = null;
     }
+    // destroy() only removes the <iframe> itself, leaving the empty host
+    // div (created imperatively in bindPlayer) behind — clear it out too so
+    // a later bindPlayer call doesn't accumulate orphaned leftover divs
+    // inside ytContainerRef across repeated open/close cycles.
+    ytContainerRef.current?.replaceChildren();
     ytPlayerReadyRef.current = false;
     ytPendingLoadRef.current = null;
   }, [isYouTubeEmbed]);
 
   useEffect(() => {
+    const container = ytContainerRef.current;
     return () => {
       if (ytPollIntervalRef.current !== null) window.clearInterval(ytPollIntervalRef.current);
       ytPlayerRef.current?.destroy();
+      container?.replaceChildren();
     };
   }, []);
 
@@ -1412,12 +1438,14 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
                       onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
                     />
                   ) : (
-                    // The YouTube IFrame Player API takes ownership of this
-                    // container (replaces it with its own iframe on first
-                    // mount) — see the ytPlayerRef effect below. A plain
-                    // <iframe src=...> has no postMessage access to
+                    // React owns this wrapper but never renders anything
+                    // inside it via JSX — the YouTube IFrame Player API gets
+                    // an imperatively-created child div instead (see
+                    // ytContainerRef's effect), so its DOM mutations never
+                    // conflict with React's reconciliation of this subtree.
+                    // A plain <iframe src=...> has no postMessage access to
                     // currentTime, which is what Pods Context Sync needs.
-                    <div key="youtube-player-container" id="pods-youtube-player" className="w-full h-full" />
+                    <div key="youtube-player-container" ref={ytContainerRef} className="w-full h-full" />
                   )
                 ) : (
                   <>
