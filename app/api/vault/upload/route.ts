@@ -61,6 +61,29 @@ export async function POST(request: Request) {
   const readmeGuide = String(form.get('readmeGuide') ?? '');
   const priceCentsRaw = form.get('priceCents');
   const priceCents = typeof priceCentsRaw === 'string' && priceCentsRaw.trim() ? Number(priceCentsRaw) : undefined;
+  const tagsRaw = form.get('tags');
+  const tags =
+    typeof tagsRaw === 'string' && tagsRaw.trim()
+      ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean)
+      : [];
+  const metadataRaw = form.get('metadata');
+  let metadata: Record<string, string | number | boolean> | undefined;
+  if (typeof metadataRaw === 'string' && metadataRaw.trim()) {
+    try {
+      const parsed: unknown = JSON.parse(metadataRaw);
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        Array.isArray(parsed) ||
+        Object.values(parsed).some((v) => typeof v !== 'string' && typeof v !== 'number' && typeof v !== 'boolean')
+      ) {
+        return new Response('metadata must be a flat JSON object of strings, numbers, or booleans.', { status: 400 });
+      }
+      metadata = parsed as Record<string, string | number | boolean>;
+    } catch {
+      return new Response('metadata must be valid JSON.', { status: 400 });
+    }
+  }
   // The ADMIN drawer holds system credentials/backups — never publishable,
   // regardless of what the client sends, so this is re-checked server-side
   // rather than trusted from the form.
@@ -153,7 +176,9 @@ export async function POST(request: Request) {
         description,
         readmeGuide,
         isPublished,
+        tags,
         ...(priceCents !== undefined ? { priceCents } : {}),
+        ...(metadata !== undefined ? { metadata } : {}),
       },
       $push: { tracks: { $each: newTracks } },
       $setOnInsert: { createdAt: new Date() },
@@ -184,6 +209,8 @@ export async function POST(request: Request) {
         tracks: trackUrls,
         priceCents: doc.priceCents,
         isPublished: doc.isPublished,
+        tags: doc.tags,
+        metadata: doc.metadata,
       },
       errors,
     });

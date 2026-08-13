@@ -45,6 +45,10 @@ export async function GET() {
           readmeGuide: doc.readmeGuide,
           dateAdded: doc.createdAt.toISOString().slice(0, 10),
           tracks,
+          priceCents: doc.priceCents,
+          isPublished: doc.isPublished,
+          tags: doc.tags,
+          metadata: doc.metadata,
         };
       })
     );

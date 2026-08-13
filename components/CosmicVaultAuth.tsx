@@ -105,6 +105,8 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
   const [uploadReadme, setUploadReadme] = useState<string>('');
   const [uploadPrice, setUploadPrice] = useState<string>('');
   const [uploadPublish, setUploadPublish] = useState<boolean>(false);
+  const [uploadTags, setUploadTags] = useState<string>('');
+  const [uploadMetadata, setUploadMetadata] = useState<string>('');
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [fileDurations, setFileDurations] = useState<Map<File, number>>(new Map());
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -260,6 +262,8 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
     setUploadReadme('');
     setUploadPrice('');
     setUploadPublish(false);
+    setUploadTags('');
+    setUploadMetadata('');
     setUploadFiles([]);
     setFileDurations(new Map());
     setUploadError('');
@@ -275,6 +279,14 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
       setUploadError('A price is required to publish to the public storefront.');
       return;
     }
+    if (uploadMetadata.trim()) {
+      try {
+        JSON.parse(uploadMetadata);
+      } catch {
+        setUploadError('Metadata must be valid JSON.');
+        return;
+      }
+    }
     setIsUploading(true);
     setUploadError('');
 
@@ -287,6 +299,8 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
     form.set('readmeGuide', uploadReadme);
     if (uploadPrice.trim()) form.set('priceCents', String(Math.round(Number(uploadPrice) * 100)));
     form.set('isPublished', String(uploadPublish));
+    form.set('tags', uploadTags);
+    if (uploadMetadata.trim()) form.set('metadata', uploadMetadata);
     form.set('durations', JSON.stringify(uploadFiles.map((f) => fileDurations.get(f) ?? null)));
 
     try {
@@ -448,6 +462,18 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
                         <h3 className="text-base font-bold text-slate-100">{item.title}</h3>
                         <p className="text-xs text-slate-400">{item.description}</p>
                         <p className="font-mono text-[10px] text-slate-600">SKU: {item.sku}</p>
+                        {item.tags && item.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {item.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="px-1.5 py-0.5 text-[9px] font-mono rounded bg-slate-800/80 text-slate-400 border border-slate-700"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -604,6 +630,20 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
               placeholder="Readme / install guide"
               value={uploadReadme}
               onChange={(e) => setUploadReadme(e.target.value)}
+              rows={2}
+              className="w-full p-3 font-mono text-sm border rounded-lg resize-none bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+            />
+            <input
+              type="text"
+              placeholder="Tags, comma-separated (for Cmd+K search)"
+              value={uploadTags}
+              onChange={(e) => setUploadTags(e.target.value)}
+              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+            />
+            <textarea
+              placeholder={'Metadata JSON, optional — e.g. {"frequency": "432Hz", "resolution": "4K"}'}
+              value={uploadMetadata}
+              onChange={(e) => setUploadMetadata(e.target.value)}
               rows={2}
               className="w-full p-3 font-mono text-sm border rounded-lg resize-none bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
             />

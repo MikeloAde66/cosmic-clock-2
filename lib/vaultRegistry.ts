@@ -49,6 +49,8 @@ export interface VaultProduct {
   tracks: VaultTrack[];
   priceCents?: number;
   isPublished?: boolean;
+  tags?: string[];
+  metadata?: Record<string, string | number | boolean>;
 }
 
 // Public-facing shape returned by GET /api/vault/published — no storage

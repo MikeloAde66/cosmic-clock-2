@@ -44,6 +44,12 @@ export interface VaultProductDoc extends Document {
   // storefront's only vault-facing endpoint). Defaults to false so nothing
   // is public until an admin explicitly opts it in.
   isPublished: boolean;
+  // Free-form labels for Cmd+K search — supplements sku/title/drawer rather
+  // than replacing them as the categorization axis.
+  tags?: string[];
+  // Free-form key/value facts (e.g. { frequency: '432Hz', resolution: '4K' })
+  // — not used by search or the storefront, just carried through for display.
+  metadata?: Record<string, string | number | boolean>;
 }
 
 const VaultProductSchema = new Schema<VaultProductDoc>({
@@ -60,6 +66,8 @@ const VaultProductSchema = new Schema<VaultProductDoc>({
   tracks: { type: [VaultTrackSchema], default: [] },
   priceCents: { type: Number },
   isPublished: { type: Boolean, default: false, index: true },
+  tags: { type: [String], default: [], index: true },
+  metadata: { type: Schema.Types.Mixed },
   createdAt: { type: Date, default: Date.now },
 });
 
