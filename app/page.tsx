@@ -1,6 +1,6 @@
 'use client';
 import { useContextMenuShare } from '@/components/useContextMenuShare';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import TopHeader from '@/components/TopHeader';
 import LeftNav from '@/components/LeftNav';
 import FactChecker from '@/components/FactChecker';
@@ -9,19 +9,33 @@ import CosmicVaultAuth from '@/components/CosmicVaultAuth';
 import AiOneHome from '@/components/AiOneHome';
 import RadioStreams from '@/components/RadioStreams';
 import SiteFooter from '@/components/SiteFooter';
+import VaultSearchModal from '@/components/VaultSearchModal';
 import { RadioPlayerProvider } from '@/components/radio/RadioPlayerContext';
 import GlobalPlayerBar from '@/components/radio/GlobalPlayerBar';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<string>('aione');
-  // Set by a Home globe Vault marker's "Open Drawer" link, consumed once as
-  // CosmicVaultAuth's initial filter — see that component's initialDrawer prop.
+  // Set by a Home globe Vault marker's "Open Drawer" link, or a Cmd+K search
+  // result, consumed once as CosmicVaultAuth's initial filter — see that
+  // component's initialDrawer prop.
   const [pendingVaultDrawer, setPendingVaultDrawer] = useState<VaultDrawer | null>(null);
   const navigateToVaultDrawer = (drawer: VaultDrawer) => {
     setPendingVaultDrawer(drawer);
     setActiveTab('vault');
   };
+
+  const [isVaultSearchOpen, setIsVaultSearchOpen] = useState(false);
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsVaultSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 useContextMenuShare();
   return (
     <RadioPlayerProvider>
@@ -50,7 +64,7 @@ useContextMenuShare();
                 page reload (where blob URLs are gone regardless), switching
                 tabs within this single-page app doesn't need to destroy them. */}
             <div className={activeTab === 'pods' ? 'w-full h-full' : 'hidden'}>
-              <PodsModule />
+              <PodsModule isActive={activeTab === 'pods'} />
             </div>
           </div>
 
@@ -61,6 +75,12 @@ useContextMenuShare();
           <SiteFooter />
         </div>
       </main>
+
+      <VaultSearchModal
+        isOpen={isVaultSearchOpen}
+        onClose={() => setIsVaultSearchOpen(false)}
+        onNavigateToVaultDrawer={navigateToVaultDrawer}
+      />
     </RadioPlayerProvider>
   );
 }
