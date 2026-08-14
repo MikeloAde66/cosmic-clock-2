@@ -18,7 +18,7 @@ function mulberry32(seed: number) {
   };
 }
 
-const STAR_COUNT = 160;
+const STAR_COUNT = 220;
 const randomStar = mulberry32(20260814);
 const STARS = Array.from({ length: STAR_COUNT }, () => {
   const twinkles = randomStar() < 0.2;
