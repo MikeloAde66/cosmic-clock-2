@@ -8,6 +8,7 @@ import AncientGlyphRain from './AncientGlyphRain';
 import { useRadioPlayer } from './radio/RadioPlayerContext';
 import { RADIO_STATIONS } from '@/lib/radioStations';
 import { GLOBE_NODES, type GlobeMarker } from '@/lib/globeMarkers';
+import { useGeolocation } from '@/lib/useGeolocation';
 import type { VaultDrawer, VaultProduct } from '@/lib/vaultRegistry';
 
 
@@ -67,6 +68,11 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange }: 
   const [previewMarker, setPreviewMarker] = useState<GlobeMarker | null>(null);
   const [drawerCount, setDrawerCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
+  // Real browser geolocation — drives both the magenta "you are here" globe
+  // marker below and NoaaWidget's default coordinates once it's open,
+  // rather than NoaaWidget always defaulting to a hardcoded Charleston, SC.
+  const { coords: userCoords } = useGeolocation();
+  const userMarkerPosition = userCoords ? projectMarker(userCoords.lat, userCoords.lon) : null;
 
   const handleMarkerClick = (marker: GlobeMarker) => {
     if (marker.type === 'radio') {
@@ -177,6 +183,31 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange }: 
                       </button>
                     );
                   })}
+
+                  {/* Real "you are here" marker — from the browser's actual
+                      Geolocation API (see useGeolocation), projected with
+                      the same orthographic math as every other globe
+                      marker. Clicking it jumps straight to the Weather
+                      view, now seeded with these same real coordinates
+                      instead of NoaaWidget's Charleston, SC fallback. */}
+                  {userMarkerPosition && (
+                    <button
+                      type="button"
+                      title="Your location — live weather"
+                      onClick={() => setActiveView('weather')}
+                      className="absolute z-20 flex items-center justify-center -translate-x-1/2 -translate-y-1/2 rounded-full cursor-pointer group"
+                      style={{
+                        left: `${userMarkerPosition.xPct}%`,
+                        top: `${userMarkerPosition.yPct}%`,
+                        width: `${14 * userMarkerPosition.scale}px`,
+                        height: `${14 * userMarkerPosition.scale}px`,
+                      }}
+                    >
+                      <span
+                        className="relative w-2 h-2 rounded-full bg-fuchsia-500 animate-user-location-pulse transition-transform group-hover:scale-125"
+                      />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -221,15 +252,18 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange }: 
         </>
       )}
 
-      {/* Weather — takes over the whole section, reuses the real NoaaWidget */}
+      {/* Weather — takes over the whole section (sized like the Kali Yuga
+          view below, not the small floating widget it used to be), reuses
+          the real NoaaWidget which now opens straight to the satellite feed
+          instead of needing a second click to reveal it. */}
       {activeView === 'weather' && (
         <div className="relative z-30 flex flex-col w-full h-full p-4">
           <div className="shrink-0 mb-4">
             <BackButton onClick={() => setActiveView('clock')} />
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="max-w-md mx-auto">
-              <NoaaWidget />
+          <div className="relative flex-1 min-h-0 w-full overflow-y-auto rounded-lg border border-slate-800 bg-black/20 p-6 backdrop-blur-md">
+            <div className="max-w-2xl mx-auto">
+              <NoaaWidget initialCoords={userCoords} />
             </div>
           </div>
         </div>
@@ -297,6 +331,13 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange }: 
         }
         .animate-marker-pulse {
           animation: markerPulse 1.5s ease-out infinite;
+        }
+        @keyframes userLocationPulse {
+          0% { transform: scale(0.9); box-shadow: 0 0 6px #ff00ff; }
+          100% { transform: scale(1.3); box-shadow: 0 0 16px #ff00ff, 0 0 24px #e000e0; }
+        }
+        .animate-user-location-pulse {
+          animation: userLocationPulse 2s ease-in-out infinite alternate;
         }
       `}</style>
     </div>
