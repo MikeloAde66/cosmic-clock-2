@@ -1,17 +1,22 @@
 'use client';
 
 import React, { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { Mic, MicOff, Plus, X } from 'lucide-react';
+import { Download, History as HistoryIcon, Image as ImageIcon, Mic, MicOff, Plus, SquarePen, X } from 'lucide-react';
 import { useSpeechToText } from './useSpeechToText';
-
-type ContentBlock =
-  | { type: 'text'; text: string }
-  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string | ContentBlock[];
-}
+import AiOneMessageContent from './AiOneMessageContent';
+import ChatHistoryPanel from './ChatHistoryPanel';
+import ChatImagesPanel from './ChatImagesPanel';
+import { downloadMarkdown, threadToMarkdown } from '@/lib/exportChat';
+import {
+  createThreadId,
+  deriveTitle,
+  messageText,
+  saveThread,
+  type ChatMessage,
+  type ChatThread,
+  type ContentBlock,
+  type DiscoveryMode,
+} from '@/lib/chatHistory';
 
 const GREETING: ChatMessage = {
   role: 'assistant',
@@ -21,19 +26,13 @@ const GREETING: ChatMessage = {
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB — a sane guard before base64 inflation
 
-type DiscoveryMode = 'cosmic' | 'quantum' | 'synthesis';
-
 const MODES: { key: DiscoveryMode; label: string; title: string }[] = [
   { key: 'cosmic', label: 'Cosmic', title: 'Cosmic / Ancient — archaeoastronomy, cycles, classical metaphysics' },
   { key: 'synthesis', label: 'Synthesis', title: 'Synthesis / Discovery — bridges ancient and modern (default)' },
   { key: 'quantum', label: 'Quantum', title: 'Quantum / Science — field theory, physics, consciousness models' },
 ];
 
-function messageText(content: string | ContentBlock[]): string {
-  if (typeof content === 'string') return content;
-  const textBlock = content.find((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text');
-  return textBlock?.text ?? '';
-}
+type WidgetView = 'chat' | 'history' | 'images';
 
 function messageImages(content: string | ContentBlock[]): string[] {
   if (typeof content === 'string') return [];
@@ -58,9 +57,16 @@ export default function AiOneChat() {
   const [mode, setMode] = useState<DiscoveryMode>('synthesis');
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState('');
+  const [view, setView] = useState<WidgetView>('chat');
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Identity for the current thread — a new one is minted on mount and
+  // again on "New chat"; loading a thread from History adopts its id
+  // instead so re-saving updates that same entry rather than forking it.
+  const threadIdRef = useRef(createThreadId());
+  const createdAtRef = useRef(Date.now());
 
   const { isListening, toggleListening, hasSupport } = useSpeechToText((transcript) => {
     setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
@@ -76,6 +82,20 @@ export default function AiOneChat() {
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, []);
 
+  // Autosaves once a real exchange has happened (more than just the
+  // greeting) and streaming has settled — not on every streamed token,
+  // just once the assistant's turn is done.
+  useEffect(() => {
+    if (isStreaming || messages.length <= 1) return;
+    saveThread({
+      id: threadIdRef.current,
+      title: deriveTitle(messages),
+      mode,
+      messages,
+      createdAt: createdAtRef.current,
+    });
+  }, [messages, isStreaming, mode]);
+
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
     const oversized = files.find((f) => f.size > MAX_IMAGE_BYTES);
@@ -86,6 +106,28 @@ export default function AiOneChat() {
 
   const removeFile = (idx: number) => {
     setAttachedFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const startNewChat = () => {
+    threadIdRef.current = createThreadId();
+    createdAtRef.current = Date.now();
+    setMessages([GREETING]);
+    setError('');
+    setView('chat');
+  };
+
+  const selectThread = (thread: ChatThread) => {
+    threadIdRef.current = thread.id;
+    createdAtRef.current = thread.createdAt;
+    setMessages(thread.messages);
+    setMode(thread.mode);
+    setError('');
+    setView('chat');
+  };
+
+  const exportCurrentThread = () => {
+    const md = threadToMarkdown({ title: deriveTitle(messages), createdAt: createdAtRef.current, messages });
+    downloadMarkdown(md, `ai-one-${threadIdRef.current}.md`);
   };
 
   const sendMessage = async (e: FormEvent) => {
@@ -150,24 +192,63 @@ export default function AiOneChat() {
     }
   };
 
+  if (view === 'history') {
+    return <ChatHistoryPanel onBack={() => setView('chat')} onSelect={selectThread} />;
+  }
+  if (view === 'images') {
+    return <ChatImagesPanel onBack={() => setView('chat')} />;
+  }
+
   return (
     <div className="flex flex-col h-full min-h-[220px]">
-      <div className="flex items-center justify-center gap-1 pb-2 shrink-0">
-        {MODES.map((m) => (
+      <div className="flex items-center justify-between gap-1 pb-2 shrink-0">
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value as DiscoveryMode)}
+          title="Reasoning mode"
+          className="px-2 py-1 text-[9px] font-mono uppercase tracking-wider bg-black/40 border rounded border-slate-700 text-slate-200 focus:outline-none focus:border-white/50"
+        >
+          {MODES.map((m) => (
+            <option key={m.key} value={m.key} title={m.title}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-0.5">
           <button
-            key={m.key}
             type="button"
-            onClick={() => setMode(m.key)}
-            title={m.title}
-            className={`px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded border transition ${
-              mode === m.key
-                ? 'bg-white/10 border-neutral-500 text-white'
-                : 'border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'
-            }`}
+            onClick={startNewChat}
+            title="New chat"
+            className="flex items-center justify-center w-6 h-6 transition rounded text-slate-400 hover:text-white hover:bg-slate-800"
           >
-            {m.label}
+            <SquarePen className="w-3.5 h-3.5" />
           </button>
-        ))}
+          <button
+            type="button"
+            onClick={() => setView('history')}
+            title="History"
+            className="flex items-center justify-center w-6 h-6 transition rounded text-slate-400 hover:text-white hover:bg-slate-800"
+          >
+            <HistoryIcon className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('images')}
+            title="Images"
+            className="flex items-center justify-center w-6 h-6 transition rounded text-slate-400 hover:text-white hover:bg-slate-800"
+          >
+            <ImageIcon className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={exportCurrentThread}
+            title="Export conversation as Markdown"
+            className="flex items-center justify-center w-6 h-6 transition rounded text-slate-400 hover:text-white hover:bg-slate-800"
+          >
+            <Download className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto pr-1">
@@ -175,7 +256,7 @@ export default function AiOneChat() {
           const text = messageText(m.content);
           const images = messageImages(m.content);
           return (
-            <div key={idx} className="text-[11px] font-mono leading-relaxed break-words text-slate-100">
+            <div key={idx} className="text-sm font-mono leading-relaxed break-words text-slate-100">
               <span
                 className={`mr-1.5 text-[9px] uppercase tracking-wider font-bold ${
                   m.role === 'user' ? 'text-slate-500' : 'text-white'
@@ -196,7 +277,13 @@ export default function AiOneChat() {
                   ))}
                 </div>
               )}
-              {text}
+              {m.role === 'assistant' ? (
+                <div className="inline">
+                  <AiOneMessageContent text={text} />
+                </div>
+              ) : (
+                <span className="whitespace-pre-wrap">{text}</span>
+              )}
               {m.role === 'assistant' && idx === messages.length - 1 && isStreaming && (
                 <span className="text-white animate-pulse">▋</span>
               )}

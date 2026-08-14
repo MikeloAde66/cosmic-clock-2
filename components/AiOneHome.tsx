@@ -132,15 +132,11 @@ export default function AiOneHome({ onNavigateToVaultDrawer }: AiOneHomeProps) {
             </div>
           </div>
         ) : (
-          /* MAIN CONTENT VIEW: Cosmic Clock centerpiece, replacing the old video monitor */
-          <div className="flex-1 w-full max-w-6xl px-6 py-10 mx-auto">
-            <div className="w-full overflow-hidden border shadow-2xl bg-slate-950 border-slate-800 rounded-2xl">
-              <div className="relative w-full aspect-video">
-                <CosmicCanvas
-                  onNavigateToVaultDrawer={onNavigateToVaultDrawer}
-                />
-              </div>
-            </div>
+          /* MAIN CONTENT VIEW: Cosmic Clock centerpiece, full-bleed so the
+             starfield/space background fills the whole viewport instead of
+             sitting inside a bordered, max-width, 16:9-locked card. */
+          <div className="relative flex-1 w-full min-h-0">
+            <CosmicCanvas onNavigateToVaultDrawer={onNavigateToVaultDrawer} />
           </div>
         )}
       </div>
