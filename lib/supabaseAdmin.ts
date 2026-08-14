@@ -19,11 +19,21 @@ export function getSupabaseAdmin() {
 export const VAULT_BUCKET = 'vault';
 
 // Idempotent: only hits the network to create the bucket the first time
-// it's actually missing.
+// it's actually missing, but always re-checks visibility — every read in
+// this app goes through createSignedUrl/createSignedUploadUrl rather than a
+// bare public URL, so the bucket should never be public. Self-heals a
+// bucket that was created public (or flipped public by hand) back to
+// private on the next request that touches it.
 export async function ensureVaultBucket() {
   const admin = getSupabaseAdmin();
   const { data: existing, error: getError } = await admin.storage.getBucket(VAULT_BUCKET);
-  if (existing) return;
+  if (existing) {
+    if (existing.public) {
+      const { error: updateError } = await admin.storage.updateBucket(VAULT_BUCKET, { public: false });
+      if (updateError) throw updateError;
+    }
+    return;
+  }
 
   // getBucket errors on "not found" as well as real failures — only treat
   // this as fatal if bucket creation also fails below.
