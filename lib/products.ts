@@ -3,9 +3,9 @@
 // pretending these are real for-sale items. Swap in real products (and
 // real images) here once there's an actual catalog; the storefront, cart
 // actions, and checkout flow don't need to change.
-export type ProductCategory = 'Apparel' | 'Art Prints' | 'Audio/Digital' | 'Vault Items';
+export type ProductCategory = 'Apparel' | 'Survival Gear' | 'Vault Items';
 
-export const PRODUCT_CATEGORIES: ProductCategory[] = ['Apparel', 'Art Prints', 'Audio/Digital', 'Vault Items'];
+export const PRODUCT_CATEGORIES: ProductCategory[] = ['Apparel', 'Survival Gear', 'Vault Items'];
 
 // Drives fulfillment routing (see app/api/webhooks/stripe/route.ts):
 // apparel -> Printful, print_collateral -> Gelato, digital -> no physical
@@ -16,10 +16,14 @@ export const PRODUCT_CATEGORIES: ProductCategory[] = ['Apparel', 'Art Prints', '
 // second lookup.
 export type ProductType = 'apparel' | 'print_collateral' | 'digital' | 'vault_shipment';
 
+// Survival Gear items (backpack, survival pack) are also Printful-fulfilled
+// physical goods, so they route through the same 'apparel' ProductType the
+// webhook already checks for — ProductType is a fulfillment-routing concept,
+// not a 1:1 mirror of the UI category (Vault Items -> 'digital' is the same
+// kind of deliberate mismatch).
 const CATEGORY_TO_PRODUCT_TYPE: Record<ProductCategory, ProductType> = {
   Apparel: 'apparel',
-  'Art Prints': 'print_collateral',
-  'Audio/Digital': 'digital',
+  'Survival Gear': 'apparel',
   'Vault Items': 'digital',
 };
 
@@ -41,7 +45,9 @@ export interface Product {
   // Real mockup/photography URLs, when they exist — still isDemo (no
   // fulfillment mapping yet) even once a product has real images; those are
   // two separate things. Only the first is shown on the storefront card
-  // (a flat grid, not a per-product detail page with a gallery).
+  // (a flat grid, not a per-product detail page with a gallery). Left
+  // undefined until real photography exists — the storefront falls back to
+  // a category icon rather than a fake placeholder image.
   imageUrls?: string[];
 }
 
@@ -49,84 +55,48 @@ function makeProduct(p: Omit<Product, 'productType' | 'isDemo'>): Product {
   return { ...p, productType: CATEGORY_TO_PRODUCT_TYPE[p.category], isDemo: true };
 }
 
-// Placeholder card art for demo products with no real photography yet — the
-// only local asset actually verified clean (no watermark, not someone
-// else's branding/screenshot). Reused across multiple cards on purpose
-// rather than raiding the rest of public/assets/, which turned out to be a
-// grab-bag of unrelated files (other projects' screenshots, watermarked
-// stock photos) unsuitable for a live storefront. Swap for real per-product
-// photography as it becomes available.
-const PLACEHOLDER_IMAGE = '/assets/products/yuga-cycle-diagram.png';
-
 export const PRODUCTS: Product[] = [
   makeProduct({
-    id: 'apparel-cosmic-tee',
-    name: 'Cosmic HUD Tee',
-    category: 'Apparel',
-    description: 'Minimal white-on-black print, cosmic clock motif.',
-    amount: 2800,
-    imageUrls: [PLACEHOLDER_IMAGE],
-  }),
-  makeProduct({
     id: 'apparel-kali-hoodie',
-    name: 'Kali Yuga Hoodie',
+    name: 'Kali Hoodie',
     category: 'Apparel',
-    description: 'Heavyweight fleece, embroidered epoch marker.',
+    description: 'Heavyweight fleece, embroidered epoch marker. Printful fulfilled.',
     amount: 5800,
-    imageUrls: [PLACEHOLDER_IMAGE],
   }),
   makeProduct({
-    id: 'art-sacred-geometry',
-    name: 'Sacred Geometry Print',
-    category: 'Art Prints',
-    description: '18x24 archival print, museum-grade paper.',
-    amount: 4500,
-    imageUrls: [PLACEHOLDER_IMAGE],
+    id: 'apparel-kali-tee',
+    name: 'Kali Tee Shirt',
+    category: 'Apparel',
+    description: 'Minimal white-on-black print, cosmic clock motif. Printful fulfilled.',
+    amount: 2800,
   }),
   makeProduct({
-    id: 'art-flammarion',
-    name: 'Flammarion Woodcut Print',
-    category: 'Art Prints',
-    description: 'Classic engraving, reproduced on matte fine art stock.',
-    amount: 3800,
-    imageUrls: [PLACEHOLDER_IMAGE],
+    id: 'apparel-kali-jersey',
+    name: 'Kali Jersey',
+    category: 'Apparel',
+    description: 'Athletic-cut jersey, epoch numerals on the sleeve. Printful fulfilled.',
+    amount: 4200,
   }),
   makeProduct({
-    id: 'audio-432-meditation',
-    name: '432Hz Meditation Pack',
-    category: 'Audio/Digital',
-    description: 'Digital download — 6 tuned ambient tracks.',
-    amount: 1500,
-    imageUrls: [PLACEHOLDER_IMAGE],
+    id: 'apparel-kali-hat',
+    name: 'Kali Hat',
+    category: 'Apparel',
+    description: 'Structured cap, embroidered mark. Printful fulfilled.',
+    amount: 2400,
   }),
   makeProduct({
-    id: 'audio-ambient-loop-kit',
-    name: 'Cosmic Ambient Loop Kit',
-    category: 'Audio/Digital',
-    description: 'Digital download — royalty-free loop pack for producers.',
-    amount: 2200,
-    imageUrls: [PLACEHOLDER_IMAGE],
+    id: 'gear-backpack',
+    name: 'Backpack',
+    category: 'Survival Gear',
+    description: 'Everyday-carry pack built for the field. Printful fulfilled.',
+    amount: 6500,
   }),
   makeProduct({
-    id: 'vault-access-pass',
-    name: 'Vault Access Pass',
-    category: 'Vault Items',
-    description: 'One-time unlock for a curated Vault drawer.',
-    amount: 1200,
-    imageUrls: [PLACEHOLDER_IMAGE],
-  }),
-  makeProduct({
-    id: 'vault-founders-bundle',
-    name: 'Spiritual Awakening Pack',
-    category: 'Vault Items',
-    description: 'Early-access bundle across multiple Vault drawers.',
-    amount: 6000,
-    imageUrls: [
-      '/assets/videos/spiritual-awakening-pack.mp4',
-      'https://files.cdn.printful.com/upload/media-library-fthumb/2e/2e9e17fc1266010cd4b5b4711e7e73bd_t?v=o7P4iLTuJE',
-      'https://files.cdn.printful.com/o/upload/variant-image/b7/b718af75ef739a3bf4ed7b3e6c9bd1ef_t',
-      'https://files.cdn.printful.com/o/upload/variant-image-jpg/24/24a4265908d1c04185a6e75fdf916e95_t',
-    ],
+    id: 'gear-kali-survival-pack',
+    name: 'Kali Survival Pack',
+    category: 'Survival Gear',
+    description: 'Bundled survival kit — Printful fulfilled, multiple items shipped together.',
+    amount: 8900,
   }),
 ];
 

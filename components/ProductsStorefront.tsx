@@ -1,15 +1,17 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Archive, Check, Image as ImageIcon, Music, Shirt } from 'lucide-react';
+import { Archive, Backpack, Check, PenSquare, Shirt } from 'lucide-react';
 import { PRODUCT_CATEGORIES, PRODUCTS, type ProductCategory } from '@/lib/products';
 import type { PublishedVaultProduct } from '@/lib/vaultRegistry';
 import { useCart } from '@/lib/cart';
+import { supabase } from '@/lib/supabase';
+import { getOverride } from '@/lib/productOverrides';
+import ProductDetailView from './ProductDetailView';
 
 const CATEGORY_ICONS: Record<ProductCategory, React.ComponentType<{ className?: string }>> = {
   Apparel: Shirt,
-  'Art Prints': ImageIcon,
-  'Audio/Digital': Music,
+  'Survival Gear': Backpack,
   'Vault Items': Archive,
 };
 
@@ -42,6 +44,11 @@ export default function ProductsStorefront() {
   const [activeCategory, setActiveCategory] = useState<'ALL' | ProductCategory>('ALL');
   const [vaultProducts, setVaultProducts] = useState<PublishedVaultProduct[]>([]);
   const [addedId, setAddedId] = useState<string | null>(null);
+  const [detailProduct, setDetailProduct] = useState<DisplayProduct | null>(null);
+  // Real RBAC — same Supabase app_metadata.role convention as Cosmic Vault,
+  // reused here rather than reinvented. Guests/subscribers just get the
+  // normal Add to Cart card; only an authenticated admin sees edit controls.
+  const [isAdmin, setIsAdmin] = useState(false);
   const { addItem } = useCart();
 
   useEffect(() => {
@@ -49,6 +56,16 @@ export default function ProductsStorefront() {
       .then((res) => res.json())
       .then((data: { products: PublishedVaultProduct[] }) => setVaultProducts(data.products || []))
       .catch((err) => console.error('Failed to load published Vault items:', err));
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setIsAdmin(data.user?.app_metadata?.role === 'admin');
+    });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAdmin(session?.user?.app_metadata?.role === 'admin');
+    });
+    return () => subscription.subscription.unsubscribe();
   }, []);
 
   const allProducts: DisplayProduct[] = [
@@ -80,6 +97,24 @@ export default function ProductsStorefront() {
   const visibleProducts = allProducts.filter(
     (p) => activeCategory === 'ALL' || p.category === activeCategory
   );
+
+  const handleAddToCart = (product: DisplayProduct) => {
+    addItem({ productId: product.id, name: product.name, amount: product.amount, imageUrl: product.imageUrl });
+    setAddedId(product.id);
+    setTimeout(() => setAddedId((current) => (current === product.id ? null : current)), 1500);
+  };
+
+  if (detailProduct) {
+    return (
+      <ProductDetailView
+        product={detailProduct}
+        isAdmin={isAdmin}
+        onBack={() => setDetailProduct(null)}
+        onAddToCart={() => handleAddToCart(detailProduct)}
+        justAdded={addedId === detailProduct.id}
+      />
+    );
+  }
 
   return (
     <div className="w-full h-full overflow-y-auto bg-[#070b14] text-slate-100 font-sans">
@@ -120,12 +155,15 @@ export default function ProductsStorefront() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {visibleProducts.map((product) => {
             const Icon = CATEGORY_ICONS[product.category];
+            const canEdit = isAdmin && product.isDemo;
+            const isAvailable = getOverride(product.id)?.isAvailable !== false;
             return (
               <div
                 key={product.id}
-                className="flex flex-col overflow-hidden transition border rounded-xl bg-[#0B0E14]/80 backdrop-blur-sm border-slate-800 hover:border-slate-700 hover:shadow-[0_0_16px_rgba(255,255,255,0.06)]"
+                onClick={() => setDetailProduct(product)}
+                className="flex flex-col overflow-hidden transition border rounded-xl bg-[#0B0E14]/80 backdrop-blur-sm border-slate-800 hover:border-slate-700 hover:shadow-[0_0_16px_rgba(255,255,255,0.06)] cursor-pointer"
               >
-                <div className="relative flex items-center justify-center overflow-hidden border-b aspect-[3/4] bg-slate-900/60 border-slate-800">
+                <div className="relative flex items-center justify-center overflow-hidden border-b aspect-square bg-slate-900/60 border-slate-800">
                   {product.imageUrl ? (
                     product.imageUrl.endsWith('.mp4') ? (
                       <video
@@ -166,24 +204,41 @@ export default function ProductsStorefront() {
 
                   <div className="pt-2 mt-auto space-y-2 border-t border-slate-800/80">
                     <span className="text-lg font-bold text-white">${formatPrice(product.amount)}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        addItem({ productId: product.id, name: product.name, amount: product.amount, imageUrl: product.imageUrl });
-                        setAddedId(product.id);
-                        setTimeout(() => setAddedId((current) => (current === product.id ? null : current)), 1500);
-                      }}
-                      className="flex items-center justify-center w-full gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition"
-                    >
-                      {addedId === product.id ? (
-                        <>
-                          <Check className="w-3.5 h-3.5" />
-                          Added
-                        </>
-                      ) : (
-                        'Add to Cart'
-                      )}
-                    </button>
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDetailProduct(product);
+                        }}
+                        className="flex items-center justify-center w-full gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase tracking-wide rounded-lg border border-neutral-700 text-white/80 hover:bg-white/10 transition"
+                      >
+                        <PenSquare className="w-3.5 h-3.5" />
+                        Edit Item
+                      </button>
+                    ) : isAvailable ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCart(product);
+                        }}
+                        className="flex items-center justify-center w-full gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition"
+                      >
+                        {addedId === product.id ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            Added
+                          </>
+                        ) : (
+                          'Add to Cart'
+                        )}
+                      </button>
+                    ) : (
+                      <span className="flex items-center justify-center w-full px-3 py-1.5 text-[11px] font-mono font-bold uppercase tracking-wide rounded-lg border border-rose-800 text-rose-400 bg-rose-950/40">
+                        Sold Out
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
