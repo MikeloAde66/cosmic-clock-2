@@ -1,11 +1,27 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Satellite, Sun as SunIcon, X } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Satellite, Sparkles, Sun as SunIcon, X } from 'lucide-react';
 import { Body as AstroBody, Equator, Horizon, Illumination, Observer, SearchRiseSet, SiderealTime } from 'astronomy-engine';
 import { calculateCosmicTime } from '@/lib/cosmicMath';
 import { fetchIssPosition, topocentricPosition, type IssStatus } from '@/lib/satelliteTracking';
 import { describeKp, fetchLatestKp, type KpReading } from '@/lib/spaceWeather';
+import {
+  lonToRaHours,
+  loadConstellationLines,
+  loadConstellationNames,
+  loadStars,
+  type ConstellationLine,
+  type ConstellationNames,
+  type StarTuple,
+} from '@/lib/skyChart';
+import { daysUntil, getUpcomingEclipses, getUpcomingMeteorShowers, type UpcomingEclipse, type UpcomingMeteorShower } from '@/lib/skyEvents';
+import { listPlaylist, parseYouTubeId, removePlaylistItem, savePlaylistItem, type PlaylistItem } from '@/lib/spaceMediaPlaylist';
+
+// The same real NASA ISS live feed already used by ISSFeedModal (the
+// header's "LIVE ISS" button) — reused here so the video is inline inside
+// Star Tracker's ISS layer instead of a separate popup elsewhere in the app.
+const ISS_STREAM_URL = 'https://www.youtube.com/embed/awQzjn72bI0?autoplay=1&mute=1';
 
 // Same deterministic PRNG + twinkle approach as CosmicCanvas's own
 // starfield, kept local here rather than shared — it's an 8-line pure
@@ -109,7 +125,38 @@ function azAltToXY(azimuth: number, altitude: number, center: number, radius: nu
 }
 
 type LocationStatus = 'requesting' | 'granted' | 'denied' | 'unavailable';
-type SelectedItem = { kind: 'body'; body: SkyBody } | { kind: 'iss' } | null;
+type SelectedItem = { kind: 'body'; body: SkyBody } | { kind: 'iss' } | { kind: 'constellation'; id: string } | null;
+
+// Fixed background stars/constellations have real RA/Dec already (unlike
+// the tracked solar-system bodies, which need Equator() first to derive
+// their current position) — this goes straight to Horizon().
+function equatorialToXY(raHours: number, decDeg: number, observer: Observer, now: Date, center: number, radius: number) {
+  const hor = Horizon(now, observer, raHours, decDeg, 'normal');
+  if (hor.altitude <= 0) return null;
+  return azAltToXY(hor.azimuth, hor.altitude, center, radius);
+}
+
+// Splits a constellation line strip into contiguous above-horizon runs —
+// a strip that dips below the horizon partway through would otherwise draw
+// a nonsensical line straight across the dome connecting its last visible
+// point to its next one.
+function projectLineStrip(points: number[][], observer: Observer, now: Date, center: number, radius: number): { x: number; y: number }[][] {
+  const runs: { x: number; y: number }[][] = [];
+  let current: { x: number; y: number }[] = [];
+  for (const [lon, lat] of points) {
+    const xy = equatorialToXY(lonToRaHours(lon), lat, observer, now, center, radius);
+    if (xy) {
+      current.push(xy);
+    } else if (current.length > 1) {
+      runs.push(current);
+      current = [];
+    } else {
+      current = [];
+    }
+  }
+  if (current.length > 1) runs.push(current);
+  return runs;
+}
 
 export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const [status, setStatus] = useState<LocationStatus>('requesting');
@@ -129,6 +176,26 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const [spaceWeatherOn, setSpaceWeatherOn] = useState(false);
   const [kp, setKp] = useState<KpReading | null>(null);
   const [kpError, setKpError] = useState(false);
+
+  const [skyMapsOn, setSkyMapsOn] = useState(false);
+  const [skyMapsLoading, setSkyMapsLoading] = useState(false);
+  const [skyMapsError, setSkyMapsError] = useState(false);
+  const [constellationLines, setConstellationLines] = useState<ConstellationLine[] | null>(null);
+  const [constellationNames, setConstellationNames] = useState<ConstellationNames | null>(null);
+  const [stars, setStars] = useState<StarTuple[] | null>(null);
+
+  const [skyFestOpen, setSkyFestOpen] = useState(false);
+  const [skyFestTab, setSkyFestTab] = useState<'eclipses' | 'meteors' | 'media'>('eclipses');
+
+  const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
+  const [nowPlayingVideoId, setNowPlayingVideoId] = useState<string | null>(null);
+  const [playlistUrlInput, setPlaylistUrlInput] = useState('');
+  const [playlistTitleInput, setPlaylistTitleInput] = useState('');
+  const [playlistFormError, setPlaylistFormError] = useState('');
+
+  useEffect(() => {
+    queueMicrotask(() => setPlaylist(listPlaylist()));
+  }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -176,6 +243,34 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
     };
   }, [issLayerOn]);
 
+  // Constellation/star data is ~46KB total — fetched lazily on first toggle
+  // rather than on mount, and cached in state afterward so switching the
+  // layer off and back on doesn't re-fetch.
+  useEffect(() => {
+    if (!skyMapsOn || constellationLines) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setSkyMapsLoading(true);
+    });
+    Promise.all([loadConstellationLines(), loadConstellationNames(), loadStars()])
+      .then(([lines, names, starData]) => {
+        if (cancelled) return;
+        setConstellationLines(lines);
+        setConstellationNames(names);
+        setStars(starData);
+        setSkyMapsError(false);
+      })
+      .catch(() => {
+        if (!cancelled) setSkyMapsError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setSkyMapsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [skyMapsOn, constellationLines]);
+
   useEffect(() => {
     if (!spaceWeatherOn) return;
     let cancelled = false;
@@ -213,7 +308,11 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
         : 'Location unavailable — showing sky at 0°N, 0°E';
 
   // Dome geometry + pan/zoom handlers
-  const size = 280;
+  // Logical SVG units, not pixels — the viewBox keeps all coordinate math
+  // (azAltToXY etc.) correct regardless of the actual rendered size, which
+  // is now driven entirely by the CSS below (w-full + aspect-square) rather
+  // than a fixed pixel cap.
+  const size = 500;
   const center = size / 2;
   const radius = size / 2 - 24;
 
@@ -243,6 +342,9 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
     dragRef.current = null;
   };
   const resetView = () => setView({ scale: 1, tx: 0, ty: 0 });
+
+  const eclipses = useMemo<UpcomingEclipse[]>(() => getUpcomingEclipses(now, 2), [now]);
+  const meteorShowers = useMemo<UpcomingMeteorShower[]>(() => getUpcomingMeteorShowers(now, 4), [now]);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col w-full h-full p-4 overflow-y-auto bg-[#050810] text-slate-100">
@@ -324,12 +426,176 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           </button>
           <button
             type="button"
-            onClick={resetView}
-            className="px-3 py-1 text-[10px] font-mono uppercase tracking-wide border rounded-full border-slate-800 text-slate-500 hover:border-slate-600 hover:text-slate-300"
+            onClick={() => setSkyMapsOn((v) => !v)}
+            title="Double-click the sky dome to reset pan/zoom"
+            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition ${
+              skyMapsOn ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300' : 'border-slate-700 text-slate-400 hover:border-slate-500'
+            }`}
           >
-            Reset view
+            <Sparkles className="w-3 h-3" />
+            Sky Maps
+          </button>
+          <button
+            type="button"
+            onClick={() => setSkyFestOpen((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition ${
+              skyFestOpen ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300' : 'border-slate-700 text-slate-400 hover:border-slate-500'
+            }`}
+          >
+            <CalendarClock className="w-3 h-3" />
+            Sky Fest
           </button>
         </div>
+
+        {skyFestOpen && (
+          <div className="overflow-hidden border rounded-lg border-cyan-500/20 bg-black/30">
+            <div className="flex border-b border-cyan-500/20">
+              {(['eclipses', 'meteors', 'media'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setSkyFestTab(tab)}
+                  className={`flex-1 px-3 py-2 text-[10px] font-mono uppercase tracking-wide transition ${
+                    skyFestTab === tab ? 'bg-cyan-500/10 text-cyan-300' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {tab === 'eclipses' ? '🌘 Eclipses' : tab === 'meteors' ? '☄️ Meteors' : '🛰️ Space Media'}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-3 space-y-2">
+              {skyFestTab === 'eclipses' &&
+                eclipses.map((e, i) => (
+                  <div key={i} className="p-2 border rounded border-slate-800 bg-slate-900/40">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-white capitalize">
+                        {e.type} eclipse — {e.kind}
+                      </span>
+                      <span className="font-mono text-[10px] text-cyan-300">{daysUntil(now, e.peak)}d</span>
+                    </div>
+                    <p className="font-mono text-[11px] text-slate-400">
+                      {e.peak.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                    {e.obscuration !== null && (
+                      <p className="font-mono text-[11px] text-slate-400">Obscuration {(e.obscuration * 100).toFixed(0)}%</p>
+                    )}
+                    {e.latitude !== null && e.longitude !== null && (
+                      <p className="font-mono text-[11px] text-slate-400">
+                        Peak visibility near {e.latitude.toFixed(1)}°, {e.longitude.toFixed(1)}°
+                      </p>
+                    )}
+                  </div>
+                ))}
+
+              {skyFestTab === 'meteors' &&
+                meteorShowers.map((m) => (
+                  <div key={m.name} className="p-2 border rounded border-slate-800 bg-slate-900/40">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-white">{m.name}</span>
+                      <span className="font-mono text-[10px] text-cyan-300">{daysUntil(now, m.nextPeak)}d</span>
+                    </div>
+                    <p className="font-mono text-[11px] text-slate-400">
+                      Peaks {m.nextPeak.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })} · parent body: {m.parentBody}
+                    </p>
+                  </div>
+                ))}
+
+              {skyFestTab === 'media' && (
+                <div className="space-y-3">
+                  {nowPlayingVideoId ? (
+                    <div className="relative w-full overflow-hidden bg-black rounded aspect-video">
+                      <iframe
+                        className="absolute top-0 left-0 w-full h-full border-0"
+                        src={`https://www.youtube.com/embed/${nowPlayingVideoId}?autoplay=1`}
+                        title="Space Media Player"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center border rounded aspect-video border-slate-800 bg-slate-950/60">
+                      <p className="px-4 text-xs text-center font-mono text-slate-500">
+                        Paste a YouTube link below — Mars rover clips, Hubble highlights, any stream link — to save and play it here.
+                      </p>
+                    </div>
+                  )}
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const videoId = parseYouTubeId(playlistUrlInput);
+                      if (!videoId) {
+                        setPlaylistFormError('That doesn’t look like a valid YouTube link.');
+                        return;
+                      }
+                      setPlaylist(savePlaylistItem(playlistTitleInput || playlistUrlInput, videoId));
+                      setNowPlayingVideoId(videoId);
+                      setPlaylistUrlInput('');
+                      setPlaylistTitleInput('');
+                      setPlaylistFormError('');
+                    }}
+                    className="flex flex-col gap-1.5 sm:flex-row"
+                  >
+                    <input
+                      type="text"
+                      value={playlistTitleInput}
+                      onChange={(e) => setPlaylistTitleInput(e.target.value)}
+                      placeholder="Name (optional)"
+                      className="w-full sm:w-32 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-white/50"
+                    />
+                    <input
+                      type="text"
+                      value={playlistUrlInput}
+                      onChange={(e) => setPlaylistUrlInput(e.target.value)}
+                      placeholder="Paste video link / YouTube URL"
+                      className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-white/50"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase rounded bg-white text-black hover:bg-neutral-200 whitespace-nowrap"
+                    >
+                      Add to Playlist
+                    </button>
+                  </form>
+                  {playlistFormError && <p className="font-mono text-[10px] text-red-400">{playlistFormError}</p>}
+
+                  {playlist.length > 0 && (
+                    <div className="space-y-1">
+                      {playlist.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`flex items-center justify-between gap-2 px-2 py-1.5 border rounded ${
+                            item.videoId === nowPlayingVideoId ? 'border-cyan-500/50 bg-cyan-500/10' : 'border-slate-800 bg-slate-900/40'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setNowPlayingVideoId(item.videoId)}
+                            className="flex-1 min-w-0 text-xs text-left truncate text-slate-100 hover:text-white"
+                          >
+                            {item.title}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPlaylist(removePlaylistItem(item.id))}
+                            className="text-slate-600 hover:text-red-400"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="font-mono text-[10px] text-slate-600">
+                    Live comet tracking isn&apos;t included — no free, reliable live data source exists for it. Saved links are
+                    stored in this browser only.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {spaceWeatherOn && (
           <div className="px-3 py-2 border rounded-lg border-cyan-500/20 bg-black/30">
@@ -346,16 +612,38 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
         )}
 
         {issLayerOn && (
-          <div className="px-3 py-2 border rounded-lg border-cyan-500/20 bg-black/30">
+          <div className="p-2 space-y-2 border rounded-lg border-cyan-500/20 bg-black/30">
             {issError ? (
-              <p className="font-mono text-xs text-red-400">ISS position unavailable right now.</p>
+              <p className="px-1 font-mono text-xs text-red-400">ISS position unavailable right now.</p>
             ) : iss && issTopo ? (
-              <p className="font-mono text-xs text-cyan-100">
+              <p className="px-1 font-mono text-xs text-cyan-100">
                 ISS is {issTopo.altitude > 0 ? 'above your horizon' : 'below your horizon'} — {compassDirection(issTopo.azimuth)}
                 {issTopo.altitude > 0 ? `, alt ${issTopo.altitude.toFixed(0)}°` : ''} · {iss.visibility}
               </p>
             ) : (
-              <p className="font-mono text-xs text-slate-500">Locating ISS…</p>
+              <p className="px-1 font-mono text-xs text-slate-500">Locating ISS…</p>
+            )}
+            {/* Inline live feed — the same real NASA stream the header's
+                "LIVE ISS" button opens, embedded here instead of a separate
+                popup so it's part of this view. */}
+            <div className="relative w-full overflow-hidden bg-black rounded aspect-video">
+              <iframe
+                className="absolute top-0 left-0 w-full h-full border-0"
+                src={ISS_STREAM_URL}
+                title="Live ISS HD Video Feed"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        )}
+
+        {skyMapsOn && (skyMapsLoading || skyMapsError) && (
+          <div className="px-3 py-2 border rounded-lg border-cyan-500/20 bg-black/30">
+            {skyMapsError ? (
+              <p className="font-mono text-xs text-red-400">Constellation data unavailable right now.</p>
+            ) : (
+              <p className="font-mono text-xs text-slate-500">Loading constellations…</p>
             )}
           </div>
         )}
@@ -364,15 +652,25 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           <svg
             ref={domeRef}
             viewBox={`0 0 ${size} ${size}`}
-            className="w-full max-w-[280px] mx-auto touch-none cursor-grab active:cursor-grabbing"
+            className="w-full aspect-square touch-none cursor-grab active:cursor-grabbing"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
             onPointerLeave={endDrag}
+            onDoubleClick={resetView}
           >
             <g transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`} style={{ transformOrigin: `${center}px ${center}px` }}>
               <circle cx={center} cy={center} r={radius} fill="rgba(6,20,28,0.6)" stroke="rgba(34,211,238,0.3)" strokeWidth={1} />
               <circle cx={center} cy={center} r={radius * 0.5} fill="none" stroke="rgba(34,211,238,0.12)" strokeWidth={1} />
+              {/* Zenith marker — straight overhead, the center of this
+                  projection by construction (altitude 90° maps to r=0). */}
+              <g className="pointer-events-none">
+                <line x1={center - 6} y1={center} x2={center + 6} y2={center} stroke="rgba(34,211,238,0.5)" strokeWidth={1} />
+                <line x1={center} y1={center - 6} x2={center} y2={center + 6} stroke="rgba(34,211,238,0.5)" strokeWidth={1} />
+                <text x={center} y={center + 16} textAnchor="middle" className="fill-cyan-500/50" fontSize={8} fontFamily="monospace">
+                  ZENITH
+                </text>
+              </g>
               {['N', 'E', 'S', 'W'].map((label, i) => {
                 const angle = (i * 90 - 90) * (Math.PI / 180);
                 const x = center + (radius + 12) * Math.cos(angle);
@@ -383,6 +681,29 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                   </text>
                 );
               })}
+              {skyMapsOn &&
+                stars?.map(([lon, lat, mag], idx) => {
+                  const xy = equatorialToXY(lonToRaHours(lon), lat, observer, now, center, radius);
+                  if (!xy) return null;
+                  const r = Math.max(0.4, 2.2 - mag * 0.35);
+                  return <circle key={idx} cx={xy.x} cy={xy.y} r={r} fill="#e2e8f0" opacity={0.85} />;
+                })}
+              {skyMapsOn &&
+                constellationLines?.map((c) =>
+                  c.lines.map((strip, stripIdx) =>
+                    projectLineStrip(strip, observer, now, center, radius).map((run, runIdx) => (
+                      <polyline
+                        key={`${c.id}-${stripIdx}-${runIdx}`}
+                        points={run.map((p) => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke="rgba(103,232,249,0.35)"
+                        strokeWidth={0.75}
+                        className="cursor-pointer hover:stroke-cyan-300"
+                        onClick={() => setSelected({ kind: 'constellation', id: c.id })}
+                      />
+                    ))
+                  )
+                )}
               {visible.map((b) => {
                 const { x, y } = azAltToXY(b.azimuth, b.altitude, center, radius);
                 const isLuminary = b.name === 'Sun' || b.name === 'Moon';
@@ -414,6 +735,35 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           </svg>
         </div>
 
+        {/* Map key — only covers what's actually drawn above, nothing invented */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[10px] font-mono text-slate-500">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#67e8f9]" /> Sun / Moon
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#e2e8f0]" /> Planet
+          </span>
+          {skyMapsOn && (
+            <>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#e2e8f0] opacity-85" /> Background star (larger = brighter)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-px bg-cyan-400/40" /> Constellation line (click to identify)
+              </span>
+            </>
+          )}
+          {issLayerOn && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 bg-[#22d3ee]" /> ISS
+            </span>
+          )}
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 border rounded-full border-cyan-500/50" /> Zenith (straight overhead)
+          </span>
+          <span>N/E/S/W = compass direction along the horizon</span>
+        </div>
+
         {/* Detail panel for the selected body/satellite — inline, not a modal */}
         {selected && (
           <div className="relative p-4 border rounded-lg border-cyan-500/40 bg-cyan-950/20">
@@ -441,7 +791,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                   <p className="font-mono text-xs text-slate-400">Next set {selected.body.nextSet.toLocaleTimeString()}</p>
                 )}
               </div>
-            ) : (
+            ) : selected.kind === 'iss' ? (
               iss &&
               issTopo && (
                 <div className="space-y-1">
@@ -452,6 +802,15 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                   <p className="font-mono text-xs text-cyan-100">Range {Math.round(issTopo.rangeKm).toLocaleString()} km</p>
                   <p className="font-mono text-xs text-cyan-100">Orbital altitude {Math.round(iss.geo.altitude)} km</p>
                   <p className="font-mono text-xs text-slate-400">Status: {iss.visibility}</p>
+                </div>
+              )
+            ) : (
+              constellationNames?.[selected.id] && (
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-white">{constellationNames[selected.id].name}</h3>
+                  <p className="font-mono text-xs text-cyan-100">Genitive: {constellationNames[selected.id].genitive}</p>
+                  <p className="font-mono text-xs text-cyan-100">IAU designation: {selected.id}</p>
+                  <p className="font-mono text-xs text-slate-400">Brightness rank: {constellationNames[selected.id].rank}</p>
                 </div>
               )
             )}
