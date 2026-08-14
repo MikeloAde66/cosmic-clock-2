@@ -10,38 +10,6 @@ import { RADIO_STATIONS } from '@/lib/radioStations';
 import { GLOBE_NODES, type GlobeMarker } from '@/lib/globeMarkers';
 import type { VaultDrawer, VaultProduct } from '@/lib/vaultRegistry';
 
-// Deterministic PRNG (mulberry32), not Math.random() — this component is
-// server-rendered before hydration, and Math.random() would produce a
-// different star field on the server than on the client, causing a
-// hydration mismatch. A fixed seed makes both renders identical while
-// still looking scattered/randomized.
-function mulberry32(seed: number) {
-  return function () {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-// Randomized starfield: sparse enough to stay in the background, dense
-// enough to not read as bare. ~20% twinkle (via the shared keyframe below);
-// the rest sit at a fixed size/opacity for depth without visual noise.
-const STAR_COUNT = 135;
-const randomStar = mulberry32(20260812);
-const STARS = Array.from({ length: STAR_COUNT }, () => {
-  const twinkles = randomStar() < 0.2;
-  return {
-    top: `${(randomStar() * 100).toFixed(2)}%`,
-    left: `${(randomStar() * 100).toFixed(2)}%`,
-    size: `${(1 + randomStar() * 1.5).toFixed(2)}px`,
-    opacity: 0.15 + randomStar() * 0.7,
-    twinkles,
-    delay: `${(randomStar() * 4).toFixed(2)}s`,
-    duration: `${(2.5 + randomStar() * 2.5).toFixed(2)}s`,
-  };
-});
 
 // The globe is a flat CSS illusion (a Blue Marble background-image panned
 // sideways behind a circular mask), not a real 3D projection — so there's
@@ -126,25 +94,10 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange }: 
   };
 
   return (
-    <div className="relative flex flex-col w-full h-full overflow-hidden bg-[#0a0a0c]">
-      {/* Randomized starfield, behind everything else — only ~20% twinkle */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        {STARS.map((star, idx) => (
-          <div
-            key={idx}
-            className={`absolute rounded-full bg-white shadow-[0_0_4px_#ffffff] ${star.twinkles ? 'animate-twinkle' : ''}`}
-            style={{
-              top: star.top,
-              left: star.left,
-              width: star.size,
-              height: star.size,
-              opacity: star.twinkles ? undefined : star.opacity,
-              animationDelay: star.twinkles ? star.delay : undefined,
-              animationDuration: star.twinkles ? star.duration : undefined,
-            }}
-          />
-        ))}
-      </div>
+    <div className="relative z-10 flex flex-col w-full h-full overflow-hidden">
+      {/* Starfield now comes from the global <Starfield /> mounted in
+          app/page.tsx, behind every tab — this used to render its own
+          separate copy here, which would have doubled up with it. */}
 
       {activeView === 'clock' && (
         <>
@@ -328,15 +281,6 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange }: 
       )}
 
       <style jsx>{`
-        @keyframes twinkle {
-          0%, 100% { opacity: 0.15; transform: scale(0.8); }
-          50% { opacity: 0.85; transform: scale(1.2); }
-        }
-        .animate-twinkle {
-          animation-name: twinkle;
-          animation-timing-function: linear;
-          animation-iteration-count: infinite;
-        }
         @keyframes earthSpin {
           from { background-position-x: 0%; }
           to { background-position-x: 100%; }

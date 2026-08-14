@@ -15,7 +15,7 @@ export default function LeftNav({ activeTab = 'aione', setActiveTab }: LeftNavPr
   };
 
   return (
-    <aside className="flex flex-col justify-between w-56 min-h-screen p-4 border-r bg-neutral-950 border-neutral-800">
+    <aside className="relative z-10 flex flex-col justify-between w-56 min-h-screen p-4 border-r bg-neutral-950 border-neutral-800">
       <div>
         {/* Top Branding / CC Logo (Pure Static Display) */}
         <div className="flex items-center mb-8 space-x-3">

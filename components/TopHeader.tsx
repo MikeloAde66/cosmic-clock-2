@@ -17,7 +17,7 @@ export default function TopHeader({ activeTab }: TopHeaderProps) {
 
   return (
     <>
-      <header className="flex items-center justify-between px-4 py-3 border-b bg-neutral-950 border-neutral-800">
+      <header className="relative z-10 flex items-center justify-between px-4 py-3 border-b bg-neutral-950 border-neutral-800">
         {/* Left Side: LIVE ISS + Star Tracker */}
         <div className="flex items-center space-x-2">
           <button

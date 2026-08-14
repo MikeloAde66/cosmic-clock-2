@@ -36,7 +36,7 @@ export default function SiteFooter() {
   const clockLabel = useLiveClock();
 
   return (
-    <footer className="w-full shrink-0 bg-[#04060A] border-t border-slate-800/80 px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-3 text-xs font-mono">
+    <footer className="relative z-10 w-full shrink-0 bg-[#04060A] border-t border-slate-800/80 px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-3 text-xs font-mono">
       <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
         <div className="flex items-center gap-2">
           <span className="text-slate-500">EARTH TIME</span>

@@ -73,7 +73,7 @@ export default function AiOneHome({ onNavigateToVaultDrawer }: AiOneHomeProps) {
 
   return (
     <CartProvider>
-      <div className="w-full h-full overflow-y-auto bg-[#070b14] text-slate-100 flex flex-col font-sans">
+      <div className="relative z-10 w-full h-full overflow-y-auto text-slate-100 flex flex-col font-sans">
         {showHeroChrome && (
           <>
             {/* HERO BANNER */}

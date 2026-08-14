@@ -25,7 +25,7 @@ export default function GlobalPlayerBar() {
   const hasQueue = queue.length > 0;
 
   return (
-    <div className="flex items-center gap-4 px-4 py-2 border-t shrink-0 bg-[#04060A] border-slate-800/80">
+    <div className="relative z-10 flex items-center gap-4 px-4 py-2 border-t shrink-0 bg-[#04060A] border-slate-800/80">
       <div className="flex items-center min-w-0 gap-2 w-40 sm:w-56">
         <div className="min-w-0">
           <p className="text-xs font-bold text-white truncate">{station.name}</p>

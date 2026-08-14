@@ -3,6 +3,7 @@ import { useContextMenuShare } from '@/components/useContextMenuShare';
 import React, { useEffect, useState } from 'react';
 import TopHeader from '@/components/TopHeader';
 import LeftNav from '@/components/LeftNav';
+import Starfield from '@/components/Starfield';
 import FactChecker from '@/components/FactChecker';
 import PodsModule from '@/components/PodsModule';
 import CosmicVaultAuth from '@/components/CosmicVaultAuth';
@@ -39,7 +40,8 @@ export default function Home() {
 useContextMenuShare();
   return (
     <RadioPlayerProvider>
-      <main className="flex h-screen w-screen overflow-hidden bg-[#0a0a0c]">
+      <main className="relative flex h-screen w-screen overflow-hidden bg-[#0a0a0c]">
+        <Starfield />
         <LeftNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
         <div className="flex flex-col flex-1 overflow-hidden">

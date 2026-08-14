@@ -454,7 +454,7 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
   );
 
   return (
-    <div className="w-full h-full overflow-y-auto bg-[#070b14] text-slate-100 font-sans">
+    <div className="relative z-10 w-full h-full overflow-y-auto text-slate-100 font-sans">
       <div className="max-w-6xl px-6 py-10 mx-auto space-y-8">
         {!isUnlocked ? (
           <div className="max-w-md p-8 mx-auto my-12 space-y-6 text-center border shadow-xl bg-slate-900/90 border-slate-800 rounded-xl">
@@ -543,7 +543,7 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
                   return (
                     <div
                       key={item.id}
-                      className="flex flex-col justify-between p-5 space-y-4 border bg-slate-900/80 border-slate-800 rounded-xl"
+                      className="flex flex-col justify-between p-5 space-y-4 border bg-slate-900/45 backdrop-blur-[10px] border-slate-800 rounded-xl"
                     >
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-[11px] font-mono">

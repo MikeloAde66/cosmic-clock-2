@@ -41,7 +41,7 @@ export default function RadioStreams() {
   });
 
   return (
-    <div className="w-full h-full p-8 overflow-y-auto bg-[#0a0a0c]">
+    <div className="relative z-10 w-full h-full p-8 overflow-y-auto">
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase">
@@ -130,7 +130,7 @@ export default function RadioStreams() {
             return (
               <div
                 key={station.id}
-                className={`relative flex flex-col justify-between p-4 space-y-4 overflow-hidden transition-all border rounded-xl bg-slate-900/80 ${
+                className={`relative flex flex-col justify-between p-4 space-y-4 overflow-hidden transition-all border rounded-xl bg-slate-900/45 backdrop-blur-[10px] ${
                   isPlaying
                     ? 'border-neutral-700 '
                     : 'border-slate-800 hover:border-slate-700'
