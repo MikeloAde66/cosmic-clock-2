@@ -40,21 +40,27 @@ const STARS = Array.from({ length: STAR_COUNT }, () => {
 export default function Starfield() {
   return (
     <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none bg-[#0a0a0c]">
-      {STARS.map((star, idx) => (
-        <div
-          key={idx}
-          className={`absolute rounded-full bg-white shadow-[0_0_4px_#ffffff] ${star.twinkles ? 'animate-global-star-twinkle' : ''}`}
-          style={{
-            top: star.top,
-            left: star.left,
-            width: star.size,
-            height: star.size,
-            opacity: star.twinkles ? undefined : star.opacity,
-            animationDelay: star.twinkles ? star.delay : undefined,
-            animationDuration: star.twinkles ? star.duration : undefined,
-          }}
-        />
-      ))}
+      {/* Wrapping div (rather than animating each star) — a slow, barely-
+          perceptible scale breathing from the viewport center reads as
+          drifting slightly forward/backward through the field, without
+          needing per-star radial-expansion math for the same sensation. */}
+      <div className="w-full h-full animate-starfield-drift">
+        {STARS.map((star, idx) => (
+          <div
+            key={idx}
+            className={`absolute rounded-full bg-white shadow-[0_0_4px_#ffffff] ${star.twinkles ? 'animate-global-star-twinkle' : ''}`}
+            style={{
+              top: star.top,
+              left: star.left,
+              width: star.size,
+              height: star.size,
+              opacity: star.twinkles ? undefined : star.opacity,
+              animationDelay: star.twinkles ? star.delay : undefined,
+              animationDuration: star.twinkles ? star.duration : undefined,
+            }}
+          />
+        ))}
+      </div>
       <style jsx>{`
         @keyframes global-star-twinkle {
           0%, 100% { opacity: 0.15; transform: scale(0.8); }
@@ -64,6 +70,13 @@ export default function Starfield() {
           animation-name: global-star-twinkle;
           animation-timing-function: linear;
           animation-iteration-count: infinite;
+        }
+        @keyframes starfield-drift {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.015); }
+        }
+        .animate-starfield-drift {
+          animation: starfield-drift 26s ease-in-out infinite;
         }
       `}</style>
     </div>
