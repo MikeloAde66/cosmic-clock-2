@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { uploadFilesDirectToStorage } from '@/lib/vaultDirectUpload';
 import {
   VAULT_DRAWERS,
   type VaultDrawer,
@@ -459,63 +460,79 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
     setIsUploading(true);
     setUploadError('');
 
-    const form = new FormData();
-    uploadFiles.forEach((file) => form.append('file', file));
-    form.set('title', uploadTitle);
-    form.set('sku', effectiveUploadSku);
-    form.set('drawer', uploadDrawer);
-    form.set('description', uploadDescription);
-    form.set('readmeGuide', uploadReadme);
-    if (uploadPrice.trim()) form.set('priceCents', String(Math.round(Number(uploadPrice) * 100)));
-    form.set('isPublished', String(uploadPublish));
-    form.set('tags', uploadTags);
-    if (uploadMetadata.trim()) form.set('metadata', uploadMetadata);
-    form.set('durations', JSON.stringify(uploadFiles.map((f) => fileDurations.get(f) ?? null)));
-
     try {
-      const res = await fetch('/api/vault/upload', { method: 'POST', headers: await getAuthHeader(), body: form });
+      const authHeader = await getAuthHeader();
+
+      // Phase 1: upload straight from the browser to Supabase Storage via
+      // signed URLs — bypasses this app's own serverless function body, so
+      // a 150MB video is no different to this than a 3MB track. See
+      // lib/vaultDirectUpload.ts for why.
+      const { tracks, failures } = await uploadFilesDirectToStorage(
+        uploadFiles,
+        uploadDrawer,
+        effectiveUploadSku,
+        fileDurations,
+        authHeader
+      );
+
+      if (tracks.length === 0) {
+        setUploadError(
+          `0 uploaded, ${failures.length} failed: ` + failures.map((f) => `${f.filename} (${f.message})`).join('; ')
+        );
+        return;
+      }
+
+      // Phase 2: finalize — record the already-uploaded tracks' metadata
+      // against this pack. Small JSON body regardless of how large the
+      // files themselves were.
+      const res = await fetch('/api/vault/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeader },
+        body: JSON.stringify({
+          title: uploadTitle,
+          sku: effectiveUploadSku,
+          drawer: uploadDrawer,
+          description: uploadDescription,
+          readmeGuide: uploadReadme,
+          ...(uploadPrice.trim() ? { priceCents: Math.round(Number(uploadPrice) * 100) } : {}),
+          isPublished: uploadPublish,
+          tags: uploadTags.split(',').map((t) => t.trim()).filter(Boolean),
+          ...(uploadMetadata.trim() ? { metadata: JSON.parse(uploadMetadata) } : {}),
+          tracks,
+        }),
+      });
       const rawBody = await res.text();
 
-      // The route returns JSON on both success and "every file in this
-      // batch failed" (still a 200/500 JSON body), but plain text for
-      // request-validation failures (missing title, bad drawer, etc.) — try
-      // JSON first and only fall back to showing the raw text when it
-      // genuinely isn't JSON, rather than ever dumping a raw {"errors":...}
-      // blob onto the screen.
-      let data: { product: VaultProduct | null; errors: { filename: string; message: string }[] } | null = null;
+      let data: { product: VaultProduct } | null = null;
       try {
         data = JSON.parse(rawBody);
       } catch {
         // not JSON — a plain-text validation error
       }
 
-      if (!data) {
+      if (!res.ok || !data) {
         setUploadError(rawBody || `Upload failed (${res.status}).`);
         return;
       }
 
-      if (data.product) {
-        // The server returns the pack's full current track list (existing +
-        // new), so replace any card with the same sku+drawer rather than
-        // appending a duplicate.
-        const product = data.product;
-        setProducts((prev) => [
-          product,
-          ...prev.filter((p) => !(p.sku === product.sku && p.drawer === product.drawer)),
-        ]);
-      }
+      // The server returns the pack's full current track list (existing +
+      // new), so replace any card with the same sku+drawer rather than
+      // appending a duplicate.
+      const product = data.product;
+      setProducts((prev) => [
+        product,
+        ...prev.filter((p) => !(p.sku === product.sku && p.drawer === product.drawer)),
+      ]);
 
-      if (data.errors.length > 0) {
+      if (failures.length > 0) {
         // Keep the failed files staged so the pack upload can just be
         // retried without re-picking everything that already succeeded.
-        const failedNames = new Set(data.errors.map((e) => e.filename));
-        setUploadFiles((prev) => prev.filter((f) => failedNames.has(f.name)));
+        const succeededNames = new Set(tracks.map((t) => t.filename));
+        setUploadFiles((prev) => prev.filter((f) => !succeededNames.has(f.name)));
         setUploadError(
-          `${uploadFiles.length - data.errors.length} uploaded, ${data.errors.length} failed: ` +
-            data.errors.map((e) => `${e.filename} (${e.message})`).join('; ')
+          `${tracks.length} uploaded, ${failures.length} failed: ` +
+            failures.map((f) => `${f.filename} (${f.message})`).join('; ')
         );
-      } else if (!res.ok) {
-        setUploadError(`Upload failed (${res.status}).`);
       } else {
         resetUploadForm();
         setShowUploadModal(false);
@@ -542,40 +559,55 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
 
     try {
       const duration = await probeAudioDuration(file);
+      const durations = new Map<File, number>();
+      if (duration !== undefined) durations.set(file, duration);
 
-      // $set on the server unconditionally overwrites title/description/etc
-      // with whatever's in this form — passing the pack's own current
-      // values through (rather than leaving them blank) is what makes this
-      // a pure append instead of wiping the rest of the record.
-      const form = new FormData();
-      form.append('file', file);
-      form.set('title', item.title);
-      form.set('sku', item.sku);
-      form.set('drawer', item.drawer);
-      form.set('description', item.description ?? '');
-      form.set('readmeGuide', item.readmeGuide ?? '');
-      if (item.priceCents !== undefined) form.set('priceCents', String(item.priceCents));
-      form.set('isPublished', String(item.isPublished ?? false));
-      form.set('tags', (item.tags ?? []).join(','));
-      if (item.metadata) form.set('metadata', JSON.stringify(item.metadata));
-      form.set('durations', JSON.stringify([duration ?? null]));
+      const authHeader = await getAuthHeader();
+      const { tracks, failures } = await uploadFilesDirectToStorage([file], item.drawer, item.sku, durations, authHeader);
 
-      const res = await fetch('/api/vault/upload', { method: 'POST', headers: await getAuthHeader(), body: form });
-      if (!res.ok) {
-        const message = await res.text();
-        setAddTrackErrors((prev) => new Map(prev).set(item.id, message));
+      if (tracks.length === 0) {
+        setAddTrackErrors((prev) => new Map(prev).set(item.id, failures.map((f) => f.message).join('; ') || 'Upload failed.'));
         return;
       }
-      const data: { product: VaultProduct | null; errors: { filename: string; message: string }[] } = await res.json();
 
-      if (data.product) {
-        setProducts((prev) => [
-          data.product as VaultProduct,
-          ...prev.filter((p) => !(p.sku === data.product!.sku && p.drawer === data.product!.drawer)),
-        ]);
+      // $set on the server unconditionally overwrites title/description/etc
+      // with whatever's in this body — passing the pack's own current
+      // values through (rather than leaving them blank) is what makes this
+      // a pure append instead of wiping the rest of the record.
+      const res = await fetch('/api/vault/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeader },
+        body: JSON.stringify({
+          title: item.title,
+          sku: item.sku,
+          drawer: item.drawer,
+          description: item.description ?? '',
+          readmeGuide: item.readmeGuide ?? '',
+          ...(item.priceCents !== undefined ? { priceCents: item.priceCents } : {}),
+          isPublished: item.isPublished ?? false,
+          tags: item.tags ?? [],
+          ...(item.metadata ? { metadata: item.metadata } : {}),
+          tracks,
+        }),
+      });
+      const rawBody = await res.text();
+      let data: { product: VaultProduct } | null = null;
+      try {
+        data = JSON.parse(rawBody);
+      } catch {
+        // not JSON — a plain-text validation error
       }
-      if (data.errors.length > 0) {
-        setAddTrackErrors((prev) => new Map(prev).set(item.id, data.errors.map((e) => `${e.filename} (${e.message})`).join('; ')));
+
+      if (!res.ok || !data) {
+        setAddTrackErrors((prev) => new Map(prev).set(item.id, rawBody || `Upload failed (${res.status}).`));
+        return;
+      }
+
+      const product = data.product;
+      setProducts((prev) => [product, ...prev.filter((p) => !(p.sku === product.sku && p.drawer === product.drawer))]);
+
+      if (failures.length > 0) {
+        setAddTrackErrors((prev) => new Map(prev).set(item.id, failures.map((f) => f.message).join('; ')));
       }
     } catch (err) {
       setAddTrackErrors((prev) => new Map(prev).set(item.id, err instanceof Error ? err.message : 'Upload failed.'));
