@@ -474,19 +474,34 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
 
     try {
       const res = await fetch('/api/vault/upload', { method: 'POST', headers: await getAuthHeader(), body: form });
-      if (!res.ok) {
-        setUploadError(await res.text());
+      const rawBody = await res.text();
+
+      // The route returns JSON on both success and "every file in this
+      // batch failed" (still a 200/500 JSON body), but plain text for
+      // request-validation failures (missing title, bad drawer, etc.) — try
+      // JSON first and only fall back to showing the raw text when it
+      // genuinely isn't JSON, rather than ever dumping a raw {"errors":...}
+      // blob onto the screen.
+      let data: { product: VaultProduct | null; errors: { filename: string; message: string }[] } | null = null;
+      try {
+        data = JSON.parse(rawBody);
+      } catch {
+        // not JSON — a plain-text validation error
+      }
+
+      if (!data) {
+        setUploadError(rawBody || `Upload failed (${res.status}).`);
         return;
       }
-      const data: { product: VaultProduct | null; errors: { filename: string; message: string }[] } = await res.json();
 
       if (data.product) {
         // The server returns the pack's full current track list (existing +
         // new), so replace any card with the same sku+drawer rather than
         // appending a duplicate.
+        const product = data.product;
         setProducts((prev) => [
-          data.product as VaultProduct,
-          ...prev.filter((p) => !(p.sku === data.product!.sku && p.drawer === data.product!.drawer)),
+          product,
+          ...prev.filter((p) => !(p.sku === product.sku && p.drawer === product.drawer)),
         ]);
       }
 
@@ -499,6 +514,8 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
           `${uploadFiles.length - data.errors.length} uploaded, ${data.errors.length} failed: ` +
             data.errors.map((e) => `${e.filename} (${e.message})`).join('; ')
         );
+      } else if (!res.ok) {
+        setUploadError(`Upload failed (${res.status}).`);
       } else {
         resetUploadForm();
         setShowUploadModal(false);

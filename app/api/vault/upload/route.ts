@@ -164,7 +164,10 @@ export async function POST(request: Request) {
       .map((o) => ({ filename: o.file.name, message: o.error }));
 
     if (newTracks.length === 0) {
-      return Response.json({ product: null, errors }, { status: 500 });
+      // Every file in this batch failed — almost always a client-side
+      // problem (oversized file, storage rejecting the type), not a server
+      // fault, so this is a 400 rather than a 500.
+      return Response.json({ product: null, errors }, { status: 400 });
     }
 
     // Upsert: a second upload with the same sku+drawer appends tracks to the
