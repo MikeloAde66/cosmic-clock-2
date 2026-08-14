@@ -42,6 +42,14 @@ export default function AiOneHome({ onNavigateToVaultDrawer }: AiOneHomeProps) {
   const [activeSection, setActiveSection] = useState<
     'home' | 'pricing' | 'products' | 'cart'
   >('home');
+  // CosmicCanvas's Weather/Kali sub-views already have their own BackButton
+  // — keeping this hero banner + sub-nav above them too just stacked a
+  // second navigation layer and pushed those views' content down by ~380px
+  // with nothing to match it at the bottom. Collapse this chrome once the
+  // user is inside one of those, same as they already collapse for
+  // Products/Pricing/Cart via the activeSection check below.
+  const [cosmicView, setCosmicView] = useState<'clock' | 'weather' | 'kali'>('clock');
+  const showHeroChrome = activeSection !== 'home' || cosmicView === 'clock';
 
   useEffect(() => {
     // Supabase's default email template sends a magic link, not a 6-digit
@@ -66,48 +74,52 @@ export default function AiOneHome({ onNavigateToVaultDrawer }: AiOneHomeProps) {
   return (
     <CartProvider>
       <div className="w-full h-full overflow-y-auto bg-[#070b14] text-slate-100 flex flex-col font-sans">
-        {/* HERO BANNER */}
-        <div className="relative w-full h-80 bg-[#060a12] overflow-hidden border-b border-slate-800/80 flex flex-col items-center justify-center shrink-0">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-600/20 via-indigo-500/30 to-white/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-transparent to-[#070b14]/70" />
+        {showHeroChrome && (
+          <>
+            {/* HERO BANNER */}
+            <div className="relative w-full h-80 bg-[#060a12] overflow-hidden border-b border-slate-800/80 flex flex-col items-center justify-center shrink-0">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-600/20 via-indigo-500/30 to-white/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-transparent to-[#070b14]/70" />
 
-          <div className="relative z-10 px-4 space-y-2 text-center">
-            <h1 className="text-5xl md:text-6xl font-black tracking-wider text-white">
-              Ai One
-            </h1>
-            <p className="font-mono text-xs tracking-widest uppercase md:text-sm text-slate-300">
-              Cosmic Creation & Broadcast Hub
-            </p>
-          </div>
-        </div>
+              <div className="relative z-10 px-4 space-y-2 text-center">
+                <h1 className="text-5xl md:text-6xl font-black tracking-wider text-white">
+                  Ai One
+                </h1>
+                <p className="font-mono text-xs tracking-widest uppercase md:text-sm text-slate-300">
+                  Cosmic Creation & Broadcast Hub
+                </p>
+              </div>
+            </div>
 
-        {/* SUB-NAV: lightweight inline menu text, not pill buttons */}
-        <div className="flex items-center justify-center w-full py-3 space-x-8 text-xs font-mono tracking-widest uppercase border-b border-slate-800/80 bg-[#0b1326] shrink-0">
-          <button
-            onClick={() => setActiveSection('products')}
-            className="text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
-          >
-            Products
-          </button>
+            {/* SUB-NAV: lightweight inline menu text, not pill buttons */}
+            <div className="flex items-center justify-center w-full py-3 space-x-8 text-xs font-mono tracking-widest uppercase border-b border-slate-800/80 bg-[#0b1326] shrink-0">
+              <button
+                onClick={() => setActiveSection('products')}
+                className="text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
+              >
+                Products
+              </button>
 
-          <button
-            onClick={() => setActiveSection('pricing')}
-            className="text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
-          >
-            Pricing
-          </button>
+              <button
+                onClick={() => setActiveSection('pricing')}
+                className="text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
+              >
+                Pricing
+              </button>
 
-          <button
-            onClick={() => setIsSignUpOpen(true)}
-            className="text-white hover:text-white font-bold border-b border-neutral-700 pb-0.5 transition-colors"
-          >
-            Sign Up
-          </button>
+              <button
+                onClick={() => setIsSignUpOpen(true)}
+                className="text-white hover:text-white font-bold border-b border-neutral-700 pb-0.5 transition-colors"
+              >
+                Sign Up
+              </button>
 
-          <CartNavButton onClick={() => setActiveSection('cart')} />
+              <CartNavButton onClick={() => setActiveSection('cart')} />
 
-          <DonationButton />
-        </div>
+              <DonationButton />
+            </div>
+          </>
+        )}
 
         <SignUpModal
           isOpen={isSignUpOpen}
@@ -136,7 +148,7 @@ export default function AiOneHome({ onNavigateToVaultDrawer }: AiOneHomeProps) {
              starfield/space background fills the whole viewport instead of
              sitting inside a bordered, max-width, 16:9-locked card. */
           <div className="relative flex-1 w-full min-h-0">
-            <CosmicCanvas onNavigateToVaultDrawer={onNavigateToVaultDrawer} />
+            <CosmicCanvas onNavigateToVaultDrawer={onNavigateToVaultDrawer} onViewChange={setCosmicView} />
           </div>
         )}
       </div>

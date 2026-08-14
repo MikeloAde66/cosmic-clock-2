@@ -256,7 +256,7 @@ export default function AiOneChat() {
           const text = messageText(m.content);
           const images = messageImages(m.content);
           return (
-            <div key={idx} className="text-sm font-mono leading-relaxed break-words text-slate-100">
+            <div key={idx} className="text-base font-mono leading-relaxed break-words text-slate-100">
               <span
                 className={`mr-1.5 text-[9px] uppercase tracking-wider font-bold ${
                   m.role === 'user' ? 'text-slate-500' : 'text-white'

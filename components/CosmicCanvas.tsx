@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, CloudSun, Compass, X } from 'lucide-react';
 import NoaaWidget from './NoaaWidget';
 import AiOneChat from './AiOneChat';
@@ -78,12 +78,23 @@ function BackButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+type CosmicCanvasView = 'clock' | 'weather' | 'kali';
+
 interface CosmicCanvasProps {
   onNavigateToVaultDrawer: (drawer: VaultDrawer) => void;
+  // Lets AiOneHome collapse its own hero banner/sub-nav while the user is
+  // inside a full-section sub-view (Weather/Kali) — those already have their
+  // own BackButton, so the outer chrome above them was just dead space with
+  // no matching space below, not a real second layer of navigation anyone used.
+  onViewChange?: (view: CosmicCanvasView) => void;
 }
 
-export default function CosmicCanvas({ onNavigateToVaultDrawer }: CosmicCanvasProps) {
-  const [activeView, setActiveView] = useState<'clock' | 'weather' | 'kali'>('clock');
+export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange }: CosmicCanvasProps) {
+  const [activeView, setActiveView] = useState<CosmicCanvasView>('clock');
+
+  useEffect(() => {
+    onViewChange?.(activeView);
+  }, [activeView, onViewChange]);
   const { station, playStation } = useRadioPlayer();
   const [previewMarker, setPreviewMarker] = useState<GlobeMarker | null>(null);
   const [drawerCount, setDrawerCount] = useState<number | null>(null);
@@ -259,7 +270,7 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer }: CosmicCanvasPr
 
       {/* Weather — takes over the whole section, reuses the real NoaaWidget */}
       {activeView === 'weather' && (
-        <div className="relative z-30 flex flex-col w-full h-full p-6">
+        <div className="relative z-30 flex flex-col w-full h-full p-4">
           <div className="shrink-0 mb-4">
             <BackButton onClick={() => setActiveView('clock')} />
           </div>
@@ -273,12 +284,12 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer }: CosmicCanvasPr
 
       {/* Kali Yuga — takes over the whole section: epoch readout on top, Ai One chat filling the rest */}
       {activeView === 'kali' && (
-        <div className="relative z-30 flex flex-col w-full h-full p-6">
+        <div className="relative z-30 flex flex-col w-full h-full p-4">
           <div className="shrink-0 mb-4">
             <BackButton onClick={() => setActiveView('clock')} />
           </div>
 
-          <div className="relative flex flex-col flex-1 min-h-0 max-w-lg mx-auto w-full overflow-hidden rounded-lg border border-cyan-500/30 bg-black/20 p-4 shadow-[0_0_30px_rgba(0,240,255,0.1)] backdrop-blur-md">
+          <div className="relative flex flex-col flex-1 min-h-0 w-full overflow-hidden rounded-lg border border-cyan-500/30 bg-black/20 p-4 shadow-[0_0_30px_rgba(0,240,255,0.1)] backdrop-blur-md">
             <AncientGlyphRain />
 
             <div className="relative z-10 flex flex-col flex-1 min-h-0">
