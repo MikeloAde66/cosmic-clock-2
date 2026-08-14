@@ -14,6 +14,7 @@
     "@react-three/fiber": "^9.6.1",
     "@supabase/supabase-js": "^2.111.0",
     "@types/dompurify": "^3.0.5",
+    "astronomy-engine": "^2.1.19",
     "dompurify": "^3.4.13",
     "lucide-react": "^1.26.0",
     "mermaid": "^11.16.1",
