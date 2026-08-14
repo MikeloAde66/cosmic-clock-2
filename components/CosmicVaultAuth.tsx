@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Pencil, Trash2, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import {
   VAULT_DRAWERS,
@@ -113,6 +113,17 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
   const [editingTrackKey, setEditingTrackKey] = useState<string | null>(null);
   const [editWeightValue, setEditWeightValue] = useState<string>('');
   const [trackActionError, setTrackActionError] = useState<string>('');
+
+  // Appending a track to an already-existing pack — reuses POST
+  // /api/vault/upload's own upsert behavior (a second upload against the
+  // same sku+drawer pushes onto the existing tracks array instead of
+  // creating a duplicate card), just triggered from inside an expanded
+  // card instead of the "new pack" modal.
+  const [addTrackTargetId, setAddTrackTargetId] = useState<string | null>(null);
+  const [addingTrackIds, setAddingTrackIds] = useState<Set<string>>(new Set());
+  const [addTrackErrors, setAddTrackErrors] = useState<Map<string, string>>(new Map());
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const addTrackInputRef = useRef<HTMLInputElement | null>(null);
 
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
   const [uploadTitle, setUploadTitle] = useState<string>('');
@@ -447,6 +458,84 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
     }
   };
 
+  const triggerAddTrack = (itemId: string) => {
+    setAddTrackTargetId(itemId);
+    addTrackInputRef.current?.click();
+  };
+
+  const appendTrackToPack = async (item: VaultProduct, file: File) => {
+    setAddingTrackIds((prev) => new Set(prev).add(item.id));
+    setAddTrackErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(item.id);
+      return next;
+    });
+
+    try {
+      const duration = await probeAudioDuration(file);
+
+      // $set on the server unconditionally overwrites title/description/etc
+      // with whatever's in this form — passing the pack's own current
+      // values through (rather than leaving them blank) is what makes this
+      // a pure append instead of wiping the rest of the record.
+      const form = new FormData();
+      form.append('file', file);
+      form.set('title', item.title);
+      form.set('sku', item.sku);
+      form.set('drawer', item.drawer);
+      form.set('description', item.description ?? '');
+      form.set('readmeGuide', item.readmeGuide ?? '');
+      if (item.priceCents !== undefined) form.set('priceCents', String(item.priceCents));
+      form.set('isPublished', String(item.isPublished ?? false));
+      form.set('tags', (item.tags ?? []).join(','));
+      if (item.metadata) form.set('metadata', JSON.stringify(item.metadata));
+      form.set('durations', JSON.stringify([duration ?? null]));
+
+      const res = await fetch('/api/vault/upload', { method: 'POST', headers: await getAuthHeader(), body: form });
+      if (!res.ok) {
+        const message = await res.text();
+        setAddTrackErrors((prev) => new Map(prev).set(item.id, message));
+        return;
+      }
+      const data: { product: VaultProduct | null; errors: { filename: string; message: string }[] } = await res.json();
+
+      if (data.product) {
+        setProducts((prev) => [
+          data.product as VaultProduct,
+          ...prev.filter((p) => !(p.sku === data.product!.sku && p.drawer === data.product!.drawer)),
+        ]);
+      }
+      if (data.errors.length > 0) {
+        setAddTrackErrors((prev) => new Map(prev).set(item.id, data.errors.map((e) => `${e.filename} (${e.message})`).join('; ')));
+      }
+    } catch (err) {
+      setAddTrackErrors((prev) => new Map(prev).set(item.id, err instanceof Error ? err.message : 'Upload failed.'));
+    } finally {
+      setAddingTrackIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  };
+
+  const handleAddTrackFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const itemId = addTrackTargetId;
+    e.target.value = ''; // allow re-selecting the same file later
+    setAddTrackTargetId(null);
+    if (!file || !itemId) return;
+    const item = products.find((p) => p.id === itemId);
+    if (item) appendTrackToPack(item, file);
+  };
+
+  const handleAddTrackDrop = (item: VaultProduct, e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOverItemId(null);
+    const file = e.dataTransfer.files?.[0];
+    if (file) appendTrackToPack(item, file);
+  };
+
   const totalUploadBytes = uploadFiles.reduce((sum, f) => sum + f.size, 0);
 
   const visibleProducts = products.filter(
@@ -607,7 +696,21 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
                         </div>
 
                         {isExpanded && (
-                          <div className="pt-2 space-y-1.5 border-t border-slate-800">
+                          <div
+                            className={`pt-2 space-y-1.5 border-t border-slate-800 rounded transition ${
+                              dragOverItemId === item.id ? 'ring-2 ring-cyan-500/50 bg-cyan-500/5' : ''
+                            }`}
+                            onDragOver={
+                              isAdmin
+                                ? (e) => {
+                                    e.preventDefault();
+                                    setDragOverItemId(item.id);
+                                  }
+                                : undefined
+                            }
+                            onDragLeave={isAdmin ? () => setDragOverItemId((prev) => (prev === item.id ? null : prev)) : undefined}
+                            onDrop={isAdmin ? (e) => handleAddTrackDrop(item, e) : undefined}
+                          >
                             {trackActionError && (
                               <p className="font-mono text-[10px] text-rose-400">{trackActionError}</p>
                             )}
@@ -684,6 +787,22 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
                                 </div>
                               );
                             })}
+                            {isAdmin && (
+                              <div className="flex items-center justify-between gap-2 pt-1">
+                                <button
+                                  onClick={() => triggerAddTrack(item.id)}
+                                  disabled={addingTrackIds.has(item.id)}
+                                  className="flex items-center gap-1 font-mono text-[10px] uppercase text-cyan-400 hover:text-cyan-300 disabled:opacity-40"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  {addingTrackIds.has(item.id) ? 'Uploading…' : '+ Add Track'}
+                                </button>
+                                <span className="font-mono text-[9px] text-slate-600">or drop a file here</span>
+                              </div>
+                            )}
+                            {addTrackErrors.get(item.id) && (
+                              <p className="font-mono text-[10px] text-rose-400">{addTrackErrors.get(item.id)}</p>
+                            )}
                           </div>
                         )}
                       </div>
@@ -695,6 +814,14 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
           </div>
         )}
       </div>
+
+      <input
+        type="file"
+        ref={addTrackInputRef}
+        accept="audio/*"
+        className="hidden"
+        onChange={handleAddTrackFileChange}
+      />
 
       {showUploadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
