@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ArrowLeft, Check, Link as LinkIcon, Lock, Unlock } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import { getOverride, saveOverride, type ProductOverride } from '@/lib/productOverrides';
 
 interface DetailProduct {
@@ -48,6 +49,40 @@ function toCanvaEmbedUrl(url: string): string {
   }
 }
 
+async function getAuthHeader(): Promise<HeadersInit> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function isCanvaShortLink(url: string): boolean {
+  try {
+    return new URL(url).hostname === 'canva.link';
+  } catch {
+    return false;
+  }
+}
+
+// canva.link short URLs redirect to a non-embed canva.com page (blocked by
+// X-Frame-Options), so they need resolving through the server-side
+// /api/products/resolve-canva-link route first — a browser fetch() can't
+// read the redirect's final URL cross-origin without CORS, which canva.link
+// doesn't grant. Long-form canva.com URLs skip the network round trip
+// entirely and go straight through toCanvaEmbedUrl.
+async function resolveToEmbedUrl(rawUrl: string): Promise<string> {
+  if (!isCanvaShortLink(rawUrl)) {
+    return toCanvaEmbedUrl(rawUrl);
+  }
+  const res = await fetch(`/api/products/resolve-canva-link?url=${encodeURIComponent(rawUrl)}`, {
+    headers: await getAuthHeader(),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || 'Failed to resolve canva.link URL.');
+  }
+  const data: { resolvedUrl: string } = await res.json();
+  return toCanvaEmbedUrl(data.resolvedUrl);
+}
+
 // Dedicated full-section view (own back arrow, not a stacked modal) —
 // reached by clicking any storefront card. Real Vault-origin items are
 // still managed through their own admin surface in Cosmic Vault; the
@@ -58,16 +93,37 @@ export default function ProductDetailView({ product, isAdmin, onBack, onAddToCar
   const [override, setOverride] = useState<ProductOverride | undefined>(() => getOverride(product.id));
   const [reelInput, setReelInput] = useState(override?.reelUrl ?? '');
   const [savedFlash, setSavedFlash] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const canEdit = isAdmin && product.isDemo;
   const isAvailable = override?.isAvailable !== false;
 
-  const handleSaveReel = (e: React.FormEvent) => {
+  const handleSaveReel = async (e: React.FormEvent) => {
     e.preventDefault();
-    const next = saveOverride(product.id, { reelUrl: reelInput.trim() || undefined });
-    setOverride(next);
-    setSavedFlash(true);
-    setTimeout(() => setSavedFlash(false), 1500);
+    setSaveError('');
+    const trimmed = reelInput.trim();
+
+    if (!trimmed) {
+      const next = saveOverride(product.id, { reelUrl: undefined });
+      setOverride(next);
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1500);
+      return;
+    }
+
+    setIsResolving(true);
+    try {
+      const embedUrl = await resolveToEmbedUrl(trimmed);
+      const next = saveOverride(product.id, { reelUrl: embedUrl });
+      setOverride(next);
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save media link.');
+    } finally {
+      setIsResolving(false);
+    }
   };
 
   const toggleAvailability = () => {
@@ -138,18 +194,22 @@ export default function ProductDetailView({ product, isAdmin, onBack, onAddToCar
                   type="url"
                   value={reelInput}
                   onChange={(e) => setReelInput(e.target.value)}
-                  placeholder="Canva share/embed link..."
-                  className="w-full py-2 pl-8 pr-3 text-xs font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-white/50"
+                  placeholder="Canva share/embed link (canva.link or canva.com)..."
+                  disabled={isResolving}
+                  className="w-full py-2 pl-8 pr-3 text-xs font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-white/50 disabled:opacity-50"
                 />
               </div>
               <button
                 type="submit"
-                className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-mono font-bold uppercase rounded bg-white text-black hover:bg-neutral-200 transition whitespace-nowrap"
+                disabled={isResolving}
+                className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-mono font-bold uppercase rounded bg-white text-black hover:bg-neutral-200 transition whitespace-nowrap disabled:opacity-50"
               >
                 {savedFlash ? <Check className="w-3.5 h-3.5" /> : null}
-                {savedFlash ? 'Saved' : 'Add Media Link'}
+                {isResolving ? 'Resolving…' : savedFlash ? 'Saved' : 'Add Media Link'}
               </button>
             </form>
+
+            {saveError && <p className="font-mono text-[10px] text-rose-400">{saveError}</p>}
 
             <button
               type="button"
