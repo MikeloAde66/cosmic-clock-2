@@ -342,6 +342,9 @@ export default function AiOneChat() {
           onChange={(e) => setInput(e.target.value)}
           placeholder={isListening ? 'LISTENING…' : 'ASK AI ONE...'}
           disabled={isStreaming}
+          spellCheck
+          autoCorrect="on"
+          autoCapitalize="sentences"
           className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-white/50 disabled:opacity-50"
         />
         <button
