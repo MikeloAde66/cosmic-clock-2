@@ -22,6 +22,35 @@ const VARIANT_PRODUCT_TYPES: VaultVariantProductType[] = [
 ];
 const VARIANT_FULFILLMENT_TYPES: VaultVariantFulfillmentType[] = ['shipment', 'digital_delivery', 'license_grant'];
 
+// Turns free text into a SKU-safe base — "Anime radio" -> "Anime-radio" —
+// preserving the casing the admin typed rather than forcing it to lowercase.
+function slugifyBase(input: string): string {
+  return input
+    .trim()
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .join('-');
+}
+
+// Finds the highest existing "<base>-<NN>" id and returns the next one,
+// e.g. existing ["Anime-radio-01"] + base "Anime-radio" -> "Anime-radio-02".
+// Zero-pads to match the widest existing suffix (minimum 2 digits) so the
+// sequence stays visually aligned as it grows past 9.
+function nextSequencedId(base: string, existingIds: string[]): string {
+  const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`^${escaped}-(\\d+)$`, 'i');
+  let maxSeq = 0;
+  let width = 2;
+  for (const id of existingIds) {
+    const match = id.match(pattern);
+    if (!match) continue;
+    const seq = parseInt(match[1], 10);
+    if (seq > maxSeq) maxSeq = seq;
+    width = Math.max(width, match[1].length);
+  }
+  return `${base}-${String(maxSeq + 1).padStart(width, '0')}`;
+}
+
 function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
@@ -128,6 +157,10 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
   const [uploadTitle, setUploadTitle] = useState<string>('');
   const [uploadSku, setUploadSku] = useState<string>('');
+  // True once the admin has typed their own SKU (e.g. to target an existing
+  // pack) — while false, the SKU field tracks the auto-sequenced suggestion
+  // below instead of a manually-managed value.
+  const [uploadSkuTouched, setUploadSkuTouched] = useState<boolean>(false);
   const [uploadDrawer, setUploadDrawer] = useState<VaultDrawer>('MUSIC');
   const [uploadDescription, setUploadDescription] = useState<string>('');
   const [uploadReadme, setUploadReadme] = useState<string>('');
@@ -184,7 +217,13 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
     setEditingVariants((prev) => [
       ...prev,
       {
-        id: `${newVariantProductType}-${Date.now()}`,
+        // Sequenced per product type instead of a Date.now() stamp, so two
+        // digital_download variants read as digital_download-01/-02 rather
+        // than opaque timestamps.
+        id: nextSequencedId(
+          newVariantProductType,
+          prev.map((v) => v.id)
+        ),
         listingTitle: newVariantTitle.trim(),
         productType: newVariantProductType,
         fulfillmentType: newVariantFulfillmentType,
@@ -371,9 +410,22 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
     }
   };
 
+  // Auto-sequenced suggestion for a brand-new pack's SKU — base off the
+  // title (falling back to the drawer name if blank), scoped to SKUs
+  // already used in that same drawer so "Anime radio" in ANIMATIONS becomes
+  // Anime-radio-01, then Anime-radio-02 for the next one. Purely derived
+  // during render, no effect needed: the moment the admin types their own
+  // SKU (uploadSkuTouched), the suggestion stops overriding their input.
+  const suggestedUploadSku = nextSequencedId(
+    uploadTitle.trim() ? slugifyBase(uploadTitle) : uploadDrawer,
+    products.filter((p) => p.drawer === uploadDrawer).map((p) => p.sku)
+  );
+  const effectiveUploadSku = uploadSkuTouched ? uploadSku : suggestedUploadSku;
+
   const resetUploadForm = () => {
     setUploadTitle('');
     setUploadSku('');
+    setUploadSkuTouched(false);
     setUploadDrawer('MUSIC');
     setUploadDescription('');
     setUploadReadme('');
@@ -410,7 +462,7 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
     const form = new FormData();
     uploadFiles.forEach((file) => form.append('file', file));
     form.set('title', uploadTitle);
-    form.set('sku', uploadSku);
+    form.set('sku', effectiveUploadSku);
     form.set('drawer', uploadDrawer);
     form.set('description', uploadDescription);
     form.set('readmeGuide', uploadReadme);
@@ -839,14 +891,24 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
               required
               className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
             />
-            <input
-              type="text"
-              placeholder="SKU (same SKU adds tracks to an existing pack)"
-              value={uploadSku}
-              onChange={(e) => setUploadSku(e.target.value)}
-              required
-              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
-            />
+            <div>
+              <input
+                type="text"
+                placeholder="SKU"
+                value={effectiveUploadSku}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setUploadSku(value);
+                  setUploadSkuTouched(value.trim().length > 0);
+                }}
+                className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+              />
+              <p className="mt-1 font-mono text-[10px] text-slate-500">
+                {uploadSkuTouched
+                  ? 'Custom SKU — same SKU as an existing pack adds tracks to it. Clear to auto-generate again.'
+                  : `Auto-sequenced from the title — edit to target an existing pack's SKU instead.`}
+              </p>
+            </div>
             <select
               value={uploadDrawer}
               onChange={(e) => {
