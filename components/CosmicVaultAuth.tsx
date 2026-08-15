@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { uploadFilesDirectToStorage } from '@/lib/vaultDirectUpload';
+import { getRoleKeys, matchRole, regenerateRoleKey, type VaultRole } from '@/lib/vaultRoleKeys';
 import {
   VAULT_DRAWERS,
   type VaultDrawer,
@@ -98,31 +99,62 @@ interface CosmicVaultAuthProps {
   // Set when arriving here via a Home globe Vault marker's "Open Drawer"
   // link — pre-selects that drawer's filter tab. Only read once, as this
   // state's initial value: the component fully remounts each time the
-  // Vault tab is switched back into (see the isUnlocked reset below), so a
+  // Vault tab is switched back into (see the vaultRole reset below), so a
   // fresh mount always picks up whatever the prop currently is.
   initialDrawer?: VaultDrawer;
+  // Set when arriving here via LeftNav's Preferences modal, which is now
+  // the only front door into the Vault — a role key entered there is
+  // handed through so this component can attempt to unlock itself on
+  // mount, rather than showing its own separate entry form. Consumed once,
+  // same lifecycle as initialDrawer. If absent, or if it doesn't match any
+  // real role key, the view renders the generic-404 look below instead of
+  // ever revealing that a login mechanism exists.
+  initialRoleKey?: string;
 }
 
-export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps = {}) {
-  // Security Key 432 Lock State
-  const [securityPin, setSecurityPin] = useState<string>('');
-  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string>('');
+export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: CosmicVaultAuthProps = {}) {
+  // Role-based access — see lib/vaultRoleKeys.ts. Replaces the old single
+  // PIN ('432') with three distinct keys (owner/staff/agent), all still
+  // client-side shared secrets like the PIN was — real enforcement for
+  // writes stays entirely in the isAdmin/requireAdmin layer below.
+  const [vaultRole, setVaultRole] = useState<VaultRole | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>(initialDrawer ?? 'ALL');
 
-  // Real RBAC layer on top of the PIN: the PIN just gets you into the Vault
-  // view (read-only browsing); Upload and Delete additionally require a
-  // signed-in Supabase session whose app_metadata.role is 'admin'. That
-  // field can only be set with the service-role key, so a signed-in user
-  // can never grant it to themselves.
+  useEffect(() => {
+    if (initialRoleKey) {
+      const role = matchRole(initialRoleKey);
+      if (role) queueMicrotask(() => setVaultRole(role));
+    }
+    // Only ever consumed once, on mount — same as initialDrawer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Real RBAC layer on top of the role keys: those just get you into the
+  // Vault view (read-only browsing); Upload/Delete/Edit additionally
+  // require a signed-in Supabase session whose app_metadata.role is
+  // 'admin'. That field can only be set with the service-role key, so a
+  // signed-in user can never grant it to themselves.
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+
+  // Owner Vault Access Rule: a real, logged-in admin (the site owner) is
+  // never prompted for a role key and never sees the 404 gate below —
+  // Vault unlocks the instant their real Supabase session is confirmed,
+  // independent of any key. isCheckingOwnerAuth covers the brief async gap
+  // before that confirmation lands, so a slow connection can't flash the
+  // 404 at a real owner even for a moment.
+  const [isCheckingOwnerAuth, setIsCheckingOwnerAuth] = useState<boolean>(true);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      setIsAdmin(data.user?.app_metadata?.role === 'admin');
+      const admin = data.user?.app_metadata?.role === 'admin';
+      setIsAdmin(admin);
+      if (admin) queueMicrotask(() => setVaultRole('owner'));
+      queueMicrotask(() => setIsCheckingOwnerAuth(false));
     });
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAdmin(session?.user?.app_metadata?.role === 'admin');
+      const admin = session?.user?.app_metadata?.role === 'admin';
+      setIsAdmin(admin);
+      if (admin) setVaultRole('owner');
     });
     return () => subscription.subscription.unsubscribe();
   }, []);
@@ -352,8 +384,8 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
     try {
       const res = await fetch('/api/vault/track', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: securityPin.trim(), sku: item.sku, drawer: item.drawer, filename, weight }),
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({ sku: item.sku, drawer: item.drawer, filename, weight }),
       });
       if (!res.ok) throw new Error(await res.text());
       const data: { product: VaultProduct } = await res.json();
@@ -398,17 +430,18 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
   };
 
   useEffect(() => {
-    if (isUnlocked) fetchInventory();
-  }, [isUnlocked]);
+    if (vaultRole) fetchInventory();
+  }, [vaultRole]);
 
-  const handleUnlock = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (securityPin.trim() === '432') {
-      setIsUnlocked(true);
-      setErrorMsg('');
-    } else {
-      setErrorMsg('Invalid Key Code.');
-    }
+  // Admin-only key management — regenerating a role's key is itself a
+  // privileged action, gated the same way destructive Vault actions are.
+  const [roleKeys, setRoleKeys] = useState(() => getRoleKeys());
+  const [justRegenerated, setJustRegenerated] = useState<VaultRole | null>(null);
+  const handleRegenerateKey = (role: VaultRole) => {
+    const next = regenerateRoleKey(role);
+    setRoleKeys((prev) => ({ ...prev, [role]: next }));
+    setJustRegenerated(role);
+    setTimeout(() => setJustRegenerated((current) => (current === role ? null : current)), 2000);
   };
 
   // Auto-sequenced suggestion for a brand-new pack's SKU — base off the
@@ -646,27 +679,21 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
   return (
     <div className="relative z-10 w-full h-full overflow-y-auto text-slate-100 font-sans">
       <div className="max-w-6xl px-6 py-10 mx-auto space-y-8">
-        {!isUnlocked ? (
-          <div className="max-w-md p-8 mx-auto my-12 space-y-6 text-center border shadow-xl bg-slate-900/90 border-slate-800 rounded-xl">
-            <h2 className="text-xl font-bold text-slate-100">Cosmic Vault Authentication</h2>
-
-            <form onSubmit={handleUnlock} className="space-y-4">
-              <input
-                type="password"
-                maxLength={6}
-                placeholder="Enter Key..."
-                value={securityPin}
-                onChange={(e) => setSecurityPin(e.target.value)}
-                className="w-full px-4 py-3 font-mono text-lg text-center border rounded bg-slate-950 border-slate-800 text-white focus:outline-none focus:border-white/50"
-              />
-              {errorMsg && <p className="font-mono text-xs text-rose-400">{errorMsg}</p>}
-              <button
-                type="submit"
-                className="w-full py-3 text-xs font-bold uppercase transition-all rounded bg-white hover:bg-neutral-200 text-slate-950"
-              >
-                Authenticate
-              </button>
-            </form>
+        {isCheckingOwnerAuth ? (
+          // Neutral hold while confirming whether this is the real owner —
+          // never the 404, never the dashboard, so a real owner on a slow
+          // connection can't get flashed a "not found" even for a moment.
+          <div className="py-24" />
+        ) : !vaultRole ? (
+          // Generic 404 look — deliberately gives no hint a Vault (or any
+          // login mechanism) exists here. The real entry point is a role
+          // key entered in LeftNav's Preferences modal, which — if valid —
+          // arrives as initialRoleKey and unlocks this on mount without
+          // ever showing this branch. Landing here with no/invalid key
+          // (a stale deep link, a guess, a bot) sees only this.
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <h1 className="font-mono text-6xl font-bold text-slate-700">404</h1>
+            <p className="mt-3 font-mono text-sm text-slate-500">This page could not be found.</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -682,13 +709,49 @@ export default function CosmicVaultAuth({ initialDrawer }: CosmicVaultAuthProps 
                   </button>
                 )}
                 <button
-                  onClick={() => setIsUnlocked(false)}
+                  onClick={() => setVaultRole(null)}
                   className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 rounded font-mono"
                 >
                   LOCK VAULT
                 </button>
               </div>
             </div>
+
+            <div className="flex items-center gap-2 font-mono text-[10px] text-slate-500 uppercase">
+              <span className="px-2 py-0.5 border rounded border-slate-800 bg-slate-900/60">
+                Access Level: {vaultRole}
+              </span>
+            </div>
+
+            {/* Role-Based Key Generator — admin-only, since regenerating an
+                access key is itself a privileged action. Regenerating a key
+                only takes effect in this browser (see lib/vaultRoleKeys.ts);
+                anyone still holding the old code for that role keeps
+                working until they, too, get the new one some other way. */}
+            {isAdmin && (
+              <div className="p-4 space-y-3 border rounded-xl border-slate-800 bg-slate-900/40">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-white/70">
+                  Role-Based Key Generator
+                </span>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {(['owner', 'staff', 'agent'] as const).map((role) => (
+                    <div key={role} className="p-3 space-y-2 border rounded-lg border-slate-800 bg-slate-950/60">
+                      <span className="font-mono text-[9px] uppercase tracking-wider text-slate-500">{role}</span>
+                      <p className="font-mono text-xs text-white break-all">{roleKeys[role]}</p>
+                      <button
+                        onClick={() => handleRegenerateKey(role)}
+                        className="w-full px-2 py-1 text-[10px] font-mono uppercase transition border rounded border-neutral-700 text-white/80 hover:bg-white/10"
+                      >
+                        {justRegenerated === role ? 'Regenerated' : 'Regenerate'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <p className="font-mono text-[9px] text-slate-600">
+                  Saved to this browser only — not synced to other admins or devices.
+                </p>
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2">
               <button

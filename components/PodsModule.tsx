@@ -2,9 +2,10 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ArrowUpDown, Camera, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Camera, Lightbulb, Sparkles, Trash2 } from 'lucide-react';
 import CosmicVisualizer from './CosmicVisualizer';
 import EqOrb from './EqOrb';
+import LumensCalculator from './LumensCalculator';
 
 // Minimal surface of the YouTube IFrame Player API actually used here — no
 // @types/youtube dependency for a handful of methods.
@@ -260,6 +261,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showLumensCalculator, setShowLumensCalculator] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1191,6 +1193,15 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
           </button>
 
           <button
+            onClick={() => setShowLumensCalculator(true)}
+            title="Q-Flow Lumens Calculator (Beta Demo)"
+            className="flex items-center h-8 gap-1.5 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+          >
+            <Lightbulb className="w-3.5 h-3.5" />
+            Q-Flow
+          </button>
+
+          <button
             onClick={() => mediaFileInputRef.current?.click()}
             title="Browse a local video file for the Broadcast Monitor"
             className="flex items-center justify-center w-8 h-8 transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
@@ -1797,6 +1808,8 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
           </form>
         </div>
       )}
+
+      <LumensCalculator isOpen={showLumensCalculator} onClose={() => setShowLumensCalculator(false)} />
 
       {/* Upload Files Modal */}
       {showUploadModal && (

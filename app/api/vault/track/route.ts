@@ -101,16 +101,20 @@ export async function PATCH(request: Request) {
     return new Response('MONGODB_URI is not configured.', { status: 500 });
   }
 
-  let body: { pin?: string; sku?: string; drawer?: string; filename?: string; weight?: number };
+  try {
+    await requireAdmin(request);
+  } catch (err) {
+    if (err instanceof AdminAuthError) return new Response(err.message, { status: err.status });
+    throw err;
+  }
+
+  let body: { sku?: string; drawer?: string; filename?: string; weight?: number };
   try {
     body = await request.json();
   } catch {
     return new Response('Invalid JSON body.', { status: 400 });
   }
 
-  if (body.pin !== '432') {
-    return new Response('Invalid vault key.', { status: 401 });
-  }
   const { sku, drawer, filename, weight } = body;
   if (!sku?.trim() || !drawer || !VAULT_DRAWERS.includes(drawer as VaultDrawer) || !filename?.trim()) {
     return new Response('sku, drawer, and filename are required.', { status: 400 });

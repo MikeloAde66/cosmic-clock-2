@@ -26,6 +26,33 @@ export default function Home() {
     setActiveTab('vault');
   };
 
+  // Set by LeftNav's Preferences modal — the only remaining front door into
+  // the Vault now that its sidebar button is gone. Handed to CosmicVaultAuth
+  // as initialRoleKey, which still does its own real verification; this
+  // just gets the user there.
+  const [pendingVaultKey, setPendingVaultKey] = useState<string | null>(null);
+  const unlockVault = (roleKey: string) => {
+    setPendingVaultKey(roleKey);
+    setActiveTab('vault');
+  };
+  // Owner Vault Access Rule: no key needed at all — CosmicVaultAuth
+  // independently confirms the real Supabase admin session and unlocks
+  // itself the moment it mounts, so this is just navigation.
+  const openVaultForOwner = () => {
+    setActiveTab('vault');
+  };
+
+  // Set by LeftNav's Weather/Kali Yuga icons — replaces the pill buttons
+  // that used to float over the 3D Earth canvas. A token (not just the view
+  // name) so clicking the same icon twice in a row still re-triggers the
+  // effect that opens it inside CosmicCanvas, which stays mounted between
+  // clicks.
+  const [homeViewRequest, setHomeViewRequest] = useState<{ view: 'weather' | 'kali'; token: number } | null>(null);
+  const openHomeView = (view: 'weather' | 'kali') => {
+    setActiveTab('aione');
+    setHomeViewRequest({ view, token: Date.now() });
+  };
+
   const [isVaultSearchOpen, setIsVaultSearchOpen] = useState(false);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -40,9 +67,21 @@ export default function Home() {
 useContextMenuShare();
   return (
     <RadioPlayerProvider>
-      <main className="relative flex h-screen w-screen overflow-hidden bg-[#0a0a0c]">
+      {/* Responsive app frame: a real desktop viewport gets the app
+          edge-to-edge as before (this wrapper is `contents` at sm+, i.e.
+          invisible to layout); a small screen instead gets the same app
+          inside a framed mobile-device shell, centered on a plain
+          backdrop. */}
+      <div className="flex items-center justify-center w-screen h-screen bg-black sm:contents">
+        <main className="relative flex w-screen h-screen overflow-hidden bg-[#0a0a0c] max-sm:h-[92vh] max-sm:max-w-sm max-sm:rounded-[40px] max-sm:border-[6px] max-sm:border-neutral-800 max-sm:shadow-2xl">
         <Starfield />
-        <LeftNav activeTab={activeTab} setActiveTab={setActiveTab} />
+        <LeftNav
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onUnlockVault={unlockVault}
+          onOpenVaultForOwner={openVaultForOwner}
+          onOpenHomeView={openHomeView}
+        />
 
         <div className="flex flex-col flex-1 overflow-hidden">
           <TopHeader activeTab={activeTab} />
@@ -50,9 +89,16 @@ useContextMenuShare();
           <div className="relative flex-1 overflow-hidden">
             {activeTab === 'radio' && <RadioStreams />}
 
-            {activeTab === 'vault' && <CosmicVaultAuth initialDrawer={pendingVaultDrawer ?? undefined} />}
+            {activeTab === 'vault' && (
+              <CosmicVaultAuth
+                initialDrawer={pendingVaultDrawer ?? undefined}
+                initialRoleKey={pendingVaultKey ?? undefined}
+              />
+            )}
 
-            {activeTab === 'aione' && <AiOneHome onNavigateToVaultDrawer={navigateToVaultDrawer} />}
+            {activeTab === 'aione' && (
+              <AiOneHome onNavigateToVaultDrawer={navigateToVaultDrawer} homeViewRequest={homeViewRequest} />
+            )}
 
             {activeTab === 'fact-checker' && (
               <div className="w-full h-full p-6 overflow-auto">
@@ -76,7 +122,8 @@ useContextMenuShare();
           <GlobalPlayerBar />
           <SiteFooter />
         </div>
-      </main>
+        </main>
+      </div>
 
       <VaultSearchModal
         isOpen={isVaultSearchOpen}

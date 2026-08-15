@@ -14,6 +14,11 @@ import type { VaultDrawer } from '@/lib/vaultRegistry';
 
 interface AiOneHomeProps {
   onNavigateToVaultDrawer: (drawer: VaultDrawer) => void;
+  // Set by LeftNav's Weather/Kali Yuga icons — forces this back to its main
+  // 'home' section (in case the user was on Products/Pricing/Cart) and
+  // passes the request through to CosmicCanvas, which actually owns the
+  // Weather/Kali sub-view state.
+  homeViewRequest?: { view: 'weather' | 'kali'; token: number } | null;
 }
 
 // Reads useCart() from inside <CartProvider>'s own subtree — rendered as a
@@ -37,7 +42,7 @@ function CartNavButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export default function AiOneHome({ onNavigateToVaultDrawer }: AiOneHomeProps) {
+export default function AiOneHome({ onNavigateToVaultDrawer, homeViewRequest }: AiOneHomeProps) {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<
     'home' | 'pricing' | 'products' | 'cart'
@@ -50,6 +55,13 @@ export default function AiOneHome({ onNavigateToVaultDrawer }: AiOneHomeProps) {
   // Products/Pricing/Cart via the activeSection check below.
   const [cosmicView, setCosmicView] = useState<'clock' | 'weather' | 'kali'>('clock');
   const showHeroChrome = activeSection !== 'home' || cosmicView === 'clock';
+
+  // A LeftNav Weather/Kali click can arrive while this is showing
+  // Products/Pricing/Cart — snap back to the main section so CosmicCanvas
+  // (which owns the actual sub-view) is mounted to receive the request.
+  useEffect(() => {
+    if (homeViewRequest) queueMicrotask(() => setActiveSection('home'));
+  }, [homeViewRequest]);
 
   useEffect(() => {
     // Supabase's default email template sends a magic link, not a 6-digit
@@ -148,7 +160,11 @@ export default function AiOneHome({ onNavigateToVaultDrawer }: AiOneHomeProps) {
              starfield/space background fills the whole viewport instead of
              sitting inside a bordered, max-width, 16:9-locked card. */
           <div className="relative flex-1 w-full min-h-0">
-            <CosmicCanvas onNavigateToVaultDrawer={onNavigateToVaultDrawer} onViewChange={setCosmicView} />
+            <CosmicCanvas
+              onNavigateToVaultDrawer={onNavigateToVaultDrawer}
+              onViewChange={setCosmicView}
+              requestedView={homeViewRequest}
+            />
           </div>
         )}
       </div>

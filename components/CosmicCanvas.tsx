@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, CloudSun, Compass, X } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import NoaaWidget from './NoaaWidget';
 import AiOneChat from './AiOneChat';
 import AncientGlyphRain from './AncientGlyphRain';
@@ -56,14 +56,23 @@ interface CosmicCanvasProps {
   // own BackButton, so the outer chrome above them was just dead space with
   // no matching space below, not a real second layer of navigation anyone used.
   onViewChange?: (view: CosmicCanvasView) => void;
+  // Set by LeftNav's Weather/Kali Yuga icons (threaded through AiOneHome) —
+  // replaces the pill buttons that used to float over the globe. A token
+  // (not just the view name) so clicking the same icon twice in a row still
+  // re-opens it even though this component stays mounted between clicks.
+  requestedView?: { view: 'weather' | 'kali'; token: number } | null;
 }
 
-export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange }: CosmicCanvasProps) {
+export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, requestedView }: CosmicCanvasProps) {
   const [activeView, setActiveView] = useState<CosmicCanvasView>('clock');
 
   useEffect(() => {
     onViewChange?.(activeView);
   }, [activeView, onViewChange]);
+
+  useEffect(() => {
+    if (requestedView) queueMicrotask(() => setActiveView(requestedView.view));
+  }, [requestedView]);
   const { station, playStation } = useRadioPlayer();
   const [previewMarker, setPreviewMarker] = useState<GlobeMarker | null>(null);
   const [drawerCount, setDrawerCount] = useState<number | null>(null);
@@ -107,24 +116,10 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange }: 
 
       {activeView === 'clock' && (
         <>
-          {/* Compact HUD toggle buttons — weather & epoch, each opens its own full section */}
-          <div className="absolute z-30 flex items-center gap-2 top-4 left-4">
-            <button
-              onClick={() => setActiveView('weather')}
-              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
-            >
-              <CloudSun className="w-3.5 h-3.5" />
-              Weather
-            </button>
-
-            <button
-              onClick={() => setActiveView('kali')}
-              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
-            >
-              <Compass className="w-3.5 h-3.5" />
-              Kali Yuga
-            </button>
-          </div>
+          {/* Weather/Kali Yuga toggles now live in LeftNav's icon rail
+              (Umbrella / pulsing Sparkles) instead of floating pill buttons
+              here — see requestedView above for how a click there reaches
+              this component. */}
 
           {/* Expanded center: live SVG/CSS Earth-axis animation */}
           <main className="relative flex items-center justify-center flex-1 p-6">
