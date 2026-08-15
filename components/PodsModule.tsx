@@ -712,7 +712,13 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
     // callback (below), not here — these just trigger the pause.
     audioRef.current?.pause();
     broadcastVideoRef.current?.pause();
-    ytPlayerRef.current?.pauseVideo();
+    // pauseVideo (like loadVideoById/loadPlaylist above) isn't attached to
+    // the Player object until its iframe handshake completes and onReady
+    // fires — calling it before that throws "pauseVideo is not a function"
+    // (verified against the real YouTube IFrame API, not assumed). Skipping
+    // the call when not ready is fine here: there's nothing playing yet for
+    // a not-ready player to pause.
+    if (ytPlayerReadyRef.current) ytPlayerRef.current?.pauseVideo();
   }, [isActive]);
 
   // Zero-gravity unfold — replays the entrance animation on the false->true
