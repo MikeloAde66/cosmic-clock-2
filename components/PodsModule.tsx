@@ -139,20 +139,58 @@ const formatTime = (seconds: number) => {
   return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
 };
 
-// Pulls the bits the YouTube Player API needs out of the embed URLs already
-// built by selectTrack/loadMedia (e.g. "https://www.youtube.com/embed/ID" or
-// ".../embed/videoseries?list=LISTID&autoplay=1") rather than threading a
-// separate videoId/listId through the whole track-selection flow.
-function parseYouTubeEmbed(embedUrl: string): { videoId?: string; listId?: string; autoplay: boolean } {
+// Single source of truth for turning ANY YouTube URL a user might paste —
+// a youtu.be short link, a standard watch link, a playlist link, or this
+// app's own internal "https://www.youtube.com/embed/ID?list=..." format —
+// into a clean videoId/listId pair, and back into that internal embed URL.
+// Deliberately extracts videoId and listId independently rather than
+// branching on "does it contain list=?" first: a link like
+// "https://youtu.be/n2F24fK1uLY?list=PLxxxx" carries both a specific video
+// AND its playlist context, and checking for list= first (the previous
+// bug here) silently discarded the video id, always jumping to the first
+// item in the playlist instead of the one actually linked.
+function parseYouTubeUrl(rawUrl: string): {
+  videoId?: string;
+  listId?: string;
+  autoplay: boolean;
+  isPlaylistOnly: boolean;
+  embedUrl: string;
+} {
+  let videoId: string | undefined;
+  let listId: string | undefined;
+  let autoplay = false;
+
   try {
-    const url = new URL(embedUrl);
-    const listId = url.searchParams.get('list') || undefined;
-    const autoplay = url.searchParams.get('autoplay') === '1';
-    const videoId = url.pathname.match(/\/embed\/([\w-]+)/)?.[1];
-    return { videoId, listId, autoplay };
+    const url = new URL(rawUrl);
+    const host = url.hostname.replace(/^www\.|^m\./, '');
+    listId = url.searchParams.get('list') || undefined;
+    autoplay = url.searchParams.get('autoplay') === '1';
+
+    if (host === 'youtu.be') {
+      videoId = url.pathname.slice(1).split('/')[0] || undefined;
+    } else if (host === 'youtube.com') {
+      if (url.pathname === '/watch') {
+        videoId = url.searchParams.get('v') || undefined;
+      } else if (url.pathname.startsWith('/embed/')) {
+        const embedId = url.pathname.match(/\/embed\/([\w-]+)/)?.[1];
+        if (embedId && embedId !== 'videoseries') videoId = embedId;
+      }
+      // '/playlist' (and any other youtube.com path) has no specific video
+      // — falls through with only listId (if present) set.
+    }
   } catch {
-    return { autoplay: false };
+    // Not a parseable absolute URL — videoId/listId stay unset, and the
+    // caller's embedUrl fallback below treats it as a direct media link.
   }
+
+  const isPlaylistOnly = !videoId && !!listId;
+  const embedUrl = videoId
+    ? `https://www.youtube.com/embed/${videoId}${listId ? `?list=${listId}` : ''}`
+    : listId
+      ? `https://www.youtube.com/embed/videoseries?list=${listId}`
+      : rawUrl;
+
+  return { videoId, listId, autoplay, isPlaylistOnly, embedUrl };
 }
 
 interface PodsModuleProps {
@@ -592,7 +630,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
 
   useEffect(() => {
     if (!isYouTubeEmbed) return;
-    const { videoId, listId, autoplay } = parseYouTubeEmbed(activeEmbedUrl);
+    const { videoId, listId, autoplay } = parseYouTubeUrl(activeEmbedUrl);
     if (!videoId && !listId) return;
 
     const applyLoad = (target: { videoId?: string; listId?: string }) => {
@@ -858,18 +896,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
   const loadMedia = () => {
     const input = mediaUrl.trim();
     if (!input) return;
-    if (input.includes('list=')) {
-      const listId = input.split('list=')[1]?.split('&')[0];
-      setActiveEmbedUrl(`https://www.youtube.com/embed/videoseries?list=${listId}`);
-    } else if (input.includes('watch?v=')) {
-      const videoId = input.split('v=')[1]?.split('&')[0];
-      setActiveEmbedUrl(`https://www.youtube.com/embed/${videoId}`);
-    } else if (input.includes('youtu.be/')) {
-      const videoId = input.split('youtu.be/')[1]?.split('?')[0];
-      setActiveEmbedUrl(`https://www.youtube.com/embed/${videoId}`);
-    } else {
-      setActiveEmbedUrl(input);
-    }
+    setActiveEmbedUrl(parseYouTubeUrl(input).embedUrl);
   };
 
   const clearMedia = () => {
@@ -1018,20 +1045,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
     if (!url) return;
     setIsImportingPlaylist(true);
 
-    let embedUrl = '';
-    const isPlaylistOnly = url.includes('list=') && !url.includes('watch?v=') && !url.includes('youtu.be/');
-    if (isPlaylistOnly) {
-      const listId = url.split('list=')[1]?.split('&')[0];
-      embedUrl = `https://www.youtube.com/embed/videoseries?list=${listId}`;
-    } else if (url.includes('watch?v=')) {
-      const videoId = url.split('v=')[1]?.split('&')[0];
-      embedUrl = `https://www.youtube.com/embed/${videoId}`;
-    } else if (url.includes('youtu.be/')) {
-      const videoId = url.split('youtu.be/')[1]?.split('?')[0];
-      embedUrl = `https://www.youtube.com/embed/${videoId}`;
-    } else {
-      embedUrl = url;
-    }
+    const { embedUrl, isPlaylistOnly } = parseYouTubeUrl(url);
 
     let title = isPlaylistOnly ? 'YouTube Playlist' : 'Imported Media';
     let description = url;
