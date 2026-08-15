@@ -21,7 +21,7 @@ import {
 const GREETING: ChatMessage = {
   role: 'assistant',
   content:
-    "Welcome. I'm Ai One — I keep company with ancient technology, quantum physics, and the mysteries stitched between them. Ask me what's on your mind.",
+    "Welcome. I'm (Kali) — I keep company with ancient technology, quantum physics, and the mysteries stitched between them. Ask me what's on your mind.",
 };
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB — a sane guard before base64 inflation
@@ -258,11 +258,11 @@ export default function AiOneChat() {
           return (
             <div key={idx} className="text-base font-mono leading-relaxed break-words text-slate-100">
               <span
-                className={`mr-1.5 text-[9px] uppercase tracking-wider font-bold ${
-                  m.role === 'user' ? 'text-slate-500' : 'text-white'
+                className={`mr-1.5 text-[9px] tracking-wider font-bold ${
+                  m.role === 'user' ? 'uppercase text-slate-500' : 'text-white'
                 }`}
               >
-                {m.role === 'user' ? 'you' : 'ai one'}
+                {m.role === 'user' ? 'you' : '(Kali)'}
               </span>
               {images.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1 mb-1">

@@ -43,6 +43,11 @@ export function getRoleKeys(): Record<VaultRole, string> {
 export function matchRole(input: string): VaultRole | null {
   const trimmed = input.trim().toUpperCase();
   if (!trimmed) return null;
+  // Bare '432' — the original shared PIN this role-key system replaced —
+  // still works on its own, mapped to 'staff' (standard read access, same
+  // as the old PIN gave everyone; write actions stay gated by the separate
+  // requireAdmin() check regardless of role).
+  if (trimmed === '432') return 'staff';
   const keys = readKeys();
   if (trimmed === keys.owner.toUpperCase()) return 'owner';
   if (trimmed === keys.staff.toUpperCase()) return 'staff';
