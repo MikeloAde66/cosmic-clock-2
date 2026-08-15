@@ -1097,11 +1097,11 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         @keyframes zeroGravityUnfold {
           0% {
             opacity: 0;
-            transform: rotateY(-8deg) rotateX(4deg) scale(0.94) translateZ(-40px);
+            transform: rotateX(15deg) scale(0.95);
           }
           100% {
             opacity: 1;
-            transform: rotateY(0deg) rotateX(0deg) scale(1) translateZ(0);
+            transform: rotateX(0deg) scale(1);
           }
         }
         .animate-zero-gravity-unfold {
