@@ -72,7 +72,7 @@ export default function CosmicApp() {
             <div className="relative flex items-center justify-center overflow-hidden bg-black border aspect-video rounded-xl border-slate-800">
               {isPlaying ? (
                 <video controls autoPlay className="object-cover w-full h-full">
-                  <source src="/assets/AiOne3.mp4" type="video/mp4" />
+                  <source src="/assets/videos/ai-hub-cinematic.mp4" type="video/mp4" />
                 </video>
               ) : (
                 <div className="text-center cursor-pointer" onClick={() => setIsPlaying(true)}>
