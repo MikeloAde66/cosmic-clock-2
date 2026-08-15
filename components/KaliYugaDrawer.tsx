@@ -38,12 +38,12 @@ export default function KaliYugaDrawer({ cosmic, onOpenLore }: KaliYugaDrawerPro
       <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden border border-slate-800">
         <div
           className="h-full transition-all duration-1000 rounded-full bg-amber-400"
-          style={{ width: `${cosmic?.kaliYugaProgress ?? 1.18}%` }}
+          style={{ width: `${cosmic?.kaliYugaProgressPercent ?? '1.18'}%` }}
         />
       </div>
 
       <div className="flex justify-between items-center text-[9px] font-mono text-slate-500 uppercase">
-        <span>Progress: {cosmic?.kaliYugaProgress?.toFixed(4) ?? "1.1870"}%</span>
+        <span>Progress: {cosmic?.kaliYugaProgressPercent ?? "1.1870"}%</span>
         <span>Iron Age</span>
       </div>
     </div>
