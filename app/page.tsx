@@ -26,6 +26,17 @@ export default function Home() {
     setActiveTab('vault');
   };
 
+  // Bumped by LeftNav's Home icon — the one dedicated "ground zero" return
+  // path now that Weather/Kali no longer have their own Back buttons. A
+  // token (not a boolean) so clicking Home while already on the clock view
+  // is still a no-op-safe signal AiOneHome/CosmicCanvas can react to every
+  // time, the same pattern homeViewRequest below already uses.
+  const [groundZeroToken, setGroundZeroToken] = useState(0);
+  const goToGroundZero = () => {
+    setActiveTab('aione');
+    setGroundZeroToken(Date.now());
+  };
+
   // Set by LeftNav's Preferences modal — the only remaining front door into
   // the Vault now that its sidebar button is gone. Handed to CosmicVaultAuth
   // as initialRoleKey, which still does its own real verification; this
@@ -81,6 +92,7 @@ useContextMenuShare();
           onUnlockVault={unlockVault}
           onOpenVaultForOwner={openVaultForOwner}
           onOpenHomeView={openHomeView}
+          onGroundZero={goToGroundZero}
         />
 
         <div className="flex flex-col flex-1 overflow-hidden">
@@ -97,7 +109,11 @@ useContextMenuShare();
             )}
 
             {activeTab === 'aione' && (
-              <AiOneHome onNavigateToVaultDrawer={navigateToVaultDrawer} homeViewRequest={homeViewRequest} />
+              <AiOneHome
+                onNavigateToVaultDrawer={navigateToVaultDrawer}
+                homeViewRequest={homeViewRequest}
+                groundZeroToken={groundZeroToken}
+              />
             )}
 
             {activeTab === 'fact-checker' && (

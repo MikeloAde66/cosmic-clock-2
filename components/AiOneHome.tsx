@@ -19,6 +19,11 @@ interface AiOneHomeProps {
   // passes the request through to CosmicCanvas, which actually owns the
   // Weather/Kali sub-view state.
   homeViewRequest?: { view: 'weather' | 'kali'; token: number } | null;
+  // Bumped by LeftNav's Home icon (see page.tsx's groundZeroToken) — resets
+  // this back to its main 'home' section AND tells CosmicCanvas to drop out
+  // of Weather/Kali back to the clock view, since those no longer have
+  // their own Back button.
+  groundZeroToken?: number;
 }
 
 // Reads useCart() from inside <CartProvider>'s own subtree — rendered as a
@@ -42,7 +47,7 @@ function CartNavButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export default function AiOneHome({ onNavigateToVaultDrawer, homeViewRequest }: AiOneHomeProps) {
+export default function AiOneHome({ onNavigateToVaultDrawer, homeViewRequest, groundZeroToken }: AiOneHomeProps) {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<
     'home' | 'pricing' | 'products' | 'cart'
@@ -62,6 +67,10 @@ export default function AiOneHome({ onNavigateToVaultDrawer, homeViewRequest }: 
   useEffect(() => {
     if (homeViewRequest) queueMicrotask(() => setActiveSection('home'));
   }, [homeViewRequest]);
+
+  useEffect(() => {
+    if (groundZeroToken) queueMicrotask(() => setActiveSection('home'));
+  }, [groundZeroToken]);
 
   useEffect(() => {
     // Supabase's default email template sends a magic link, not a 6-digit
@@ -164,6 +173,7 @@ export default function AiOneHome({ onNavigateToVaultDrawer, homeViewRequest }: 
               onNavigateToVaultDrawer={onNavigateToVaultDrawer}
               onViewChange={setCosmicView}
               requestedView={homeViewRequest}
+              groundZeroToken={groundZeroToken}
             />
           </div>
         )}

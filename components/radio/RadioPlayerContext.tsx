@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { RadioStation } from '@/lib/radioStations';
 
 export interface QueueTrack {
@@ -32,6 +32,11 @@ interface RadioPlayerContextValue {
   seek: (time: number) => void;
   setVolume: (v: number) => void;
   stop: () => void;
+  // Pauses the radio without touching station/queue state — for external
+  // media sources the global document-level listener below can't see
+  // directly (cross-origin YouTube iframes), so they can still cede
+  // priority to the radio the same way any native <video>/<audio> does.
+  pauseForExternalMedia: () => void;
 }
 
 const RadioPlayerContext = createContext<RadioPlayerContextValue | null>(null);
@@ -177,6 +182,31 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     setStatus('idle');
   }, []);
 
+  const pauseForExternalMedia = useCallback(() => {
+    audioRef.current?.pause();
+  }, []);
+
+  // Global audio priority: any other <video>/<audio> element starting
+  // playback anywhere in the app takes priority over the radio. The
+  // 'play' event doesn't bubble, but a capture-phase listener on document
+  // still sees it fire on any descendant — one listener here covers every
+  // current and future native media element in the app without each of
+  // them needing to know the radio exists. Cross-origin players (YouTube
+  // iframes) don't fire DOM events the parent page can observe, so those
+  // call pauseForExternalMedia() directly from their own state-change
+  // handlers instead (see PodsModule's YT player).
+  useEffect(() => {
+    const handleGlobalPlay = (e: Event) => {
+      const target = e.target;
+      if (target === audioRef.current) return;
+      if (target instanceof HTMLMediaElement) {
+        audioRef.current?.pause();
+      }
+    };
+    document.addEventListener('play', handleGlobalPlay, true);
+    return () => document.removeEventListener('play', handleGlobalPlay, true);
+  }, []);
+
   // Auto-advance when a queued track finishes — a no-op for live streams,
   // which have no queue to advance through.
   const handleEnded = useCallback(() => {
@@ -201,6 +231,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
         seek,
         setVolume,
         stop,
+        pauseForExternalMedia,
       }}
     >
       {/* crossOrigin lets createMediaElementSource read real frequency data

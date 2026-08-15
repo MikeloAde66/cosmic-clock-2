@@ -17,6 +17,11 @@ interface LeftNavProps {
   // Opens the Home tab's Weather/Kali Yuga sub-views directly, replacing
   // the pill buttons that used to float over the 3D Earth canvas.
   onOpenHomeView?: (view: 'weather' | 'kali') => void;
+  // The Home icon's dedicated "ground zero" behavior — always returns to
+  // the main clock view, collapsing out of Weather/Kali/Products/Pricing/
+  // Cart, not just switching tabs. Those sub-views no longer have their own
+  // Back button, so this is now the only way out of them.
+  onGroundZero?: () => void;
 }
 
 // Cosmic Vault is intentionally absent from this list — see the Vault
@@ -33,6 +38,7 @@ export default function LeftNav({
   onUnlockVault,
   onOpenVaultForOwner,
   onOpenHomeView,
+  onGroundZero,
 }: LeftNavProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
@@ -48,6 +54,13 @@ export default function LeftNav({
   }, []);
 
   const handleNavClick = (tabKey: string) => {
+    // Home is "ground zero" — always collapse back to the main clock view,
+    // not just switch tabs, since Weather/Kali/Products/Pricing/Cart no
+    // longer have their own way back out.
+    if (tabKey === 'aione') {
+      onGroundZero?.();
+      return;
+    }
     setActiveTab?.(tabKey);
   };
 
@@ -111,9 +124,9 @@ export default function LeftNav({
               <button
                 onClick={() => onOpenHomeView?.('kali')}
                 aria-label="Kali Yuga"
-                className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-cyan-400/80 hover:text-cyan-300 hover:bg-neutral-900/50"
+                className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-white hover:bg-neutral-900/50"
               >
-                <Sparkles className="w-4 h-4 animate-pulse" />
+                <Sparkles className="w-4 h-4 animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
               </button>
               <span className="absolute z-20 px-2 py-1 ml-2 text-[10px] font-mono transition-opacity -translate-y-1/2 rounded opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-neutral-900 border border-neutral-700 text-neutral-200 group-hover:opacity-100">
                 Kali Yuga

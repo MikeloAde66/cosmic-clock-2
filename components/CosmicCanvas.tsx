@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import NoaaWidget from './NoaaWidget';
 import AiOneChat from './AiOneChat';
 import AncientGlyphRain from './AncientGlyphRain';
@@ -35,16 +35,45 @@ function projectMarker(lat: number, lng: number): { xPct: number; yPct: number; 
   };
 }
 
-function BackButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
-    >
-      <ArrowLeft className="w-3.5 h-3.5" />
-      Back
-    </button>
-  );
+// Deterministic PRNG (same approach StarTrackerView uses for its own,
+// unrelated star field — kept local rather than shared, since it's an
+// 8-line pure function and the two views have no other dependency on
+// each other).
+function mulberry32(seed: number) {
+  return function () {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const CASCADE_STAR_COUNT = 26;
+const randomCascade = mulberry32(19700101);
+const CASCADE_STARS = Array.from({ length: CASCADE_STAR_COUNT }, () => ({
+  left: `${(randomCascade() * 100).toFixed(2)}%`,
+  size: `${(1 + randomCascade() * 1.6).toFixed(2)}px`,
+  delay: `${(randomCascade() * 16).toFixed(2)}s`,
+  duration: `${(10 + randomCascade() * 10).toFixed(2)}s`,
+  opacity: (0.2 + randomCascade() * 0.5).toFixed(2),
+}));
+
+// Deep midnight purple/black → muted burnt sienna, interpolated by real
+// wall-clock time. `phase` is where "now" falls within the current 12-hour
+// block (0..1); running it through a sine wave (rather than a hard reset at
+// the boundary) means the loop has no visible seam — it eases up to sienna
+// at the midpoint of each 12h block and back down to midnight by the end.
+const AMBIENT_FROM = { r: 12, g: 8, b: 28 };
+const AMBIENT_TO = { r: 122, g: 58, b: 34 };
+function getAmbientColor(date: Date): string {
+  const CYCLE_MS = 12 * 60 * 60 * 1000;
+  const phase = (date.getTime() % CYCLE_MS) / CYCLE_MS;
+  const t = (Math.sin(phase * Math.PI * 2 - Math.PI / 2) + 1) / 2;
+  const r = Math.round(AMBIENT_FROM.r + (AMBIENT_TO.r - AMBIENT_FROM.r) * t);
+  const g = Math.round(AMBIENT_FROM.g + (AMBIENT_TO.g - AMBIENT_FROM.g) * t);
+  const b = Math.round(AMBIENT_FROM.b + (AMBIENT_TO.b - AMBIENT_FROM.b) * t);
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 type CosmicCanvasView = 'clock' | 'weather' | 'kali';
@@ -61,9 +90,14 @@ interface CosmicCanvasProps {
   // (not just the view name) so clicking the same icon twice in a row still
   // re-opens it even though this component stays mounted between clicks.
   requestedView?: { view: 'weather' | 'kali'; token: number } | null;
+  // Bumped by LeftNav's Home icon (threaded through AiOneHome as
+  // groundZeroToken) — Weather/Kali no longer have their own Back button,
+  // so Home is the only way out of them, and needs to reset this
+  // component's own view state directly.
+  groundZeroToken?: number;
 }
 
-export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, requestedView }: CosmicCanvasProps) {
+export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, requestedView, groundZeroToken }: CosmicCanvasProps) {
   const [activeView, setActiveView] = useState<CosmicCanvasView>('clock');
 
   useEffect(() => {
@@ -73,6 +107,19 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
   useEffect(() => {
     if (requestedView) queueMicrotask(() => setActiveView(requestedView.view));
   }, [requestedView]);
+
+  useEffect(() => {
+    if (groundZeroToken) queueMicrotask(() => setActiveView('clock'));
+  }, [groundZeroToken]);
+
+  // Real-time 12-hour ambient color morph — recomputed on a slow interval
+  // (not every render) since it only needs to *gradually* shift; the CSS
+  // transition on the element using it smooths each step into a crossfade.
+  const [ambientColor, setAmbientColor] = useState(() => getAmbientColor(new Date()));
+  useEffect(() => {
+    const id = window.setInterval(() => setAmbientColor(getAmbientColor(new Date())), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
   const { station, playStation } = useRadioPlayer();
   const [previewMarker, setPreviewMarker] = useState<GlobeMarker | null>(null);
   const [drawerCount, setDrawerCount] = useState<number | null>(null);
@@ -122,8 +169,48 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
               this component. */}
 
           {/* Expanded center: live SVG/CSS Earth-axis animation */}
-          <main className="relative flex items-center justify-center flex-1 p-6">
-            <div className="relative w-full max-w-[480px] aspect-square flex items-center justify-center">
+          <main className="relative flex items-center justify-center flex-1 p-6 overflow-hidden">
+            {/* Real-time 12-hour ambient wash — deep midnight purple/black
+                easing toward burnt sienna and back, tied to wall-clock time
+                (see getAmbientColor). Scoped to this view only, so Star
+                Tracker (a fully separate, opaque full-screen overlay
+                mounted from TopHeader) is never touched by it. */}
+            <div
+              className="absolute inset-0 pointer-events-none transition-colors duration-[3000ms] ease-in-out"
+              style={{
+                background: `radial-gradient(ellipse 80% 60% at 50% 40%, ${ambientColor} 0%, transparent 72%)`,
+                opacity: 0.45,
+              }}
+            />
+
+            {/* Soft galactic color hazes — slow independent drift, well
+                under the Earth/marker layer. */}
+            <div className="absolute w-[420px] h-[420px] -top-16 -left-20 rounded-full bg-gradient-to-br from-indigo-600/20 via-blue-500/10 to-transparent blur-3xl pointer-events-none animate-haze-drift-a" />
+            <div className="absolute w-[380px] h-[380px] -bottom-20 -right-16 rounded-full bg-gradient-to-tl from-violet-600/15 via-blue-400/10 to-transparent blur-3xl pointer-events-none animate-haze-drift-b" />
+
+            {/* Micro-cascading stars — a slow, sparse drift distinct from
+                the twinkling global <Starfield /> behind every tab. */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              {CASCADE_STARS.map((s, i) => (
+                <span
+                  key={i}
+                  className="absolute top-0 rounded-full bg-white animate-star-cascade"
+                  style={{
+                    left: s.left,
+                    width: s.size,
+                    height: s.size,
+                    animationDelay: s.delay,
+                    animationDuration: s.duration,
+                    ['--star-opacity' as string]: s.opacity,
+                  } as React.CSSProperties}
+                />
+              ))}
+            </div>
+
+            {/* Slow, hypnotic Apple-style camera drift — the whole scene
+                (Earth, markers, moon) breathes gently rather than sitting
+                perfectly static. */}
+            <div className="relative w-full max-w-[480px] aspect-square flex items-center justify-center animate-cinematic-drift">
 
               {/* Earth sphere mesh — 23.4° axial tilt kept as a real detail
                   of the globe itself, not part of the (now removed) HUD
@@ -253,9 +340,6 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
           instead of needing a second click to reveal it. */}
       {activeView === 'weather' && (
         <div className="relative z-30 flex flex-col w-full h-full p-4">
-          <div className="shrink-0 mb-4">
-            <BackButton onClick={() => setActiveView('clock')} />
-          </div>
           <div className="relative flex-1 min-h-0 w-full overflow-y-auto rounded-lg border border-slate-800 bg-black/20 p-6 backdrop-blur-md">
             <div className="max-w-2xl mx-auto">
               <NoaaWidget initialCoords={userCoords} />
@@ -267,10 +351,6 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
       {/* Kali Yuga — takes over the whole section: epoch readout on top, Ai One chat filling the rest */}
       {activeView === 'kali' && (
         <div className="relative z-30 flex flex-col w-full h-full p-4">
-          <div className="shrink-0 mb-4">
-            <BackButton onClick={() => setActiveView('clock')} />
-          </div>
-
           <div className="relative flex flex-col flex-1 min-h-0 w-full overflow-hidden rounded-lg border border-cyan-500/30 bg-black/20 p-4 shadow-[0_0_30px_rgba(0,240,255,0.1)] backdrop-blur-md">
             <AncientGlyphRain />
 
@@ -333,6 +413,38 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
         }
         .animate-user-location-pulse {
           animation: userLocationPulse 2s ease-in-out infinite alternate;
+        }
+        @keyframes cinematicDrift {
+          0%, 100% { transform: scale(1) translate3d(0, 0, 0); }
+          50% { transform: scale(1.035) translate3d(-0.6%, 0.4%, 0); }
+        }
+        .animate-cinematic-drift {
+          animation: cinematicDrift 48s ease-in-out infinite;
+        }
+        @keyframes hazeDriftA {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(3%, 4%) scale(1.08); }
+        }
+        .animate-haze-drift-a {
+          animation: hazeDriftA 60s ease-in-out infinite;
+        }
+        @keyframes hazeDriftB {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(-4%, -3%) scale(1.06); }
+        }
+        .animate-haze-drift-b {
+          animation: hazeDriftB 70s ease-in-out infinite;
+        }
+        @keyframes starCascade {
+          0% { transform: translateY(-10%); opacity: 0; }
+          15% { opacity: var(--star-opacity, 0.5); }
+          85% { opacity: var(--star-opacity, 0.5); }
+          100% { transform: translateY(115%); opacity: 0; }
+        }
+        .animate-star-cascade {
+          animation-name: starCascade;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
         }
       `}</style>
     </div>
