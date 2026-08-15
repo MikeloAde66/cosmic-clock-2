@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ArrowUpDown, Camera, Sparkles, Trash2 } from 'lucide-react';
 import CosmicVisualizer from './CosmicVisualizer';
+import EqOrb from './EqOrb';
 
 // Minimal surface of the YouTube IFrame Player API actually used here — no
 // @types/youtube dependency for a handful of methods.
@@ -183,6 +184,24 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
   const [cameraError, setCameraError] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  // PodCam motion detection — cheap frame-differencing (draws each frame to
+  // a tiny hidden canvas, compares total pixel delta against the previous
+  // frame) rather than real gesture/hand-tracking ML, which would need a
+  // trained model this app doesn't have. Only runs once the camera is
+  // already on (never requests access on its own), triggers "next track" on
+  // a detected motion spike, with a cooldown so one wave doesn't skip five
+  // tracks.
+  const [motionFlash, setMotionFlash] = useState(false);
+  const motionCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const prevFrameRef = useRef<Uint8ClampedArray | null>(null);
+  const motionCooldownRef = useRef(false);
+
+  // Zero-gravity unfold — replays a CSS 3D-transform entrance animation each
+  // time Pods becomes the active tab (not just on first mount), by bumping a
+  // key that remounts the animated wrapper.
+  const [unfoldKey, setUnfoldKey] = useState(0);
+  const wasActiveRef = useRef(isActive);
+
   // Custom Video/Playlist Embed State
   const [mediaUrl, setMediaUrl] = useState<string>('');
   const [activeEmbedUrl, setActiveEmbedUrl] = useState<string>('');
@@ -204,6 +223,18 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const filtersRef = useRef<{ [freq: string]: BiquadFilterNode }>({});
   const analyserRef = useRef<AnalyserNode | null>(null);
+
+  // Orb EQ control — a draggable alternative to the 5-band sliders, same
+  // underlying BiquadFilterNodes. Stereo pan width is real too: a
+  // StereoPannerNode whose pan is driven by a slow LFO (oscillatorRef ->
+  // panLfoGainRef -> pannerRef.pan), with panLfoGainRef's gain set to the
+  // orb's radial distance (0 = static center, 1 = full sweep). This is
+  // ordinary Web Audio stereo panning, not licensed Dolby spatial audio —
+  // no SDK for that exists here, so it's never claimed as such.
+  const [eqControlMode, setEqControlMode] = useState<'sliders' | 'orb'>('sliders');
+  const [panWidthPct, setPanWidthPct] = useState<number>(0);
+  const pannerRef = useRef<StereoPannerNode | null>(null);
+  const panLfoGainRef = useRef<GainNode | null>(null);
 
   // Dedicated full-view switch (player vs. cosmic visualizer) — not a modal,
   // so audio stays mounted and playing underneath while visualizer is active.
@@ -403,13 +434,30 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       compressorRef.current = compressor;
       lastNode.connect(compressor);
 
-      // Visualizer tap: sits between the compressor and the destination so
-      // the CosmicVisualizer canvas reads post-mastering audio without
-      // altering what's actually heard.
+      // Stereo pan width (the Orb EQ's radial-distance control): a real
+      // StereoPannerNode swept by a slow LFO. The LFO's own gain node is
+      // what the orb actually drives — 0 width means the LFO contributes
+      // nothing and pan stays dead center; 1 means a full -1..1 sweep.
+      const panner = ctx.createStereoPanner();
+      pannerRef.current = panner;
+      compressor.connect(panner);
+
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.15; // slow, ~6.7s per cycle
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 0; // orb starts centered — no sweep until dragged
+      panLfoGainRef.current = lfoGain;
+      lfo.connect(lfoGain);
+      lfoGain.connect(panner.pan);
+      lfo.start();
+
+      // Visualizer tap: sits after the panner so the CosmicVisualizer canvas
+      // reads the fully-processed signal without altering what's heard.
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 128;
       analyserRef.current = analyser;
-      compressor.connect(analyser);
+      panner.connect(analyser);
       analyser.connect(ctx.destination);
     }
   };
@@ -440,12 +488,18 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
     }
   };
 
-  const handleMasterVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    setMasterVolume(val);
+  // Shared by the classic slider and the Orb — both ultimately just set
+  // audioRef.current.volume, so there's one real code path either way.
+  const setMasterVolumeValue = (val: number) => {
+    const clamped = Math.max(0, Math.min(100, val));
+    setMasterVolume(clamped);
     if (audioRef.current) {
-      audioRef.current.volume = val / 100;
+      audioRef.current.volume = clamped / 100;
     }
+  };
+
+  const handleMasterVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMasterVolumeValue(parseFloat(e.target.value));
   };
 
   const handleEqChange = (freq: string, gain: number) => {
@@ -454,6 +508,18 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       filtersRef.current[freq].gain.value = gain;
     }
   };
+
+  const handleOrbBassTreble = useCallback((bassGain: number, trebleGain: number) => {
+    handleEqChange('60', bassGain);
+    handleEqChange('12000', trebleGain);
+  }, []);
+
+  const handleOrbPanWidth = useCallback((width: number) => {
+    setPanWidthPct(Math.round(width * 100));
+    if (panLfoGainRef.current && audioCtxRef.current) {
+      panLfoGainRef.current.gain.setTargetAtTime(width, audioCtxRef.current.currentTime, 0.05);
+    }
+  }, []);
 
   const applyPreset = (preset: 'flat' | 'warm432' | 'vocal' | 'bass') => {
     let gains = { '60': 0, '250': 0, '1000': 0, '4000': 0, '12000': 0 };
@@ -649,6 +715,16 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
     ytPlayerRef.current?.pauseVideo();
   }, [isActive]);
 
+  // Zero-gravity unfold — replays the entrance animation on the false->true
+  // transition (i.e. every time you actually navigate into Pods), not just
+  // on first mount, since PodsModule stays mounted in the background.
+  useEffect(() => {
+    if (isActive && !wasActiveRef.current) {
+      setUnfoldKey((k) => k + 1);
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive]);
+
   // Pods Context Sync: which contentSegment (if any) matches the current
   // playback time — the last segment whose timestamp has been reached.
   // -1 means no segments exist for this track (reading pane falls back to
@@ -708,6 +784,67 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       }
     }
   };
+
+  // PodCam motion detection — samples the live camera feed onto a tiny
+  // (32x24) hidden canvas at ~6fps and compares total pixel delta against
+  // the previous frame. A spike past MOTION_THRESHOLD (something moved
+  // through frame — a wave, someone entering) triggers "next track", gated
+  // by a 2s cooldown so one gesture doesn't cascade through the whole
+  // playlist. This is real frame-differencing, not gesture/hand-tracking ML
+  // — it can't tell a wave from someone walking past, only that something
+  // changed a lot, all at once.
+  useEffect(() => {
+    if (!isCameraActive) {
+      prevFrameRef.current = null;
+      return;
+    }
+
+    const MOTION_THRESHOLD = 18; // avg per-pixel grayscale delta, 0-255 scale
+    const SAMPLE_W = 32;
+    const SAMPLE_H = 24;
+    const canvas = motionCanvasRef.current;
+    if (!canvas) return;
+    canvas.width = SAMPLE_W;
+    canvas.height = SAMPLE_H;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    const interval = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || video.readyState < 2) return;
+
+      ctx.drawImage(video, 0, 0, SAMPLE_W, SAMPLE_H);
+      const frame = ctx.getImageData(0, 0, SAMPLE_W, SAMPLE_H).data;
+      const prev = prevFrameRef.current;
+
+      if (prev) {
+        let diffSum = 0;
+        const pixelCount = SAMPLE_W * SAMPLE_H;
+        for (let i = 0; i < frame.length; i += 4) {
+          // Cheap grayscale (average of RGB) rather than full luma weighting
+          // — plenty accurate for "did something big just change".
+          const g1 = (frame[i] + frame[i + 1] + frame[i + 2]) / 3;
+          const g2 = (prev[i] + prev[i + 1] + prev[i + 2]) / 3;
+          diffSum += Math.abs(g1 - g2);
+        }
+        const avgDiff = diffSum / pixelCount;
+
+        if (avgDiff > MOTION_THRESHOLD && !motionCooldownRef.current) {
+          motionCooldownRef.current = true;
+          setMotionFlash(true);
+          handleNextTrack();
+          setTimeout(() => setMotionFlash(false), 1200);
+          setTimeout(() => {
+            motionCooldownRef.current = false;
+          }, 2000);
+        }
+      }
+      prevFrameRef.current = frame;
+    }, 160);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCameraActive]);
 
   // Parse & load a custom YouTube video/playlist or direct media URL into the monitor
   const loadMedia = () => {
@@ -941,13 +1078,32 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
 
   return (
     <div
+      key={unfoldKey}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`p-8 max-w-6xl mx-auto space-y-6 relative transition ${
+      className={`p-8 max-w-6xl mx-auto space-y-6 relative transition animate-zero-gravity-unfold ${
         isDraggingOver ? 'bg-white/10 border-2 border-dashed border-neutral-700 rounded-2xl' : ''
       }`}
+      style={{ perspective: '1200px' }}
     >
+      <style jsx>{`
+        @keyframes zeroGravityUnfold {
+          0% {
+            opacity: 0;
+            transform: rotateY(-8deg) rotateX(4deg) scale(0.94) translateZ(-40px);
+          }
+          100% {
+            opacity: 1;
+            transform: rotateY(0deg) rotateX(0deg) scale(1) translateZ(0);
+          }
+        }
+        .animate-zero-gravity-unfold {
+          transform-style: preserve-3d;
+          animation: zeroGravityUnfold 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+      `}</style>
+
       <audio
         ref={audioRef}
         src={activeTrack?.src || undefined}
@@ -1272,14 +1428,45 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
                     <span className="font-mono text-xs tracking-wider uppercase text-white">
                       Parametric Equalizer
                     </span>
-                    <div className="flex gap-1 text-[10px] font-mono">
-                      <button onClick={() => applyPreset('flat')} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">FLAT</button>
-                      <button onClick={() => applyPreset('warm432')} className="px-1.5 py-0.5 bg-white/20 text-white rounded hover:bg-white/10">432Hz WARM</button>
-                      <button onClick={() => applyPreset('vocal')} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">VOCAL</button>
-                      <button onClick={() => applyPreset('bass')} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">BASS</button>
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1 text-[10px] font-mono">
+                        <button onClick={() => applyPreset('flat')} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">FLAT</button>
+                        <button onClick={() => applyPreset('warm432')} className="px-1.5 py-0.5 bg-white/20 text-white rounded hover:bg-white/10">432Hz WARM</button>
+                        <button onClick={() => applyPreset('vocal')} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">VOCAL</button>
+                        <button onClick={() => applyPreset('bass')} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">BASS</button>
+                      </div>
+                      <div className="flex gap-1 pl-2 ml-1 text-[10px] font-mono border-l border-slate-800">
+                        <button
+                          onClick={() => setEqControlMode('sliders')}
+                          className={`px-1.5 py-0.5 rounded ${eqControlMode === 'sliders' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'}`}
+                        >
+                          SLIDERS
+                        </button>
+                        <button
+                          onClick={() => setEqControlMode('orb')}
+                          className={`px-1.5 py-0.5 rounded ${eqControlMode === 'orb' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'}`}
+                        >
+                          ORB
+                        </button>
+                      </div>
                     </div>
                   </div>
 
+                  {eqControlMode === 'orb' ? (
+                    <div className="flex flex-col items-center gap-2 py-2">
+                      <EqOrb
+                        onBassTrebleChange={handleOrbBassTreble}
+                        onVolumeChange={setMasterVolumeValue}
+                        onPanWidthChange={handleOrbPanWidth}
+                      />
+                      <div className="flex gap-4 font-mono text-[10px] text-slate-400">
+                        <span>BASS {eqGains['60'] > 0 ? `+${eqGains['60']}` : eqGains['60']}dB</span>
+                        <span>TREBLE {eqGains['12000'] > 0 ? `+${eqGains['12000']}` : eqGains['12000']}dB</span>
+                        <span>VOL {masterVolume}%</span>
+                        <span>PAN WIDTH {panWidthPct}%</span>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-5 gap-2 pt-1">
                     {[
                       { freq: '60', label: '60Hz' },
@@ -1303,6 +1490,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
                       </div>
                     ))}
                   </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1356,23 +1544,41 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                   Podcasts & Broadcast Monitor
                 </span>
-                <button
-                  onClick={toggleCamera}
-                  className={`px-4 py-1.5 rounded-full text-xs font-mono uppercase tracking-wider transition flex items-center gap-1.5 ${
-                    isCameraActive
-                      ? 'bg-red-950 text-red-300 border border-red-800'
-                      : 'bg-white text-black font-bold hover:bg-neutral-200'
-                  }`}
-                >
-                  {isCameraActive ? (
-                    'Stop Broadcast'
-                  ) : (
-                    <>
-                      <Camera className="w-3.5 h-3.5" /> Pod Cam
-                    </>
+                <div className="flex items-center gap-2">
+                  {isCameraActive && (
+                    <span
+                      title="PodCam Intent Controls: a big motion spike (wave / entering frame) skips to the next track"
+                      className={`px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider border transition ${
+                        motionFlash
+                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                          : 'bg-slate-900 border-slate-700 text-slate-500'
+                      }`}
+                    >
+                      {motionFlash ? '● Motion → Next' : 'Intent Watch'}
+                    </span>
                   )}
-                </button>
+                  <button
+                    onClick={toggleCamera}
+                    className={`px-4 py-1.5 rounded-full text-xs font-mono uppercase tracking-wider transition flex items-center gap-1.5 ${
+                      isCameraActive
+                        ? 'bg-red-950 text-red-300 border border-red-800'
+                        : 'bg-white text-black font-bold hover:bg-neutral-200'
+                    }`}
+                  >
+                    {isCameraActive ? (
+                      'Stop Broadcast'
+                    ) : (
+                      <>
+                        <Camera className="w-3.5 h-3.5" /> Pod Cam
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
+
+              {/* Off-screen sampling canvas for PodCam motion detection —
+                  never displayed, just read back into pixel data. */}
+              <canvas ref={motionCanvasRef} className="hidden" />
 
               <input
                 type="file"
