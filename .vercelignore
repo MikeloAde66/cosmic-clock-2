@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+_local-archive
+
+# Unreferenced media files over Vercel's 100MB per-file deploy limit —
+# confirmed unused anywhere in app/components/lib before excluding.
+public/assets/who am i.mp4
+public/assets/WHO AM I canva.mp4
