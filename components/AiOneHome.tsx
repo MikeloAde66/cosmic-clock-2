@@ -6,9 +6,8 @@ import CosmicCanvas from './CosmicCanvas';
 import SignUpModal from './SignUpModal';
 import DonationButton from './DonationButton';
 import PricingPlans from './PricingPlans';
-import ProductsStorefront from './ProductsStorefront';
 import CartView from './CartView';
-import { CartProvider, useCart } from '@/lib/cart';
+import { useCart } from '@/lib/cart';
 import { supabase } from '@/lib/supabase';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
@@ -59,9 +58,7 @@ export default function AiOneHome({
   pricingRequestToken,
 }: AiOneHomeProps) {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<
-    'home' | 'pricing' | 'products' | 'cart'
-  >('home');
+  const [activeSection, setActiveSection] = useState<'home' | 'pricing' | 'cart'>('home');
   // CosmicCanvas's Weather/Kali sub-views already have their own BackButton
   // — keeping this hero banner + sub-nav above them too just stacked a
   // second navigation layer and pushed those views' content down by ~380px
@@ -107,91 +104,84 @@ export default function AiOneHome({
   }, []);
 
   return (
-    <CartProvider>
-      <div className="relative z-10 w-full h-full overflow-y-auto text-slate-100 flex flex-col font-sans">
-        {showHeroChrome && (
-          <>
-            {/* HERO BANNER */}
-            <div className="relative w-full h-80 bg-[#060a12] overflow-hidden border-b border-slate-800/80 flex flex-col items-center justify-center shrink-0">
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-600/20 via-indigo-500/30 to-white/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-transparent to-[#070b14]/70" />
+    <div className="relative z-10 w-full h-full overflow-y-auto text-slate-100 flex flex-col font-sans">
+      {showHeroChrome && (
+        <>
+          {/* HERO BANNER */}
+          <div className="relative w-full h-80 bg-[#060a12] overflow-hidden border-b border-slate-800/80 flex flex-col items-center justify-center shrink-0">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-600/20 via-indigo-500/30 to-white/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-transparent to-[#070b14]/70" />
 
-              <div className="relative z-10 px-4 space-y-2 text-center">
-                <h1 className="text-5xl md:text-6xl font-black tracking-wider text-white">
-                  Ai One
-                </h1>
-                <p className="font-mono text-xs tracking-widest uppercase md:text-sm text-slate-300">
-                  Cosmic Creation & Broadcast Hub
-                </p>
-              </div>
-            </div>
-
-            {/* SUB-NAV: lightweight inline menu text, not pill buttons */}
-            <div className="flex items-center justify-center w-full py-3 space-x-8 text-xs font-mono tracking-widest uppercase border-b border-slate-800/80 bg-[#0b1326] shrink-0">
-              <button
-                onClick={() => setActiveSection('products')}
-                className="text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
-              >
-                Products
-              </button>
-
-              <button
-                onClick={() => setActiveSection('pricing')}
-                className="text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
-              >
-                Pricing
-              </button>
-
-              <button
-                onClick={() => setIsSignUpOpen(true)}
-                className="text-white hover:text-white font-bold border-b border-neutral-700 pb-0.5 transition-colors"
-              >
-                Sign Up
-              </button>
-
-              <CartNavButton onClick={() => setActiveSection('cart')} />
-
-              <DonationButton />
-            </div>
-          </>
-        )}
-
-        <SignUpModal
-          isOpen={isSignUpOpen}
-          onClose={() => setIsSignUpOpen(false)}
-        />
-
-        {activeSection !== 'home' ? (
-          <div className="flex flex-col flex-1 min-h-0">
-            <div className="px-6 pt-4 shrink-0">
-              <button
-                onClick={() => setActiveSection('home')}
-                className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Back
-              </button>
-            </div>
-            <div className="flex-1 min-h-0">
-              {activeSection === 'pricing' && <PricingPlans />}
-              {activeSection === 'products' && <ProductsStorefront />}
-              {activeSection === 'cart' && <CartView />}
+            <div className="relative z-10 px-4 space-y-2 text-center">
+              <h1 className="text-5xl md:text-6xl font-black tracking-wider text-white">
+                Ai One
+              </h1>
+              <p className="font-mono text-xs tracking-widest uppercase md:text-sm text-slate-300">
+                Cosmic Creation & Broadcast Hub
+              </p>
             </div>
           </div>
-        ) : (
-          /* MAIN CONTENT VIEW: Cosmic Clock centerpiece, full-bleed so the
-             starfield/space background fills the whole viewport instead of
-             sitting inside a bordered, max-width, 16:9-locked card. */
-          <div className="relative flex-1 w-full min-h-0">
-            <CosmicCanvas
-              onNavigateToVaultDrawer={onNavigateToVaultDrawer}
-              onViewChange={setCosmicView}
-              requestedView={homeViewRequest}
-              groundZeroToken={groundZeroToken}
-            />
+
+          {/* SUB-NAV: lightweight inline menu text, not pill buttons.
+              Products/merch moved into the Vault's Merch drawer — see
+              CosmicVaultAuth — so this main platform sub-nav stays
+              focused on the core space/broadcast tools. */}
+          <div className="flex items-center justify-center w-full py-3 space-x-8 text-xs font-mono tracking-widest uppercase border-b border-slate-800/80 bg-[#0b1326] shrink-0">
+            <button
+              onClick={() => setActiveSection('pricing')}
+              className="text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
+            >
+              Pricing
+            </button>
+
+            <button
+              onClick={() => setIsSignUpOpen(true)}
+              className="text-white hover:text-white font-bold border-b border-neutral-700 pb-0.5 transition-colors"
+            >
+              Sign Up
+            </button>
+
+            <CartNavButton onClick={() => setActiveSection('cart')} />
+
+            <DonationButton />
           </div>
-        )}
-      </div>
-    </CartProvider>
+        </>
+      )}
+
+      <SignUpModal
+        isOpen={isSignUpOpen}
+        onClose={() => setIsSignUpOpen(false)}
+      />
+
+      {activeSection !== 'home' ? (
+        <div className="flex flex-col flex-1 min-h-0">
+          <div className="px-6 pt-4 shrink-0">
+            <button
+              onClick={() => setActiveSection('home')}
+              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Back
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            {activeSection === 'pricing' && <PricingPlans />}
+            {activeSection === 'cart' && <CartView />}
+          </div>
+        </div>
+      ) : (
+        /* MAIN CONTENT VIEW: Cosmic Clock centerpiece, full-bleed so the
+           starfield/space background fills the whole viewport instead of
+           sitting inside a bordered, max-width, 16:9-locked card. */
+        <div className="relative flex-1 w-full min-h-0">
+          <CosmicCanvas
+            onNavigateToVaultDrawer={onNavigateToVaultDrawer}
+            onViewChange={setCosmicView}
+            requestedView={homeViewRequest}
+            groundZeroToken={groundZeroToken}
+          />
+        </div>
+      )}
+    </div>
   );
 }

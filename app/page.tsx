@@ -14,6 +14,7 @@ import SiteFooter from '@/components/SiteFooter';
 import VaultSearchModal from '@/components/VaultSearchModal';
 import { RadioPlayerProvider } from '@/components/radio/RadioPlayerContext';
 import GlobalPlayerBar from '@/components/radio/GlobalPlayerBar';
+import { CartProvider } from '@/lib/cart';
 import { supabase } from '@/lib/supabase';
 import { checkSubscriptionStatus } from '@/lib/subscriptionStatus';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
@@ -120,6 +121,7 @@ useContextMenuShare();
   }, []);
   return (
     <RadioPlayerProvider>
+    <CartProvider>
       {/* Responsive app frame: a real desktop viewport gets the app
           edge-to-edge as before (this wrapper is `contents` at sm+, i.e.
           invisible to layout); a small screen instead gets the same app
@@ -189,6 +191,7 @@ useContextMenuShare();
         onClose={() => setIsVaultSearchOpen(false)}
         onNavigateToVaultDrawer={navigateToVaultDrawer}
       />
+    </CartProvider>
     </RadioPlayerProvider>
   );
 }

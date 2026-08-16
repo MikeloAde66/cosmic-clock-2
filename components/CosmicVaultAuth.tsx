@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import ProductsStorefront from './ProductsStorefront';
 import { uploadFilesDirectToStorage } from '@/lib/vaultDirectUpload';
 import { getRoleKeys, matchRole, regenerateRoleKey, type VaultRole } from '@/lib/vaultRoleKeys';
 import {
@@ -779,7 +780,15 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
               ))}
             </div>
 
-            {isLoadingInventory ? (
+            {selectedCategory === 'MERCH' ? (
+              // Not a real track-pack drawer — see the VaultDrawer type's
+              // MERCH comment. Renders the actual, unmodified storefront
+              // (its own catalog/cart/checkout) rather than forcing apparel
+              // into the track-pack grid below.
+              <div className="-mx-6 border rounded-xl border-slate-800 overflow-hidden">
+                <ProductsStorefront />
+              </div>
+            ) : isLoadingInventory ? (
               <p className="font-mono text-xs text-slate-500">Loading inventory…</p>
             ) : visibleProducts.length === 0 ? (
               <p className="font-mono text-xs text-slate-500">
@@ -1030,7 +1039,10 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
               }}
               className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
             >
-              {VAULT_DRAWERS.map((drawer) => (
+              {/* MERCH isn't a real upload target — it renders ProductsStorefront
+                  instead of track packs, so a file uploaded "into" it would
+                  never appear anywhere in the UI. */}
+              {VAULT_DRAWERS.filter((drawer) => drawer !== 'MERCH').map((drawer) => (
                 <option key={drawer} value={drawer}>
                   {drawer}
                 </option>

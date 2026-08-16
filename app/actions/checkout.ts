@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { findTierByPriceId } from '@/lib/pricingPlans';
+import { findStandaloneProductByPriceId } from '@/lib/standaloneProducts';
 
 // Server Actions are effectively public, unauthenticated POST endpoints —
 // the plan being checked out is validated against our own known price IDs
@@ -69,6 +70,47 @@ export async function createCheckoutSession(formData: FormData) {
     }
   } catch (err) {
     console.error('Failed to record pending subscription (continuing to checkout regardless):', err);
+  }
+
+  redirect(session.url);
+}
+
+// One-time-purchase counterpart to createCheckoutSession above — mode:
+// 'payment' against a persisted Stripe Price (see lib/standaloneProducts.ts)
+// rather than a subscription. The Stripe Product backing that price already
+// carries productId/product_type metadata, so the existing order webhook
+// (handleProductOrderCompleted in app/api/webhooks/stripe/route.ts) records
+// and fulfills it the same way it does any other digital product — no
+// webhook changes needed for this to actually deliver.
+export async function createStandaloneCheckoutSession(formData: FormData) {
+  const priceId = formData.get('priceId');
+  const userEmail = formData.get('userEmail');
+
+  if (typeof priceId !== 'string') {
+    throw new Error('Missing priceId.');
+  }
+  const product = findStandaloneProductByPriceId(priceId);
+  if (!product) {
+    throw new Error('Unknown product.');
+  }
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('Stripe is not configured.');
+  }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const headersList = await headers();
+  const origin = headersList.get('origin') || `http://${headersList.get('host') ?? 'localhost:3000'}`;
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: `${origin}/products/${product.id}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/products/${product.id}`,
+    customer_email: typeof userEmail === 'string' && userEmail ? userEmail : undefined,
+  });
+
+  if (!session.url) {
+    throw new Error('Stripe did not return a checkout URL.');
   }
 
   redirect(session.url);

@@ -12,7 +12,15 @@ export type VaultDrawer =
   | 'DOCS'
   | 'TEMPLATES'
   | 'PLANNERS'
-  | 'PHOTOS';
+  | 'PHOTOS'
+  // Not a real VaultProduct/track-pack category like the others above —
+  // VaultProduct requires at least one uploaded track and has no
+  // Printful/Gelato-aware fulfillment type, neither of which fits physical
+  // apparel. This drawer instead renders the existing, real
+  // ProductsStorefront (its own catalog, cart, and checkout/fulfillment
+  // path, unchanged) inside the Vault shell — see CosmicVaultAuth's
+  // selectedCategory === 'MERCH' branch.
+  | 'MERCH';
 
 export const VAULT_DRAWERS: VaultDrawer[] = [
   'ADMIN',
@@ -25,6 +33,7 @@ export const VAULT_DRAWERS: VaultDrawer[] = [
   'TEMPLATES',
   'PLANNERS',
   'PHOTOS',
+  'MERCH',
 ];
 
 export interface VaultTrack {
