@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import ISSFeedModal from './ISSFeedModal';
 import LoginModal from './LoginModal';
 import StarTrackerView from './StarTrackerView';
+import { supabase } from '@/lib/supabase';
 
 interface TopHeaderProps {
   activeTab?: string;
@@ -14,6 +15,23 @@ export default function TopHeader({ activeTab }: TopHeaderProps) {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(false);
   const isHome = activeTab === 'aione';
+
+  // Real session, not just isAdmin (LeftNav's check) — any signed-in
+  // account counts here, since this button represents "is someone logged
+  // in at all," not vault access. Drives the avatar button below: a blank,
+  // fully transparent placeholder until a real account exists, then real
+  // initials derived from that account's own email.
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setAccountEmail(data.user?.email ?? null);
+    });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccountEmail(session?.user?.email ?? null);
+    });
+    return () => subscription.subscription.unsubscribe();
+  }, []);
+  const accountInitials = accountEmail ? accountEmail.slice(0, 2).toUpperCase() : '';
 
   return (
     <>
@@ -53,10 +71,14 @@ export default function TopHeader({ activeTab }: TopHeaderProps) {
           )}
           <button
             onClick={() => setIsLoginOpen(true)}
-            title="Account Profile"
-            className="flex items-center justify-center w-8 h-8 text-xs font-semibold text-white transition border rounded-full bg-neutral-800 border-neutral-700 hover:border-neutral-500"
+            title={accountEmail ? 'Account Profile' : 'Log In'}
+            className={`flex items-center justify-center w-8 h-8 text-xs font-semibold rounded-full transition border ${
+              accountEmail
+                ? 'text-white bg-neutral-800 border-neutral-700 hover:border-neutral-500'
+                : 'bg-transparent border-transparent hover:border-neutral-800'
+            }`}
           >
-            CC
+            {accountInitials}
           </button>
         </div>
       </header>
