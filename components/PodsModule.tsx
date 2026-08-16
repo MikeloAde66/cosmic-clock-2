@@ -6,6 +6,7 @@ import { ArrowUpDown, Camera, Lightbulb, Sparkles, Trash2 } from 'lucide-react';
 import CosmicVisualizer from './CosmicVisualizer';
 import EqOrb from './EqOrb';
 import LumensCalculator from './LumensCalculator';
+import { useRadioPlayer } from './radio/RadioPlayerContext';
 
 // Minimal surface of the YouTube IFrame Player API actually used here — no
 // @types/youtube dependency for a handful of methods.
@@ -203,6 +204,14 @@ interface PodsModuleProps {
 }
 
 export default function PodsModule({ isActive }: PodsModuleProps) {
+  // Global audio priority — see RadioPlayerContext's document-level 'play'
+  // listener for native <video>/<audio> (covers this file's local-upload
+  // and direct-URL video, and the Vault-track <audio> element, with no
+  // extra code needed here). The YouTube IFrame Player below lives in a
+  // cross-origin iframe, so it can't fire a DOM event the parent page can
+  // observe — its own onStateChange has to push the signal through
+  // explicitly instead, which is what this call does.
+  const { pauseForExternalMedia } = useRadioPlayer();
   const [playlists, setPlaylists] = useState<Playlist[]>(DEFAULT_PLAYLISTS);
   const [activePlaylistId, setActivePlaylistId] = useState<string>('pods');
   const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
@@ -676,6 +685,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
             // currentTime into the same state <audio>/<video> already use.
             if (event.data === window.YT!.PlayerState.PLAYING) {
               setIsPlaying(true);
+              pauseForExternalMedia();
               ytPollIntervalRef.current = window.setInterval(() => {
                 const player = ytPlayerRef.current;
                 if (!player) return;
