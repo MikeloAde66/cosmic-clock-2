@@ -25,11 +25,16 @@ export const PRICING_TIERS: PricingTier[] = [
     name: 'Hobby',
     description: 'All the basics for starting a new project.',
     features: ['1 broadcast channel', 'Community support', 'Basic Vault storage'],
-    isFree: true,
+    // These price ids were always real, active $12/mo and $120/yr Stripe
+    // Prices (verified directly against the Stripe API) — isFree/$0 here
+    // never matched Stripe and routed checkout through activateFreeTier's
+    // Stripe-bypassing insert instead of a real Checkout Session, which is
+    // what actually caused Hobby's checkout to error while the other three
+    // tiers worked fine.
     monthlyPriceId: 'price_1U3cHF6YqqBfIrut7OdSX6a5',
-    monthlyAmount: 0,
+    monthlyAmount: 1200,
     yearlyPriceId: 'price_1U3cHF6YqqBfIrutJvtBewQb',
-    yearlyAmount: 0,
+    yearlyAmount: 12000,
   },
   {
     id: 'freelancer',
