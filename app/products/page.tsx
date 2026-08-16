@@ -41,37 +41,31 @@ export default function ProductsPage() {
     {
       key: 'earth',
       title: 'Earth Hub',
-      description: 'The live 3D Earth centerpiece — real geolocation, station markers, and the Vault globe.',
       render: () => <CosmicCanvas onNavigateToVaultDrawer={() => router.push('/')} />,
     },
     {
       key: 'radio',
       title: 'Radio Hub',
-      description: 'Live and on-demand broadcast stations, streaming for real right here.',
       render: () => <RadioStreams />,
     },
     {
       key: 'pods',
       title: 'Audio & Content Pods',
-      description: 'The full Pods broadcast monitor — playlists, EQ, and media playback.',
       render: () => <PodsModule isActive />,
     },
     {
       key: 'noaa',
       title: 'NOAA Telemetry',
-      description: 'Real satellite weather imagery and live atmospheric data.',
       render: () => <NoaaWidget />,
     },
     {
       key: 'kali',
       title: 'Kali AI',
-      description: 'The in-app cosmic/quantum discovery chat, live.',
       render: () => <AiOneChat />,
     },
     {
       key: 'star-tracker',
       title: 'Star Tracker',
-      description: 'Real-time planetary positions, sidereal time, and live ISS telemetry.',
       render: () => <StarTrackerView onBack={() => {}} />,
       cta: true,
     },
@@ -86,12 +80,6 @@ export default function ProductsPage() {
     <div className="relative w-full min-h-screen overflow-hidden bg-[#0a0a0c] text-slate-100">
       <Starfield />
       <div className="relative z-10 max-w-4xl px-6 py-16 mx-auto space-y-6">
-        <div className="space-y-2 text-center">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Ai One</p>
-          <h1 className="text-3xl font-bold text-white">See it live</h1>
-          <p className="text-sm text-neutral-400">{slide.description}</p>
-        </div>
-
         <div className="flex items-center gap-3">
           <button
             onClick={goPrev}
@@ -104,7 +92,7 @@ export default function ProductsPage() {
           <div className="flex-1 min-w-0 space-y-3">
             <LiveFrame>{slide.render()}</LiveFrame>
 
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col items-center gap-2 text-center">
               <h2 className="text-sm font-bold text-white">{slide.title}</h2>
               {slide.cta && (
                 <Link

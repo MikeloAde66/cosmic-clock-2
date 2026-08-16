@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Home, Mic, Radio as RadioIcon, Settings, Sparkles, Umbrella } from 'lucide-react';
+import Link from 'next/link';
+import { Home, LayoutGrid, Mic, Radio as RadioIcon, Settings, Sparkles, Umbrella } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import PreferencesModal from './PreferencesModal';
 
@@ -121,6 +122,22 @@ export default function LeftNav({
                 </span>
               </div>
             ))}
+
+            {/* Products/Showcase — a real standalone route (/products), not
+                an activeTab switch like Home/Radio/Pods above, so this is a
+                genuine navigation via <Link> rather than handleNavClick. */}
+            <div className="relative group">
+              <Link
+                href="/products"
+                aria-label="Products"
+                className="flex items-center justify-center w-10 h-10 rounded transition-all cursor-pointer border text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Link>
+              <span className="absolute z-20 px-2 py-1 ml-2 text-[10px] font-mono transition-opacity -translate-y-1/2 rounded opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-neutral-900 border border-neutral-700 text-neutral-200 group-hover:opacity-100">
+                Products
+              </span>
+            </div>
 
             {/* Weather / Kali Yuga — moved here from the floating pill
                 buttons that used to sit over the 3D Earth canvas. Each
