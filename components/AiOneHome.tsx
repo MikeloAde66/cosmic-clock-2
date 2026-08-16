@@ -24,6 +24,11 @@ interface AiOneHomeProps {
   // of Weather/Kali back to the clock view, since those no longer have
   // their own Back button.
   groundZeroToken?: number;
+  // Bumped by page.tsx when the URL carries ?checkout=cancelled or
+  // ?checkout=required (Stripe's cancel_url, or /dashboard bouncing a
+  // signed-in visitor with no active plan back here) — jumps straight to
+  // the Pricing section instead of leaving them stranded on Home.
+  pricingRequestToken?: number;
 }
 
 // Reads useCart() from inside <CartProvider>'s own subtree — rendered as a
@@ -47,7 +52,12 @@ function CartNavButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export default function AiOneHome({ onNavigateToVaultDrawer, homeViewRequest, groundZeroToken }: AiOneHomeProps) {
+export default function AiOneHome({
+  onNavigateToVaultDrawer,
+  homeViewRequest,
+  groundZeroToken,
+  pricingRequestToken,
+}: AiOneHomeProps) {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<
     'home' | 'pricing' | 'products' | 'cart'
@@ -71,6 +81,10 @@ export default function AiOneHome({ onNavigateToVaultDrawer, homeViewRequest, gr
   useEffect(() => {
     if (groundZeroToken) queueMicrotask(() => setActiveSection('home'));
   }, [groundZeroToken]);
+
+  useEffect(() => {
+    if (pricingRequestToken) queueMicrotask(() => setActiveSection('pricing'));
+  }, [pricingRequestToken]);
 
   useEffect(() => {
     // Supabase's default email template sends a magic link, not a 6-digit

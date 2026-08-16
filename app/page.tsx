@@ -1,6 +1,7 @@
 'use client';
 import { useContextMenuShare } from '@/components/useContextMenuShare';
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import TopHeader from '@/components/TopHeader';
 import LeftNav from '@/components/LeftNav';
 import Starfield from '@/components/Starfield';
@@ -13,9 +14,13 @@ import SiteFooter from '@/components/SiteFooter';
 import VaultSearchModal from '@/components/VaultSearchModal';
 import { RadioPlayerProvider } from '@/components/radio/RadioPlayerContext';
 import GlobalPlayerBar from '@/components/radio/GlobalPlayerBar';
+import { supabase } from '@/lib/supabase';
+import { checkSubscriptionStatus } from '@/lib/subscriptionStatus';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
-export default function Home() {
+function HomeInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<string>('aione');
   // Set by a Home globe Vault marker's "Open Drawer" link, or a Cmd+K search
   // result, consumed once as CosmicVaultAuth's initial filter — see that
@@ -76,6 +81,43 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 useContextMenuShare();
+
+  // Smart Auth & Access Guard: a signed-in visitor with a real active
+  // subscription skips the landing page entirely. Runs silently in the
+  // background rather than gating the initial render — the common case
+  // (an unauthenticated visitor) shouldn't wait on an auth round-trip just
+  // to see the landing page it was already about to show.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      if (!user || cancelled) return;
+      const status = await checkSubscriptionStatus(user.id);
+      if (!cancelled && status.active) router.replace('/dashboard');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  // /dashboard's "Radio Broadcast Hub" link, and Stripe's cancel_url /
+  // dashboard's required-plan redirect, land back here with a query param
+  // rather than app state — read it once on mount and translate it into
+  // this component's own existing state (activeTab / the Pricing section).
+  const [pricingRequestToken, setPricingRequestToken] = useState(0);
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'radio') setActiveTab('radio');
+
+    const checkout = searchParams.get('checkout');
+    if (checkout === 'cancelled' || checkout === 'required') {
+      setActiveTab('aione');
+      setPricingRequestToken(Date.now());
+    }
+    // Only ever consumed once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <RadioPlayerProvider>
       {/* Responsive app frame: a real desktop viewport gets the app
@@ -113,6 +155,7 @@ useContextMenuShare();
                 onNavigateToVaultDrawer={navigateToVaultDrawer}
                 homeViewRequest={homeViewRequest}
                 groundZeroToken={groundZeroToken}
+                pricingRequestToken={pricingRequestToken}
               />
             )}
 
@@ -147,5 +190,13 @@ useContextMenuShare();
         onNavigateToVaultDrawer={navigateToVaultDrawer}
       />
     </RadioPlayerProvider>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeInner />
+    </Suspense>
   );
 }

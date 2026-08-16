@@ -38,8 +38,8 @@ export async function createCheckoutSession(formData: FormData) {
     mode: 'subscription',
     line_items: [{ price: priceId, quantity: 1 }],
     subscription_data: { trial_period_days: 14 },
-    success_url: `${origin}/?subscribed=success`,
-    cancel_url: `${origin}/?subscribed=cancelled`,
+    success_url: `${origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/?checkout=cancelled`,
     customer_email: typeof userEmail === 'string' && userEmail ? userEmail : undefined,
     metadata: {
       supabase_user_id: typeof userId === 'string' ? userId : '',
@@ -100,5 +100,5 @@ export async function activateFreeTier(formData: FormData) {
     throw new Error(`Failed to activate free tier: ${error.message}`);
   }
 
-  redirect('/?subscribed=success');
+  redirect('/dashboard');
 }
