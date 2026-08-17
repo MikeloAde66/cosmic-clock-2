@@ -18,7 +18,7 @@ function mulberry32(seed: number) {
   };
 }
 
-const STAR_COUNT = 220;
+const STAR_COUNT = 420;
 const randomStar = mulberry32(20260814);
 const STARS = Array.from({ length: STAR_COUNT }, () => {
   const twinkles = randomStar() < 0.2;
@@ -40,10 +40,25 @@ const STARS = Array.from({ length: STAR_COUNT }, () => {
 export default function Starfield() {
   return (
     <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none bg-[#0a0a0c]">
+      {/* Ambient glow — the same deep blue/indigo the "Ai One" hero banner
+          uses (AiOneHome.tsx's own blurred blob), extended into a real
+          radial-gradient across the whole backdrop rather than one small
+          blob, so every tab (not just Home) shares the same soft center
+          luminescence fading into dark space. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(ellipse 70% 55% at 50% 45%, rgba(37,99,235,0.16) 0%, rgba(99,102,241,0.10) 40%, transparent 72%)',
+        }}
+      />
       {/* Wrapping div (rather than animating each star) — a slow, barely-
-          perceptible scale breathing from the viewport center reads as
-          drifting slightly forward/backward through the field, without
-          needing per-star radial-expansion math for the same sensation. */}
+          perceptible scale/translate breathing from the viewport center
+          reads as drifting slightly forward/backward through the field.
+          Uses the exact same keyframe values as CosmicCanvas's own
+          animate-cinematic-drift (the main 3D Earth backdrop's slow
+          hypnotic camera motion), so the starfield and the globe scene
+          move with matching character instead of two different drifts. */}
       <div className="w-full h-full animate-starfield-drift">
         {STARS.map((star, idx) => (
           <div
@@ -72,11 +87,11 @@ export default function Starfield() {
           animation-iteration-count: infinite;
         }
         @keyframes starfield-drift {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.015); }
+          0%, 100% { transform: scale(1) translate3d(0, 0, 0); }
+          50% { transform: scale(1.035) translate3d(-0.6%, 0.4%, 0); }
         }
         .animate-starfield-drift {
-          animation: starfield-drift 26s ease-in-out infinite;
+          animation: starfield-drift 48s ease-in-out infinite;
         }
       `}</style>
     </div>
