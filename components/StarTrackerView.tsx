@@ -18,6 +18,7 @@ import {
 import { daysUntil, getUpcomingEclipses, getUpcomingMeteorShowers, type UpcomingEclipse, type UpcomingMeteorShower } from '@/lib/skyEvents';
 import { listPlaylist, parseYouTubeId, removePlaylistItem, savePlaylistItem, type PlaylistItem } from '@/lib/spaceMediaPlaylist';
 import type { YouTubePlayer } from '@/lib/youtubeIframeApi';
+import { MESSIER_OBJECTS } from '@/lib/messierCatalog';
 import ObservatoryPicker, { OBSERVATORIES, type Observatory } from './ObservatoryPicker';
 
 // The same real NASA ISS live feed already used by ISSFeedModal (the
@@ -164,9 +165,9 @@ function projectLineStrip(points: number[][], observer: Observer, now: Date, cen
 }
 
 // Individual focus modes replacing the old blanket on/off toggle.
-// BRIGHT_STARS renders points from the star catalog instead of
-// constellation lines — it has no constellation-line filter of its own.
-type SkyFocusMode = 'OFF' | 'BIG_DIPPER' | 'ZODIAC' | 'BRIGHT_STARS' | 'ALL';
+// BRIGHT_STARS and MESSIER render points from their own catalogs instead
+// of constellation lines — neither has a constellation-line filter.
+type SkyFocusMode = 'OFF' | 'BIG_DIPPER' | 'ZODIAC' | 'BRIGHT_STARS' | 'MESSIER' | 'ALL';
 
 // ConstellationLine only carries a real IAU 3-letter abbreviation (id) and
 // raw line-strip coordinates — there's no groupId/target/isEcliptic field
@@ -188,7 +189,7 @@ function shouldDrawConstellation(id: string, mode: SkyFocusMode): boolean {
   if (mode === 'ALL') return true;
   if (mode === 'BIG_DIPPER') return BIG_DIPPER_IDS.has(id);
   if (mode === 'ZODIAC') return ZODIAC_IDS.has(id);
-  return false; // OFF, BRIGHT_STARS
+  return false; // OFF, BRIGHT_STARS, MESSIER
 }
 
 // Naked-eye "bright star" cutoff — real astronomical convention (lower
@@ -641,6 +642,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
               <option value="BIG_DIPPER">Big Dipper / Polaris</option>
               <option value="ZODIAC">Zodiac / Ecliptic</option>
               <option value="BRIGHT_STARS">Brightest Stars</option>
+              <option value="MESSIER">Messier Deep-Sky</option>
               <option value="ALL">All Constellations</option>
             </select>
           </div>
@@ -919,6 +921,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                   })}
               {skyFocusMode !== 'OFF' &&
                 skyFocusMode !== 'BRIGHT_STARS' &&
+                skyFocusMode !== 'MESSIER' &&
                 constellationLines
                   ?.filter((c) => shouldDrawConstellation(c.id, skyFocusMode))
                   .map((c) =>
@@ -936,6 +939,41 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                       ))
                     )
                   )}
+              {skyFocusMode === 'MESSIER' &&
+                MESSIER_OBJECTS.map((m) => {
+                  // Same real Horizon()-backed projection already used for
+                  // the star catalog and constellation lines above — not a
+                  // separate hand-rolled az/alt formula — using the live
+                  // `now`/`observer`, not a fixed/simulated time.
+                  const xy = equatorialToXY(m.raHours, m.decDeg, observer, now, center, radius);
+                  if (!xy) return null;
+                  return (
+                    <g key={m.id} className="cursor-pointer">
+                      <title>
+                        {m.id} — {m.name} ({m.type}, mag {m.magnitude})
+                      </title>
+                      <rect
+                        x={xy.x - 3}
+                        y={xy.y - 3}
+                        width={6}
+                        height={6}
+                        transform={`rotate(45 ${xy.x} ${xy.y})`}
+                        fill="rgba(192,132,252,0.3)"
+                        stroke="#c084fc"
+                        strokeWidth={1}
+                      />
+                      <text
+                        x={xy.x + 7}
+                        y={xy.y + 3}
+                        className="pointer-events-none fill-purple-300"
+                        fontSize={8}
+                        fontFamily="monospace"
+                      >
+                        {m.id}
+                      </text>
+                    </g>
+                  );
+                })}
               {visible.map((b) => {
                 const { x, y } = azAltToXY(b.azimuth, b.altitude, center, radius);
                 const isLuminary = b.name === 'Sun' || b.name === 'Moon';
@@ -1001,9 +1039,14 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
               {skyFocusMode === 'BRIGHT_STARS' ? 'Bright star (mag ≤ 2.0)' : 'Background star (larger = brighter)'}
             </span>
           )}
-          {skyFocusMode !== 'OFF' && skyFocusMode !== 'BRIGHT_STARS' && (
+          {skyFocusMode !== 'OFF' && skyFocusMode !== 'BRIGHT_STARS' && skyFocusMode !== 'MESSIER' && (
             <span className="flex items-center gap-1.5">
               <span className="inline-block w-3 h-px bg-cyan-400/40" /> Constellation line (click to identify)
+            </span>
+          )}
+          {skyFocusMode === 'MESSIER' && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rotate-45 border border-purple-400 bg-purple-500/30" /> Messier object (hover for name)
             </span>
           )}
           {issLayerOn && (
