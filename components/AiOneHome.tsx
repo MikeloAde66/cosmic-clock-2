@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import CosmicCanvas from './CosmicCanvas';
+import Starfield from './Starfield';
 import SignUpModal from './SignUpModal';
 import DonationButton from './DonationButton';
 import PricingPlans from './PricingPlans';
@@ -110,6 +111,13 @@ export default function AiOneHome({
           {/* HERO BANNER */}
           <div className="relative w-full h-80 bg-[#060a12] overflow-hidden border-b border-slate-800/80 flex flex-col items-center justify-center shrink-0">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-600/20 via-indigo-500/30 to-white/10 rounded-full blur-3xl pointer-events-none" />
+            {/* Second, self-contained Starfield instance — the global one
+                (mounted in app/page.tsx) sits behind the whole app, but this
+                banner's own opaque background fully hides it. Same star
+                logic/drift timing as the global instance, just scoped to
+                this banner instead of the viewport, at a lower count
+                proportional to its much smaller area. */}
+            <Starfield contained starCount={170} />
             <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-transparent to-[#070b14]/70" />
 
             <div className="relative z-10 px-4 space-y-2 text-center">
