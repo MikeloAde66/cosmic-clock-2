@@ -11,14 +11,19 @@ import { STANDALONE_PRODUCTS } from '@/lib/standaloneProducts';
 const product = STANDALONE_PRODUCTS.find((p) => p.id === 'star-tracker')!;
 
 // Real capabilities only — StarTrackerView.tsx has no AI/ML in it anywhere;
-// these are the actual astronomy-engine-backed calculations it runs.
+// these are the actual astronomy-engine/satellite.js-backed calculations
+// it runs. "Pass predictions" and "20 Hz" were dropped from an earlier
+// draft of this copy — useIssTracker.ts only reports current live
+// position (no rise/set search), and defaults to 1 Hz, not 20 Hz (a
+// numeric display updating every 50ms burns battery for nothing
+// perceptible).
 const CAPABILITIES = [
-  'Real-time planetary position tracking (Sun, Moon, and five visible planets) via the astronomy-engine library',
-  'Live sidereal time calculation for your exact location',
-  'Live ISS telemetry — real-time position, altitude, and pass predictions',
-  'Real-time space weather (Kp index) readings',
-  'Interactive sky chart with real star and constellation data',
-  'Upcoming eclipse and meteor shower predictions',
+  'World-Class Observatory Horizon Nodes: switch between your live IP-based location and famous research sites (Mauna Kea, Palomar, VLT Chile, Greenwich, Griffith) with real-time topocentric horizon recalculation',
+  'Local SGP4 Orbital Engine: real-time ISS position propagation and live telemetry (azimuth, elevation, altitude), paired with a dual-tab live feed modal',
+  'Messier Deep-Sky Overlay Catalog: real-time Alt/Az plotting for deep-space nebulae, galaxies, and star clusters mapped onto the starfield canvas',
+  'Precision Sidereal & Kali Yuga Clocks: live synchronization of Local Time, Local Sidereal Time (LST), and cosmic epoch percentage metrics',
+  'Live NOAA Space Weather Integration: real-time geomagnetic Kp index monitoring with human-readable storm-level status',
+  'Sky Fest Event & Media Hub: automated countdowns for solar/lunar eclipses, active meteor showers with parent body tracking, and an integrated space video playlist player',
 ];
 
 export default function StarTrackerProductPage() {
@@ -46,8 +51,8 @@ export default function StarTrackerProductPage() {
           <p className="font-mono text-[10px] uppercase tracking-widest text-cyan-400/80">Standalone</p>
           <h1 className="text-4xl font-bold text-white">Star Tracker</h1>
           <p className="text-sm text-neutral-400">
-            Deep-space telemetry and real-time sky tracking, built on real astronomical calculations —
-            not stock imagery or a static almanac.
+            Deep-space telemetry, real-time SGP4 orbital propagation, and observatory-grade horizon
+            tracking — built on client-side astronomical algorithms, not stock imagery or static almanacs.
           </p>
         </div>
 
