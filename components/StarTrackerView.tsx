@@ -124,7 +124,10 @@ function azAltToXY(azimuth: number, altitude: number, center: number, radius: nu
   return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle) };
 }
 
-type LocationStatus = 'requesting' | 'granted' | 'denied' | 'unavailable';
+// 'ip-fallback' is distinct from 'granted' — city-level IP geolocation is
+// far less precise than real GPS, and the UI says so rather than silently
+// presenting it as an exact position.
+type LocationStatus = 'requesting' | 'granted' | 'ip-fallback' | 'denied' | 'unavailable';
 type SelectedItem = { kind: 'body'; body: SkyBody } | { kind: 'iss' } | { kind: 'constellation'; id: string } | null;
 
 // Fixed background stars/constellations have real RA/Dec already (unlike
@@ -158,6 +161,69 @@ function projectLineStrip(points: number[][], observer: Observer, now: Date, cen
   return runs;
 }
 
+// Individual focus modes replacing the old blanket on/off toggle.
+// BRIGHT_STARS renders points from the star catalog instead of
+// constellation lines — it has no constellation-line filter of its own.
+type SkyFocusMode = 'OFF' | 'BIG_DIPPER' | 'ZODIAC' | 'BRIGHT_STARS' | 'ALL';
+
+// ConstellationLine only carries a real IAU 3-letter abbreviation (id) and
+// raw line-strip coordinates — there's no groupId/target/isEcliptic field
+// in the actual dataset (lib/skyChart.ts), so these modes are built
+// against the one real, identifying field that exists.
+//
+// The trimmed star/constellation data has no separate "Big Dipper" line
+// set — the Dipper is just 7 of Ursa Major's stars, not a distinct IAU
+// figure — so this mode shows the whole Ursa Major (+ Ursa Minor, for
+// Polaris at its tip) constellation lines, the closest honest match the
+// real data supports.
+const BIG_DIPPER_IDS = new Set(['UMa', 'UMi']);
+
+// The 12 real IAU zodiac constellations (their standard 3-letter
+// abbreviations), not a fabricated field.
+const ZODIAC_IDS = new Set(['Ari', 'Tau', 'Gem', 'Cnc', 'Leo', 'Vir', 'Lib', 'Sco', 'Sgr', 'Cap', 'Aqr', 'Psc']);
+
+function shouldDrawConstellation(id: string, mode: SkyFocusMode): boolean {
+  if (mode === 'ALL') return true;
+  if (mode === 'BIG_DIPPER') return BIG_DIPPER_IDS.has(id);
+  if (mode === 'ZODIAC') return ZODIAC_IDS.has(id);
+  return false; // OFF, BRIGHT_STARS
+}
+
+// Naked-eye "bright star" cutoff — real astronomical convention (lower
+// magnitude = brighter; ~2.0 is a standard threshold for the brightest,
+// most recognizable stars).
+const BRIGHT_STAR_MAGNITUDE_LIMIT = 2.0;
+
+interface ResolvedLabel {
+  renderedY: number;
+  needsLeaderLine: boolean;
+}
+
+// Stacks overlapping body labels (e.g. Mercury sitting almost exactly on
+// top of the Sun from Earth's sky) into a vertically staggered column with
+// a short leader line back to the actual marker, instead of drawing
+// unreadable overlapping text. Operates on each body's *label* position
+// (marker y minus the label's fixed offset), not the marker itself — the
+// marker stays exactly where it astronomically belongs either way.
+function resolveLabelCollisions(
+  points: { key: string; x: number; labelY: number }[],
+  minSpacing = 22,
+  maxDx = 40
+): Map<string, ResolvedLabel> {
+  const sorted = [...points].sort((a, b) => a.labelY - b.labelY);
+  const resolved = new Map<string, ResolvedLabel>();
+  let lastX = Number.NEGATIVE_INFINITY;
+  let lastRenderedY = Number.NEGATIVE_INFINITY;
+  for (const p of sorted) {
+    const collides = Math.abs(p.x - lastX) < maxDx && p.labelY - lastRenderedY < minSpacing;
+    const renderedY = collides ? lastRenderedY + minSpacing : p.labelY;
+    resolved.set(p.key, { renderedY, needsLeaderLine: collides });
+    lastX = p.x;
+    lastRenderedY = renderedY;
+  }
+  return resolved;
+}
+
 export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const [status, setStatus] = useState<LocationStatus>('requesting');
   const [coords, setCoords] = useState<{ lat: number; lon: number }>({ lat: 0, lon: 0 });
@@ -177,7 +243,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const [kp, setKp] = useState<KpReading | null>(null);
   const [kpError, setKpError] = useState(false);
 
-  const [skyMapsOn, setSkyMapsOn] = useState(false);
+  const [skyFocusMode, setSkyFocusMode] = useState<SkyFocusMode>('OFF');
   const [skyMapsLoading, setSkyMapsLoading] = useState(false);
   const [skyMapsError, setSkyMapsError] = useState(false);
   const [constellationLines, setConstellationLines] = useState<ConstellationLine[] | null>(null);
@@ -198,18 +264,50 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    // City-level fallback when GPS is denied/unavailable — real public
+    // service (ipapi.co, no key required for this volume), not a
+    // fabricated endpoint. Genuinely less precise than GPS, so this is
+    // labeled 'ip-fallback' rather than 'granted'; if it also fails, this
+    // falls through to the honest "location unavailable, showing sky at
+    // 0°N, 0°E" state that already existed.
+    const tryIpFallback = async (deniedStatus: 'denied' | 'unavailable') => {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (!res.ok) throw new Error(`ipapi.co responded ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+        if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+          setCoords({ lat: data.latitude, lon: data.longitude });
+          setStatus('ip-fallback');
+        } else {
+          setStatus(deniedStatus);
+        }
+      } catch {
+        if (!cancelled) setStatus(deniedStatus);
+      }
+    };
+
     if (!navigator.geolocation) {
-      queueMicrotask(() => setStatus('unavailable'));
-      return;
+      tryIpFallback('unavailable');
+      return () => {
+        cancelled = true;
+      };
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (cancelled) return;
         setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
         setStatus('granted');
       },
-      () => setStatus('denied'),
+      () => tryIpFallback('denied'),
       { timeout: 8000 }
     );
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -247,7 +345,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   // rather than on mount, and cached in state afterward so switching the
   // layer off and back on doesn't re-fetch.
   useEffect(() => {
-    if (!skyMapsOn || constellationLines) return;
+    if (skyFocusMode === 'OFF' || constellationLines) return;
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) setSkyMapsLoading(true);
@@ -269,7 +367,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [skyMapsOn, constellationLines]);
+  }, [skyFocusMode, constellationLines]);
 
   useEffect(() => {
     if (!spaceWeatherOn) return;
@@ -303,9 +401,11 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const locationLabel =
     status === 'granted'
       ? `${coords.lat.toFixed(2)}°, ${coords.lon.toFixed(2)}°`
-      : status === 'requesting'
-        ? 'Locating…'
-        : 'Location unavailable — showing sky at 0°N, 0°E';
+      : status === 'ip-fallback'
+        ? `${coords.lat.toFixed(2)}°, ${coords.lon.toFixed(2)}° (approximate, from IP)`
+        : status === 'requesting'
+          ? 'Locating…'
+          : 'Location unavailable — showing sky at 0°N, 0°E';
 
   // Dome geometry + pan/zoom handlers
   // Logical SVG units, not pixels — the viewBox keeps all coordinate math
@@ -315,6 +415,20 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const size = 500;
   const center = size / 2;
   const radius = size / 2 - 24;
+
+  // Resolves overlapping body labels (e.g. Mercury sitting almost exactly
+  // on the Sun from Earth's sky) into a staggered column with leader
+  // lines — see resolveLabelCollisions above.
+  const resolvedLabels = useMemo(
+    () =>
+      resolveLabelCollisions(
+        visible.map((b) => {
+          const { x, y } = azAltToXY(b.azimuth, b.altitude, center, radius);
+          return { key: b.name, x, labelY: y - 9 };
+        })
+      ),
+    [visible, center, radius]
+  );
 
   // React attaches wheel listeners as passive by default (for scroll
   // performance), which silently no-ops preventDefault on a JSX onWheel —
@@ -424,17 +538,25 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
             <SunIcon className="w-3 h-3" />
             Space Weather
           </button>
-          <button
-            type="button"
-            onClick={() => setSkyMapsOn((v) => !v)}
-            title="Double-click the sky dome to reset pan/zoom"
-            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition ${
-              skyMapsOn ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300' : 'border-slate-700 text-slate-400 hover:border-slate-500'
-            }`}
-          >
-            <Sparkles className="w-3 h-3" />
-            Sky Maps
-          </button>
+          <div className="relative flex items-center">
+            <Sparkles className="absolute w-3 h-3 pointer-events-none left-2.5 text-cyan-300" />
+            <select
+              value={skyFocusMode}
+              onChange={(e) => setSkyFocusMode(e.target.value as SkyFocusMode)}
+              title="Double-click the sky dome to reset pan/zoom"
+              className={`appearance-none pl-7 pr-2 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition cursor-pointer ${
+                skyFocusMode !== 'OFF'
+                  ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300'
+                  : 'border-slate-700 text-slate-400 hover:border-slate-500'
+              }`}
+            >
+              <option value="OFF">Sky Maps: Off</option>
+              <option value="BIG_DIPPER">Big Dipper / Polaris</option>
+              <option value="ZODIAC">Zodiac / Ecliptic</option>
+              <option value="BRIGHT_STARS">Brightest Stars</option>
+              <option value="ALL">All Constellations</option>
+            </select>
+          </div>
           <button
             type="button"
             onClick={() => setSkyFestOpen((v) => !v)}
@@ -638,7 +760,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        {skyMapsOn && (skyMapsLoading || skyMapsError) && (
+        {skyFocusMode !== 'OFF' && (skyMapsLoading || skyMapsError) && (
           <div className="px-3 py-2 border rounded-lg border-cyan-500/20 bg-black/30">
             {skyMapsError ? (
               <p className="font-mono text-xs text-red-400">Constellation data unavailable right now.</p>
@@ -681,36 +803,75 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                   </text>
                 );
               })}
-              {skyMapsOn &&
-                stars?.map(([lon, lat, mag], idx) => {
-                  const xy = equatorialToXY(lonToRaHours(lon), lat, observer, now, center, radius);
-                  if (!xy) return null;
-                  const r = Math.max(0.4, 2.2 - mag * 0.35);
-                  return <circle key={idx} cx={xy.x} cy={xy.y} r={r} fill="#e2e8f0" opacity={0.85} />;
-                })}
-              {skyMapsOn &&
-                constellationLines?.map((c) =>
-                  c.lines.map((strip, stripIdx) =>
-                    projectLineStrip(strip, observer, now, center, radius).map((run, runIdx) => (
-                      <polyline
-                        key={`${c.id}-${stripIdx}-${runIdx}`}
-                        points={run.map((p) => `${p.x},${p.y}`).join(' ')}
-                        fill="none"
-                        stroke="rgba(103,232,249,0.35)"
-                        strokeWidth={0.75}
-                        className="cursor-pointer hover:stroke-cyan-300"
-                        onClick={() => setSelected({ kind: 'constellation', id: c.id })}
+              {skyFocusMode !== 'OFF' &&
+                stars
+                  ?.filter(([, , mag]) => skyFocusMode !== 'BRIGHT_STARS' || mag <= BRIGHT_STAR_MAGNITUDE_LIMIT)
+                  .map(([lon, lat, mag], idx) => {
+                    const xy = equatorialToXY(lonToRaHours(lon), lat, observer, now, center, radius);
+                    if (!xy) return null;
+                    // Brightest Stars mode draws the same real magnitude
+                    // data larger/more prominent, since the whole point of
+                    // that mode is to make the naked-eye-brightest stars
+                    // easy to pick out rather than blending into the field.
+                    const r =
+                      skyFocusMode === 'BRIGHT_STARS' ? Math.max(1.2, 3.2 - mag * 0.5) : Math.max(0.4, 2.2 - mag * 0.35);
+                    return (
+                      <circle
+                        key={idx}
+                        cx={xy.x}
+                        cy={xy.y}
+                        r={r}
+                        fill={skyFocusMode === 'BRIGHT_STARS' ? '#67e8f9' : '#e2e8f0'}
+                        opacity={skyFocusMode === 'BRIGHT_STARS' ? 1 : 0.85}
                       />
-                    ))
-                  )
-                )}
+                    );
+                  })}
+              {skyFocusMode !== 'OFF' &&
+                skyFocusMode !== 'BRIGHT_STARS' &&
+                constellationLines
+                  ?.filter((c) => shouldDrawConstellation(c.id, skyFocusMode))
+                  .map((c) =>
+                    c.lines.map((strip, stripIdx) =>
+                      projectLineStrip(strip, observer, now, center, radius).map((run, runIdx) => (
+                        <polyline
+                          key={`${c.id}-${stripIdx}-${runIdx}`}
+                          points={run.map((p) => `${p.x},${p.y}`).join(' ')}
+                          fill="none"
+                          stroke={skyFocusMode === 'ALL' ? 'rgba(103,232,249,0.35)' : 'rgba(34,211,238,0.75)'}
+                          strokeWidth={skyFocusMode === 'ALL' ? 0.75 : 1.5}
+                          className="cursor-pointer hover:stroke-cyan-300"
+                          onClick={() => setSelected({ kind: 'constellation', id: c.id })}
+                        />
+                      ))
+                    )
+                  )}
               {visible.map((b) => {
                 const { x, y } = azAltToXY(b.azimuth, b.altitude, center, radius);
                 const isLuminary = b.name === 'Sun' || b.name === 'Moon';
+                const label = resolvedLabels.get(b.name);
+                const labelY = label?.renderedY ?? y - 9;
                 return (
                   <g key={b.name} onClick={() => setSelected({ kind: 'body', body: b })} className="cursor-pointer">
                     <circle cx={x} cy={y} r={isLuminary ? 6 : 4.5} fill={isLuminary ? '#67e8f9' : '#e2e8f0'} stroke="transparent" strokeWidth={8} />
-                    <text x={x} y={y - 9} textAnchor="middle" className="pointer-events-none fill-slate-300" fontSize={9} fontFamily="monospace">
+                    {label?.needsLeaderLine && (
+                      <line
+                        x1={x}
+                        y1={y - 9}
+                        x2={x + 10}
+                        y2={labelY - 4}
+                        stroke="rgba(34,211,238,0.4)"
+                        strokeWidth={1}
+                        className="pointer-events-none"
+                      />
+                    )}
+                    <text
+                      x={label?.needsLeaderLine ? x + 14 : x}
+                      y={labelY}
+                      textAnchor={label?.needsLeaderLine ? 'start' : 'middle'}
+                      className="pointer-events-none fill-slate-300"
+                      fontSize={9}
+                      fontFamily="monospace"
+                    >
                       {b.name}
                     </text>
                   </g>
@@ -743,15 +904,16 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-[#e2e8f0]" /> Planet
           </span>
-          {skyMapsOn && (
-            <>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#e2e8f0] opacity-85" /> Background star (larger = brighter)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block w-3 h-px bg-cyan-400/40" /> Constellation line (click to identify)
-              </span>
-            </>
+          {skyFocusMode !== 'OFF' && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#e2e8f0] opacity-85" />
+              {skyFocusMode === 'BRIGHT_STARS' ? 'Bright star (mag ≤ 2.0)' : 'Background star (larger = brighter)'}
+            </span>
+          )}
+          {skyFocusMode !== 'OFF' && skyFocusMode !== 'BRIGHT_STARS' && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-3 h-px bg-cyan-400/40" /> Constellation line (click to identify)
+            </span>
           )}
           {issLayerOn && (
             <span className="flex items-center gap-1.5">
