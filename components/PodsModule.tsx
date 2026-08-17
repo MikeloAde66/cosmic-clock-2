@@ -16,6 +16,11 @@ interface YouTubePlayer {
   loadVideoById: (videoId: string) => void;
   loadPlaylist: (options: { list: string }) => void;
   pauseVideo: () => void;
+  // 0-100 integer, same scale as the console's own Master Volume slider —
+  // the real IFrame API method, distinct from (and unreachable by) Web
+  // Audio gain nodes, which can't touch a cross-origin iframe's audio at
+  // all.
+  setVolume: (volume: number) => void;
   destroy: () => void;
 }
 
@@ -294,6 +299,11 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
   // bitstreams, so this only ever claims to do what it actually does.
   const [showOutputMonitor, setShowOutputMonitor] = useState<boolean>(false);
   const [masterVolume, setMasterVolume] = useState<number>(100);
+  // Mirrors masterVolume for the YT onReady closure below, which is set up
+  // inside an effect keyed on [isYouTubeEmbed, activeEmbedUrl] — not
+  // masterVolume — so a plain closure over the state would go stale the
+  // moment the console's volume changes without a new video also loading.
+  const masterVolumeRef = useRef(masterVolume);
   const [masteringPreset, setMasteringPreset] = useState<'flat' | 'broadcast'>('flat');
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
 
@@ -537,13 +547,21 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
     }
   };
 
-  // Shared by the classic slider and the Orb — both ultimately just set
-  // audioRef.current.volume, so there's one real code path either way.
+  // Shared by the classic slider and the Orb — one real code path for
+  // both. Sets audioRef.current.volume (0-1) for native audio/video tracks
+  // AND, when the active track is a YouTube embed, the real IFrame Player
+  // setVolume(0-100) — a separate call because Web Audio gain nodes can't
+  // reach into a cross-origin YouTube iframe at all, so there's no way to
+  // route both through one shared audio graph.
   const setMasterVolumeValue = (val: number) => {
     const clamped = Math.max(0, Math.min(100, val));
     setMasterVolume(clamped);
+    masterVolumeRef.current = clamped;
     if (audioRef.current) {
       audioRef.current.volume = clamped / 100;
+    }
+    if (ytPlayerReadyRef.current) {
+      ytPlayerRef.current?.setVolume(clamped);
     }
   };
 
@@ -669,6 +687,10 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         events: {
           onReady: () => {
             ytPlayerReadyRef.current = true;
+            // A freshly mounted player otherwise defaults to its own last
+            // volume (usually 100), ignoring whatever the console's
+            // Master Volume slider is already set to.
+            ytPlayerRef.current?.setVolume(masterVolumeRef.current);
             if (ytPendingLoadRef.current) {
               const pending = ytPendingLoadRef.current;
               ytPendingLoadRef.current = null;
