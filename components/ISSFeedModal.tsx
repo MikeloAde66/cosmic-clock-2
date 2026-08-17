@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import IssModal from './IssModal';
 
 interface ISSModalProps {
   isOpen: boolean;
@@ -8,6 +9,8 @@ interface ISSModalProps {
 }
 
 export default function ISSFeedModal({ isOpen, onClose }: ISSModalProps) {
+  const [tab, setTab] = useState<'video' | 'telemetry'>('video');
+
   if (!isOpen) return null;
 
   return (
@@ -29,22 +32,43 @@ export default function ISSFeedModal({ isOpen, onClose }: ISSModalProps) {
           </button>
         </div>
 
-        {/* Video Container */}
-        <div className="relative w-full bg-black aspect-video">
-          <iframe
-            className="absolute top-0 left-0 w-full h-full border-0"
-            src="https://www.youtube.com/embed/awQzjn72bI0?autoplay=1&mute=1"
-            title="Live ISS HD Video Feed"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
+        {/* Tab Switcher */}
+        <div className="flex border-b bg-neutral-950 border-neutral-800">
+          {(['video', 'telemetry'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 px-4 py-2 text-[10px] font-mono uppercase tracking-wide transition ${
+                tab === t ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              {t === 'video' ? 'Video Feed' : 'Live Telemetry'}
+            </button>
+          ))}
         </div>
 
-        {/* Telemetry Footer */}
-        <div className="px-4 py-2 bg-neutral-950 border-t border-neutral-800 flex justify-between items-center text-[10px] font-mono text-neutral-400">
-          <span>SOURCE: NASA HDEV / Live Feed</span>
-          <span>ORBITAL SPEED: ~17,500 MPH</span>
-        </div>
+        {tab === 'video' ? (
+          <>
+            {/* Video Container */}
+            <div className="relative w-full bg-black aspect-video">
+              <iframe
+                className="absolute top-0 left-0 w-full h-full border-0"
+                src="https://www.youtube.com/embed/awQzjn72bI0?autoplay=1&mute=1"
+                title="Live ISS HD Video Feed"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+
+            {/* Telemetry Footer */}
+            <div className="px-4 py-2 bg-neutral-950 border-t border-neutral-800 flex justify-between items-center text-[10px] font-mono text-neutral-400">
+              <span>SOURCE: NASA HDEV / Live Feed</span>
+              <span>ORBITAL SPEED: ~17,500 MPH</span>
+            </div>
+          </>
+        ) : (
+          <IssModal />
+        )}
       </div>
     </div>
   );
