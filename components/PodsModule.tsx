@@ -7,49 +7,9 @@ import CosmicVisualizer from './CosmicVisualizer';
 import EqOrb from './EqOrb';
 import LumensCalculator from './LumensCalculator';
 import { useRadioPlayer } from './radio/RadioPlayerContext';
-
-// Minimal surface of the YouTube IFrame Player API actually used here — no
-// @types/youtube dependency for a handful of methods.
-interface YouTubePlayer {
-  getCurrentTime: () => number;
-  getDuration: () => number;
-  loadVideoById: (videoId: string) => void;
-  loadPlaylist: (options: { list: string }) => void;
-  pauseVideo: () => void;
-  // 0-100 integer, same scale as the console's own Master Volume slider —
-  // the real IFrame API method, distinct from (and unreachable by) Web
-  // Audio gain nodes, which can't touch a cross-origin iframe's audio at
-  // all.
-  setVolume: (volume: number) => void;
-  destroy: () => void;
-}
-
-interface YouTubePlayerEvent {
-  data: number;
-  target: YouTubePlayer;
-}
-
-declare global {
-  interface Window {
-    YT?: {
-      Player: new (
-        // A real HTMLElement, not just an id string — see ytContainerRef's
-        // effect below for why an imperatively-created element is used.
-        elementId: string | HTMLElement,
-        options: {
-          videoId?: string;
-          playerVars?: Record<string, string | number>;
-          events?: {
-            onReady?: (event: YouTubePlayerEvent) => void;
-            onStateChange?: (event: YouTubePlayerEvent) => void;
-          };
-        }
-      ) => YouTubePlayer;
-      PlayerState: { PLAYING: number; PAUSED: number; ENDED: number };
-    };
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
+// Shared with StarTrackerView's own YT.Player mount (Sky Fest's Space
+// Media tab) — see that file for why this lives in one place.
+import type { YouTubePlayer, YouTubePlayerEvent } from '@/lib/youtubeIframeApi';
 
 interface ContentSegment {
   // Seconds into playback when this segment becomes the active one.

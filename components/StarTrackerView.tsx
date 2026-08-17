@@ -17,6 +17,7 @@ import {
 } from '@/lib/skyChart';
 import { daysUntil, getUpcomingEclipses, getUpcomingMeteorShowers, type UpcomingEclipse, type UpcomingMeteorShower } from '@/lib/skyEvents';
 import { listPlaylist, parseYouTubeId, removePlaylistItem, savePlaylistItem, type PlaylistItem } from '@/lib/spaceMediaPlaylist';
+import type { YouTubePlayer } from '@/lib/youtubeIframeApi';
 
 // The same real NASA ISS live feed already used by ISSFeedModal (the
 // header's "LIVE ISS" button) — reused here so the video is inline inside
@@ -258,6 +259,66 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const [playlistUrlInput, setPlaylistUrlInput] = useState('');
   const [playlistTitleInput, setPlaylistTitleInput] = useState('');
   const [playlistFormError, setPlaylistFormError] = useState('');
+
+  // Real YT.Player instance (not a plain <iframe>) — needed so onReady can
+  // actually call setVolume(); a bare iframe src has no JS handle at all.
+  // Same pattern PodsModule.tsx already uses for its Broadcast Monitor.
+  const ytContainerRef = useRef<HTMLDivElement | null>(null);
+  const ytPlayerRef = useRef<YouTubePlayer | null>(null);
+
+  useEffect(() => {
+    if (skyFestTab !== 'media' || !nowPlayingVideoId) return;
+    let cancelled = false;
+
+    const bindPlayer = () => {
+      if (cancelled || !ytContainerRef.current) return;
+      ytContainerRef.current.replaceChildren();
+      const playerHost = document.createElement('div');
+      playerHost.style.width = '100%';
+      playerHost.style.height = '100%';
+      ytContainerRef.current.appendChild(playerHost);
+      ytPlayerRef.current = new window.YT!.Player(playerHost, {
+        videoId: nowPlayingVideoId,
+        playerVars: { autoplay: 1 },
+        events: {
+          // Loads at a lower default rather than full blast — native
+          // controls stay fully visible/enabled for manual adjustment
+          // from there.
+          onReady: (event) => event.target.setVolume(70),
+        },
+      });
+    };
+
+    if (window.YT?.Player) {
+      bindPlayer();
+    } else {
+      const previousCallback = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        previousCallback?.();
+        bindPlayer();
+      };
+      if (!document.getElementById('youtube-iframe-api-script')) {
+        const script = document.createElement('script');
+        script.id = 'youtube-iframe-api-script';
+        script.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(script);
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      ytPlayerRef.current?.destroy();
+      ytPlayerRef.current = null;
+      ytContainerRef.current?.replaceChildren();
+    };
+    // Re-binds a fresh player on every video/tab change rather than
+    // reusing one via loadVideoById — this container can itself unmount
+    // (switching Sky Fest tabs, or back to the "paste a link" placeholder
+    // when nowPlayingVideoId is cleared), so a single long-lived instance
+    // isn't a safe assumption here the way it is in PodsModule's
+    // always-mounted Broadcast Monitor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nowPlayingVideoId, skyFestTab]);
 
   useEffect(() => {
     queueMicrotask(() => setPlaylist(listPlaylist()));
@@ -627,13 +688,12 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                 <div className="space-y-3">
                   {nowPlayingVideoId ? (
                     <div className="relative w-full overflow-hidden bg-black rounded aspect-video">
-                      <iframe
-                        className="absolute top-0 left-0 w-full h-full border-0"
-                        src={`https://www.youtube.com/embed/${nowPlayingVideoId}?autoplay=1`}
-                        title="Space Media Player"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
+                      {/* React owns this wrapper but never puts JSX children
+                          inside it — YT.Player replaces whatever element
+                          it's given with its own <iframe>, entirely outside
+                          React's reconciliation (see the mount effect
+                          above). */}
+                      <div ref={ytContainerRef} className="absolute inset-0 w-full h-full" />
                     </div>
                   ) : (
                     <div className="flex items-center justify-center border rounded aspect-video border-slate-800 bg-slate-950/60">
@@ -651,7 +711,12 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                         setPlaylistFormError('That doesn’t look like a valid YouTube link.');
                         return;
                       }
-                      setPlaylist(savePlaylistItem(playlistTitleInput || playlistUrlInput, videoId));
+                      // Falling back to the raw pasted URL as the title
+                      // (the previous behavior here) meant an unnamed
+                      // save showed a full youtube.com link in the chip
+                      // instead of a clean label.
+                      const cleanTitle = playlistTitleInput.trim() || `Space Stream #${playlist.length + 1}`;
+                      setPlaylist(savePlaylistItem(cleanTitle, videoId));
                       setNowPlayingVideoId(videoId);
                       setPlaylistUrlInput('');
                       setPlaylistTitleInput('');
