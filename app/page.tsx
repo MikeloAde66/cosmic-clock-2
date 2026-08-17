@@ -177,10 +177,15 @@ useContextMenuShare();
             </div>
           </div>
 
-          {/* Always mounted (renders nothing until a station is playing) so
-              radio playback survives switching tabs, not scoped to the Radio
-              tab's own lifecycle the way everything but Pods currently is. */}
-          <GlobalPlayerBar />
+          {/* Scoped to the Home tab only — RadioPlayerProvider (mounted
+              above, at the app-shell level) still keeps actual playback
+              running across every tab exactly as before; only this visible
+              bar/controls are now Home-only. Star Tracker and /products
+              need no extra handling here: Star Tracker is a fixed z-50
+              overlay that already covers this bar (z-10) whenever it's
+              open, and /products is a fully separate Next.js route that
+              never renders this tree at all. */}
+          {activeTab === 'aione' && <GlobalPlayerBar />}
           <SiteFooter />
         </div>
         </main>
