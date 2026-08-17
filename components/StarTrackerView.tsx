@@ -18,6 +18,7 @@ import {
 import { daysUntil, getUpcomingEclipses, getUpcomingMeteorShowers, type UpcomingEclipse, type UpcomingMeteorShower } from '@/lib/skyEvents';
 import { listPlaylist, parseYouTubeId, removePlaylistItem, savePlaylistItem, type PlaylistItem } from '@/lib/spaceMediaPlaylist';
 import type { YouTubePlayer } from '@/lib/youtubeIframeApi';
+import ObservatoryPicker, { OBSERVATORIES, type Observatory } from './ObservatoryPicker';
 
 // The same real NASA ISS live feed already used by ISSFeedModal (the
 // header's "LIVE ISS" button) — reused here so the video is inline inside
@@ -227,7 +228,14 @@ function resolveLabelCollisions(
 
 export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const [status, setStatus] = useState<LocationStatus>('requesting');
+  // Real, live-tracked coords (GPS or the IP-geolocation fallback below) —
+  // always kept up to date regardless of which observatory is selected,
+  // so switching back to "Local Observer" is instant rather than needing
+  // to re-run geolocation.
   const [coords, setCoords] = useState<{ lat: number; lon: number }>({ lat: 0, lon: 0 });
+  // Manual observatory override — 'local' defers entirely to the live
+  // coords/status above; anything else is a fixed real-world site.
+  const [selectedObservatoryId, setSelectedObservatoryId] = useState('local');
   const [now, setNow] = useState(() => new Date());
   const [selected, setSelected] = useState<SelectedItem>(null);
 
@@ -448,19 +456,34 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
     };
   }, [spaceWeatherOn]);
 
-  const observer = useMemo(() => new Observer(coords.lat, coords.lon, 0), [coords]);
+  const selectedObservatory = OBSERVATORIES.find((o) => o.id === selectedObservatoryId) ?? OBSERVATORIES[0];
+  const isCustomObservatory = selectedObservatory.id !== 'local';
+  // 'local' always uses the real, live-tracked coords — a preset
+  // observatory's own lat/lon/elevation only ever apply when one is
+  // actually selected.
+  const effectiveCoords = isCustomObservatory ? { lat: selectedObservatory.lat, lon: selectedObservatory.lon } : coords;
+  const effectiveElevationKm = isCustomObservatory ? selectedObservatory.elevationMeters / 1000 : 0;
+
+  const observer = useMemo(
+    () => new Observer(effectiveCoords.lat, effectiveCoords.lon, effectiveElevationKm),
+    [effectiveCoords.lat, effectiveCoords.lon, effectiveElevationKm]
+  );
   const sky = useMemo(() => computeSky(observer, now), [observer, now]);
   const visible = sky.filter((b) => b.altitude > 0);
   const belowHorizon = sky.filter((b) => b.altitude <= 0);
 
   const issTopo = useMemo(() => {
     if (!iss) return null;
-    return topocentricPosition({ latitude: coords.lat, longitude: coords.lon, altitude: 0 }, iss.geo);
-  }, [iss, coords]);
+    return topocentricPosition(
+      { latitude: effectiveCoords.lat, longitude: effectiveCoords.lon, altitude: effectiveElevationKm },
+      iss.geo
+    );
+  }, [iss, effectiveCoords, effectiveElevationKm]);
 
   const cosmic = calculateCosmicTime();
-  const locationLabel =
-    status === 'granted'
+  const locationLabel = isCustomObservatory
+    ? `${selectedObservatory.name} — ${effectiveCoords.lat.toFixed(2)}°, ${effectiveCoords.lon.toFixed(2)}° · Elev ${selectedObservatory.elevationMeters}m`
+    : status === 'granted'
       ? `${coords.lat.toFixed(2)}°, ${coords.lon.toFixed(2)}°`
       : status === 'ip-fallback'
         ? `${coords.lat.toFixed(2)}°, ${coords.lon.toFixed(2)}° (approximate, from IP)`
@@ -555,10 +578,13 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
       </div>
 
       <div className="relative z-10 w-full max-w-3xl mx-auto space-y-6">
-        <div>
-          <span className="text-[10px] font-mono tracking-widest uppercase text-cyan-400/80">Sky Above You</span>
-          <h2 className="text-2xl font-bold tracking-wider text-white">Star Tracker</h2>
-          <p className="mt-1 font-mono text-xs text-cyan-100/80">{locationLabel}</p>
+        <div className="space-y-3">
+          <div>
+            <span className="text-[10px] font-mono tracking-widest uppercase text-cyan-400/80">Sky Above You</span>
+            <h2 className="text-2xl font-bold tracking-wider text-white">Star Tracker</h2>
+            <p className="mt-1 font-mono text-xs text-cyan-100/80">{locationLabel}</p>
+          </div>
+          <ObservatoryPicker selectedId={selectedObservatoryId} onSelectObservatory={(obs: Observatory) => setSelectedObservatoryId(obs.id)} />
         </div>
 
         {/* Time Sync header */}
@@ -569,7 +595,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           </div>
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">Sidereal Time</div>
-            <div className="font-mono text-sm text-cyan-300">{localSiderealTime(now, coords.lon)}</div>
+            <div className="font-mono text-sm text-cyan-300">{localSiderealTime(now, effectiveCoords.lon)}</div>
           </div>
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">Kali Yuga Epoch</div>
