@@ -7,6 +7,8 @@ import AiOneMessageContent from './AiOneMessageContent';
 import ChatHistoryPanel from './ChatHistoryPanel';
 import ChatImagesPanel from './ChatImagesPanel';
 import { downloadMarkdown, threadToMarkdown } from '@/lib/exportChat';
+import { useLanguage } from '@/lib/languageContext';
+import { translate, type TranslationKey } from '@/lib/translations';
 import {
   createThreadId,
   deriveTitle,
@@ -18,19 +20,14 @@ import {
   type DiscoveryMode,
 } from '@/lib/chatHistory';
 
-const GREETING: ChatMessage = {
-  role: 'assistant',
-  content:
-    "Welcome. I'm (Kali) — I keep company with ancient technology, quantum physics, and the mysteries stitched between them. Ask me what's on your mind.",
-};
-
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB — a sane guard before base64 inflation
 
-const MODES: { key: DiscoveryMode; label: string; title: string }[] = [
-  { key: 'cosmic', label: 'Cosmic', title: 'Cosmic / Ancient — archaeoastronomy, cycles, classical metaphysics' },
-  { key: 'synthesis', label: 'Synthesis', title: 'Synthesis / Discovery — bridges ancient and modern (default)' },
-  { key: 'quantum', label: 'Quantum', title: 'Quantum / Science — field theory, physics, consciousness models' },
-];
+const MODE_KEYS: DiscoveryMode[] = ['cosmic', 'synthesis', 'quantum'];
+const MODE_TRANSLATION_KEYS: Record<DiscoveryMode, { label: TranslationKey; title: TranslationKey }> = {
+  cosmic: { label: 'kali.mode.cosmic.label', title: 'kali.mode.cosmic.title' },
+  synthesis: { label: 'kali.mode.synthesis.label', title: 'kali.mode.synthesis.title' },
+  quantum: { label: 'kali.mode.quantum.label', title: 'kali.mode.quantum.title' },
+};
 
 type WidgetView = 'chat' | 'history' | 'images';
 
@@ -51,7 +48,15 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 export default function AiOneChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
+  const { language } = useLanguage();
+  // A plain function, not a module-level constant — needs the current
+  // language at call time, both for the initial mount and for "New chat"
+  // starting a fresh thread in whatever language is selected right now.
+  // Only ever computed once per thread; switching language mid-conversation
+  // doesn't retroactively rewrite messages already on screen (that would
+  // need a real translation call per message, not a static dictionary).
+  const greetingMessage = (): ChatMessage => ({ role: 'assistant', content: translate('kali.greeting', language) });
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [greetingMessage()]);
   const [input, setInput] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [mode, setMode] = useState<DiscoveryMode>('synthesis');
@@ -99,7 +104,7 @@ export default function AiOneChat() {
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
     const oversized = files.find((f) => f.size > MAX_IMAGE_BYTES);
-    setError(oversized ? `${oversized.name.toUpperCase()} IS TOO LARGE (5MB MAX).` : '');
+    setError(oversized ? `${oversized.name.toUpperCase()} ${translate('kali.error.fileTooLarge', language)}` : '');
     setAttachedFiles((prev) => [...prev, ...files.filter((f) => f.size <= MAX_IMAGE_BYTES)]);
     e.target.value = ''; // allow re-selecting the same file later
   };
@@ -111,7 +116,7 @@ export default function AiOneChat() {
   const startNewChat = () => {
     threadIdRef.current = createThreadId();
     createdAtRef.current = Date.now();
-    setMessages([GREETING]);
+    setMessages([greetingMessage()]);
     setError('');
     setView('chat');
   };
@@ -161,7 +166,7 @@ export default function AiOneChat() {
       const res = await fetch('/api/ai-one-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: nextMessages, mode }),
+        body: JSON.stringify({ messages: nextMessages, mode, language }),
       });
 
       if (!res.ok || !res.body) {
@@ -185,7 +190,7 @@ export default function AiOneChat() {
         });
       }
     } catch {
-      setError('SIGNAL LOST. AI ONE IS UNREACHABLE.');
+      setError(translate('kali.error.unreachable', language));
       setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsStreaming(false);
@@ -205,21 +210,24 @@ export default function AiOneChat() {
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value as DiscoveryMode)}
-          title="Reasoning mode"
+          title={translate('kali.tooltip.reasoningMode', language)}
           className="px-2 py-1 text-[9px] font-mono uppercase tracking-wider bg-black/40 border rounded border-slate-700 text-slate-200 focus:outline-none focus:border-white/50"
         >
-          {MODES.map((m) => (
-            <option key={m.key} value={m.key} title={m.title}>
-              {m.label}
-            </option>
-          ))}
+          {MODE_KEYS.map((key) => {
+            const t = MODE_TRANSLATION_KEYS[key];
+            return (
+              <option key={key} value={key} title={translate(t.title, language)}>
+                {translate(t.label, language)}
+              </option>
+            );
+          })}
         </select>
 
         <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={startNewChat}
-            title="New chat"
+            title={translate('kali.tooltip.newChat', language)}
             className="flex items-center justify-center w-6 h-6 transition rounded text-slate-400 hover:text-white hover:bg-slate-800"
           >
             <SquarePen className="w-3.5 h-3.5" />
@@ -227,7 +235,7 @@ export default function AiOneChat() {
           <button
             type="button"
             onClick={() => setView('history')}
-            title="History"
+            title={translate('kali.tooltip.history', language)}
             className="flex items-center justify-center w-6 h-6 transition rounded text-slate-400 hover:text-white hover:bg-slate-800"
           >
             <HistoryIcon className="w-3.5 h-3.5" />
@@ -235,7 +243,7 @@ export default function AiOneChat() {
           <button
             type="button"
             onClick={() => setView('images')}
-            title="Images"
+            title={translate('kali.tooltip.images', language)}
             className="flex items-center justify-center w-6 h-6 transition rounded text-slate-400 hover:text-white hover:bg-slate-800"
           >
             <ImageIcon className="w-3.5 h-3.5" />
@@ -243,7 +251,7 @@ export default function AiOneChat() {
           <button
             type="button"
             onClick={exportCurrentThread}
-            title="Export conversation as Markdown"
+            title={translate('kali.tooltip.export', language)}
             className="flex items-center justify-center w-6 h-6 transition rounded text-slate-400 hover:text-white hover:bg-slate-800"
           >
             <Download className="w-3.5 h-3.5" />
@@ -262,7 +270,7 @@ export default function AiOneChat() {
                   m.role === 'user' ? 'uppercase text-slate-500' : 'text-white'
                 }`}
               >
-                {m.role === 'user' ? 'you' : '(Kali)'}
+                {m.role === 'user' ? translate('kali.you', language) : '(Kali)'}
               </span>
               {images.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1 mb-1">
@@ -315,7 +323,7 @@ export default function AiOneChat() {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          title="Attach an image"
+          title={translate('kali.tooltip.attachImage', language)}
           className="flex items-center justify-center w-8 h-8 transition rounded shrink-0 text-slate-400 hover:text-white hover:bg-slate-800"
         >
           <Plus className="w-4 h-4" />
@@ -325,7 +333,7 @@ export default function AiOneChat() {
           <button
             type="button"
             onClick={toggleListening}
-            title={isListening ? 'Stop voice input' : 'Voice input'}
+            title={translate(isListening ? 'kali.tooltip.voiceInputStop' : 'kali.tooltip.voiceInputStart', language)}
             className={`flex items-center justify-center w-8 h-8 shrink-0 rounded transition ${
               isListening
                 ? 'bg-red-500/20 text-red-400 animate-pulse border border-red-500/40'
@@ -340,7 +348,7 @@ export default function AiOneChat() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={isListening ? 'LISTENING…' : 'ASK AI ONE...'}
+          placeholder={translate(isListening ? 'kali.placeholder.listening' : 'kali.placeholder.ask', language)}
           disabled={isStreaming}
           spellCheck
           autoCorrect="on"
@@ -352,7 +360,7 @@ export default function AiOneChat() {
           disabled={isStreaming || (!input.trim() && attachedFiles.length === 0)}
           className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-white text-black hover:bg-neutral-200 disabled:opacity-50 whitespace-nowrap"
         >
-          {isStreaming ? '…' : 'Send'}
+          {isStreaming ? '…' : translate('kali.send', language)}
         </button>
       </form>
     </div>

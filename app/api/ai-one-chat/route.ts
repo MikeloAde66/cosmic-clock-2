@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dbConnect from '@/lib/dbConnect';
 import { embedOne } from '@/lib/voyage';
+import { isLanguageCode, LANGUAGE_NAMES } from '@/lib/languages';
 
 export const runtime = 'nodejs';
 
@@ -100,7 +101,11 @@ export async function POST(request: Request) {
     return new Response('Ai One is not connected yet — no API key configured.', { status: 500 });
   }
 
-  const { messages, mode } = (await request.json()) as { messages: ChatMessage[]; mode?: unknown };
+  const { messages, mode, language } = (await request.json()) as {
+    messages: ChatMessage[];
+    mode?: unknown;
+    language?: unknown;
+  };
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return new Response('No messages provided.', { status: 400 });
@@ -113,6 +118,15 @@ export async function POST(request: Request) {
     MODE_ADDENDA[resolvedMode] +
     (retrievedContext
       ? `\n\nRelevant excerpts from ingested primary sources — draw on these where genuinely relevant, cite the source naturally, and ignore any that aren't a good fit for this question:\n\n${retrievedContext}`
+      : '') +
+    // 'en' (the default) needs no instruction — Claude already responds in
+    // whatever language the user writes in. Anything else asks for a real
+    // language switch, since a user picking Spanish still often types in
+    // English or mixes languages. Product/brand names (Ai One, Kali AI,
+    // Star Tracker, etc.) stay in English regardless — that's a real,
+    // fixed identity, not something to localize.
+    (isLanguageCode(language) && language !== 'en'
+      ? `\n\nLanguage preference: ${LANGUAGE_NAMES[language]}. Respond entirely in ${LANGUAGE_NAMES[language]}, regardless of what language the user's message is written in. Keep product and brand names exactly as given in English (e.g. "Ai One", "Kali AI", "Star Tracker") — don't translate those.`
       : '');
 
   for (const m of messages) {

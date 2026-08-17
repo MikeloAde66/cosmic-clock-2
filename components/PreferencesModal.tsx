@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { matchRole } from '@/lib/vaultRoleKeys';
+import { useLanguage } from '@/lib/languageContext';
+import { LANGUAGE_OPTIONS } from '@/lib/languages';
 
 interface PreferencesModalProps {
   isAdmin: boolean;
@@ -20,6 +22,7 @@ interface PreferencesModalProps {
 export default function PreferencesModal({ isAdmin, onClose, onUnlockVault, onOpenVaultForOwner }: PreferencesModalProps) {
   const [vaultKeyInput, setVaultKeyInput] = useState('');
   const [vaultKeyError, setVaultKeyError] = useState('');
+  const { language, setLanguage } = useLanguage();
 
   const handleVaultKeySubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +51,30 @@ export default function PreferencesModal({ isAdmin, onClose, onUnlockVault, onOp
           <button onClick={onClose} aria-label="Close" className="text-neutral-500 hover:text-white">
             ✕
           </button>
+        </div>
+
+        <div className="space-y-2">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-500">Language</span>
+          <div className="grid grid-cols-4 gap-1.5">
+            {LANGUAGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.code}
+                type="button"
+                onClick={() => setLanguage(opt.code)}
+                title={opt.label}
+                className={`px-2 py-1.5 text-[10px] font-mono uppercase rounded border transition ${
+                  language === opt.code
+                    ? 'bg-white text-black border-white font-bold'
+                    : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:border-neutral-600 hover:text-neutral-200'
+                }`}
+              >
+                {opt.code === 'en' ? 'EN' : opt.code.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <p className="font-mono text-[9px] text-neutral-600">
+            Sets Kali AI's response language and translates the chat interface.
+          </p>
         </div>
 
         <div className="pt-4 space-y-2 border-t border-neutral-900">
