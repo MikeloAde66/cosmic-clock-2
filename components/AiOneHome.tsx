@@ -121,7 +121,15 @@ export default function AiOneHome({
             <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-transparent to-[#070b14]/70" />
 
             <div className="relative z-10 px-4 space-y-2 text-center">
-              <h1 className="text-5xl md:text-6xl font-black tracking-wider text-white">
+              <h1
+                className="text-5xl md:text-6xl text-white"
+                style={{
+                  fontFamily:
+                    '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif',
+                  fontWeight: 800,
+                  letterSpacing: '-0.025em',
+                }}
+              >
                 Ai One
               </h1>
               <p className="font-mono text-xs tracking-widest uppercase md:text-sm text-slate-300">
