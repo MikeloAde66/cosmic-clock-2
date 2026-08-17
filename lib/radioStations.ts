@@ -27,6 +27,14 @@ export type RadioStation = LiveRadioStation | VaultRadioStation;
 
 export const CATEGORIES = ['ALL', 'CURRENT AFFAIRS', 'VAULT STATIONS'];
 
+// Display-only relabeling — CATEGORIES' own values still drive filtering
+// (station.category === activeCategory) and every RadioStation's category
+// field, so this only changes the filter button's rendered text, not the
+// underlying matching logic. Categories not listed here render as-is.
+export const CATEGORY_LABELS: Record<string, string> = {
+  'VAULT STATIONS': 'STATIONS',
+};
+
 export interface OutkastLink {
   label: string;
   // Placeholder destinations — swap for the real URLs once they exist, same

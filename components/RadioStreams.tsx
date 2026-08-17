@@ -1,27 +1,162 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
-import { CATEGORIES, OUTKAST_COMING_SOON, OUTKAST_LINKS, RADIO_STATIONS, type RadioStation } from '@/lib/radioStations';
+import { Folder, FolderOpen, Pause, Play, Plus, Search, Upload, X } from 'lucide-react';
+import {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  OUTKAST_COMING_SOON,
+  OUTKAST_LINKS,
+  RADIO_STATIONS,
+  type RadioStation,
+} from '@/lib/radioStations';
 import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
+
+interface CustomTrack {
+  id: string;
+  title: string;
+  fileUrl: string;
+  // Only set for uploaded files (needs URL.revokeObjectURL on cleanup) —
+  // the pre-loaded demo track points at a real static asset instead.
+  isBlobUrl?: boolean;
+}
+
+interface CustomPlaylist {
+  id: string;
+  name: string;
+  tracks: CustomTrack[];
+}
+
+// One pre-loaded Vault Folder so first-time visitors see exactly how
+// playback/track loading/folder views work before uploading anything of
+// their own. Real audio file already in the project, not a placeholder.
+const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
+  {
+    id: 'demo-folder',
+    name: 'Demo Beats',
+    tracks: [{ id: 'demo-track-jlb', title: 'JLB Fusion', fileUrl: '/assets/jlb%20fusion.mp3' }],
+  },
+];
+
+function VaultFolderCard({
+  playlist,
+  isExpanded,
+  onToggle,
+  onPlayTrack,
+  activeTrackId,
+  isPlaying,
+}: {
+  playlist: CustomPlaylist;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onPlayTrack: (track: CustomTrack) => void;
+  activeTrackId?: string;
+  isPlaying: boolean;
+}) {
+  const FolderIcon = isExpanded ? FolderOpen : Folder;
+  return (
+    <div className="relative mt-3">
+      {/* Folder tab — the "high-tech Vault Folder" motif: a small notch
+          above the card body, same silhouette as a physical file folder. */}
+      <div className="absolute px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider border border-b-0 rounded-t -top-2.5 left-3 bg-cyan-950/70 border-cyan-800/60 text-cyan-400">
+        Vault Folder
+      </div>
+      <div className="overflow-hidden border rounded-lg rounded-tl-none border-cyan-900/50 bg-slate-950/80 shadow-[0_0_15px_rgba(0,240,255,0.05)]">
+        <button
+          onClick={onToggle}
+          className="flex items-center justify-between w-full gap-2 px-3 py-2.5 text-left transition hover:bg-cyan-950/20"
+        >
+          <div className="flex items-center min-w-0 gap-2">
+            <FolderIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="text-xs font-bold text-white truncate">{playlist.name}</span>
+          </div>
+          <span className="font-mono text-[10px] text-slate-500 shrink-0">
+            {playlist.tracks.length} track{playlist.tracks.length === 1 ? '' : 's'}
+          </span>
+        </button>
+
+        {isExpanded && (
+          <div className="border-t border-cyan-900/40">
+            {playlist.tracks.length === 0 ? (
+              <p className="px-3 py-2 font-mono text-[10px] text-slate-600">Empty — no tracks yet.</p>
+            ) : (
+              playlist.tracks.map((track) => {
+                const isActive = activeTrackId === track.id;
+                return (
+                  <button
+                    key={track.id}
+                    onClick={() => onPlayTrack(track)}
+                    className={`flex items-center gap-2 w-full px-3 py-2 text-left text-[11px] font-mono transition border-t border-slate-800/60 first:border-t-0 ${
+                      isActive ? 'bg-cyan-950/30 text-cyan-300' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    {isActive && isPlaying ? (
+                      <Pause className="w-3 h-3 shrink-0" />
+                    ) : (
+                      <Play className="w-3 h-3 shrink-0" />
+                    )}
+                    <span className="truncate">{track.title}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function RadioStreams() {
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [showOutkastMenu, setShowOutkastMenu] = useState<boolean>(false);
-  const outkastMenuRef = useRef<HTMLDivElement | null>(null);
+  const [showBrowseMenu, setShowBrowseMenu] = useState<boolean>(false);
+  const browseMenuRef = useRef<HTMLDivElement | null>(null);
   const { station: playingStation, status, playStation, togglePlayPause } = useRadioPlayer();
 
+  // Custom playlists — kept in this component's own React state only, not
+  // localStorage or a backend: uploaded files become blob URLs (same
+  // approach PodsModule's local uploads already use), which are only ever
+  // valid for the current page session and don't survive a reload.
+  const [customPlaylists, setCustomPlaylists] = useState<CustomPlaylist[]>(DEFAULT_PLAYLISTS);
+  const [expandedPlaylistId, setExpandedPlaylistId] = useState<string | null>('demo-folder');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+
+  // Independent local player for custom tracks — a native <audio> element,
+  // separate from the global radio queue (which is built from real station
+  // configs, not ad-hoc client uploads). RadioPlayerContext's own
+  // document-level 'play' listener already picks this up automatically and
+  // pauses the global radio the instant it starts, with no extra wiring
+  // needed here.
+  const customAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [activeCustomTrack, setActiveCustomTrack] = useState<CustomTrack | null>(null);
+  const [isCustomPlaying, setIsCustomPlaying] = useState(false);
+
   useEffect(() => {
-    if (!showOutkastMenu) return;
+    if (!showBrowseMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (outkastMenuRef.current && !outkastMenuRef.current.contains(e.target as Node)) {
-        setShowOutkastMenu(false);
+      if (browseMenuRef.current && !browseMenuRef.current.contains(e.target as Node)) {
+        setShowBrowseMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showOutkastMenu]);
+  }, [showBrowseMenu]);
+
+  // Revoke blob URLs on unmount so uploaded files don't leak memory once
+  // this view goes away.
+  // Tracks every blob URL ever created (a ref, not customPlaylists state
+  // itself, so the unmount cleanup below always sees playlists created
+  // after mount too — a plain [] effect closing over customPlaylists would
+  // only ever see its initial value).
+  const blobUrlsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    return () => {
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   const handleTuneIn = (station: RadioStation) => {
     if (playingStation?.id === station.id) {
@@ -29,6 +164,52 @@ export default function RadioStreams() {
       return;
     }
     playStation(station);
+  };
+
+  const playCustomTrack = (track: CustomTrack) => {
+    if (activeCustomTrack?.id === track.id) {
+      if (isCustomPlaying) customAudioRef.current?.pause();
+      else customAudioRef.current?.play().catch(() => {});
+      return;
+    }
+    setActiveCustomTrack(track);
+  };
+
+  useEffect(() => {
+    if (!activeCustomTrack || !customAudioRef.current) return;
+    customAudioRef.current.src = activeCustomTrack.fileUrl;
+    customAudioRef.current.play().catch(() => {});
+  }, [activeCustomTrack]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    setPendingFiles((prev) => [...prev, ...files]);
+    e.target.value = '';
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCreatePlaylist = () => {
+    const name = newPlaylistName.trim();
+    if (!name) return;
+    const tracks: CustomTrack[] = pendingFiles.map((file, i) => {
+      const fileUrl = URL.createObjectURL(file);
+      blobUrlsRef.current.add(fileUrl);
+      return {
+        id: `${Date.now()}-${i}`,
+        title: file.name.replace(/\.[^/.]+$/, ''),
+        fileUrl,
+        isBlobUrl: true,
+      };
+    });
+    const newPlaylist: CustomPlaylist = { id: `playlist-${Date.now()}`, name, tracks };
+    setCustomPlaylists((prev) => [newPlaylist, ...prev]);
+    setExpandedPlaylistId(newPlaylist.id);
+    setNewPlaylistName('');
+    setPendingFiles([]);
+    setShowCreateModal(false);
   };
 
   const query = searchQuery.trim().toLowerCase();
@@ -42,6 +223,12 @@ export default function RadioStreams() {
 
   return (
     <div className="relative z-10 w-full h-full p-8 overflow-y-auto">
+      <audio
+        ref={customAudioRef}
+        onPlay={() => setIsCustomPlaying(true)}
+        onPause={() => setIsCustomPlaying(false)}
+        onEnded={() => setIsCustomPlaying(false)}
+      />
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase">
@@ -70,25 +257,50 @@ export default function RadioStreams() {
                   : 'bg-slate-900/60 text-slate-400 border border-slate-800 hover:border-slate-700'
               }`}
             >
-              {cat}
+              {CATEGORY_LABELS[cat] ?? cat}
             </button>
           ))}
 
-          <div className="relative" ref={outkastMenuRef}>
+          <div className="relative" ref={browseMenuRef}>
             <button
-              onClick={() => setShowOutkastMenu((v) => !v)}
+              onClick={() => setShowBrowseMenu((v) => !v)}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-mono uppercase tracking-wide transition whitespace-nowrap border ${
-                showOutkastMenu
+                showBrowseMenu
                   ? 'bg-white/20 text-white border-neutral-700'
                   : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:border-slate-700'
               }`}
             >
-              OUTKAST ▾
+              BROWSE ▾
             </button>
 
-            {showOutkastMenu && (
-              <div className="absolute left-0 z-50 py-1 mt-2 border rounded-md shadow-lg w-56 bg-slate-900 border-neutral-700">
-                <div className="px-3 pt-2 pb-1 text-[10px] font-mono tracking-wider uppercase text-slate-500">
+            {showBrowseMenu && (
+              <div className="absolute left-0 z-50 p-3 mt-2 border rounded-md shadow-lg w-96 bg-slate-900 border-neutral-700 max-h-[70vh] overflow-y-auto">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono tracking-wider uppercase text-slate-500">
+                    Your Playlists
+                  </span>
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-white text-black hover:bg-neutral-200 transition"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add Playlist
+                  </button>
+                </div>
+
+                {customPlaylists.map((pl) => (
+                  <VaultFolderCard
+                    key={pl.id}
+                    playlist={pl}
+                    isExpanded={expandedPlaylistId === pl.id}
+                    onToggle={() => setExpandedPlaylistId((cur) => (cur === pl.id ? null : pl.id))}
+                    onPlayTrack={playCustomTrack}
+                    activeTrackId={activeCustomTrack?.id}
+                    isPlaying={isCustomPlaying}
+                  />
+                ))}
+
+                <div className="px-1 pt-3 pb-1 mt-4 text-[10px] font-mono tracking-wider uppercase border-t text-slate-500 border-slate-800">
                   Community
                 </div>
                 {OUTKAST_LINKS.map((link) => (
@@ -97,19 +309,19 @@ export default function RadioStreams() {
                     href={link.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block w-full px-3 py-1.5 text-left text-[11px] font-mono text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                    className="block w-full px-1 py-1.5 text-left text-[11px] font-mono text-slate-300 hover:text-white transition-colors"
                   >
                     {link.label}
                   </a>
                 ))}
 
-                <div className="px-3 pt-2 pb-1 mt-1 text-[10px] font-mono tracking-wider uppercase border-t text-slate-500 border-slate-800">
+                <div className="px-1 pt-2 pb-1 mt-1 text-[10px] font-mono tracking-wider uppercase border-t text-slate-500 border-slate-800">
                   Challenges
                 </div>
                 {OUTKAST_COMING_SOON.map((entry) => (
                   <div
                     key={entry.label}
-                    className="flex items-center justify-between w-full px-3 py-1.5 text-[11px] font-mono text-slate-600"
+                    className="flex items-center justify-between w-full px-1 py-1.5 text-[11px] font-mono text-slate-600"
                   >
                     <span>{entry.label}</span>
                     <span className="text-[9px] uppercase tracking-wider text-slate-700">Soon</span>
@@ -194,6 +406,63 @@ export default function RadioStreams() {
           })}
         </div>
       </div>
+
+      {showCreateModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            className="w-full max-w-sm p-6 space-y-4 border shadow-2xl bg-slate-950 border-cyan-900/50 rounded-xl shadow-[0_0_30px_rgba(0,240,255,0.08)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white">New Vault Folder</h3>
+              <button onClick={() => setShowCreateModal(false)} aria-label="Close" className="text-slate-500 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <input
+              type="text"
+              value={newPlaylistName}
+              onChange={(e) => setNewPlaylistName(e.target.value)}
+              placeholder="Playlist name…"
+              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-900 border-slate-800 text-slate-200 focus:outline-none focus:border-cyan-500/50"
+            />
+
+            <label className="flex items-center justify-center gap-2 w-full p-3 text-xs font-mono uppercase tracking-wide border border-dashed rounded-lg cursor-pointer border-slate-700 text-slate-400 hover:border-cyan-700 hover:text-cyan-300 transition">
+              <Upload className="w-3.5 h-3.5" />
+              Upload audio files
+              <input type="file" accept="audio/*" multiple className="hidden" onChange={handleFileSelect} />
+            </label>
+
+            {pendingFiles.length > 0 && (
+              <ul className="space-y-1 max-h-32 overflow-y-auto">
+                {pendingFiles.map((file, i) => (
+                  <li
+                    key={`${file.name}-${i}`}
+                    className="flex items-center justify-between px-2 py-1 text-[11px] font-mono border rounded border-slate-800 bg-slate-900/60 text-slate-300"
+                  >
+                    <span className="truncate">{file.name}</span>
+                    <button onClick={() => removePendingFile(i)} className="ml-2 text-slate-500 hover:text-rose-400 shrink-0">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <button
+              onClick={handleCreatePlaylist}
+              disabled={!newPlaylistName.trim()}
+              className="w-full py-2.5 text-xs font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Create Playlist
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
