@@ -11,6 +11,7 @@ import {
   type RadioStation,
 } from '@/lib/radioStations';
 import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
+import { getAllStoredPlaylists, saveStoredPlaylist, type StoredPlaylist } from '@/lib/customPlaylistDB';
 
 interface CustomTrack {
   id: string;
@@ -114,15 +115,19 @@ export default function RadioStreams() {
   const browseMenuRef = useRef<HTMLDivElement | null>(null);
   const { station: playingStation, status, playStation, togglePlayPause } = useRadioPlayer();
 
-  // Custom playlists — kept in this component's own React state only, not
-  // localStorage or a backend: uploaded files become blob URLs (same
-  // approach PodsModule's local uploads already use), which are only ever
-  // valid for the current page session and don't survive a reload.
+  // Custom playlists — strictly client-side, no network calls anywhere in
+  // this flow. React state drives the UI; user-created playlists (not the
+  // shipped demo folder) are also persisted to IndexedDB via
+  // lib/customPlaylistDB, which — unlike localStorage — can actually store
+  // the uploaded audio bytes themselves, not just names/strings. Loaded
+  // back and re-materialized into fresh blob URLs on mount below.
   const [customPlaylists, setCustomPlaylists] = useState<CustomPlaylist[]>(DEFAULT_PLAYLISTS);
   const [expandedPlaylistId, setExpandedPlaylistId] = useState<string | null>('demo-folder');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  // Title is independently editable per file, defaulting to its filename —
+  // not just derived from the filename at creation time.
+  const [pendingTracks, setPendingTracks] = useState<{ file: File; title: string }[]>([]);
 
   // Independent local player for custom tracks — a native <audio> element,
   // separate from the global radio queue (which is built from real station
@@ -145,16 +150,39 @@ export default function RadioStreams() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showBrowseMenu]);
 
-  // Revoke blob URLs on unmount so uploaded files don't leak memory once
-  // this view goes away.
   // Tracks every blob URL ever created (a ref, not customPlaylists state
   // itself, so the unmount cleanup below always sees playlists created
   // after mount too — a plain [] effect closing over customPlaylists would
-  // only ever see its initial value).
+  // only ever see its initial value) — revoked on unmount so they don't
+  // leak memory once this view goes away.
   const blobUrlsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     return () => {
       blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  // Load any playlists persisted from a previous session — re-materializes
+  // each stored Blob into a fresh object URL, since those don't survive a
+  // reload even though the underlying bytes in IndexedDB do.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const stored = await getAllStoredPlaylists();
+      if (cancelled || stored.length === 0) return;
+      const restored: CustomPlaylist[] = stored.map((pl) => ({
+        id: pl.id,
+        name: pl.name,
+        tracks: pl.tracks.map((t) => {
+          const fileUrl = URL.createObjectURL(t.blob);
+          blobUrlsRef.current.add(fileUrl);
+          return { id: t.id, title: t.title, fileUrl, isBlobUrl: true };
+        }),
+      }));
+      setCustomPlaylists((prev) => [...prev, ...restored]);
+    })();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -183,23 +211,32 @@ export default function RadioStreams() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    setPendingFiles((prev) => [...prev, ...files]);
+    setPendingTracks((prev) => [
+      ...prev,
+      ...files.map((file) => ({ file, title: file.name.replace(/\.[^/.]+$/, '') })),
+    ]);
     e.target.value = '';
   };
 
-  const removePendingFile = (index: number) => {
-    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  const removePendingTrack = (index: number) => {
+    setPendingTracks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const renamePendingTrack = (index: number, title: string) => {
+    setPendingTracks((prev) => prev.map((t, i) => (i === index ? { ...t, title } : t)));
   };
 
   const handleCreatePlaylist = () => {
     const name = newPlaylistName.trim();
     if (!name) return;
-    const tracks: CustomTrack[] = pendingFiles.map((file, i) => {
+
+    const trackIds = pendingTracks.map((_, i) => `${Date.now()}-${i}`);
+    const tracks: CustomTrack[] = pendingTracks.map(({ file, title }, i) => {
       const fileUrl = URL.createObjectURL(file);
       blobUrlsRef.current.add(fileUrl);
       return {
-        id: `${Date.now()}-${i}`,
-        title: file.name.replace(/\.[^/.]+$/, ''),
+        id: trackIds[i],
+        title: title.trim() || file.name.replace(/\.[^/.]+$/, ''),
         fileUrl,
         isBlobUrl: true,
       };
@@ -208,8 +245,21 @@ export default function RadioStreams() {
     setCustomPlaylists((prev) => [newPlaylist, ...prev]);
     setExpandedPlaylistId(newPlaylist.id);
     setNewPlaylistName('');
-    setPendingFiles([]);
+    setPendingTracks([]);
     setShowCreateModal(false);
+
+    // Persist the raw File objects (Files are Blobs) so this playlist,
+    // including its actual audio, survives a reload — not just its name.
+    const stored: StoredPlaylist = {
+      id: newPlaylist.id,
+      name: newPlaylist.name,
+      tracks: pendingTracks.map(({ file, title }, i) => ({
+        id: trackIds[i],
+        title: title.trim() || file.name.replace(/\.[^/.]+$/, ''),
+        blob: file,
+      })),
+    };
+    saveStoredPlaylist(stored);
   };
 
   const query = searchQuery.trim().toLowerCase();
@@ -437,15 +487,21 @@ export default function RadioStreams() {
               <input type="file" accept="audio/*" multiple className="hidden" onChange={handleFileSelect} />
             </label>
 
-            {pendingFiles.length > 0 && (
-              <ul className="space-y-1 max-h-32 overflow-y-auto">
-                {pendingFiles.map((file, i) => (
+            {pendingTracks.length > 0 && (
+              <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                {pendingTracks.map((t, i) => (
                   <li
-                    key={`${file.name}-${i}`}
-                    className="flex items-center justify-between px-2 py-1 text-[11px] font-mono border rounded border-slate-800 bg-slate-900/60 text-slate-300"
+                    key={`${t.file.name}-${i}`}
+                    className="flex items-center gap-2 px-2 py-1.5 border rounded border-slate-800 bg-slate-900/60"
                   >
-                    <span className="truncate">{file.name}</span>
-                    <button onClick={() => removePendingFile(i)} className="ml-2 text-slate-500 hover:text-rose-400 shrink-0">
+                    <input
+                      type="text"
+                      value={t.title}
+                      onChange={(e) => renamePendingTrack(i, e.target.value)}
+                      placeholder="Track title…"
+                      className="flex-1 min-w-0 text-[11px] font-mono bg-transparent text-slate-200 outline-none"
+                    />
+                    <button onClick={() => removePendingTrack(i)} className="text-slate-500 hover:text-rose-400 shrink-0">
                       <X className="w-3 h-3" />
                     </button>
                   </li>
