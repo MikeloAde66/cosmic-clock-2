@@ -228,6 +228,15 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
                       backgroundRepeat: 'repeat-x',
                     }}
                   />
+                  {/* Southern pole blend — the source photo's Antarctic ice
+                      renders as stark bright white; this tints it down into
+                      the surrounding deep-navy ocean palette instead. The
+                      image only pans horizontally (backgroundSize is
+                      200% 100%), so the pole always sits at the same
+                      vertical position regardless of animation phase — a
+                      gradient anchored to the bottom of the disc stays
+                      correctly aligned with it at every frame. */}
+                  <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_85%_38%_at_50%_100%,rgba(8,20,45,0.78)_0%,rgba(8,20,45,0.45)_45%,transparent_78%)]" />
                   {/* Subtle spherical shading */}
                   <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_35%_35%,transparent_35%,rgba(0,0,0,0.55)_100%)]" />
                   {/* Day/night terminator */}
