@@ -8,6 +8,7 @@ export default function HardwareProductSlide({ product }: { product: HardwarePro
   return (
     <ProductHeroCard
       heroImageSrc={product.heroImageSrc}
+      videoSrc={product.videoSrc}
       heroTagline={product.heroTagline}
       ctaLabel="Explore Node Specs →"
       ctaHref={`/products/${product.id}`}

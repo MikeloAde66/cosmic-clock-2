@@ -27,7 +27,19 @@ export default function HardwareProductDetail({ product }: { product: HardwarePr
         {/* Hero: image alongside headline/price/CTA, stacked on mobile */}
         <div className="grid gap-8 md:grid-cols-2 md:items-center">
           <div className="relative w-full h-80 overflow-hidden border rounded-xl border-slate-800 bg-[#0B0E14]">
-            <Image src={product.heroImageSrc} alt={product.heroTagline} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-contain" />
+            {product.videoSrc ? (
+              <video
+                src={product.videoSrc}
+                poster={product.heroImageSrc}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 object-contain w-full h-full"
+              />
+            ) : (
+              <Image src={product.heroImageSrc} alt={product.heroTagline} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-contain" />
+            )}
           </div>
 
           <div className="space-y-5">

@@ -13,6 +13,11 @@ export interface HardwareProduct {
   // Real hero graphic slot — doesn't exist in public/images/ yet. Renders
   // as a broken image until the real file is saved at that exact path.
   heroImageSrc: string;
+  // Optional looping MP4/WebM demo, e.g. '/videos/aione-core-demo.mp4' —
+  // when set, replaces heroImageSrc as the rendered media (which still
+  // doubles as the video's poster frame) in both the carousel card and
+  // detail page hero. No product sets this yet.
+  videoSrc?: string;
   heroTagline: string;
   essence: string;
   features: string[];

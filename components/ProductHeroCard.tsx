@@ -10,11 +10,13 @@ import Link from 'next/link';
 // underneath a poster that already shows one.
 export default function ProductHeroCard({
   heroImageSrc,
+  videoSrc,
   heroTagline,
   ctaLabel,
   ctaHref,
 }: {
   heroImageSrc: string;
+  videoSrc?: string;
   heroTagline: string;
   ctaLabel: string;
   ctaHref: string;
@@ -26,7 +28,19 @@ export default function ProductHeroCard({
         aria-label={ctaLabel}
         className="relative block w-full max-w-md h-[480px] overflow-hidden transition border rounded-xl border-slate-800 bg-[#0B0E14] hover:border-neutral-500"
       >
-        <Image src={heroImageSrc} alt={heroTagline} fill sizes="(max-width: 640px) 100vw, 448px" className="object-contain" />
+        {videoSrc ? (
+          <video
+            src={videoSrc}
+            poster={heroImageSrc}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 object-contain w-full h-full"
+          />
+        ) : (
+          <Image src={heroImageSrc} alt={heroTagline} fill sizes="(max-width: 640px) 100vw, 448px" className="object-contain" />
+        )}
       </Link>
     </div>
   );
