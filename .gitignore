@@ -39,6 +39,12 @@ yarn-error.log*
 # local archive of non-media files pulled out of public/assets (never web-servable, never committed)
 /_local-archive/
 
+# unreferenced local media dump — nothing in app code links to these; never committed
+/public/assets/
+
+# scratch project with its own node_modules, unrelated to this app
+/sat-test/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
