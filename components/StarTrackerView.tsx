@@ -20,6 +20,8 @@ import { listPlaylist, parseYouTubeId, removePlaylistItem, savePlaylistItem, typ
 import type { YouTubePlayer } from '@/lib/youtubeIframeApi';
 import { MESSIER_OBJECTS } from '@/lib/messierCatalog';
 import ObservatoryPicker, { OBSERVATORIES, type Observatory } from './ObservatoryPicker';
+import { useTelescopeConnection } from '@/lib/useTelescopeConnection';
+import TelescopeConnectPanel from './telescope/TelescopeConnectPanel';
 
 // The same real NASA ISS live feed already used by ISSFeedModal (the
 // header's "LIVE ISS" button) — reused here so the video is inline inside
@@ -261,6 +263,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const [stars, setStars] = useState<StarTuple[] | null>(null);
 
   const [skyFestOpen, setSkyFestOpen] = useState(false);
+  const telescope = useTelescopeConnection();
   const [skyFestTab, setSkyFestTab] = useState<'eclipses' | 'meteors' | 'media'>('eclipses');
 
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
@@ -658,6 +661,8 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           </button>
         </div>
 
+        <TelescopeConnectPanel connection={telescope} />
+
         {skyFestOpen && (
           <div className="overflow-hidden border rounded-lg border-cyan-500/20 bg-black/30">
             <div className="flex border-b border-cyan-500/20">
@@ -1021,6 +1026,32 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                   })()}
                 </g>
               )}
+              {(telescope.mode === 'connected' || telescope.mode === 'simulator') &&
+                telescope.position &&
+                (() => {
+                  const xy = equatorialToXY(telescope.position.raHours, telescope.position.decDeg, observer, now, center, radius);
+                  if (!xy) return null;
+                  return (
+                    <g className="pointer-events-none">
+                      <circle
+                        cx={xy.x}
+                        cy={xy.y}
+                        r={telescope.slewing ? 10 : 8}
+                        fill="none"
+                        stroke={telescope.slewing ? '#c084fc' : '#22d3ee'}
+                        strokeWidth={1.5}
+                        strokeDasharray={telescope.slewing ? '3 2' : undefined}
+                      />
+                      <line x1={xy.x - 13} y1={xy.y} x2={xy.x - 5} y2={xy.y} stroke={telescope.slewing ? '#c084fc' : '#22d3ee'} strokeWidth={1.5} />
+                      <line x1={xy.x + 5} y1={xy.y} x2={xy.x + 13} y2={xy.y} stroke={telescope.slewing ? '#c084fc' : '#22d3ee'} strokeWidth={1.5} />
+                      <line x1={xy.x} y1={xy.y - 13} x2={xy.x} y2={xy.y - 5} stroke={telescope.slewing ? '#c084fc' : '#22d3ee'} strokeWidth={1.5} />
+                      <line x1={xy.x} y1={xy.y + 5} x2={xy.x} y2={xy.y + 13} stroke={telescope.slewing ? '#c084fc' : '#22d3ee'} strokeWidth={1.5} />
+                      <text x={xy.x} y={xy.y + 24} textAnchor="middle" fill={telescope.slewing ? '#c084fc' : '#22d3ee'} fontSize={8} fontFamily="monospace">
+                        {telescope.slewing ? 'SLEWING' : 'SCOPE'}
+                      </text>
+                    </g>
+                  );
+                })()}
             </g>
           </svg>
         </div>
@@ -1052,6 +1083,11 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           {issLayerOn && (
             <span className="flex items-center gap-1.5">
               <span className="inline-block w-2 h-2 bg-[#22d3ee]" /> ISS
+            </span>
+          )}
+          {(telescope.mode === 'connected' || telescope.mode === 'simulator') && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 border rounded-full border-cyan-400" /> Telescope target
             </span>
           )}
           <span className="flex items-center gap-1.5">
