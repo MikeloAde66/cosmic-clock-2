@@ -1,17 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Starfield from '@/components/Starfield';
-import CosmicCanvas from '@/components/CosmicCanvas';
-import RadioStreams from '@/components/RadioStreams';
-import PodsModule from '@/components/PodsModule';
-import NoaaWidget from '@/components/NoaaWidget';
-import AiOneChat from '@/components/AiOneChat';
 import StarTrackerView from '@/components/StarTrackerView';
-import { RadioPlayerProvider } from '@/components/radio/RadioPlayerContext';
+import HardwareProductSlide from '@/components/HardwareProductSlide';
+import { HARDWARE_PRODUCTS } from '@/lib/hardwareProducts';
 
 // A `transform` on an ancestor establishes a new containing block for any
 // `position: fixed` descendant (CSS spec, not a hack) — StarTrackerView's
@@ -30,45 +25,25 @@ function LiveFrame({ children }: { children: React.ReactNode }) {
 }
 
 export default function ProductsPage() {
-  const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Real components, mounted live — not screenshots. Only the active slide
-  // is ever mounted, so switching slides doesn't leave five other heavy
-  // components (camera access, YouTube players, audio contexts) running
-  // in the background.
-  const slides = [
-    {
-      key: 'earth',
-      title: 'Earth Hub',
-      render: () => <CosmicCanvas onNavigateToVaultDrawer={() => router.push('/')} />,
-    },
-    {
-      key: 'radio',
-      title: 'Radio Hub',
-      render: () => <RadioStreams />,
-    },
-    {
-      key: 'pods',
-      title: 'Audio & Content Pods',
-      render: () => <PodsModule isActive />,
-    },
-    {
-      key: 'noaa',
-      title: 'NOAA Telemetry',
-      render: () => <NoaaWidget />,
-    },
-    {
-      key: 'kali',
-      title: 'Kali AI',
-      render: () => <AiOneChat />,
-    },
+  // Star Tracker is a real component, mounted live — not a screenshot. Only
+  // the active slide is ever mounted, so switching slides doesn't leave
+  // anything heavy running in the background. The two hardware slides are
+  // pre-launch placeholders (see lib/hardwareProducts.ts) rather than live
+  // previews of a running feature.
+  const slides: { key: string; title: string; render: () => React.ReactElement; cta?: boolean }[] = [
     {
       key: 'star-tracker',
       title: 'Star Tracker',
       render: () => <StarTrackerView onBack={() => {}} />,
       cta: true,
     },
+    ...HARDWARE_PRODUCTS.map((product) => ({
+      key: product.id,
+      title: product.name,
+      render: () => <HardwareProductSlide product={product} />,
+    })),
   ];
 
   const slide = slides[activeIndex];
@@ -76,7 +51,6 @@ export default function ProductsPage() {
   const goNext = () => setActiveIndex((i) => (i + 1) % slides.length);
 
   return (
-    <RadioPlayerProvider>
     <div className="relative w-full min-h-screen overflow-hidden bg-[#0a0a0c] text-slate-100">
       <Starfield />
       <div className="relative z-10 max-w-4xl px-6 py-16 mx-auto space-y-6">
@@ -128,6 +102,5 @@ export default function ProductsPage() {
         </div>
       </div>
     </div>
-    </RadioPlayerProvider>
   );
 }
