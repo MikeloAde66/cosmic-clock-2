@@ -58,6 +58,68 @@ function validateVariants(input: unknown): VaultProductVariant[] | null {
   return variants;
 }
 
+// Admin-gated: creates a new, empty pack (tracks: []) — the schema has
+// always allowed this (VaultProduct.tracks defaults to []), but until now
+// the only way to create a pack was via /api/vault/upload, which requires
+// at least one file. This gives an admin a "+ New Pack" path to reserve a
+// title/sku/drawer first and add files to it afterward via the existing
+// "+ Add Track" flow on the resulting (empty) card.
+export async function POST(request: Request) {
+  if (!process.env.MONGODB_URI) {
+    return new Response('MONGODB_URI is not configured.', { status: 500 });
+  }
+
+  try {
+    await requireAdmin(request);
+  } catch (err) {
+    if (err instanceof AdminAuthError) return new Response(err.message, { status: err.status });
+    throw err;
+  }
+
+  let body: { sku?: string; drawer?: string; title?: string; description?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return new Response('Invalid JSON body.', { status: 400 });
+  }
+
+  const { sku, drawer, title, description } = body;
+  if (!sku?.trim() || !drawer || !VAULT_DRAWERS.includes(drawer as VaultDrawer) || !title?.trim()) {
+    return new Response('sku, drawer, and title are required.', { status: 400 });
+  }
+
+  try {
+    await dbConnect();
+    const doc = await VaultProduct.create({
+      sku: sku.trim(),
+      drawer: drawer as VaultDrawer,
+      title: title.trim(),
+      description: description?.trim() ?? '',
+      tracks: [],
+    });
+    return Response.json({
+      product: {
+        id: doc._id.toString(),
+        sku: doc.sku,
+        drawer: doc.drawer,
+        title: doc.title,
+        description: doc.description,
+        readmeGuide: doc.readmeGuide,
+        dateAdded: doc.createdAt.toISOString().slice(0, 10),
+        tracks: [],
+      },
+    });
+  } catch (err) {
+    // Duplicate {sku, drawer} — the schema's unique index rejects it.
+    if (err && typeof err === 'object' && 'code' in err && err.code === 11000) {
+      return new Response('A pack with this SKU already exists in that drawer.', { status: 409 });
+    }
+    console.error('Vault pack create error:', err);
+    const message = err instanceof Error ? err.message : 'Create failed.';
+    return new Response(message, { status: 500 });
+  }
+}
+
 // Admin-gated: replaces a pack's whole productVariants array (same
 // upsert-the-whole-field convention as tags on upload) — lets an admin
 // turn one Vault master item into several separately priced/fulfilled

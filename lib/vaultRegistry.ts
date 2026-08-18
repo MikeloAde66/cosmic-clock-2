@@ -86,9 +86,10 @@ export interface VaultProduct {
   description: string;
   readmeGuide: string;
   dateAdded: string;
-  // Every product is a pack of at least one uploaded track — a single-file
-  // upload is just a one-track pack. There's no placeholder/empty state:
-  // a product only exists once something has actually been uploaded to it.
+  // Usually at least one uploaded track (a single-file upload is just a
+  // one-track pack), but can start empty — POST /api/vault/product's
+  // "+ New Pack" flow reserves a title/sku/drawer first, with tracks added
+  // afterward via the resulting card's own "+ Add Track".
   tracks: VaultTrack[];
   priceCents?: number;
   isPublished?: boolean;

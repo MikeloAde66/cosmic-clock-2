@@ -192,6 +192,18 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
   const [editPackDescription, setEditPackDescription] = useState<string>('');
   const [editPackError, setEditPackError] = useState<string>('');
 
+  // "+ New Pack" — creates an empty pack (tracks: []) up front, distinct
+  // from "+ Upload File" (showUploadModal below), which always requires
+  // picking a file first. Files can be added to the resulting empty card
+  // afterward via its own "+ Add Track" control.
+  const [showNewPackModal, setShowNewPackModal] = useState<boolean>(false);
+  const [newPackTitle, setNewPackTitle] = useState<string>('');
+  const [newPackSku, setNewPackSku] = useState<string>('');
+  const [newPackDrawer, setNewPackDrawer] = useState<VaultDrawer>('MUSIC');
+  const [newPackDescription, setNewPackDescription] = useState<string>('');
+  const [newPackError, setNewPackError] = useState<string>('');
+  const [isCreatingPack, setIsCreatingPack] = useState<boolean>(false);
+
   // Appending a track to an already-existing pack — reuses POST
   // /api/vault/upload's own upsert behavior (a second upload against the
   // same sku+drawer pushes onto the existing tracks array instead of
@@ -425,6 +437,39 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
       cancelEditPack();
     } catch (err) {
       setEditPackError(err instanceof Error ? err.message : 'Failed to update pack.');
+    }
+  };
+
+  const handleCreatePack = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPackTitle.trim() || !newPackSku.trim()) {
+      setNewPackError('Title and SKU are required.');
+      return;
+    }
+    setIsCreatingPack(true);
+    setNewPackError('');
+    try {
+      const res = await fetch('/api/vault/product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({
+          sku: newPackSku,
+          drawer: newPackDrawer,
+          title: newPackTitle,
+          description: newPackDescription,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data: { product: VaultProduct } = await res.json();
+      setProducts((prev) => [data.product, ...prev]);
+      setShowNewPackModal(false);
+      setNewPackTitle('');
+      setNewPackSku('');
+      setNewPackDescription('');
+    } catch (err) {
+      setNewPackError(err instanceof Error ? err.message : 'Failed to create pack.');
+    } finally {
+      setIsCreatingPack(false);
     }
   };
 
@@ -809,6 +854,14 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
               <div className="flex items-center gap-3">
                 {isAdmin && (
                   <button
+                    onClick={() => setShowNewPackModal(true)}
+                    className="px-3 py-1.5 text-xs font-mono uppercase bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 rounded transition"
+                  >
+                    + New Pack
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
                     onClick={() => setShowUploadModal(true)}
                     className="px-3 py-1.5 text-xs font-mono uppercase bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 rounded transition"
                   >
@@ -939,7 +992,7 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
                                 title="Delete entire pack"
                                 className="flex items-center justify-center w-5 h-5 text-slate-500 transition rounded hover:text-rose-400 hover:bg-white/10 disabled:opacity-40"
                               >
-                                <X className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             )}
                           </div>
@@ -1149,6 +1202,77 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
         className="hidden"
         onChange={handleAddTrackFileChange}
       />
+
+      {showNewPackModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <form
+            onSubmit={handleCreatePack}
+            className="w-full max-w-md p-6 space-y-4 border shadow-2xl bg-slate-900 border-neutral-700 rounded-xl"
+          >
+            <h3 className="text-lg font-bold text-white">New Pack</h3>
+            <p className="text-xs text-slate-500">
+              Creates an empty pack — add files to it afterward with its card's own &quot;+ Add Track&quot;.
+            </p>
+
+            <input
+              type="text"
+              placeholder="Title"
+              value={newPackTitle}
+              onChange={(e) => setNewPackTitle(e.target.value)}
+              required
+              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+            />
+            <input
+              type="text"
+              placeholder="SKU"
+              value={newPackSku}
+              onChange={(e) => setNewPackSku(e.target.value)}
+              required
+              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+            />
+            <select
+              value={newPackDrawer}
+              onChange={(e) => setNewPackDrawer(e.target.value as VaultDrawer)}
+              className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+            >
+              {VAULT_DRAWERS.filter((drawer) => drawer !== 'MERCH').map((drawer) => (
+                <option key={drawer} value={drawer}>
+                  {drawer}
+                </option>
+              ))}
+            </select>
+            <textarea
+              placeholder="Description"
+              value={newPackDescription}
+              onChange={(e) => setNewPackDescription(e.target.value)}
+              rows={2}
+              className="w-full p-3 font-mono text-sm border rounded-lg resize-none bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
+            />
+
+            {newPackError && <p className="font-mono text-xs text-rose-400">{newPackError}</p>}
+
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={isCreatingPack}
+                className="flex-1 py-2.5 text-sm font-mono font-bold uppercase tracking-wide text-black transition bg-white rounded-lg hover:bg-neutral-200 disabled:opacity-50"
+              >
+                {isCreatingPack ? 'Creating…' : 'Create Pack'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewPackModal(false);
+                  setNewPackError('');
+                }}
+                className="px-4 py-2.5 text-sm font-mono uppercase text-slate-400 transition border rounded-lg border-neutral-700 hover:text-white"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {showUploadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
