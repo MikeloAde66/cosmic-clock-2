@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, CalendarClock, Satellite, Sparkles, Sun as SunIcon, X } from 'lucide-react';
 import { Body as AstroBody, Equator, Horizon, Illumination, Observer, SearchRiseSet, SiderealTime } from 'astronomy-engine';
 import { calculateCosmicTime } from '@/lib/cosmicMath';
-import { fetchIssPosition, topocentricPosition, type IssStatus } from '@/lib/satelliteTracking';
+import { useIssTracker } from '@/lib/useIssTracker';
 import { describeKp, fetchLatestKp, type KpReading } from '@/lib/spaceWeather';
 import {
   lonToRaHours,
@@ -248,8 +248,6 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const domeRef = useRef<SVGSVGElement | null>(null);
 
   const [issLayerOn, setIssLayerOn] = useState(false);
-  const [iss, setIss] = useState<IssStatus | null>(null);
-  const [issError, setIssError] = useState(false);
 
   const [spaceWeatherOn, setSpaceWeatherOn] = useState(false);
   const [kp, setKp] = useState<KpReading | null>(null);
@@ -388,32 +386,6 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
     return () => clearInterval(interval);
   }, []);
 
-  // ISS position polling — only while the layer is toggled on, so this app
-  // isn't hitting a third-party API in the background for a feature no one
-  // has opened.
-  useEffect(() => {
-    if (!issLayerOn) return;
-    let cancelled = false;
-    const poll = () => {
-      fetchIssPosition()
-        .then((data) => {
-          if (!cancelled) {
-            setIss(data);
-            setIssError(false);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setIssError(true);
-        });
-    };
-    poll();
-    const interval = setInterval(poll, 10_000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [issLayerOn]);
-
   // Constellation/star data is ~46KB total — fetched lazily on first toggle
   // rather than on mount, and cached in state afterward so switching the
   // layer off and back on doesn't re-fetch.
@@ -476,13 +448,15 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const visible = sky.filter((b) => b.altitude > 0);
   const belowHorizon = sky.filter((b) => b.altitude <= 0);
 
-  const issTopo = useMemo(() => {
-    if (!iss) return null;
-    return topocentricPosition(
-      { latitude: effectiveCoords.lat, longitude: effectiveCoords.lon, altitude: effectiveElevationKm },
-      iss.geo
-    );
-  }, [iss, effectiveCoords, effectiveElevationKm]);
+  // Real SGP4 propagation from a live CelesTrak TLE, not a REST position
+  // poll — enabled only while the layer is toggled on (see useIssTracker's
+  // own `enabled` param), so this app isn't fetching from CelesTrak or
+  // running propagation in the background for a feature no one has opened.
+  const issTracker = useIssTracker(
+    { latitude: effectiveCoords.lat, longitude: effectiveCoords.lon, altitudeKm: effectiveElevationKm },
+    1000,
+    issLayerOn
+  );
 
   const cosmic = calculateCosmicTime();
   const locationLabel = isCustomObservatory
@@ -833,12 +807,14 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
 
         {issLayerOn && (
           <div className="p-2 space-y-2 border rounded-lg border-cyan-500/20 bg-black/30">
-            {issError ? (
+            {issTracker.error ? (
               <p className="px-1 font-mono text-xs text-red-400">ISS position unavailable right now.</p>
-            ) : iss && issTopo ? (
+            ) : issTracker.telemetry ? (
               <p className="px-1 font-mono text-xs text-cyan-100">
-                ISS is {issTopo.altitude > 0 ? 'above your horizon' : 'below your horizon'} — {compassDirection(issTopo.azimuth)}
-                {issTopo.altitude > 0 ? `, alt ${issTopo.altitude.toFixed(0)}°` : ''} · {iss.visibility}
+                ISS is {issTracker.telemetry.elevation > 0 ? 'above your horizon' : 'below your horizon'} —{' '}
+                {compassDirection(issTracker.telemetry.azimuth)}
+                {issTracker.telemetry.elevation > 0 ? `, alt ${issTracker.telemetry.elevation.toFixed(0)}°` : ''} ·{' '}
+                {issTracker.telemetry.velocityKmS.toFixed(2)} km/s
               </p>
             ) : (
               <p className="px-1 font-mono text-xs text-slate-500">Locating ISS…</p>
@@ -1011,10 +987,25 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                   </g>
                 );
               })}
-              {issLayerOn && issTopo && issTopo.altitude > 0 && (
+              {issLayerOn && issTracker.trajectory.length > 1 && (
+                <polyline
+                  points={issTracker.trajectory
+                    .map((p) => {
+                      const { x, y } = azAltToXY(p.azimuth, p.elevation, center, radius);
+                      return `${x},${y}`;
+                    })
+                    .join(' ')}
+                  fill="none"
+                  stroke="rgba(34,211,238,0.4)"
+                  strokeWidth={1}
+                  strokeDasharray="3 3"
+                  className="pointer-events-none"
+                />
+              )}
+              {issLayerOn && issTracker.telemetry && issTracker.telemetry.elevation > 0 && (
                 <g onClick={() => setSelected({ kind: 'iss' })} className="cursor-pointer">
                   {(() => {
-                    const { x, y } = azAltToXY(issTopo.azimuth, issTopo.altitude, center, radius);
+                    const { x, y } = azAltToXY(issTracker.telemetry.azimuth, issTracker.telemetry.elevation, center, radius);
                     return (
                       <>
                         <rect x={x - 4} y={y - 4} width={8} height={8} fill="#22d3ee" stroke="transparent" strokeWidth={8} />
@@ -1124,16 +1115,16 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                 )}
               </div>
             ) : selected.kind === 'iss' ? (
-              iss &&
-              issTopo && (
+              issTracker.telemetry && (
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold text-white">International Space Station</h3>
                   <p className="font-mono text-xs text-cyan-100">
-                    {compassDirection(issTopo.azimuth)} ({issTopo.azimuth.toFixed(1)}°) · altitude {issTopo.altitude.toFixed(1)}°
+                    {compassDirection(issTracker.telemetry.azimuth)} ({issTracker.telemetry.azimuth.toFixed(1)}°) · altitude{' '}
+                    {issTracker.telemetry.elevation.toFixed(1)}°
                   </p>
-                  <p className="font-mono text-xs text-cyan-100">Range {Math.round(issTopo.rangeKm).toLocaleString()} km</p>
-                  <p className="font-mono text-xs text-cyan-100">Orbital altitude {Math.round(iss.geo.altitude)} km</p>
-                  <p className="font-mono text-xs text-slate-400">Status: {iss.visibility}</p>
+                  <p className="font-mono text-xs text-cyan-100">Range {Math.round(issTracker.telemetry.rangeKm).toLocaleString()} km</p>
+                  <p className="font-mono text-xs text-cyan-100">Orbital altitude {Math.round(issTracker.telemetry.altitudeKm)} km</p>
+                  <p className="font-mono text-xs text-cyan-100">Velocity {issTracker.telemetry.velocityKmS.toFixed(2)} km/s</p>
                 </div>
               )
             ) : (
