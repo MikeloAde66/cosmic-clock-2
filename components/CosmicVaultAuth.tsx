@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Key, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import ProductsStorefront from './ProductsStorefront';
 import { uploadFilesDirectToStorage } from '@/lib/vaultDirectUpload';
@@ -120,6 +120,17 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
   // writes stays entirely in the isAdmin/requireAdmin layer below.
   const [vaultRole, setVaultRole] = useState<VaultRole | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>(initialDrawer ?? 'ALL');
+  // Distinguishes "I was just in the Vault and locked it myself" from "I
+  // have no key and never had one" — only the former should ever see the
+  // friendly Vault-branded locked screen. It's local, in-memory state (never
+  // persisted), so a stale link, a guess, or a bot with no prior session
+  // still falls straight into the generic-404 branch below, exactly as
+  // before — this doesn't weaken that obscurity, it only adds a screen
+  // reachable solely by someone who already had real access this session.
+  const [justLocked, setJustLocked] = useState(false);
+  const [keyInputOpen, setKeyInputOpen] = useState(false);
+  const [keyInputValue, setKeyInputValue] = useState('');
+  const [keyInputError, setKeyInputError] = useState('');
 
   useEffect(() => {
     if (initialRoleKey) {
@@ -176,6 +187,10 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
   const [editingTrackKey, setEditingTrackKey] = useState<string | null>(null);
   const [editWeightValue, setEditWeightValue] = useState<string>('');
   const [trackActionError, setTrackActionError] = useState<string>('');
+  const [editingPackId, setEditingPackId] = useState<string | null>(null);
+  const [editPackTitle, setEditPackTitle] = useState<string>('');
+  const [editPackDescription, setEditPackDescription] = useState<string>('');
+  const [editPackError, setEditPackError] = useState<string>('');
 
   // Appending a track to an already-existing pack — reuses POST
   // /api/vault/upload's own upsert behavior (a second upload against the
@@ -374,6 +389,43 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
   const cancelEditWeight = () => {
     setEditingTrackKey(null);
     setEditWeightValue('');
+  };
+
+  const startEditPack = (item: VaultProduct) => {
+    setEditingPackId(item.id);
+    setEditPackTitle(item.title);
+    setEditPackDescription(item.description ?? '');
+    setEditPackError('');
+  };
+
+  const cancelEditPack = () => {
+    setEditingPackId(null);
+    setEditPackError('');
+  };
+
+  const saveEditPack = async (item: VaultProduct) => {
+    if (!editPackTitle.trim()) {
+      setEditPackError('Title cannot be blank.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/vault/metadata', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({
+          sku: item.sku,
+          drawer: item.drawer,
+          title: editPackTitle,
+          description: editPackDescription,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data: { product: VaultProduct } = await res.json();
+      setProducts((prev) => prev.map((p) => (p.id === item.id ? data.product : p)));
+      cancelEditPack();
+    } catch (err) {
+      setEditPackError(err instanceof Error ? err.message : 'Failed to update pack.');
+    }
   };
 
   const saveEditWeight = async (item: VaultProduct, filename: string) => {
@@ -685,6 +737,60 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
           // never the 404, never the dashboard, so a real owner on a slow
           // connection can't get flashed a "not found" even for a moment.
           <div className="py-24" />
+        ) : justLocked ? (
+          // Only reachable by someone who held a real role this session and
+          // just locked it themselves — everyone else (stale link, guess,
+          // bot) still falls into the plain 404 branch below, unchanged.
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setKeyInputOpen((v) => !v);
+                setKeyInputError('');
+              }}
+              aria-label="Unlock Vault"
+              className="relative flex items-center justify-center w-20 h-20 mb-5 transition border rounded-full group border-cyan-500/40 bg-cyan-500/5 hover:border-cyan-400 hover:bg-cyan-500/10"
+            >
+              <Key className="w-8 h-8 transition text-cyan-400 group-hover:text-cyan-300 group-hover:scale-110" />
+            </button>
+            <h1 className="font-mono text-xl font-bold tracking-widest text-white uppercase">Vault Locked</h1>
+            <p className="mt-2 font-mono text-xs text-slate-500">Click the key to unlock with your access key.</p>
+
+            {keyInputOpen && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const role = matchRole(keyInputValue);
+                  if (role) {
+                    setVaultRole(role);
+                    setJustLocked(false);
+                    setKeyInputOpen(false);
+                    setKeyInputValue('');
+                    setKeyInputError('');
+                  } else {
+                    setKeyInputError('Invalid access key.');
+                  }
+                }}
+                className="flex flex-col items-center gap-2 mt-5"
+              >
+                <input
+                  type="text"
+                  autoFocus
+                  value={keyInputValue}
+                  onChange={(e) => setKeyInputValue(e.target.value)}
+                  placeholder="Access key"
+                  className="px-3 py-1.5 text-xs text-center text-white border rounded font-mono border-slate-700 bg-slate-900/80 focus:outline-none focus:border-cyan-500 w-48"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-black transition bg-white rounded hover:bg-neutral-200"
+                >
+                  Unlock
+                </button>
+                {keyInputError && <p className="font-mono text-[10px] text-rose-400">{keyInputError}</p>}
+              </form>
+            )}
+          </div>
         ) : !vaultRole ? (
           // Generic 404 look — deliberately gives no hint a Vault (or any
           // login mechanism) exists here. The real entry point is a role
@@ -710,7 +816,10 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
                   </button>
                 )}
                 <button
-                  onClick={() => setVaultRole(null)}
+                  onClick={() => {
+                    setVaultRole(null);
+                    setJustLocked(true);
+                  }}
                   className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 rounded font-mono"
                 >
                   LOCK VAULT
@@ -816,6 +925,15 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
                             <span className="text-slate-500">{item.dateAdded}</span>
                             {isAdmin && (
                               <button
+                                onClick={() => startEditPack(item)}
+                                title="Edit pack title/description"
+                                className="flex items-center justify-center w-5 h-5 text-slate-500 transition rounded hover:text-cyan-400 hover:bg-white/10"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
                                 onClick={() => handleDeletePack(item)}
                                 disabled={deletingPackIds.has(item.id)}
                                 title="Delete entire pack"
@@ -827,8 +945,44 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
                           </div>
                         </div>
 
-                        <h3 className="text-base font-bold text-slate-100">{item.title}</h3>
-                        <p className="text-xs text-slate-400">{item.description}</p>
+                        {editingPackId === item.id ? (
+                          <div className="space-y-1.5">
+                            <input
+                              type="text"
+                              value={editPackTitle}
+                              onChange={(e) => setEditPackTitle(e.target.value)}
+                              placeholder="Title"
+                              className="w-full px-2 py-1 text-sm text-white border rounded border-slate-700 bg-slate-900/80 focus:outline-none focus:border-cyan-500"
+                            />
+                            <textarea
+                              value={editPackDescription}
+                              onChange={(e) => setEditPackDescription(e.target.value)}
+                              placeholder="Description"
+                              rows={2}
+                              className="w-full px-2 py-1 text-xs text-white border rounded resize-none border-slate-700 bg-slate-900/80 focus:outline-none focus:border-cyan-500"
+                            />
+                            {editPackError && <p className="font-mono text-[10px] text-rose-400">{editPackError}</p>}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => saveEditPack(item)}
+                                className="px-2 py-1 text-[10px] font-mono uppercase text-black transition bg-white rounded hover:bg-neutral-200"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={cancelEditPack}
+                                className="px-2 py-1 text-[10px] font-mono uppercase text-slate-400 transition border rounded border-slate-700 hover:text-white"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <h3 className="text-base font-bold text-slate-100">{item.title}</h3>
+                            <p className="text-xs text-slate-400">{item.description}</p>
+                          </>
+                        )}
                         <p className="font-mono text-[10px] text-slate-600">SKU: {item.sku}</p>
                         {isAdmin && (
                           <button
