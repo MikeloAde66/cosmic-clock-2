@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
-import { Pause, Play, SkipBack, SkipForward, Volume2, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronDown, Pause, Play, Radio as RadioIcon, SkipBack, SkipForward, Volume2, X } from 'lucide-react';
 import { useRadioPlayer } from './RadioPlayerContext';
 import PlayerSpectrum from './PlayerSpectrum';
+import { RADIO_STATIONS } from '@/lib/radioStations';
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds)) return '--:--';
@@ -12,14 +13,50 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// Mounted once at the app-shell level, always rendered (renders nothing
-// until a station is selected) — this is what makes playback persist across
-// tab switches instead of stopping when Radio unmounts.
+// Mounted once at the app-shell level and always rendered above SiteFooter —
+// on every tab, from initial page load. With no station picked yet it shows
+// an idle/paused strip rather than nothing, so the bar itself is always
+// visible; actual playback still only ever starts from an explicit Play
+// press (playStation/togglePlayPause), never automatically.
 export default function GlobalPlayerBar() {
-  const { station, queue, currentIndex, status, currentTime, duration, volume, analyserRef, togglePlayPause, next, prev, seek, setVolume, stop } =
+  const { station, queue, currentIndex, status, currentTime, duration, volume, analyserRef, playStation, togglePlayPause, next, prev, seek, setVolume, stop } =
     useRadioPlayer();
+  const [collapsed, setCollapsed] = useState(false);
 
-  if (!station) return null;
+  if (collapsed) {
+    return (
+      <button
+        onClick={() => setCollapsed(false)}
+        className="relative z-10 flex items-center gap-2 px-4 py-1.5 border-t shrink-0 bg-[#04060A] border-slate-800/80 text-slate-500 hover:text-white transition-colors"
+        aria-label="Show radio player"
+      >
+        <RadioIcon className="w-3.5 h-3.5" />
+        <span className="text-[10px] font-mono uppercase tracking-wider">Radio</span>
+      </button>
+    );
+  }
+
+  if (!station) {
+    return (
+      <div className="relative z-10 flex items-center gap-4 px-4 py-2 border-t shrink-0 bg-[#04060A] border-slate-800/80">
+        <div className="flex items-center min-w-0 gap-2">
+          <RadioIcon className="w-4 h-4 text-slate-500 shrink-0" />
+          <p className="text-xs text-slate-500 truncate">Radio — press play to start streaming</p>
+        </div>
+        <div className="flex-1" />
+        <button
+          onClick={() => playStation(RADIO_STATIONS[0])}
+          className="flex items-center justify-center w-8 h-8 text-black transition bg-white rounded-full hover:bg-neutral-200 shrink-0"
+          aria-label="Play"
+        >
+          <Play className="w-4 h-4 ml-0.5" />
+        </button>
+        <button onClick={() => setCollapsed(true)} className="text-slate-500 hover:text-white shrink-0" aria-label="Hide radio player">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
 
   const currentTrack = queue[currentIndex];
   const hasQueue = queue.length > 0;
@@ -98,6 +135,9 @@ export default function GlobalPlayerBar() {
       )}
       {status === 'error' && <span className="font-mono text-[10px] text-rose-400 shrink-0">Error</span>}
 
+      <button onClick={() => setCollapsed(true)} className="text-slate-500 hover:text-white shrink-0" aria-label="Minimize radio player">
+        <ChevronDown className="w-4 h-4" />
+      </button>
       <button onClick={stop} className="text-slate-500 hover:text-white shrink-0" aria-label="Stop">
         <X className="w-4 h-4" />
       </button>

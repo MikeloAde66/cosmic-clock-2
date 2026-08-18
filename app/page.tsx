@@ -177,15 +177,14 @@ useContextMenuShare();
             </div>
           </div>
 
-          {/* Scoped to the Home tab only — RadioPlayerProvider (mounted
-              above, at the app-shell level) still keeps actual playback
-              running across every tab exactly as before; only this visible
-              bar/controls are now Home-only. Star Tracker and /products
-              need no extra handling here: Star Tracker is a fixed z-50
-              overlay that already covers this bar (z-10) whenever it's
-              open, and /products is a fully separate Next.js route that
-              never renders this tree at all. */}
-          {activeTab === 'aione' && <GlobalPlayerBar />}
+          {/* Always mounted above SiteFooter, on every tab, from initial
+              page load — shows an idle/paused strip until a station is
+              picked, per GlobalPlayerBar's own idle-state rendering. Star
+              Tracker and /products need no extra handling here: Star
+              Tracker is a fixed z-50 overlay that already covers this bar
+              (z-10) whenever it's open, and /products is a fully separate
+              Next.js route that never renders this tree at all. */}
+          <GlobalPlayerBar />
           <SiteFooter />
         </div>
         </main>
