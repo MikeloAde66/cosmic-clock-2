@@ -1,25 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Starfield from '@/components/Starfield';
-import StarTrackerView from '@/components/StarTrackerView';
+import ProductHeroCard from '@/components/ProductHeroCard';
 import HardwareProductSlide from '@/components/HardwareProductSlide';
 import { HARDWARE_PRODUCTS } from '@/lib/hardwareProducts';
 
-// A `transform` on an ancestor establishes a new containing block for any
-// `position: fixed` descendant (CSS spec, not a hack) — StarTrackerView's
-// root is `fixed inset-0` (a real fullscreen overlay when opened normally
-// from TopHeader), so without this it would break out of its slide frame
-// and cover the whole page instead of previewing inside it. `scale(1)` is
-// visually a no-op; it exists purely for that containment side effect.
-function LiveFrame({ children }: { children: React.ReactNode }) {
+function SlideFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative w-full h-[560px] overflow-hidden border rounded-2xl border-neutral-800 bg-[#0a0a0c] shadow-2xl">
-      <div className="absolute inset-0 w-full h-full" style={{ transform: 'scale(1)' }}>
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
@@ -27,17 +18,21 @@ function LiveFrame({ children }: { children: React.ReactNode }) {
 export default function ProductsPage() {
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Star Tracker is a real component, mounted live — not a screenshot. Only
-  // the active slide is ever mounted, so switching slides doesn't leave
-  // anything heavy running in the background. The two hardware slides are
-  // pre-launch placeholders (see lib/hardwareProducts.ts) rather than live
-  // previews of a running feature.
-  const slides: { key: string; title: string; render: () => React.ReactElement; cta?: boolean }[] = [
+  // All three slides are hero-image + CTA cards now, not live component
+  // previews — Star Tracker's real interactive app still lives at its own
+  // /products/star-tracker page, just one tap away via this card's CTA.
+  const slides: { key: string; title: string; render: () => React.ReactElement }[] = [
     {
       key: 'star-tracker',
       title: 'Star Tracker',
-      render: () => <StarTrackerView onBack={() => {}} />,
-      cta: true,
+      render: () => (
+        <ProductHeroCard
+          heroImageSrc="/images/star-tracker.png"
+          heroTagline="See Beyond the Horizon."
+          ctaLabel="Explore Specs →"
+          ctaHref="/products/star-tracker"
+        />
+      ),
     },
     ...HARDWARE_PRODUCTS.map((product) => ({
       key: product.id,
@@ -64,18 +59,10 @@ export default function ProductsPage() {
           </button>
 
           <div className="flex-1 min-w-0 space-y-3">
-            <LiveFrame>{slide.render()}</LiveFrame>
+            <SlideFrame>{slide.render()}</SlideFrame>
 
             <div className="flex flex-col items-center gap-2 text-center">
               <h2 className="text-sm font-bold text-white">{slide.title}</h2>
-              {slide.cta && (
-                <Link
-                  href="/products/star-tracker"
-                  className="px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition"
-                >
-                  Explore Standalone App →
-                </Link>
-              )}
             </div>
           </div>
 
