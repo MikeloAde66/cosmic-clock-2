@@ -66,4 +66,25 @@ export const HARDWARE_PRODUCTS: HardwareProduct[] = [
     featured: true,
     comingSoon: true,
   },
+  {
+    id: 'aione-core',
+    categoryBadge: 'CENTRAL HUB',
+    name: 'Ai One Core',
+    brandedTitle: 'Ai One Core™',
+    heroImageSrc: '/images/aione-core.png',
+    heroTagline: 'Local Off-Grid Hub & VR Sandbox',
+    priceCents: 59900,
+    essence:
+      'Ai One Core is the central micro-server for the entire node network — a low-draw offline communications hub and local VR spatial development engine. It aggregates real-time telemetry from field-deployed HydroNode units over LoRa, hosts an offline Matrix server and knowledge vault, and tracks solar microgrid power generation and battery state-of-charge, all without a cloud round-trip.',
+    features: [
+      'High-Tier Single-Board Compute (Raspberry Pi 5 8GB / Rock 5B) in Industrial Aluminum Passive Heatsink Chassis',
+      '1TB NVMe M.2 SSD (PCIe HAT) Running Encrypted SQLite Vault & Offline Matrix Server',
+      'Multichannel SX1302 LoRa Gateway Concentrator with Onboard Wi-Fi 6 AP & Dual Gigabit Ethernet',
+      '12V–24V DC Wide-Input Step-Down Converter with Seamless UPS Battery Failover',
+      'Local WebXR VR Sandbox for Offline Spatial Development & Documentation',
+    ],
+    callout: '100% Data Sovereignty — offline Matrix server and local WebXR sandbox, no cloud round-trip required.',
+    preOrderCta: 'Pre-Order Ai One Core →',
+    comingSoon: true,
+  },
 ];
