@@ -62,6 +62,30 @@ async function decrementVaultVariantInventoryIfApplicable(productId: string, qua
   }
 }
 
+// Permanent, product-specific feature unlocks live in app_metadata (same
+// mechanism/location as the admin role flag in lib/adminAuth.ts) — settable
+// only via this service-role client, never by the user themselves. Reads
+// the account's current app_metadata first and merges into it rather than
+// overwriting, so this can never accidentally clear an existing admin role
+// or a different product's unlock flag. Never throws: a failed grant here
+// shouldn't fail the whole webhook or roll back the order/fulfillment work
+// already done above it — it just means the purchase is recorded and
+// delivered as a digital product but the in-app tab needs unlocking by
+// other means (e.g. a manual grant) until this is retried or fixed.
+async function grantEntitlementIfApplicable(admin: SupabaseAdmin, productId: string, userId: string | undefined) {
+  if (productId !== 'star-tracker' || !userId) return;
+  try {
+    const { data, error: fetchError } = await admin.auth.admin.getUserById(userId);
+    if (fetchError || !data.user) throw fetchError ?? new Error('User not found.');
+    const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
+      app_metadata: { ...data.user.app_metadata, starTrackerUnlocked: true },
+    });
+    if (updateError) throw updateError;
+  } catch (err) {
+    console.error(`Failed to grant Star Tracker entitlement for user ${userId}:`, err);
+  }
+}
+
 // One-time product purchases (mode: 'payment') -- routes physical items to
 // Printful/Gelato based on product_type, skips fulfillment entirely for
 // digital items. Never throws: a failed fulfillment call marks that line's
@@ -114,11 +138,10 @@ async function handleProductOrderCompleted(session: Stripe.Checkout.Session, adm
     }
 
     if (productType === 'digital') {
-      // No physical shipment — mark delivered immediately. (Actually gating
-      // download access behind purchase status is a separate, not-yet-built
-      // piece; this only reflects fulfillment state.)
+      // No physical shipment — mark delivered immediately.
       await updateOrder(admin, session.id, productId, { fulfillment_status: 'delivered' });
       await decrementVaultVariantInventoryIfApplicable(productId, quantity);
+      await grantEntitlementIfApplicable(admin, productId, session.metadata?.supabase_user_id);
       continue;
     }
 

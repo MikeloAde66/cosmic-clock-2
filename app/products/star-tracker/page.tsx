@@ -27,10 +27,12 @@ const CAPABILITIES = [
 ];
 
 export default function StarTrackerProductPage() {
+  const [userId, setUserId] = useState('');
   const [userEmail, setUserEmail] = useState('');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? '');
       setUserEmail(data.user?.email ?? '');
     });
   }, []);
@@ -73,6 +75,7 @@ export default function StarTrackerProductPage() {
 
         <form action={createStandaloneCheckoutSession} className="space-y-3">
           <input type="hidden" name="priceId" value={product.priceId} />
+          <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="userEmail" value={userEmail} />
           <div className="flex items-baseline gap-2">
             <span className="text-4xl font-bold text-white">${(product.amountCents / 100).toFixed(2)}</span>

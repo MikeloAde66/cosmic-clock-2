@@ -80,10 +80,13 @@ export async function createCheckoutSession(formData: FormData) {
 // rather than a subscription. The Stripe Product backing that price already
 // carries productId/product_type metadata, so the existing order webhook
 // (handleProductOrderCompleted in app/api/webhooks/stripe/route.ts) records
-// and fulfills it the same way it does any other digital product — no
-// webhook changes needed for this to actually deliver.
+// and fulfills it the same way it does any other digital product. It also
+// reads supabase_user_id off this session's own metadata (same convention
+// as createCheckoutSession above) to grant permanent feature access for
+// products that need it — see grantEntitlementIfApplicable in the webhook.
 export async function createStandaloneCheckoutSession(formData: FormData) {
   const priceId = formData.get('priceId');
+  const userId = formData.get('userId');
   const userEmail = formData.get('userEmail');
 
   if (typeof priceId !== 'string') {
@@ -107,6 +110,9 @@ export async function createStandaloneCheckoutSession(formData: FormData) {
     success_url: `${origin}/products/${product.id}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/products/${product.id}`,
     customer_email: typeof userEmail === 'string' && userEmail ? userEmail : undefined,
+    metadata: {
+      supabase_user_id: typeof userId === 'string' ? userId : '',
+    },
   });
 
   if (!session.url) {
