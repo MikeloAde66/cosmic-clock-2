@@ -16,6 +16,9 @@ export interface HardwareProduct {
   heroTagline: string;
   essence: string;
   features: string[];
+  // Optional labeled Bill of Materials grid for the detail page — when
+  // present, replaces the plain checkmark list built from `features`.
+  bom?: { label: string; value: string }[];
   callout: string;
   preOrderCta: string;
   featured?: boolean;
@@ -72,7 +75,7 @@ export const HARDWARE_PRODUCTS: HardwareProduct[] = [
     name: 'Ai One Core',
     brandedTitle: 'Ai One Core™',
     heroImageSrc: '/images/aione-core.png',
-    heroTagline: 'Local Off-Grid Hub & VR Sandbox',
+    heroTagline: 'The Heart of Your Offline Network',
     priceCents: 59900,
     essence:
       'Ai One Core is the central micro-server for the entire node network — a low-draw offline communications hub and local VR spatial development engine. It aggregates real-time telemetry from field-deployed HydroNode units over LoRa, hosts an offline Matrix server and knowledge vault, and tracks solar microgrid power generation and battery state-of-charge, all without a cloud round-trip.',
@@ -82,6 +85,13 @@ export const HARDWARE_PRODUCTS: HardwareProduct[] = [
       'Multichannel SX1302 LoRa Gateway Concentrator with Onboard Wi-Fi 6 AP & Dual Gigabit Ethernet',
       '12V–24V DC Wide-Input Step-Down Converter with Seamless UPS Battery Failover',
       'Local WebXR VR Sandbox for Offline Spatial Development & Documentation',
+    ],
+    bom: [
+      { label: 'Compute', value: 'High-Tier Single-Board Compute (Raspberry Pi 5 8GB / Rock 5B) in an Industrial Aluminum Passive Heatsink Chassis.' },
+      { label: 'Storage', value: '1TB NVMe M.2 SSD (PCIe HAT) running Encrypted SQLite Vault & Offline Matrix Server.' },
+      { label: 'Connectivity', value: 'Multichannel SX1302 LoRa Gateway Concentrator, Wi-Fi 6 AP, and Dual Gigabit Ethernet ports.' },
+      { label: 'Power', value: '12V–24V DC Wide-Input Step-Down Converter with Seamless UPS Battery Failover.' },
+      { label: 'Spatial Engine', value: 'Local WebXR VR Sandbox for offline spatial development & system documentation.' },
     ],
     callout: '100% Data Sovereignty — offline Matrix server and local WebXR sandbox, no cloud round-trip required.',
     preOrderCta: 'Pre-Order Ai One Core →',
