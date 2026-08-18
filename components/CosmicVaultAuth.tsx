@@ -680,7 +680,7 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
     addTrackInputRef.current?.click();
   };
 
-  const appendTrackToPack = async (item: VaultProduct, file: File) => {
+  const appendTrackToPack = async (item: VaultProduct, files: File[]) => {
     setAddingTrackIds((prev) => new Set(prev).add(item.id));
     setAddTrackErrors((prev) => {
       const next = new Map(prev);
@@ -689,12 +689,16 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
     });
 
     try {
-      const duration = await probeAudioDuration(file);
       const durations = new Map<File, number>();
-      if (duration !== undefined) durations.set(file, duration);
+      await Promise.all(
+        files.map(async (file) => {
+          const duration = await probeAudioDuration(file);
+          if (duration !== undefined) durations.set(file, duration);
+        })
+      );
 
       const authHeader = await getAuthHeader();
-      const { tracks, failures } = await uploadFilesDirectToStorage([file], item.drawer, item.sku, durations, authHeader);
+      const { tracks, failures } = await uploadFilesDirectToStorage(files, item.drawer, item.sku, durations, authHeader);
 
       if (tracks.length === 0) {
         setAddTrackErrors((prev) => new Map(prev).set(item.id, failures.map((f) => f.message).join('; ') || 'Upload failed.'));
@@ -752,20 +756,20 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
   };
 
   const handleAddTrackFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     const itemId = addTrackTargetId;
-    e.target.value = ''; // allow re-selecting the same file later
+    e.target.value = ''; // allow re-selecting the same file(s) later
     setAddTrackTargetId(null);
-    if (!file || !itemId) return;
+    if (files.length === 0 || !itemId) return;
     const item = products.find((p) => p.id === itemId);
-    if (item) appendTrackToPack(item, file);
+    if (item) appendTrackToPack(item, files);
   };
 
   const handleAddTrackDrop = (item: VaultProduct, e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOverItemId(null);
-    const file = e.dataTransfer.files?.[0];
-    if (file) appendTrackToPack(item, file);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length > 0) appendTrackToPack(item, files);
   };
 
   const totalUploadBytes = uploadFiles.reduce((sum, f) => sum + f.size, 0);
@@ -852,14 +856,12 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <h2 className="text-2xl font-bold text-white">Automated Asset Drawers</h2>
               <div className="flex items-center gap-3">
-                {isAdmin && (
-                  <button
-                    onClick={() => setShowNewPackModal(true)}
-                    className="px-3 py-1.5 text-xs font-mono uppercase bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 rounded transition"
-                  >
-                    + New Pack
-                  </button>
-                )}
+                <button
+                  onClick={() => setShowNewPackModal(true)}
+                  className="px-3 py-1.5 text-xs font-mono uppercase bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 rounded transition"
+                >
+                  + New Folder
+                </button>
                 {isAdmin && (
                   <button
                     onClick={() => setShowUploadModal(true)}
@@ -985,16 +987,14 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
                                 <Pencil className="w-3 h-3" />
                               </button>
                             )}
-                            {isAdmin && (
-                              <button
-                                onClick={() => handleDeletePack(item)}
-                                disabled={deletingPackIds.has(item.id)}
-                                title="Delete entire pack"
-                                className="flex items-center justify-center w-5 h-5 text-slate-500 transition rounded hover:text-rose-400 hover:bg-white/10 disabled:opacity-40"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                            <button
+                              onClick={() => handleDeletePack(item)}
+                              disabled={deletingPackIds.has(item.id)}
+                              title="Delete entire pack"
+                              className="flex items-center justify-center w-5 h-5 text-slate-500 transition rounded hover:text-rose-400 hover:bg-white/10 disabled:opacity-40"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
 
@@ -1080,16 +1080,12 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
                             className={`pt-2 space-y-1.5 border-t border-slate-800 rounded transition ${
                               dragOverItemId === item.id ? 'ring-2 ring-cyan-500/50 bg-cyan-500/5' : ''
                             }`}
-                            onDragOver={
-                              isAdmin
-                                ? (e) => {
-                                    e.preventDefault();
-                                    setDragOverItemId(item.id);
-                                  }
-                                : undefined
-                            }
-                            onDragLeave={isAdmin ? () => setDragOverItemId((prev) => (prev === item.id ? null : prev)) : undefined}
-                            onDrop={isAdmin ? (e) => handleAddTrackDrop(item, e) : undefined}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setDragOverItemId(item.id);
+                            }}
+                            onDragLeave={() => setDragOverItemId((prev) => (prev === item.id ? null : prev))}
+                            onDrop={(e) => handleAddTrackDrop(item, e)}
                           >
                             {trackActionError && (
                               <p className="font-mono text-[10px] text-rose-400">{trackActionError}</p>
@@ -1151,35 +1147,31 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
                                         >
                                           <Pencil className="w-3 h-3" />
                                         </button>
-                                        {isAdmin && (
-                                          <button
-                                            onClick={() => handleDeleteTrack(item, t.filename)}
-                                            disabled={isDeleting}
-                                            title="Delete file"
-                                            className="text-slate-500 hover:text-rose-400 disabled:opacity-40"
-                                          >
-                                            <Trash2 className="w-3 h-3" />
-                                          </button>
-                                        )}
+                                        <button
+                                          onClick={() => handleDeleteTrack(item, t.filename)}
+                                          disabled={isDeleting}
+                                          title="Delete file"
+                                          className="text-slate-500 hover:text-rose-400 disabled:opacity-40"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
                                       </>
                                     )}
                                   </div>
                                 </div>
                               );
                             })}
-                            {isAdmin && (
-                              <div className="flex items-center justify-between gap-2 pt-1">
-                                <button
-                                  onClick={() => triggerAddTrack(item.id)}
-                                  disabled={addingTrackIds.has(item.id)}
-                                  className="flex items-center gap-1 font-mono text-[10px] uppercase text-cyan-400 hover:text-cyan-300 disabled:opacity-40"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  {addingTrackIds.has(item.id) ? 'Uploading…' : '+ Add Track'}
-                                </button>
-                                <span className="font-mono text-[9px] text-slate-600">or drop a file here</span>
-                              </div>
-                            )}
+                            <div className="flex items-center justify-between gap-2 pt-1">
+                              <button
+                                onClick={() => triggerAddTrack(item.id)}
+                                disabled={addingTrackIds.has(item.id)}
+                                className="flex items-center gap-1 font-mono text-[10px] uppercase text-cyan-400 hover:text-cyan-300 disabled:opacity-40"
+                              >
+                                <Plus className="w-3 h-3" />
+                                {addingTrackIds.has(item.id) ? 'Uploading…' : '+ Add Track'}
+                              </button>
+                              <span className="font-mono text-[9px] text-slate-600">or drop a file here</span>
+                            </div>
                             {addTrackErrors.get(item.id) && (
                               <p className="font-mono text-[10px] text-rose-400">{addTrackErrors.get(item.id)}</p>
                             )}
@@ -1198,7 +1190,7 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
       <input
         type="file"
         ref={addTrackInputRef}
-        accept="audio/*"
+        multiple
         className="hidden"
         onChange={handleAddTrackFileChange}
       />
@@ -1209,7 +1201,7 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
             onSubmit={handleCreatePack}
             className="w-full max-w-md p-6 space-y-4 border shadow-2xl bg-slate-900 border-neutral-700 rounded-xl"
           >
-            <h3 className="text-lg font-bold text-white">New Pack</h3>
+            <h3 className="text-lg font-bold text-white">New Folder</h3>
             <p className="text-xs text-slate-500">
               Creates an empty pack — add files to it afterward with its card's own &quot;+ Add Track&quot;.
             </p>
