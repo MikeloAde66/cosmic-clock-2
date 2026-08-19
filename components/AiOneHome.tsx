@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import CosmicCanvas from './CosmicCanvas';
+import CenterHero from './CenterHero';
 import PricingPlans from './PricingPlans';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
@@ -60,14 +60,6 @@ export default function AiOneHome({
   pricingRequestToken,
 }: AiOneHomeProps) {
   const [activeSection, setActiveSection] = useState<'home' | 'pricing'>('home');
-  // CosmicCanvas's Weather/Kali sub-views already have their own BackButton
-  // — keeping this hero banner above them too just stacked a second
-  // navigation layer and pushed those views' content down by ~380px with
-  // nothing to match it at the bottom. Collapse this chrome once the user
-  // is inside one of those, same as they already collapse for Pricing via
-  // the activeSection check below.
-  const [cosmicView, setCosmicView] = useState<'clock' | 'weather' | 'kali'>('clock');
-  const showHeroChrome = activeSection !== 'home' || cosmicView === 'clock';
 
   // Which of the 3 shadow-slide images is current — JS-driven instead of a
   // pure CSS @keyframes loop so the first slide can render already at full
@@ -166,78 +158,33 @@ export default function AiOneHome({
       </div>
 
       {/* Layer 4: everything interactive/foreground, lifted toward the
-          viewer via translateZ(30px) per the layer architecture. */}
+          viewer via translateZ(30px) per the layer architecture. CenterHero
+          (hero title + interactive globe) unmounts entirely whenever
+          Pricing is showing instead — see its own visible prop. */}
       <div className="content-layer flex flex-col flex-1 min-h-0">
-      {showHeroChrome && (
-        <>
-          {/* HERO BANNER — no overflow-hidden and no Starfield instance of
-              its own anymore. Both used to create a real seam: this box's
-              hard-clipped edge cut off its own separate, denser (850-star)
-              Starfield exactly at the banner's bottom edge, so star density
-              visibly dropped below that line where only the sparser global
-              Starfield + .star-layer CSS remained. Removing the contained
-              instance leaves one continuous star layer (global Starfield +
-              .star-layer) across the whole page, so there's no density
-              discontinuity — and no box edge left to clip anything at. */}
-          <div className="relative w-full h-80 flex flex-col items-center justify-center shrink-0">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-600/20 via-indigo-500/30 to-white/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#070b14]/60 via-transparent to-[#070b14]/40" />
+        <CenterHero
+          onNavigateToVaultDrawer={onNavigateToVaultDrawer}
+          homeViewRequest={homeViewRequest}
+          groundZeroToken={groundZeroToken}
+          visible={activeSection === 'home'}
+        />
 
-            {/* Unboxed — no card/border/background behind the title
-                anymore, per the "no placeholder box" direction. Floats
-                directly over the cosmic canvas layers instead. */}
-            <div className="px-8 py-6 space-y-2 text-center">
-              <h1
-                className="text-5xl md:text-6xl text-white"
-                style={{
-                  fontFamily:
-                    '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif',
-                  fontWeight: 800,
-                  letterSpacing: '-0.025em',
-                  textShadow: '0 2px 24px rgba(0,0,0,0.6), 0 0 40px rgba(96,165,250,0.25)',
-                }}
+        {activeSection !== 'home' && (
+          <div className="flex flex-col flex-1 min-h-0">
+            <div className="px-6 pt-4 shrink-0">
+              <button
+                onClick={() => setActiveSection('home')}
+                className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
               >
-                Ai One
-              </h1>
-              <p
-                className="font-mono text-xs tracking-widest uppercase md:text-sm text-slate-300"
-                style={{ textShadow: '0 1px 8px rgba(0,0,0,0.7)' }}
-              >
-                Cosmic Creation & Broadcast Hub
-              </p>
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Back
+              </button>
+            </div>
+            <div className="flex-1 min-h-0">
+              {activeSection === 'pricing' && <PricingPlans />}
             </div>
           </div>
-        </>
-      )}
-
-      {activeSection !== 'home' ? (
-        <div className="flex flex-col flex-1 min-h-0">
-          <div className="px-6 pt-4 shrink-0">
-            <button
-              onClick={() => setActiveSection('home')}
-              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back
-            </button>
-          </div>
-          <div className="flex-1 min-h-0">
-            {activeSection === 'pricing' && <PricingPlans />}
-          </div>
-        </div>
-      ) : (
-        /* MAIN CONTENT VIEW: Cosmic Clock centerpiece, full-bleed so the
-           starfield/space background fills the whole viewport instead of
-           sitting inside a bordered, max-width, 16:9-locked card. */
-        <div className="relative flex-1 w-full min-h-0">
-          <CosmicCanvas
-            onNavigateToVaultDrawer={onNavigateToVaultDrawer}
-            onViewChange={setCosmicView}
-            requestedView={homeViewRequest}
-            groundZeroToken={groundZeroToken}
-          />
-        </div>
-      )}
+        )}
       </div>
     </div>
   );
