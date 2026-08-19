@@ -60,7 +60,7 @@ export default function AncientGlyphRain() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 z-0 w-full h-full rounded-xl opacity-45 pointer-events-none"
+      className="absolute inset-0 z-0 w-full h-full opacity-45 pointer-events-none"
     />
   );
 }

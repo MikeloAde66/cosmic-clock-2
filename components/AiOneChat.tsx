@@ -85,12 +85,6 @@ export default function AiOneChat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
-  useEffect(() => {
-    // Bring the input into view on mount — the popup card can be taller than
-    // short/narrow browser windows, and the input sits near its bottom.
-    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, []);
-
   // Autosaves once a real exchange has happened (more than just the
   // greeting) and streaming has settled — not on every streamed token,
   // just once the assistant's turn is done.

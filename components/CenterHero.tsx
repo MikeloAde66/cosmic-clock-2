@@ -17,6 +17,12 @@ interface CenterHeroProps {
   // true so this behaves like an always-on centerpiece unless told
   // otherwise. false unmounts it entirely rather than just hiding it.
   visible?: boolean;
+  // Mirrors CosmicCanvas's own activeView up to AiOneHome, which owns the
+  // shared background layers (shadow-slideshow etc.) and needs to know
+  // which sub-view is active to hide the photographic hero image outside
+  // the clock view — CenterHero itself already tracks this locally for its
+  // own hero-title-visibility logic, this just also reports it upward.
+  onCosmicViewChange?: (view: 'clock' | 'weather' | 'kali') => void;
 }
 
 export default function CenterHero({
@@ -24,6 +30,7 @@ export default function CenterHero({
   homeViewRequest,
   groundZeroToken,
   visible = true,
+  onCosmicViewChange,
 }: CenterHeroProps) {
   // CosmicCanvas's Weather/Kali sub-views already have their own BackButton
   // — keeping the hero title above them too just stacked a second
@@ -32,6 +39,11 @@ export default function CenterHero({
   // is inside one of those; the globe itself (CosmicCanvas) stays mounted
   // and just shows a different internal view.
   const [cosmicView, setCosmicView] = useState<'clock' | 'weather' | 'kali'>('clock');
+
+  const handleViewChange = (view: 'clock' | 'weather' | 'kali') => {
+    setCosmicView(view);
+    onCosmicViewChange?.(view);
+  };
 
   if (!visible) return null;
 
@@ -73,7 +85,7 @@ export default function CenterHero({
       <div className="relative flex-1 w-full min-h-0">
         <CosmicCanvas
           onNavigateToVaultDrawer={onNavigateToVaultDrawer}
-          onViewChange={setCosmicView}
+          onViewChange={handleViewChange}
           requestedView={homeViewRequest}
           groundZeroToken={groundZeroToken}
         />

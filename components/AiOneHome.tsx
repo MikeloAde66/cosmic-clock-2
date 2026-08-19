@@ -77,6 +77,11 @@ export default function AiOneHome({
   pricingRequestToken,
 }: AiOneHomeProps) {
   const [activeSection, setActiveSection] = useState<'home' | 'pricing'>('home');
+  // Mirrors CenterHero/CosmicCanvas's own activeView — used only to hide
+  // the photographic shadow-slide background (mountain/planet hero image)
+  // outside the clock view, so Weather/Kali sit on the plain procedural
+  // starfield/sky layers instead.
+  const [cosmicView, setCosmicView] = useState<'clock' | 'weather' | 'kali'>('clock');
 
   // Ambient "Space Dust" event — fires roughly every 30min (randomized
   // offset so it never feels mechanically on-the-dot), stays active for
@@ -170,9 +175,15 @@ export default function AiOneHome({
           />
         ))}
       </div>
-      <div className="shadow-slideshow-container">
-        <div className="shadow-slide" />
-      </div>
+      {/* Photographic hero image — clock view only. Weather/Kali sit on
+          the plain procedural sky/star/dust layers above instead, per the
+          "clean, unified dark starfield, no mountain/planet image" request
+          for those two sub-views. */}
+      {activeSection === 'home' && cosmicView === 'clock' && (
+        <div className="shadow-slideshow-container">
+          <div className="shadow-slide" />
+        </div>
+      )}
 
       {/* Layer 4: everything interactive/foreground, lifted toward the
           viewer via translateZ(30px) per the layer architecture. CenterHero
@@ -184,6 +195,7 @@ export default function AiOneHome({
           homeViewRequest={homeViewRequest}
           groundZeroToken={groundZeroToken}
           visible={activeSection === 'home'}
+          onCosmicViewChange={setCosmicView}
         />
 
         {activeSection !== 'home' && (
