@@ -51,13 +51,24 @@ function mulberry32(seed: number) {
 
 const CASCADE_STAR_COUNT = 26;
 const randomCascade = mulberry32(19700101);
-const CASCADE_STARS = Array.from({ length: CASCADE_STAR_COUNT }, () => ({
-  left: `${(randomCascade() * 100).toFixed(2)}%`,
-  size: `${(1 + randomCascade() * 1.6).toFixed(2)}px`,
-  delay: `${(randomCascade() * 16).toFixed(2)}s`,
-  duration: `${(10 + randomCascade() * 10).toFixed(2)}s`,
-  opacity: (0.2 + randomCascade() * 0.5).toFixed(2),
-}));
+// Slow/medium/fast duration tiers per star — gives the radial field a sense
+// of depth (nearer stars rush past faster) instead of every star expanding
+// outward at the same uniform rate.
+const CASCADE_SPEED_TIERS = [
+  { min: 14, max: 20 }, // slow
+  { min: 8, max: 13 }, // medium
+  { min: 3.5, max: 7 }, // fast
+];
+const CASCADE_STARS = Array.from({ length: CASCADE_STAR_COUNT }, () => {
+  const tier = CASCADE_SPEED_TIERS[Math.floor(randomCascade() * CASCADE_SPEED_TIERS.length)];
+  return {
+    angle: `${(randomCascade() * 360).toFixed(2)}deg`,
+    size: `${(1 + randomCascade() * 1.6).toFixed(2)}px`,
+    delay: `${(randomCascade() * 16).toFixed(2)}s`,
+    duration: `${(tier.min + randomCascade() * (tier.max - tier.min)).toFixed(2)}s`,
+    opacity: (0.2 + randomCascade() * 0.5).toFixed(2),
+  };
+});
 
 // Deep midnight purple/black → muted burnt sienna, interpolated by real
 // wall-clock time. `phase` is where "now" falls within the current 12-hour
@@ -188,19 +199,20 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
             <div className="absolute w-[420px] h-[420px] -top-16 -left-20 rounded-full bg-gradient-to-br from-indigo-600/20 via-blue-500/10 to-transparent blur-3xl pointer-events-none animate-haze-drift-a" />
             <div className="absolute w-[380px] h-[380px] -bottom-20 -right-16 rounded-full bg-gradient-to-tl from-violet-600/15 via-blue-400/10 to-transparent blur-3xl pointer-events-none animate-haze-drift-b" />
 
-            {/* Micro-cascading stars — a slow, sparse drift distinct from
-                the twinkling global <Starfield /> behind every tab. */}
+            {/* Micro-cascading stars — radial "warp speed" expansion from
+                center, distinct from the twinkling global <Starfield />
+                behind every tab. */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
               {CASCADE_STARS.map((s, i) => (
                 <span
                   key={i}
-                  className="absolute top-0 rounded-full bg-white animate-star-cascade"
+                  className="absolute top-1/2 left-1/2 rounded-full bg-white animate-star-cascade"
                   style={{
-                    left: s.left,
                     width: s.size,
                     height: s.size,
                     animationDelay: s.delay,
                     animationDuration: s.duration,
+                    ['--star-angle' as string]: s.angle,
                     ['--star-opacity' as string]: s.opacity,
                   } as React.CSSProperties}
                 />
@@ -445,10 +457,16 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
           animation: hazeDriftB 70s ease-in-out infinite;
         }
         @keyframes starCascade {
-          0% { top: -10%; opacity: 0; }
+          0% {
+            transform: translate(-50%, -50%) rotate(var(--star-angle)) translateX(0) scale(0.4);
+            opacity: 0;
+          }
           15% { opacity: var(--star-opacity, 0.5); }
           85% { opacity: var(--star-opacity, 0.5); }
-          100% { top: 115%; opacity: 0; }
+          100% {
+            transform: translate(-50%, -50%) rotate(var(--star-angle)) translateX(70vmax) scale(1.6);
+            opacity: 0;
+          }
         }
         .animate-star-cascade {
           animation-name: starCascade;

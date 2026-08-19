@@ -150,6 +150,54 @@ body {
 }
 
 /* ------------------------------------------
+   AMBIENT SPACE DUST EVENT — an occasional (~30min, randomized offset) 6s
+   puff of soft cosmic smoke, distinct from the permanent slow-drifting
+   .dust-layer above. AiOneHome's dustEventActive state (a setTimeout loop)
+   owns *when* this fires; toggling the .active class here just starts a
+   single 6s animation per puff with its own fade-in/hold/fade-out curve —
+   no continuous rendering cost the rest of the time.
+   ------------------------------------------ */
+.home-page .dust-event {
+  position: absolute;
+  inset: -10%;
+  z-index: 18;
+  pointer-events: none;
+}
+
+.home-page .dust-puff {
+  position: absolute;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.35) 0%, rgba(148, 163, 184, 0.18) 45%, transparent 75%);
+  filter: blur(18px);
+  opacity: 0;
+}
+
+.home-page .dust-event.active .dust-puff {
+  animation: home-space-dust-puff 6s ease-in-out 1 both;
+}
+
+@keyframes home-space-dust-puff {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.85);
+  }
+  25% {
+    /* 1.5s / 6s — fade-in complete, drift/hold begins */
+    opacity: 1;
+    transform: translate(calc(var(--dust-drift-x, 0px) * 0.3), calc(var(--dust-drift-y, 0px) * 0.3)) scale(1);
+  }
+  75% {
+    /* 4.5s / 6s — hold ends, fade-out begins */
+    opacity: 1;
+    transform: translate(calc(var(--dust-drift-x, 0px) * 0.75), calc(var(--dust-drift-y, 0px) * 0.75)) scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dust-drift-x, 0px), var(--dust-drift-y, 0px)) scale(1.15);
+  }
+}
+
+/* ------------------------------------------
    LAYER 2: translucent shadow projections + acute 3D tilt.
    3 slides, each holding for 45min (2700s) with a ~4min crossfade, over a
    shared 8100s (3 x 45min) loop — staggered via animation-delay so only
