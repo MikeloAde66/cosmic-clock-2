@@ -19,6 +19,7 @@ import {
   type ContentBlock,
   type DiscoveryMode,
 } from '@/lib/chatHistory';
+import { fetchWikiSummary } from '@/lib/wiki';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB — a sane guard before base64 inflation
 
@@ -141,6 +142,23 @@ export default function AiOneChat() {
     if ((!text && attachedFiles.length === 0) || isStreaming) return;
 
     setError('');
+
+    // /wiki <topic> — an instant Wikipedia summary lookup, bypassing the
+    // real Ai One backend entirely. Still appended to messages like a
+    // normal exchange so the existing autosave effect below picks it up.
+    if (/^\/wiki\s+/i.test(text)) {
+      const topic = text.replace(/^\/wiki\s+/i, '').trim();
+      const userMessage: ChatMessage = { role: 'user', content: text };
+      setMessages((prev) => [...prev, userMessage]);
+      setInput('');
+
+      const summary = topic ? await fetchWikiSummary(topic) : null;
+      const replyText = summary
+        ? summary.extract
+        : `No Wikipedia summary found for "${topic}".`;
+      setMessages((prev) => [...prev, { role: 'assistant', content: replyText }]);
+      return;
+    }
 
     const imageBlocks: ContentBlock[] = await Promise.all(
       attachedFiles.map(async (file) => ({
