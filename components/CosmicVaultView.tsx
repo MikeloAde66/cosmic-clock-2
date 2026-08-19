@@ -129,7 +129,7 @@ export default function CosmicApp() {
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
                   {vaultAssets.map((asset) => (
                     <div key={asset.id} className="overflow-hidden border rounded-lg bg-slate-900 border-slate-800 group">
                       <div className="h-40 overflow-hidden bg-slate-950">

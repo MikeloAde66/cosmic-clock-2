@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Home, LayoutGrid, Mic, Radio as RadioIcon, Settings, Sparkles, Umbrella } from 'lucide-react';
+import { Home, LayoutGrid, Menu, Mic, Radio as RadioIcon, Settings, Sparkles, Umbrella, X as CloseIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import PreferencesModal from './PreferencesModal';
 import DonationButton from './DonationButton';
@@ -64,6 +64,9 @@ export default function LeftNav({
 }: LeftNavProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
+  // Mobile/tablet only (< md) — the icon rail below is hidden and replaced
+  // by a hamburger trigger + slide-out drawer holding the same nav items.
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -76,6 +79,7 @@ export default function LeftNav({
   }, []);
 
   const handleNavClick = (tabKey: string) => {
+    setIsDrawerOpen(false);
     // Home is "ground zero" — always collapse back to the main clock view,
     // not just switch tabs, since Weather/Kali/Products/Pricing/Cart no
     // longer have their own way back out.
@@ -86,13 +90,113 @@ export default function LeftNav({
     setActiveTab?.(tabKey);
   };
 
+  const handleHomeViewClick = (view: 'weather' | 'kali') => {
+    setIsDrawerOpen(false);
+    onOpenHomeView?.(view);
+  };
+
   return (
     <>
-      {/* pb-16 (vs. a plain py-4) keeps the Preferences button clear of the
-          bottom-left corner, where Next.js's own dev-tools indicator lives
-          in local dev (production has no such overlay, but there's no
-          reason to fight it in dev either). */}
-      <aside className="relative z-10 flex flex-col items-center justify-between w-16 min-h-screen pt-4 pb-16 bg-neutral-950/30 backdrop-blur-sm">
+      {/* Mobile/tablet trigger (< md) — the icon rail is hidden below md,
+          this hamburger opens the slide-out drawer instead. */}
+      <button
+        onClick={() => setIsDrawerOpen(true)}
+        aria-label="Open navigation menu"
+        className="fixed z-40 flex items-center justify-center w-10 h-10 text-white border rounded-full top-3 left-3 md:hidden bg-neutral-950/80 backdrop-blur-sm border-neutral-700"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Backdrop + slide-out drawer (< md only) — same nav items as the
+          desktop rail below, just with text labels since there's room. */}
+      {isDrawerOpen && (
+        <div
+          onClick={() => setIsDrawerOpen(false)}
+          className="fixed inset-0 z-40 bg-black/60 md:hidden"
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col w-64 gap-6 pt-4 pb-8 overflow-y-auto transition-transform duration-200 border-r bg-neutral-950 border-neutral-800 md:hidden ${
+          isDrawerOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between px-4">
+          <div
+            title="AIONE — Cosmic HUD"
+            className="flex items-center justify-center w-10 h-10 border rounded-full border-neutral-700 bg-neutral-900 text-[#EBE7DF]"
+          >
+            <AiOneEmblem />
+          </div>
+          <button
+            onClick={() => setIsDrawerOpen(false)}
+            aria-label="Close navigation menu"
+            className="flex items-center justify-center w-8 h-8 rounded text-neutral-400 hover:text-white hover:bg-neutral-900"
+          >
+            <CloseIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        <nav className="flex flex-col gap-1 px-3">
+          {NAV_ITEMS.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => handleNavClick(key)}
+              className={`flex items-center gap-3 h-11 px-3 rounded-lg transition-all border ${
+                activeTab === key
+                  ? 'bg-neutral-900 text-white border-neutral-700'
+                  : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent'
+              }`}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              <span className="text-sm">{label}</span>
+            </button>
+          ))}
+
+          <Link
+            href="/products"
+            onClick={() => setIsDrawerOpen(false)}
+            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+          >
+            <LayoutGrid className="w-4 h-4 shrink-0" />
+            <span className="text-sm">Products</span>
+          </Link>
+
+          <button
+            onClick={() => handleHomeViewClick('weather')}
+            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+          >
+            <Umbrella className="w-4 h-4 shrink-0" />
+            <span className="text-sm">Weather</span>
+          </button>
+
+          <button
+            onClick={() => handleHomeViewClick('kali')}
+            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-white hover:bg-neutral-900/50"
+          >
+            <Sparkles className="w-4 h-4 shrink-0 animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
+            <span className="text-sm">Ai</span>
+          </button>
+
+          <DonationButton row />
+
+          <button
+            onClick={() => {
+              setIsDrawerOpen(false);
+              setShowPreferences(true);
+            }}
+            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+          >
+            <Settings className="w-4 h-4 shrink-0" />
+            <span className="text-sm">Preferences</span>
+          </button>
+        </nav>
+      </aside>
+
+      {/* Desktop icon rail (md+) — pb-16 (vs. a plain py-4) keeps the
+          Preferences button clear of the bottom-left corner, where Next.js's
+          own dev-tools indicator lives in local dev (production has no such
+          overlay, but there's no reason to fight it in dev either). */}
+      <aside className="relative z-10 hidden flex-col items-center justify-between w-16 min-h-screen pt-4 pb-16 bg-neutral-950/30 backdrop-blur-sm md:flex">
         <div className="flex flex-col items-center gap-6">
           <div
             title="AIONE — Cosmic HUD"

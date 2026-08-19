@@ -132,13 +132,13 @@ useContextMenuShare();
   return (
     <RadioPlayerProvider>
     <CartProvider>
-      {/* Responsive app frame: a real desktop viewport gets the app
-          edge-to-edge as before (this wrapper is `contents` at sm+, i.e.
-          invisible to layout); a small screen instead gets the same app
-          inside a framed mobile-device shell, centered on a plain
-          backdrop. */}
-      <div className="flex items-center justify-center w-screen h-screen bg-black sm:contents">
-        <main className="relative flex w-screen h-screen overflow-hidden bg-[#0a0a0c] max-sm:h-[92vh] max-sm:max-w-sm max-sm:rounded-[40px] max-sm:border-[6px] max-sm:border-neutral-800 max-sm:shadow-2xl">
+      {/* Edge-to-edge at every viewport size — small screens use the real
+          device width/height now that the internal layout (sidebar drawer,
+          collapsible header pills, single-column grids) is genuinely
+          responsive, rather than being shrunk into a fake phone-mockup
+          bezel. */}
+      <div className="w-screen h-screen bg-black">
+        <main className="relative flex w-screen h-screen overflow-hidden bg-[#0a0a0c]">
         <Starfield />
         <LeftNav
           activeTab={activeTab}

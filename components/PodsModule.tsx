@@ -1490,7 +1490,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
                       </div>
                     </div>
                   ) : (
-                  <div className="grid grid-cols-5 gap-2 pt-1">
+                  <div className="grid grid-cols-5 gap-1 pt-1 sm:gap-2">
                     {[
                       { freq: '60', label: '60Hz' },
                       { freq: '250', label: '250Hz' },
@@ -1506,7 +1506,10 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
                           step={1}
                           value={eqGains[band.freq] || 0}
                           onChange={(e) => handleEqChange(band.freq, parseFloat(e.target.value))}
-                          className="h-16 accent-white bg-slate-950 rounded cursor-pointer [writing-mode:vertical-lr] [direction:rtl]"
+                          // Taller on mobile (h-24) for touch-drag precision on
+                          // a vertical slider; reverts to the tighter h-16 once
+                          // mouse precision is available at sm+.
+                          className="w-full h-24 sm:h-16 accent-white bg-slate-950 rounded cursor-pointer [writing-mode:vertical-lr] [direction:rtl]"
                         />
                         <span className="text-[10px] font-mono text-slate-400">{band.label}</span>
                         <span className="text-[9px] font-mono text-white">{eqGains[band.freq] > 0 ? `+${eqGains[band.freq]}` : eqGains[band.freq]}dB</span>

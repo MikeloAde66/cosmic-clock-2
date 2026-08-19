@@ -6,8 +6,10 @@ import { Gift } from 'lucide-react';
 // compact renders as a LeftNav-style 40x40 icon button with a hover
 // tooltip, matching that sidebar's other items — for mounting this
 // somewhere narrower than the wide text-button default (e.g. underneath
-// the Kali Yuga icon), reusing the same donation-session handler either way.
-export default function DonationButton({ compact = false }: { compact?: boolean }) {
+// the Kali Yuga icon). row renders as an icon+label list item matching
+// LeftNav's mobile drawer rows. All three reuse the same donation-session
+// handler.
+export default function DonationButton({ compact = false, row = false }: { compact?: boolean; row?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -56,6 +58,19 @@ export default function DonationButton({ compact = false }: { compact?: boolean 
           {error || 'Donate'}
         </span>
       </div>
+    );
+  }
+
+  if (row) {
+    return (
+      <button
+        onClick={handleDonation}
+        disabled={loading}
+        className="flex items-center w-full gap-3 px-3 rounded-lg transition-all border border-transparent h-11 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 disabled:opacity-50"
+      >
+        <Gift className="w-4 h-4 shrink-0" />
+        <span className="text-sm">{error || (loading ? 'Donate…' : 'Donate')}</span>
+      </button>
     );
   }
 
