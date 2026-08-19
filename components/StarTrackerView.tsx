@@ -87,6 +87,18 @@ function formatDistance(au: number): string {
   return au < 0.01 ? `${Math.round(au * AU_IN_KM).toLocaleString()} km` : `${au.toFixed(3)} AU`;
 }
 
+function formatLightYears(ly: number): string {
+  if (ly >= 1_000_000) return `${(ly / 1_000_000).toFixed(1)} million ly`;
+  return `${ly.toLocaleString()} ly`;
+}
+
+// NASA's Hubble Messier Catalog pages key off the bare catalog number, not
+// the "M" prefix (verified against the real M42 page before wiring this in).
+function messierArchiveUrl(id: string): string {
+  const number = id.replace(/^M/i, '');
+  return `https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-${number}/`;
+}
+
 function computeSky(observer: Observer, now: Date): SkyBody[] {
   return TRACKED_BODIES.map((body) => {
     const eq = Equator(body, now, observer, true, true);
@@ -241,6 +253,9 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const [selectedObservatoryId, setSelectedObservatoryId] = useState('local');
   const [now, setNow] = useState(() => new Date());
   const [selected, setSelected] = useState<SelectedItem>(null);
+  // Hover-only (not click-persisted like `selected` above) — which Messier
+  // diamond currently has its dark-themed preview overlay showing.
+  const [hoveredMessierId, setHoveredMessierId] = useState<string | null>(null);
 
   // Pan/zoom state for the sky dome — drag to pan, wheel to zoom.
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
@@ -468,6 +483,11 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
         : status === 'requesting'
           ? 'Locating…'
           : 'Location unavailable — showing sky at 0°N, 0°E';
+  // While a Messier diamond is hovered, the location line temporarily
+  // reports a target lock on it instead — reverts the instant the hover
+  // ends, since the underlying locationLabel above is unaffected.
+  const hoveredMessier = hoveredMessierId ? MESSIER_OBJECTS.find((m) => m.id === hoveredMessierId) : null;
+  const statusLine = hoveredMessier ? `🎯 TARGET LOCK: ${hoveredMessier.id} — ${hoveredMessier.name}` : locationLabel;
 
   // Dome geometry + pan/zoom handlers
   // Logical SVG units, not pixels — the viewBox keeps all coordinate math
@@ -560,7 +580,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           <div>
             <span className="text-[10px] font-mono tracking-widest uppercase text-cyan-400/80">Sky Above You</span>
             <h2 className="text-2xl font-bold tracking-wider text-white">Star Tracker</h2>
-            <p className="mt-1 font-mono text-xs text-cyan-100/80">{locationLabel}</p>
+            <p className="mt-1 font-mono text-xs text-cyan-100/80">{statusLine}</p>
           </div>
           <ObservatoryPicker selectedId={selectedObservatoryId} onSelectObservatory={(obs: Observatory) => setSelectedObservatoryId(obs.id)} />
         </div>
@@ -928,20 +948,48 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                   // `now`/`observer`, not a fixed/simulated time.
                   const xy = equatorialToXY(m.raHours, m.decDeg, observer, now, center, radius);
                   if (!xy) return null;
+                  const isHovered = hoveredMessierId === m.id;
+                  // Tooltip box in the same logical (viewBox) units as the
+                  // dome itself, clamped so it never runs off the edge —
+                  // above-right of the node by default, flipping to
+                  // below/left near the dome's boundary.
+                  const boxW = 148;
+                  const boxH = 78;
+                  const boxX = Math.min(Math.max(xy.x + 8, 4), size - boxW - 4);
+                  const boxY = xy.y - boxH - 8 < 0 ? xy.y + 12 : xy.y - boxH - 8;
                   return (
-                    <g key={m.id} className="cursor-pointer">
-                      <title>
-                        {m.id} — {m.name} ({m.type}, mag {m.magnitude})
-                      </title>
+                    <g
+                      key={m.id}
+                      className="cursor-pointer"
+                      onClick={() => window.open(messierArchiveUrl(m.id), '_blank', 'noopener,noreferrer')}
+                      onMouseEnter={() => setHoveredMessierId(m.id)}
+                      onMouseLeave={() => setHoveredMessierId((prev) => (prev === m.id ? null : prev))}
+                    >
+                      {/* Transparent, wider hit area — the visible diamond is
+                          only 6x6, too small to reliably hover/click on its
+                          own, matching the wider-stroke hit targets used for
+                          the celestial-body markers below. */}
+                      <circle cx={xy.x} cy={xy.y} r={9} fill="transparent" />
+                      {isHovered && (
+                        <circle
+                          cx={xy.x}
+                          cy={xy.y}
+                          r={5}
+                          fill="none"
+                          stroke="#c084fc"
+                          strokeWidth={1}
+                          className="pointer-events-none animate-messier-pulse"
+                        />
+                      )}
                       <rect
                         x={xy.x - 3}
                         y={xy.y - 3}
                         width={6}
                         height={6}
                         transform={`rotate(45 ${xy.x} ${xy.y})`}
-                        fill="rgba(192,132,252,0.3)"
+                        fill={isHovered ? 'rgba(192,132,252,0.55)' : 'rgba(192,132,252,0.3)'}
                         stroke="#c084fc"
-                        strokeWidth={1}
+                        strokeWidth={isHovered ? 1.5 : 1}
                       />
                       <text
                         x={xy.x + 7}
@@ -952,6 +1000,17 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                       >
                         {m.id}
                       </text>
+                      {isHovered && (
+                        <foreignObject x={boxX} y={boxY} width={boxW} height={boxH} className="pointer-events-none">
+                          <div className="p-2 space-y-0.5 text-[7px] font-mono leading-tight text-purple-100 border rounded shadow-lg border-purple-500/40 bg-slate-950/95">
+                            <div className="text-[8px] font-bold text-white">
+                              🌌 {m.id} • Click to launch deep space archive
+                            </div>
+                            <div className="pt-0.5">{m.name} — {m.type}</div>
+                            <div>Distance: {formatLightYears(m.distanceLy)}</div>
+                          </div>
+                        </foreignObject>
+                      )}
                     </g>
                   );
                 })}
@@ -1068,7 +1127,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           )}
           {skyFocusMode === 'MESSIER' && (
             <span className="flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rotate-45 border border-purple-400 bg-purple-500/30" /> Messier object (hover for name)
+              <span className="inline-block w-2 h-2 rotate-45 border border-purple-400 bg-purple-500/30" /> Messier object (hover for details, click for NASA archive)
             </span>
           )}
           {issLayerOn && (
@@ -1197,6 +1256,13 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           animation-name: star-twinkle;
           animation-timing-function: linear;
           animation-iteration-count: infinite;
+        }
+        @keyframes messier-pulse {
+          0% { r: 5; stroke-opacity: 0.9; }
+          100% { r: 11; stroke-opacity: 0; }
+        }
+        .animate-messier-pulse {
+          animation: messier-pulse 1.1s ease-out infinite;
         }
       `}</style>
     </div>
