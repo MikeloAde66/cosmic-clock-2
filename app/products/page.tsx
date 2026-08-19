@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import Starfield from '@/components/Starfield';
 import ProductHeroCard from '@/components/ProductHeroCard';
 import HardwareProductSlide from '@/components/HardwareProductSlide';
@@ -48,6 +49,14 @@ export default function ProductsPage() {
   return (
     <div className="relative w-full min-h-screen overflow-hidden bg-[#0a0a0c] text-slate-100">
       <Starfield />
+      <Link
+        href="/"
+        aria-label="Home"
+        className="absolute top-6 left-6 z-20 flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+      >
+        <Home className="w-3.5 h-3.5" />
+        Home
+      </Link>
       <div className="relative z-10 max-w-4xl px-6 py-16 mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <button
