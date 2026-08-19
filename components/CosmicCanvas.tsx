@@ -445,15 +445,16 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
           animation: hazeDriftB 70s ease-in-out infinite;
         }
         @keyframes starCascade {
-          0% { transform: translateY(-10%); opacity: 0; }
+          0% { top: -10%; opacity: 0; }
           15% { opacity: var(--star-opacity, 0.5); }
           85% { opacity: var(--star-opacity, 0.5); }
-          100% { transform: translateY(115%); opacity: 0; }
+          100% { top: 115%; opacity: 0; }
         }
         .animate-star-cascade {
           animation-name: starCascade;
           animation-timing-function: linear;
           animation-iteration-count: infinite;
+          animation-fill-mode: backwards;
         }
       `}</style>
     </div>

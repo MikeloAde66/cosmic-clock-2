@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Home, LayoutGrid, Mic, Radio as RadioIcon, Settings, Sparkles, Umbrella } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import PreferencesModal from './PreferencesModal';
+import DonationButton from './DonationButton';
 
 // The Ai One emblem — an angled open loop ("a") paired with a parallel
 // diagonal stem and dot ("i"). No background shape of its own; the
@@ -91,7 +92,7 @@ export default function LeftNav({
           bottom-left corner, where Next.js's own dev-tools indicator lives
           in local dev (production has no such overlay, but there's no
           reason to fight it in dev either). */}
-      <aside className="relative z-10 flex flex-col items-center justify-between w-16 min-h-screen pt-4 pb-16 border-r bg-neutral-950 border-neutral-800">
+      <aside className="relative z-10 flex flex-col items-center justify-between w-16 min-h-screen pt-4 pb-16 bg-neutral-950/30 backdrop-blur-sm">
         <div className="flex flex-col items-center gap-6">
           <div
             title="AIONE — Cosmic HUD"
@@ -169,6 +170,10 @@ export default function LeftNav({
                 Kali Yuga
               </span>
             </div>
+
+            {/* Donations — relocated here from the Home tab's sub-nav,
+                directly underneath Kali Yuga. */}
+            <DonationButton compact />
           </nav>
         </div>
 

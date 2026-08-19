@@ -119,6 +119,16 @@ useContextMenuShare();
     // Only ever consumed once, on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Triggers AiOneHome's Pricing section from TopHeader, now that the
+  // Pricing button lives there instead of AiOneHome's own sub-nav — reuses
+  // the same pricingRequestToken mechanism Stripe's cancel_url already
+  // drives above.
+  const openPricing = () => {
+    setActiveTab('aione');
+    setPricingRequestToken(Date.now());
+  };
+
   return (
     <RadioPlayerProvider>
     <CartProvider>
@@ -140,7 +150,7 @@ useContextMenuShare();
         />
 
         <div className="flex flex-col flex-1 overflow-hidden">
-          <TopHeader activeTab={activeTab} />
+          <TopHeader activeTab={activeTab} onOpenPricing={openPricing} />
 
           <div className="relative flex-1 overflow-hidden">
             {activeTab === 'radio' && <RadioStreams />}

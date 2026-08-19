@@ -1,15 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, ShoppingCart } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import CosmicCanvas from './CosmicCanvas';
-import Starfield from './Starfield';
-import SignUpModal from './SignUpModal';
-import DonationButton from './DonationButton';
 import PricingPlans from './PricingPlans';
-import CartView from './CartView';
-import { useCart } from '@/lib/cart';
-import { supabase } from '@/lib/supabase';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
 interface AiOneHomeProps {
@@ -31,47 +25,40 @@ interface AiOneHomeProps {
   pricingRequestToken?: number;
 }
 
-// Reads useCart() from inside <CartProvider>'s own subtree — rendered as a
-// child of the provider below rather than called directly in AiOneHome's
-// body, which sits outside the context it wraps.
-function CartNavButton({ onClick }: { onClick: () => void }) {
-  const { itemCount } = useCart();
-  return (
-    <button
-      onClick={onClick}
-      className="relative text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
-    >
-      <ShoppingCart className="inline w-3.5 h-3.5 -mt-0.5 mr-1" />
-      Cart
-      {itemCount > 0 && (
-        <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[16px] h-4 px-1 text-[9px] font-bold rounded-full bg-white text-black">
-          {itemCount}
-        </span>
-      )}
-    </button>
-  );
-}
-
 export default function AiOneHome({
   onNavigateToVaultDrawer,
   homeViewRequest,
   groundZeroToken,
   pricingRequestToken,
 }: AiOneHomeProps) {
-  const [isSignUpOpen, setIsSignUpOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<'home' | 'pricing' | 'cart'>('home');
+  const [activeSection, setActiveSection] = useState<'home' | 'pricing'>('home');
   // CosmicCanvas's Weather/Kali sub-views already have their own BackButton
-  // — keeping this hero banner + sub-nav above them too just stacked a
-  // second navigation layer and pushed those views' content down by ~380px
-  // with nothing to match it at the bottom. Collapse this chrome once the
-  // user is inside one of those, same as they already collapse for
-  // Products/Pricing/Cart via the activeSection check below.
+  // — keeping this hero banner above them too just stacked a second
+  // navigation layer and pushed those views' content down by ~380px with
+  // nothing to match it at the bottom. Collapse this chrome once the user
+  // is inside one of those, same as they already collapse for Pricing via
+  // the activeSection check below.
   const [cosmicView, setCosmicView] = useState<'clock' | 'weather' | 'kali'>('clock');
   const showHeroChrome = activeSection !== 'home' || cosmicView === 'clock';
 
-  // A LeftNav Weather/Kali click can arrive while this is showing
-  // Products/Pricing/Cart — snap back to the main section so CosmicCanvas
-  // (which owns the actual sub-view) is mounted to receive the request.
+  // Which of the 3 shadow-slide images is current — JS-driven instead of a
+  // pure CSS @keyframes loop so the first slide can render already at full
+  // opacity on mount (a class present from the initial render never fires
+  // its CSS transition; only a later change to it does), while switches
+  // between slides still get a snappy transition. Same 45min hold per
+  // slide as the CSS version this replaced — only the fade itself sped up.
+  const [activeShadowSlide, setActiveShadowSlide] = useState(0);
+  useEffect(() => {
+    const SLIDE_HOLD_MS = 45 * 60 * 1000;
+    const id = setInterval(() => {
+      setActiveShadowSlide((i) => (i + 1) % 3);
+    }, SLIDE_HOLD_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  // A LeftNav Weather/Kali click can arrive while this is showing Pricing —
+  // snap back to the main section so CosmicCanvas (which owns the actual
+  // sub-view) is mounted to receive the request.
   useEffect(() => {
     if (homeViewRequest) queueMicrotask(() => setActiveSection('home'));
   }, [homeViewRequest]);
@@ -83,26 +70,6 @@ export default function AiOneHome({
   useEffect(() => {
     if (pricingRequestToken) queueMicrotask(() => setActiveSection('pricing'));
   }, [pricingRequestToken]);
-
-  useEffect(() => {
-    // Supabase's default email template sends a magic link, not a 6-digit
-    // code — clicking it authenticates silently via a URL token rather than
-    // going through the in-app "enter code" step. Catch that here so
-    // onboarding (terms/profile) still continues instead of leaving the
-    // user stranded on a closed modal despite being signed in.
-    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
-      // Log In uses the same passwordless mechanism as Sign Up, so this
-      // fires for both — only pop the Sign Up onboarding (terms/profile)
-      // when the sign-in was actually initiated from Sign Up.
-      if (
-        event === 'SIGNED_IN' &&
-        localStorage.getItem('cosmic_auth_intent') === 'signup'
-      ) {
-        setIsSignUpOpen(true);
-      }
-    });
-    return () => subscription.subscription.unsubscribe();
-  }, []);
 
   return (
     <div className="home-page relative z-10 w-full h-full overflow-y-auto text-slate-100 flex flex-col font-sans">
@@ -116,9 +83,9 @@ export default function AiOneHome({
       <div className="star-layer" />
       <div className="dust-layer" />
       <div className="shadow-slideshow-container">
-        <div className="shadow-slide" />
-        <div className="shadow-slide" />
-        <div className="shadow-slide" />
+        <div className={`shadow-slide${activeShadowSlide === 0 ? ' active' : ''}`} />
+        <div className={`shadow-slide${activeShadowSlide === 1 ? ' active' : ''}`} />
+        <div className={`shadow-slide${activeShadowSlide === 2 ? ' active' : ''}`} />
       </div>
 
       {/* Layer 4: everything interactive/foreground, lifted toward the
@@ -126,22 +93,23 @@ export default function AiOneHome({
       <div className="content-layer flex flex-col flex-1 min-h-0">
       {showHeroChrome && (
         <>
-          {/* HERO BANNER */}
-          <div className="relative w-full h-80 overflow-hidden border-b border-slate-800/80 flex flex-col items-center justify-center shrink-0">
+          {/* HERO BANNER — no overflow-hidden and no Starfield instance of
+              its own anymore. Both used to create a real seam: this box's
+              hard-clipped edge cut off its own separate, denser (850-star)
+              Starfield exactly at the banner's bottom edge, so star density
+              visibly dropped below that line where only the sparser global
+              Starfield + .star-layer CSS remained. Removing the contained
+              instance leaves one continuous star layer (global Starfield +
+              .star-layer) across the whole page, so there's no density
+              discontinuity — and no box edge left to clip anything at. */}
+          <div className="relative w-full h-80 flex flex-col items-center justify-center shrink-0">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-600/20 via-indigo-500/30 to-white/10 rounded-full blur-3xl pointer-events-none" />
-            {/* Second, self-contained Starfield instance — the global one
-                (mounted in app/page.tsx) sits behind the whole app, but this
-                banner used to have its own opaque background hiding it too;
-                now translucent so the cascading sky layer above shows
-                through both. Same star logic as the global instance, just
-                scoped to this banner instead of the viewport — deliberately
-                denser (850 vs. the global default of 420) for this specific
-                atmospheric-canvas feature; each star is a real DOM node, so
-                this is heavier than the .star-layer CSS overlay below. */}
-            <Starfield contained starCount={850} />
             <div className="absolute inset-0 bg-gradient-to-t from-[#070b14]/60 via-transparent to-[#070b14]/40" />
 
-            <div className="content-wrapper px-8 py-6 space-y-2 text-center">
+            {/* Unboxed — no card/border/background behind the title
+                anymore, per the "no placeholder box" direction. Floats
+                directly over the cosmic canvas layers instead. */}
+            <div className="px-8 py-6 space-y-2 text-center">
               <h1
                 className="text-5xl md:text-6xl text-white"
                 style={{
@@ -149,46 +117,21 @@ export default function AiOneHome({
                     '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif',
                   fontWeight: 800,
                   letterSpacing: '-0.025em',
+                  textShadow: '0 2px 24px rgba(0,0,0,0.6), 0 0 40px rgba(96,165,250,0.25)',
                 }}
               >
                 Ai One
               </h1>
-              <p className="font-mono text-xs tracking-widest uppercase md:text-sm text-slate-300">
+              <p
+                className="font-mono text-xs tracking-widest uppercase md:text-sm text-slate-300"
+                style={{ textShadow: '0 1px 8px rgba(0,0,0,0.7)' }}
+              >
                 Cosmic Creation & Broadcast Hub
               </p>
             </div>
           </div>
-
-          {/* SUB-NAV: lightweight inline menu text, not pill buttons.
-              Products/merch moved into the Vault's Merch drawer — see
-              CosmicVaultAuth — so this main platform sub-nav stays
-              focused on the core space/broadcast tools. */}
-          <div className="content-wrapper flex items-center justify-center w-full py-3 space-x-8 text-xs font-mono tracking-widest uppercase shrink-0">
-            <button
-              onClick={() => setActiveSection('pricing')}
-              className="text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
-            >
-              Pricing
-            </button>
-
-            <button
-              onClick={() => setIsSignUpOpen(true)}
-              className="text-white hover:text-white font-bold border-b border-neutral-700 pb-0.5 transition-colors"
-            >
-              Sign Up
-            </button>
-
-            <CartNavButton onClick={() => setActiveSection('cart')} />
-
-            <DonationButton />
-          </div>
         </>
       )}
-
-      <SignUpModal
-        isOpen={isSignUpOpen}
-        onClose={() => setIsSignUpOpen(false)}
-      />
 
       {activeSection !== 'home' ? (
         <div className="flex flex-col flex-1 min-h-0">
@@ -203,7 +146,6 @@ export default function AiOneHome({
           </div>
           <div className="flex-1 min-h-0">
             {activeSection === 'pricing' && <PricingPlans />}
-            {activeSection === 'cart' && <CartView />}
           </div>
         </div>
       ) : (

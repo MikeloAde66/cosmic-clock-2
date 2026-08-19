@@ -1,8 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Gift } from 'lucide-react';
 
-export default function DonationButton() {
+// compact renders as a LeftNav-style 40x40 icon button with a hover
+// tooltip, matching that sidebar's other items — for mounting this
+// somewhere narrower than the wide text-button default (e.g. underneath
+// the Kali Yuga icon), reusing the same donation-session handler either way.
+export default function DonationButton({ compact = false }: { compact?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -35,6 +40,24 @@ export default function DonationButton() {
       setLoading(false);
     }
   };
+
+  if (compact) {
+    return (
+      <div className="relative group">
+        <button
+          onClick={handleDonation}
+          disabled={loading}
+          aria-label="Donations"
+          className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 disabled:opacity-50"
+        >
+          <Gift className="w-4 h-4" />
+        </button>
+        <span className="absolute z-20 px-2 py-1 ml-2 text-[10px] font-mono transition-opacity -translate-y-1/2 rounded opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-neutral-900 border border-neutral-700 text-neutral-200 group-hover:opacity-100">
+          {error || 'Donations'}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-1">

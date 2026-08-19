@@ -78,10 +78,27 @@ body {
   inset: 0;
   z-index: 10;
   pointer-events: none;
-  background-image: radial-gradient(1.5px 1.5px at 15% 20%, rgba(255, 255, 255, 0.9), transparent),
-    radial-gradient(2px 2px at 40% 60%, rgba(255, 255, 255, 0.75), transparent),
+  /* Was only 5 points spread across the entire page height — sparse enough
+     to read as basically empty wherever nothing else compensated (the hero
+     banner, once its own dedicated dense Starfield instance was removed).
+     Bumped to 16, weighted toward the top ~35% so that area has real,
+     visible star coverage of its own rather than relying on layers below
+     an already-near-opaque sky-layer gradient. */
+  background-image: radial-gradient(1.2px 1.2px at 5% 10%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.8px 1.8px at 25% 8%, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(1px 1px at 50% 15%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.6px 1.6px at 75% 12%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1.3px 1.3px at 92% 18%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 15% 20%, rgba(255, 255, 255, 0.9), transparent),
     radial-gradient(1px 1px at 65% 25%, rgba(255, 255, 255, 0.95), transparent),
+    radial-gradient(1.2px 1.2px at 12% 32%, rgba(255, 255, 255, 0.65), transparent),
+    radial-gradient(1.5px 1.5px at 10% 45%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(2px 2px at 40% 60%, rgba(255, 255, 255, 0.75), transparent),
+    radial-gradient(1px 1px at 55% 38%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.7px 1.7px at 80% 50%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1.2px 1.2px at 20% 70%, rgba(255, 255, 255, 0.65), transparent),
     radial-gradient(2px 2px at 85% 80%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1.4px 1.4px at 60% 85%, rgba(255, 255, 255, 0.75), transparent),
     radial-gradient(1.5px 1.5px at 30% 90%, rgba(255, 255, 255, 0.65), transparent);
   animation: home-star-pulse 6s ease-in-out infinite alternate;
   transform: translateZ(-50px);
@@ -155,38 +172,26 @@ body {
   opacity: 0;
   mix-blend-mode: soft-light;
   filter: contrast(110%) blur(1px);
-  animation: home-shadow-crossfade 8100s ease-in-out infinite;
+  /* JS-driven (AiOneHome's activeShadowSlide state + a 45min setInterval)
+     instead of a CSS @keyframes loop — a class present on the very first
+     render never triggers this transition (only a later class change
+     does), so the first slide shows at full opacity immediately with no
+     fade-in wait, while later switches still get a snappy 0.4s crossfade. */
+  transition: opacity 0.4s ease-in-out;
+}
+
+.home-page .shadow-slide.active {
+  opacity: 0.18;
 }
 
 .home-page .shadow-slide:nth-child(1) {
-  animation-delay: 0s;
   background-image: url('/shadow-purple.png');
 }
 .home-page .shadow-slide:nth-child(2) {
-  animation-delay: 2700s; /* +45min */
   background-image: url('/shadow-milkyway.png');
 }
 .home-page .shadow-slide:nth-child(3) {
-  animation-delay: 5400s; /* +90min */
   background-image: url('/shadow-ice.png');
-}
-
-@keyframes home-shadow-crossfade {
-  0% {
-    opacity: 0;
-  }
-  3% {
-    opacity: 0.18;
-  }
-  30% {
-    opacity: 0.18;
-  }
-  33% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 0;
-  }
 }
 
 /* ------------------------------------------
