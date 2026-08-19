@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { Download, History as HistoryIcon, Image as ImageIcon, Mic, MicOff, Plus, SquarePen, X } from 'lucide-react';
+import { Download, History as HistoryIcon, Image as ImageIcon, Mic, MicOff, Plus, SquarePen, Volume2, VolumeX, X } from 'lucide-react';
 import { useSpeechToText } from './useSpeechToText';
 import AiOneMessageContent from './AiOneMessageContent';
 import ChatHistoryPanel from './ChatHistoryPanel';
@@ -64,6 +64,9 @@ export default function AiOneChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState('');
   const [view, setView] = useState<WidgetView>('chat');
+  // Index of the message currently being read aloud via window.speechSynthesis
+  // — null when nothing is speaking. Only one message speaks at a time.
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -101,6 +104,47 @@ export default function AiOneChat() {
       createdAt: createdAtRef.current,
     });
   }, [messages, isStreaming, mode]);
+
+  // Speech never outlives this component — cancel on unmount so switching
+  // away from Kali (or navigating elsewhere) doesn't leave her talking.
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  // Toggle: clicking the speaker on the message already speaking stops it;
+  // clicking a different one cancels that and starts the new one instead.
+  const toggleSpeak = (idx: number, text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    if (speakingIdx === idx) {
+      window.speechSynthesis.cancel();
+      setSpeakingIdx(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    // Lower, deliberate terminal tone, matching Kali's grounded/analytical
+    // persona rather than a default chipper assistant voice.
+    utterance.pitch = 0.85;
+    utterance.rate = 0.9;
+
+    const voices = window.speechSynthesis.getVoices();
+    utterance.voice =
+      voices.find((v) => v.name.includes('Google UK English Female') || v.name.includes('Samantha')) ??
+      voices[0];
+
+    utterance.onend = () => setSpeakingIdx(null);
+    utterance.onerror = () => setSpeakingIdx(null);
+
+    window.speechSynthesis.speak(utterance);
+    setSpeakingIdx(idx);
+  };
 
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
@@ -143,39 +187,60 @@ export default function AiOneChat() {
 
     setError('');
 
-    // /wiki <topic> — an instant Wikipedia summary lookup, bypassing the
-    // real Ai One backend entirely. Still appended to messages like a
-    // normal exchange so the existing autosave effect below picks it up.
-    if (/^\/wiki\s+/i.test(text)) {
-      const topic = text.replace(/^\/wiki\s+/i, '').trim();
-      const userMessage: ChatMessage = { role: 'user', content: text };
-      setMessages((prev) => [...prev, userMessage]);
-      setInput('');
+    // What actually shows in the transcript vs. what's sent to the model —
+    // normally identical, but /wiki keeps the visible bubble as the raw
+    // command while the API sees the fetched summary as context instead.
+    let displayContent: string | ContentBlock[] = text;
+    let apiContent: string | ContentBlock[] = text;
+
+    // /wiki <topic> <optional instructions> — looks up a Wikipedia summary
+    // and hands it to Kali as context so she formulates the actual reply in
+    // her own voice, rather than the raw extract bypassing her entirely.
+    // The query is the main title only: everything up to a dash/colon that's
+    // clearly acting as a separator (surrounded by whitespace), not a
+    // hyphen inside the title itself (e.g. "X-ray", "COVID-19" stay whole).
+    const wikiMatch = /^\/wiki\s+(.+)/i.exec(text);
+    if (wikiMatch) {
+      const rest = wikiMatch[1].trim();
+      const split = /^(.*?)(?:\s+[-–—]\s+|:\s+)(.+)$/.exec(rest);
+      const topic = (split ? split[1] : rest).trim();
+      const instructions = split ? split[2].trim() : '';
 
       const summary = topic ? await fetchWikiSummary(topic) : null;
-      const replyText = summary
-        ? summary.extract
-        : `No Wikipedia summary found for "${topic}".`;
-      setMessages((prev) => [...prev, { role: 'assistant', content: replyText }]);
-      return;
+
+      if (!summary) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'user', content: text },
+          { role: 'assistant', content: `No Wikipedia summary found for "${topic}".` },
+        ]);
+        setInput('');
+        setAttachedFiles([]);
+        return;
+      }
+
+      apiContent = `[Wikipedia summary for "${summary.title}"]\n${summary.extract}\n\n${
+        instructions || `Give a complete, well-formed answer about ${summary.title} using the summary above.`
+      }`;
+    } else if (attachedFiles.length > 0) {
+      const imageBlocks: ContentBlock[] = await Promise.all(
+        attachedFiles.map(async (file) => ({
+          type: 'image' as const,
+          source: {
+            type: 'base64' as const,
+            media_type: file.type || 'image/png',
+            data: await fileToBase64(file),
+          },
+        }))
+      );
+      const withImages: ContentBlock[] = [...imageBlocks, { type: 'text', text: text || 'What do you see here?' }];
+      displayContent = withImages;
+      apiContent = withImages;
     }
 
-    const imageBlocks: ContentBlock[] = await Promise.all(
-      attachedFiles.map(async (file) => ({
-        type: 'image' as const,
-        source: {
-          type: 'base64' as const,
-          media_type: file.type || 'image/png',
-          data: await fileToBase64(file),
-        },
-      }))
-    );
-
-    const userContent: string | ContentBlock[] =
-      imageBlocks.length > 0 ? [...imageBlocks, { type: 'text', text: text || 'What do you see here?' }] : text;
-
-    const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: userContent }];
-    setMessages([...nextMessages, { role: 'assistant', content: '' }]);
+    const displayMessages: ChatMessage[] = [...messages, { role: 'user', content: displayContent }];
+    const apiMessages: ChatMessage[] = [...messages, { role: 'user', content: apiContent }];
+    setMessages([...displayMessages, { role: 'assistant', content: '' }]);
     setInput('');
     setAttachedFiles([]);
     setIsStreaming(true);
@@ -184,7 +249,7 @@ export default function AiOneChat() {
       const res = await fetch('/api/ai-one-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: nextMessages, mode, language }),
+        body: JSON.stringify({ messages: apiMessages, mode, language }),
       });
 
       if (!res.ok || !res.body) {
@@ -290,6 +355,20 @@ export default function AiOneChat() {
               >
                 {m.role === 'user' ? translate('kali.you', language) : '(Kali)'}
               </span>
+              {m.role === 'assistant' && text && !(idx === messages.length - 1 && isStreaming) && (
+                <button
+                  type="button"
+                  onClick={() => toggleSpeak(idx, text)}
+                  title={speakingIdx === idx ? 'Stop reading aloud' : 'Read aloud'}
+                  className={`inline-flex items-center justify-center w-5 h-5 mr-1.5 -mt-0.5 align-middle transition rounded ${
+                    speakingIdx === idx
+                      ? 'text-white bg-slate-800'
+                      : 'text-slate-500 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  {speakingIdx === idx ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                </button>
+              )}
               {images.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1 mb-1">
                   {images.map((src, i) => (

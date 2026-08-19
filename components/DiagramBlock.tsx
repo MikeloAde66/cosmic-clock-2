@@ -58,6 +58,7 @@ export default function DiagramBlock({ lang, code }: DiagramBlockProps) {
           if (!cancelled) setSvg(sanitizeSvg(rendered));
         })
         .catch((err) => {
+          console.warn('Mermaid render failed, falling back to raw source:', err);
           if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to render diagram.');
         });
     } else if (lang === 'svg') {
@@ -80,10 +81,14 @@ export default function DiagramBlock({ lang, code }: DiagramBlockProps) {
     );
   }
 
+  // A malformed mermaid/svg block is a model mistake, not something the
+  // reader needs a parser stack trace for — fall back to the same plain
+  // source-as-text treatment as an unlabeled fence, so a syntax error never
+  // surfaces as a visible broken/error box, just the diagram's intent as text.
   if (error) {
     return (
-      <pre className="p-2 my-1 text-xs border rounded whitespace-pre-wrap border-red-900/40 bg-red-950/20 text-red-400">
-        Diagram failed to render: {error}
+      <pre className="p-2 my-1 overflow-x-auto text-xs border rounded bg-black/40 border-slate-800 text-slate-300 whitespace-pre-wrap">
+        {code}
       </pre>
     );
   }
