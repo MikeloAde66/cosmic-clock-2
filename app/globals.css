@@ -12,3 +12,164 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   overflow: hidden;
 }
+
+/* ==========================================
+   HOME PAGE — MULTI-LAYER ATMOSPHERIC CANVAS
+   Scoped entirely under .home-page (applied only to AiOneHome.tsx's own
+   root element) — no body/html/layout selectors touched, so no other
+   route or tab is affected.
+
+   Dawn phase uses rose/magenta, not the amber/orange/sienna named in the
+   spec this was built from ("Dawn Burnt Sienna", "Warm Amber Glow") — this
+   app's standing rule is zero yellow/amber/gold anywhere, white/neutral
+   (and here, cyan/purple/pink) only. This is the same substitution made
+   the first two times this exact palette came up.
+
+   Layer 2's shadow slideshow uses the three real images in public/
+   (shadow-purple.png, shadow-milkyway.png, shadow-ice.png) — note the
+   filenames describe content, not literal source filenames; the files as
+   originally saved had their "purple" and "ice" content swapped and a
+   doubled .png.png extension, corrected when copying them into public/.
+   ========================================== */
+.home-page {
+  position: relative;
+  isolation: isolate; /* clean root stacking context for the z-index layers below */
+  perspective: 1200px; /* 3D depth for Layer 2's acute tilt */
+}
+
+/* ------------------------------------------
+   LAYER 0: 4-hour cascading sky (14,400s = one full dusk-to-dawn arc)
+   ------------------------------------------ */
+.home-page .sky-layer {
+  position: absolute;
+  inset: -5%; /* overbleed so the scale(1.1)/translateZ below never clips a visible edge */
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 20, 38, 0.95) 0%,     /* Dusk Blue */
+    rgba(22, 42, 77, 0.85) 25%,   /* Deep Twilight */
+    rgba(157, 23, 77, 0.9) 50%,   /* Dawn Rose */
+    rgba(219, 39, 119, 0.75) 75%, /* Soft Magenta Glow */
+    rgba(1, 2, 4, 1) 100%         /* Pitch Black Deep Space */
+  );
+  background-size: 100% 500%;
+  animation: home-sky-arc 14400s ease-in-out infinite alternate;
+  transform: translateZ(-100px) scale(1.1);
+}
+
+@keyframes home-sky-arc {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 0% 100%;
+  }
+}
+
+/* ------------------------------------------
+   LAYER 1: independent twinkling starfield
+   ------------------------------------------ */
+.home-page .star-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  background-image: radial-gradient(1.5px 1.5px at 15% 20%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(2px 2px at 40% 60%, rgba(255, 255, 255, 0.75), transparent),
+    radial-gradient(1px 1px at 65% 25%, rgba(255, 255, 255, 0.95), transparent),
+    radial-gradient(2px 2px at 85% 80%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1.5px 1.5px at 30% 90%, rgba(255, 255, 255, 0.65), transparent);
+  animation: home-star-pulse 6s ease-in-out infinite alternate;
+  transform: translateZ(-50px);
+}
+
+@keyframes home-star-pulse {
+  0% {
+    opacity: 0.25;
+    transform: translateZ(-50px) scale(0.99);
+  }
+  100% {
+    opacity: 0.85;
+    transform: translateZ(-50px) scale(1.01);
+  }
+}
+
+/* ------------------------------------------
+   LAYER 2: translucent shadow projections + acute 3D tilt.
+   3 slides, each holding for 45min (2700s) with a ~4min crossfade, over a
+   shared 8100s (3 x 45min) loop — staggered via animation-delay so only
+   one is ever visible at a time.
+   ------------------------------------------ */
+.home-page .shadow-slideshow-container {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  transform: rotateX(3deg) rotateY(-2deg) translateZ(0px);
+  transform-style: preserve-3d;
+}
+
+.home-page .shadow-slide {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  mix-blend-mode: soft-light;
+  filter: contrast(110%) blur(1px);
+  animation: home-shadow-crossfade 8100s ease-in-out infinite;
+}
+
+.home-page .shadow-slide:nth-child(1) {
+  animation-delay: 0s;
+  background-image: url('/shadow-purple.png');
+}
+.home-page .shadow-slide:nth-child(2) {
+  animation-delay: 2700s; /* +45min */
+  background-image: url('/shadow-milkyway.png');
+}
+.home-page .shadow-slide:nth-child(3) {
+  animation-delay: 5400s; /* +90min */
+  background-image: url('/shadow-ice.png');
+}
+
+@keyframes home-shadow-crossfade {
+  0% {
+    opacity: 0;
+  }
+  3% {
+    opacity: 0.18;
+  }
+  30% {
+    opacity: 0.18;
+  }
+  33% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------
+   LAYER 4: foreground content — cards/controls/globe
+   ------------------------------------------ */
+.home-page .content-layer {
+  position: relative;
+  z-index: 40;
+  pointer-events: auto;
+  transform: translateZ(30px);
+}
+
+.home-page .content-wrapper {
+  position: relative;
+  background: rgba(8, 12, 22, 0.35);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+}

@@ -105,22 +105,41 @@ export default function AiOneHome({
   }, []);
 
   return (
-    <div className="relative z-10 w-full h-full overflow-y-auto text-slate-100 flex flex-col font-sans">
+    <div className="home-page relative z-10 w-full h-full overflow-y-auto text-slate-100 flex flex-col font-sans">
+      {/* Layers 0-2: the 4-hour cascading sky, independent starfield, and
+          shadow-slideshow (see .home-page rules in app/globals.css) — all
+          sit behind Layer 4's content below. CosmicCanvas (the Earth Hub
+          globe) still has its own opaque background and isn't touched, so
+          these layers are only visible through the hero banner/sub-nav's
+          translucent chrome above them, not through the globe view. */}
+      <div className="sky-layer" />
+      <div className="star-layer" />
+      <div className="shadow-slideshow-container">
+        <div className="shadow-slide" />
+        <div className="shadow-slide" />
+        <div className="shadow-slide" />
+      </div>
+
+      {/* Layer 4: everything interactive/foreground, lifted toward the
+          viewer via translateZ(30px) per the layer architecture. */}
+      <div className="content-layer flex flex-col flex-1 min-h-0">
       {showHeroChrome && (
         <>
           {/* HERO BANNER */}
-          <div className="relative w-full h-80 bg-[#060a12] overflow-hidden border-b border-slate-800/80 flex flex-col items-center justify-center shrink-0">
+          <div className="relative w-full h-80 overflow-hidden border-b border-slate-800/80 flex flex-col items-center justify-center shrink-0">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-600/20 via-indigo-500/30 to-white/10 rounded-full blur-3xl pointer-events-none" />
             {/* Second, self-contained Starfield instance — the global one
                 (mounted in app/page.tsx) sits behind the whole app, but this
-                banner's own opaque background fully hides it. Same star
-                logic/drift timing as the global instance, just scoped to
-                this banner instead of the viewport, at a lower count
-                proportional to its much smaller area. */}
+                banner used to have its own opaque background hiding it too;
+                now translucent so the cascading sky layer above shows
+                through both. Same star logic/drift timing as the global
+                instance, just scoped to this banner instead of the
+                viewport, at a lower count proportional to its much smaller
+                area. */}
             <Starfield contained starCount={170} />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-transparent to-[#070b14]/70" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#070b14]/60 via-transparent to-[#070b14]/40" />
 
-            <div className="relative z-10 px-4 space-y-2 text-center">
+            <div className="content-wrapper px-8 py-6 space-y-2 text-center">
               <h1
                 className="text-5xl md:text-6xl text-white"
                 style={{
@@ -142,7 +161,7 @@ export default function AiOneHome({
               Products/merch moved into the Vault's Merch drawer — see
               CosmicVaultAuth — so this main platform sub-nav stays
               focused on the core space/broadcast tools. */}
-          <div className="flex items-center justify-center w-full py-3 space-x-8 text-xs font-mono tracking-widest uppercase border-b border-slate-800/80 bg-[#0b1326] shrink-0">
+          <div className="content-wrapper flex items-center justify-center w-full py-3 space-x-8 text-xs font-mono tracking-widest uppercase shrink-0">
             <button
               onClick={() => setActiveSection('pricing')}
               className="text-white/70 transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
@@ -198,6 +217,7 @@ export default function AiOneHome({
           />
         </div>
       )}
+      </div>
     </div>
   );
 }
