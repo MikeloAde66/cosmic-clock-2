@@ -47,13 +47,13 @@ export default function DonationButton({ compact = false }: { compact?: boolean 
         <button
           onClick={handleDonation}
           disabled={loading}
-          aria-label="Donations"
+          aria-label="Donate"
           className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 disabled:opacity-50"
         >
           <Gift className="w-4 h-4" />
         </button>
-        <span className="absolute z-20 px-2 py-1 ml-2 text-[10px] font-mono transition-opacity -translate-y-1/2 rounded opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-neutral-900 border border-neutral-700 text-neutral-200 group-hover:opacity-100">
-          {error || 'Donations'}
+        <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
+          {error || 'Donate'}
         </span>
       </div>
     );

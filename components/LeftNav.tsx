@@ -51,7 +51,7 @@ interface LeftNavProps {
 const NAV_ITEMS = [
   { key: 'aione', label: 'Home', Icon: Home },
   { key: 'radio', label: 'Radio', Icon: RadioIcon },
-  { key: 'pods', label: 'Pods', Icon: Mic },
+  { key: 'pods', label: 'Pods Studio', Icon: Mic },
 ];
 
 export default function LeftNav({
@@ -118,7 +118,7 @@ export default function LeftNav({
                 {/* Hover tooltip drawer — click-to-open activation above is
                     what changes the view; this is purely a label, so it
                     never causes layout shift in the main canvas. */}
-                <span className="absolute z-20 px-2 py-1 ml-2 text-[10px] font-mono transition-opacity -translate-y-1/2 rounded opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-neutral-900 border border-neutral-700 text-neutral-200 group-hover:opacity-100">
+                <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
                   {label}
                 </span>
               </div>
@@ -135,7 +135,7 @@ export default function LeftNav({
               >
                 <LayoutGrid className="w-4 h-4" />
               </Link>
-              <span className="absolute z-20 px-2 py-1 ml-2 text-[10px] font-mono transition-opacity -translate-y-1/2 rounded opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-neutral-900 border border-neutral-700 text-neutral-200 group-hover:opacity-100">
+              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
                 Products
               </span>
             </div>
@@ -153,7 +153,7 @@ export default function LeftNav({
               >
                 <Umbrella className="w-4 h-4" />
               </button>
-              <span className="absolute z-20 px-2 py-1 ml-2 text-[10px] font-mono transition-opacity -translate-y-1/2 rounded opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-neutral-900 border border-neutral-700 text-neutral-200 group-hover:opacity-100">
+              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
                 Weather
               </span>
             </div>
@@ -161,13 +161,13 @@ export default function LeftNav({
             <div className="relative group">
               <button
                 onClick={() => onOpenHomeView?.('kali')}
-                aria-label="Kali Yuga"
+                aria-label="Ai"
                 className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-white hover:bg-neutral-900/50"
               >
                 <Sparkles className="w-4 h-4 animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
               </button>
-              <span className="absolute z-20 px-2 py-1 ml-2 text-[10px] font-mono transition-opacity -translate-y-1/2 rounded opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-neutral-900 border border-neutral-700 text-neutral-200 group-hover:opacity-100">
-                Kali Yuga
+              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
+                Ai
               </span>
             </div>
 
@@ -192,7 +192,7 @@ export default function LeftNav({
             >
               <Settings className="w-4 h-4" />
             </button>
-            <span className="absolute z-20 px-2 py-1 ml-2 text-[10px] font-mono transition-opacity -translate-y-1/2 rounded opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-neutral-900 border border-neutral-700 text-neutral-200 group-hover:opacity-100">
+            <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
               Preferences
             </span>
           </div>
