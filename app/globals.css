@@ -99,6 +99,40 @@ body {
 }
 
 /* ------------------------------------------
+   DUST LAYER: soft, slow-drifting cosmic dust — CSS-only (no canvas/JS
+   particle sim), consistent with every other layer in this feature.
+   A handful of large, heavily blurred radial-gradient blobs stand in for
+   many small drifting particles, panned horizontally via background-
+   position to read as wind-blown smoke rather than an obviously repeating
+   tile.
+   ------------------------------------------ */
+.home-page .dust-layer {
+  position: absolute;
+  inset: -10%;
+  z-index: 15;
+  pointer-events: none;
+  opacity: 0.22;
+  filter: blur(6px);
+  background-image: radial-gradient(80px 40px at 10% 30%, rgba(226, 232, 240, 0.5), transparent 70%),
+    radial-gradient(120px 50px at 40% 70%, rgba(203, 213, 225, 0.4), transparent 70%),
+    radial-gradient(90px 45px at 65% 20%, rgba(226, 232, 240, 0.45), transparent 70%),
+    radial-gradient(110px 55px at 85% 60%, rgba(203, 213, 225, 0.35), transparent 70%),
+    radial-gradient(70px 35px at 25% 85%, rgba(226, 232, 240, 0.4), transparent 70%);
+  background-repeat: repeat-x;
+  background-size: 200% 100%;
+  animation: home-dust-drift 240s linear infinite;
+}
+
+@keyframes home-dust-drift {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: -200% 0%;
+  }
+}
+
+/* ------------------------------------------
    LAYER 2: translucent shadow projections + acute 3D tilt.
    3 slides, each holding for 45min (2700s) with a ~4min crossfade, over a
    shared 8100s (3 x 45min) loop — staggered via animation-delay so only

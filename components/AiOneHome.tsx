@@ -114,6 +114,7 @@ export default function AiOneHome({
           translucent chrome above them, not through the globe view. */}
       <div className="sky-layer" />
       <div className="star-layer" />
+      <div className="dust-layer" />
       <div className="shadow-slideshow-container">
         <div className="shadow-slide" />
         <div className="shadow-slide" />
@@ -132,11 +133,12 @@ export default function AiOneHome({
                 (mounted in app/page.tsx) sits behind the whole app, but this
                 banner used to have its own opaque background hiding it too;
                 now translucent so the cascading sky layer above shows
-                through both. Same star logic/drift timing as the global
-                instance, just scoped to this banner instead of the
-                viewport, at a lower count proportional to its much smaller
-                area. */}
-            <Starfield contained starCount={170} />
+                through both. Same star logic as the global instance, just
+                scoped to this banner instead of the viewport — deliberately
+                denser (850 vs. the global default of 420) for this specific
+                atmospheric-canvas feature; each star is a real DOM node, so
+                this is heavier than the .star-layer CSS overlay below. */}
+            <Starfield contained starCount={850} />
             <div className="absolute inset-0 bg-gradient-to-t from-[#070b14]/60 via-transparent to-[#070b14]/40" />
 
             <div className="content-wrapper px-8 py-6 space-y-2 text-center">
