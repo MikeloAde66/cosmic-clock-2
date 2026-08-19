@@ -40,7 +40,7 @@ export default function CenterHero({
       {cosmicView === 'clock' && (
         <div className="relative w-full h-80 flex flex-col items-center justify-center shrink-0">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-600/20 via-indigo-500/30 to-white/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#070b14]/60 via-transparent to-[#070b14]/40" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#070b14]/22 via-transparent to-[#070b14]/12" />
 
           {/* Unboxed — no card/border/background behind the title, floats
               directly over the cosmic canvas layers behind it. */}

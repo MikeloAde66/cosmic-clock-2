@@ -20,7 +20,7 @@ function mulberry32(seed: number) {
   };
 }
 
-// The ambient "Space Dust" event's 12-20 soft cloud puffs — positions/sizes
+// The ambient "Space Dust" event's 16 soft cloud puffs — positions/sizes
 // are fixed per puff (same set reused every time the event fires); only
 // *when* it fires and its 6s fade curve are handled by JS/CSS below.
 const SPACE_DUST_PUFF_COUNT = 16;
@@ -32,6 +32,23 @@ const SPACE_DUST_PUFFS = Array.from({ length: SPACE_DUST_PUFF_COUNT }, () => ({
   delay: `${(randomDust() * 0.8).toFixed(2)}s`,
   driftX: `${((randomDust() - 0.5) * 80).toFixed(1)}px`,
   driftY: `${((randomDust() - 0.5) * 80).toFixed(1)}px`,
+}));
+
+// A second, finer-grained layer of "grit" specks that fires alongside the
+// same event/timing as the soft puffs above — small, mostly-unblurred blue/
+// purple points instead of large soft blobs, so the event reads as detailed
+// drifting grit on top of the ambient glow rather than pure blur.
+const SPACE_DUST_GRIT_COUNT = 50;
+const randomGrit = mulberry32(20260820);
+const GRIT_COLORS = ['rgba(165,180,252,0.9)', 'rgba(196,181,253,0.85)', 'rgba(147,197,253,0.8)'];
+const SPACE_DUST_GRIT = Array.from({ length: SPACE_DUST_GRIT_COUNT }, () => ({
+  left: `${(randomGrit() * 100).toFixed(2)}%`,
+  top: `${(randomGrit() * 100).toFixed(2)}%`,
+  size: `${(1 + randomGrit() * 2).toFixed(2)}px`,
+  delay: `${(randomGrit() * 1.2).toFixed(2)}s`,
+  driftX: `${((randomGrit() - 0.5) * 140).toFixed(1)}px`,
+  driftY: `${((randomGrit() - 0.5) * 140).toFixed(1)}px`,
+  color: GRIT_COLORS[Math.floor(randomGrit() * GRIT_COLORS.length)],
 }));
 
 interface AiOneHomeProps {
@@ -60,21 +77,6 @@ export default function AiOneHome({
   pricingRequestToken,
 }: AiOneHomeProps) {
   const [activeSection, setActiveSection] = useState<'home' | 'pricing'>('home');
-
-  // Which of the 3 shadow-slide images is current — JS-driven instead of a
-  // pure CSS @keyframes loop so the first slide can render already at full
-  // opacity on mount (a class present from the initial render never fires
-  // its CSS transition; only a later change to it does), while switches
-  // between slides still get a snappy transition. Same 45min hold per
-  // slide as the CSS version this replaced — only the fade itself sped up.
-  const [activeShadowSlide, setActiveShadowSlide] = useState(0);
-  useEffect(() => {
-    const SLIDE_HOLD_MS = 45 * 60 * 1000;
-    const id = setInterval(() => {
-      setActiveShadowSlide((i) => (i + 1) % 3);
-    }, SLIDE_HOLD_MS);
-    return () => clearInterval(id);
-  }, []);
 
   // Ambient "Space Dust" event — fires roughly every 30min (randomized
   // offset so it never feels mechanically on-the-dot), stays active for
@@ -150,11 +152,26 @@ export default function AiOneHome({
             } as React.CSSProperties}
           />
         ))}
+        {SPACE_DUST_GRIT.map((g, i) => (
+          <span
+            key={i}
+            className="dust-grit"
+            style={{
+              left: g.left,
+              top: g.top,
+              width: g.size,
+              height: g.size,
+              background: g.color,
+              color: g.color,
+              animationDelay: g.delay,
+              ['--dust-drift-x' as string]: g.driftX,
+              ['--dust-drift-y' as string]: g.driftY,
+            } as React.CSSProperties}
+          />
+        ))}
       </div>
       <div className="shadow-slideshow-container">
-        <div className={`shadow-slide${activeShadowSlide === 0 ? ' active' : ''}`} />
-        <div className={`shadow-slide${activeShadowSlide === 1 ? ' active' : ''}`} />
-        <div className={`shadow-slide${activeShadowSlide === 2 ? ' active' : ''}`} />
+        <div className="shadow-slide" />
       </div>
 
       {/* Layer 4: everything interactive/foreground, lifted toward the

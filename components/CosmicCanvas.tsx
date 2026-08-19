@@ -21,24 +21,28 @@ function mulberry32(seed: number) {
   };
 }
 
-const CASCADE_STAR_COUNT = 26;
+// 70 stars, sized 0.7-1.8px for a dense, crisp pinpoint field — density and
+// glow untouched. Duration tiers slowed way down (~75-80% velocity cut from
+// the prior 9-13s/5-8s/2-4s) for a gentle, subtle, ambient drift rather than
+// a fast rush.
+const CASCADE_STAR_COUNT = 70;
 const randomCascade = mulberry32(19700101);
 // Slow/medium/fast duration tiers per star — gives the radial field a sense
 // of depth (nearer stars rush past faster) instead of every star expanding
 // outward at the same uniform rate.
 const CASCADE_SPEED_TIERS = [
-  { min: 14, max: 20 }, // slow
-  { min: 8, max: 13 }, // medium
-  { min: 3.5, max: 7 }, // fast
+  { min: 42, max: 60 }, // slow
+  { min: 24, max: 38 }, // medium
+  { min: 10, max: 18 }, // fast
 ];
 const CASCADE_STARS = Array.from({ length: CASCADE_STAR_COUNT }, () => {
   const tier = CASCADE_SPEED_TIERS[Math.floor(randomCascade() * CASCADE_SPEED_TIERS.length)];
   return {
     angle: `${(randomCascade() * 360).toFixed(2)}deg`,
-    size: `${(1 + randomCascade() * 1.6).toFixed(2)}px`,
+    size: `${(0.6 + randomCascade() * 2.2).toFixed(2)}px`,
     delay: `${(randomCascade() * 16).toFixed(2)}s`,
     duration: `${(tier.min + randomCascade() * (tier.max - tier.min)).toFixed(2)}s`,
-    opacity: (0.2 + randomCascade() * 0.5).toFixed(2),
+    opacity: (0.5 + randomCascade() * 0.5).toFixed(2),
   };
 });
 
@@ -148,7 +152,7 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
               {CASCADE_STARS.map((s, i) => (
                 <span
                   key={i}
-                  className="absolute top-1/2 left-1/2 rounded-full bg-white animate-star-cascade"
+                  className="absolute top-1/2 left-1/2 rounded-full bg-white shadow-[0_0_6px_2px_#ffffff] animate-star-cascade"
                   style={{
                     width: s.size,
                     height: s.size,
@@ -270,6 +274,10 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
         }
         .animate-star-cascade {
           animation-name: starCascade;
+          /* Was a steep ease-in cubic-bezier (slow start, aggressive rush
+             at the end) — reverted to linear (constant, steady speed
+             throughout) for a gentler, more ambient drift with no
+             acceleration spike. */
           animation-timing-function: linear;
           animation-iteration-count: infinite;
           animation-fill-mode: backwards;
