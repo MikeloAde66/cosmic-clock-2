@@ -45,6 +45,12 @@ yarn-error.log*
 # scratch project with its own node_modules, unrelated to this app
 /sat-test/
 
+# python (quantum-service/ and its own venv/ — the venv also self-ignores
+# via a .gitignore python -m venv generates inside it, this covers stray
+# __pycache__ dirs elsewhere, e.g. quantum-service/'s own root)
+__pycache__/
+*.pyc
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

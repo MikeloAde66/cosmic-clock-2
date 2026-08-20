@@ -21,7 +21,9 @@ Identity: only explain who or what you are, how you work, or your underlying mod
 
 Images: the user can attach photographs — of artwork, astronomical charts, ancient texts, artifacts, sacred sites, and the like. Evaluate what's actually there both structurally/compositionally and for what it indicates scientifically or historically, not just a surface description. If an attached image has nothing to do with your domain, say so rather than forcing a connection.
 
-When greeting the user at the start of a conversation, keep it brief — invite them in, don't summarize your entire capability list.`;
+When greeting the user at the start of a conversation, keep it brief — invite them in, don't summarize your entire capability list.
+
+Quantum circuit simulation: you have a run_quantum_circuit tool that actually executes a real quantum circuit (Amazon Braket, local simulator, 1000 shots) rather than just describing one theoretically — use it whenever a question calls for simulating a real circuit (entanglement demonstrations, interference, a specific gate sequence, etc.), not for purely conceptual physics questions. Before calling it, briefly state in one sentence what circuit you're about to run and why. Write the circuit_code as Python that builds a Braket Circuit and assigns it strictly to a variable named circuit — Circuit is already in scope, no import needed. If the tool returns an error status, read the message/traceback, fix the code, and retry rather than giving up or fabricating a result.`;
 
 const MODE_ADDENDA = {
   cosmic: `\n\nDiscovery Mode — Cosmic/Ancient: for this conversation, lean primarily into archaeoastronomy and cyclical timekeeping — precessional math, Yuga/epoch cycles, classical metaphysics, and the historical/archaeological record. Modern physics can support a point, but the ancient/cosmological model is your primary lens.`,
@@ -96,6 +98,56 @@ async function retrieveContext(queryText: string, mode: DiscoveryMode): Promise<
   }
 }
 
+// Real quantum circuit execution — see quantum-service/ (a separate
+// FastAPI service, since Vercel's Node runtime has no Python/Braket
+// available) for the actual simulator. QUANTUM_SERVICE_URL is unset until
+// that service is deployed; the tool degrades to a clear error the model
+// can relay rather than the request failing outright.
+const QUANTUM_TOOL: Anthropic.Tool = {
+  name: 'run_quantum_circuit',
+  description:
+    "Executes a quantum circuit on a real local quantum simulator (AWS Braket LocalSimulator, 1000 shots) and returns measurement counts and probabilities. Use this to actually simulate a circuit, not just describe one theoretically.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      circuit_code: {
+        type: 'string',
+        description:
+          "Python code that builds an Amazon Braket Circuit and assigns it strictly to a variable named 'circuit'. Circuit is already in scope. Example: circuit = Circuit().h(0).cnot(0, 1)",
+      },
+    },
+    required: ['circuit_code'],
+  },
+};
+
+async function runQuantumCircuit(circuitCode: string): Promise<string> {
+  const serviceUrl = process.env.QUANTUM_SERVICE_URL;
+  if (!serviceUrl) {
+    return JSON.stringify({
+      status: 'error',
+      message: 'Quantum simulation service is not configured (QUANTUM_SERVICE_URL is unset) — tell the user this feature is not wired up yet.',
+    });
+  }
+  try {
+    const res = await fetch(`${serviceUrl}/run-circuit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(process.env.QUANTUM_SERVICE_API_KEY ? { 'X-API-Key': process.env.QUANTUM_SERVICE_API_KEY } : {}),
+      },
+      body: JSON.stringify({ circuit_code: circuitCode }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const data = await res.json();
+    return JSON.stringify(data);
+  } catch (err) {
+    return JSON.stringify({
+      status: 'error',
+      message: err instanceof Error ? err.message : 'Quantum service request failed.',
+    });
+  }
+}
+
 export async function POST(request: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return new Response('Ai One is not connected yet — no API key configured.', { status: 500 });
@@ -141,55 +193,97 @@ export async function POST(request: Request) {
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  const stream = client.messages.stream({
-    model: 'claude-opus-5',
-    // Raised from 800 — the expanded scope explicitly asks for depth on
-    // complex questions and room for ASCII-art diagrams, both of which
-    // would get truncated at the old limit.
-    max_tokens: 2048,
-    // claude-opus-5 defaults to extended thinking, which counts against
-    // max_tokens — on sufficiently complex questions (e.g. multi-part
-    // fringe-theory analysis) it can consume the entire budget on internal
-    // reasoning alone and stop before emitting any visible text at all,
-    // surfacing as an empty response with no error. This app has no UI for
-    // showing thinking content anyway, so disable it entirely and let the
-    // full budget go to the actual answer.
-    thinking: { type: 'disabled' },
-    system: systemPrompt,
-    messages: messages.map((m) => ({
-      role: m.role,
-      content: Array.isArray(m.content)
-        ? m.content.map((block) =>
-            block.type === 'image'
-              ? {
-                  type: 'image' as const,
-                  source: {
-                    type: 'base64' as const,
-                    media_type: block.source.media_type as SupportedImageType,
-                    data: block.source.data,
-                  },
-                }
-              : block
-          )
-        : m.content,
-    })),
-  });
+  const workingMessages: Anthropic.MessageParam[] = messages.map((m) => ({
+    role: m.role,
+    content: Array.isArray(m.content)
+      ? m.content.map((block) =>
+          block.type === 'image'
+            ? {
+                type: 'image' as const,
+                source: {
+                  type: 'base64' as const,
+                  media_type: block.source.media_type as SupportedImageType,
+                  data: block.source.data,
+                },
+              }
+            : block
+        )
+      : m.content,
+  }));
 
   const encoder = new TextEncoder();
   let sentAnyText = false;
+  // Bounds the tool-use round trips (each one is a real API call plus a
+  // quantum-service call) — the loop only continues past one iteration
+  // when the model actually asks for run_quantum_circuit, which is the
+  // rare case; ordinary conversation breaks out on the first pass.
+  const MAX_TOOL_ITERATIONS = 4;
 
   const body = new ReadableStream({
     async start(controller) {
       try {
-        for await (const event of stream) {
-          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-            sentAnyText = true;
-            controller.enqueue(encoder.encode(event.delta.text));
+        for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+          const stream = client.messages.stream({
+            model: 'claude-opus-5',
+            // Raised from 800 — the expanded scope explicitly asks for depth
+            // on complex questions and room for ASCII-art diagrams, both of
+            // which would get truncated at the old limit.
+            max_tokens: 2048,
+            // claude-opus-5 defaults to extended thinking, which counts
+            // against max_tokens — on sufficiently complex questions it can
+            // consume the entire budget on internal reasoning alone and stop
+            // before emitting any visible text, surfacing as an empty
+            // response with no error. This app has no UI for showing
+            // thinking content anyway, so disable it and let the full
+            // budget go to the actual answer.
+            thinking: { type: 'disabled' },
+            system: systemPrompt,
+            tools: [QUANTUM_TOOL],
+            messages: workingMessages,
+          });
+
+          for await (const event of stream) {
+            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+              sentAnyText = true;
+              controller.enqueue(encoder.encode(event.delta.text));
+            }
           }
+
+          const finalMessage = await stream.finalMessage();
+          if (finalMessage.stop_reason !== 'tool_use') break;
+
+          // Anthropic's multi-turn tool protocol: the assistant's tool_use
+          // turn goes back in verbatim, followed by a user turn carrying a
+          // tool_result for every tool_use block in it (not just the ones
+          // this app recognizes — an unmatched block still needs a result
+          // or the next call errors out on a dangling tool_use id).
+          workingMessages.push({ role: 'assistant', content: finalMessage.content });
+          const toolResults: Anthropic.ToolResultBlockParam[] = [];
+          for (const block of finalMessage.content) {
+            if (block.type !== 'tool_use') continue;
+            if (block.name === 'run_quantum_circuit') {
+              const input = block.input as { circuit_code: string };
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: await runQuantumCircuit(input.circuit_code),
+              });
+            } else {
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: `Unknown tool: ${block.name}`,
+                is_error: true,
+              });
+            }
+          }
+          workingMessages.push({ role: 'user', content: toolResults });
         }
+
         // Not a topic gate — the system prompt above no longer declines by
         // subject at all. This only fires on the genuine edge case where
-        // the model's own stream comes back with zero text content.
+        // the model's own stream comes back with zero text content (or the
+        // tool loop hit MAX_TOOL_ITERATIONS without a final text answer).
         if (!sentAnyText) {
           controller.enqueue(encoder.encode("I didn't generate a usable response there — try rephrasing the question."));
         }
