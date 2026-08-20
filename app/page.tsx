@@ -1,13 +1,16 @@
 'use client';
 import { useContextMenuShare } from '@/components/useContextMenuShare';
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowUp } from 'lucide-react';
 import TopHeader from '@/components/TopHeader';
 import LeftNav from '@/components/LeftNav';
 import type { LayoutMode } from '@/components/LayoutModeToggle';
 import GalleryGrid from '@/components/GalleryGrid';
 import KaliSection from '@/components/KaliSection';
 import ProductsSection from '@/components/ProductsSection';
+import TenForwardSection from '@/components/TenForwardSection';
+import Reveal from '@/components/Reveal';
 
 // Continuous Stack (Layout 1) mounts Home/Radio/Pods as sibling sections
 // (ids stack-section-aione/radio/pods — see the layoutMode === 'stack'
@@ -120,6 +123,15 @@ function HomeInner() {
   const changeLayoutMode = (mode: LayoutMode) => {
     setLayoutMode(mode);
     localStorage.setItem('aione_layout_mode', mode);
+  };
+
+  // Floating Back to Top button (Stack mode only) — tracks the Stack
+  // layout's own scrollable container (not window.scroll, since the page
+  // itself never scrolls; this inner div does).
+  const stackScrollRef = useRef<HTMLDivElement>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const handleStackScroll = () => {
+    setShowBackToTop((stackScrollRef.current?.scrollTop ?? 0) > 400);
   };
 
   const [isVaultSearchOpen, setIsVaultSearchOpen] = useState(false);
@@ -299,28 +311,59 @@ useContextMenuShare();
               (KaliSection.tsx, extracted out of CosmicCanvas so Hub/Gallery
               mode's nested Kali sub-view can share the same component). */}
           {layoutMode === 'stack' && (
-            <div className="relative flex-1 overflow-y-auto">
+            <div ref={stackScrollRef} onScroll={handleStackScroll} className="relative flex-1 overflow-y-auto">
               <div id="stack-section-aione" className="w-full min-h-full">
-                <AiOneHome
-                  onNavigateToVaultDrawer={navigateToVaultDrawer}
-                  homeViewRequest={homeViewRequest}
-                  groundZeroToken={groundZeroToken}
-                  pricingRequestToken={pricingRequestToken}
-                />
+                <Reveal className="w-full h-full">
+                  <AiOneHome
+                    onNavigateToVaultDrawer={navigateToVaultDrawer}
+                    homeViewRequest={homeViewRequest}
+                    groundZeroToken={groundZeroToken}
+                    pricingRequestToken={pricingRequestToken}
+                  />
+                </Reveal>
               </div>
               <div id="stack-section-radio" className="w-full min-h-full border-t border-slate-800/80">
-                <RadioStreams />
+                <Reveal className="w-full h-full">
+                  <RadioStreams />
+                </Reveal>
               </div>
               <div id="stack-section-pods" className="w-full min-h-full border-t border-slate-800/80">
-                <PodsModule isActive />
+                <Reveal className="w-full h-full">
+                  <PodsModule isActive />
+                </Reveal>
               </div>
               <div id="stack-section-products" className="w-full min-h-full border-t border-slate-800/80">
-                <ProductsSection />
+                <Reveal>
+                  <ProductsSection />
+                </Reveal>
               </div>
               <div id="stack-section-kali" className="w-full min-h-full border-t border-slate-800/80">
-                <KaliSection />
+                <Reveal className="w-full h-full">
+                  <KaliSection />
+                </Reveal>
               </div>
+              <div id="stack-section-tenforward" className="w-full min-h-full border-t border-slate-800/80">
+                <Reveal>
+                  <TenForwardSection />
+                </Reveal>
+              </div>
+
             </div>
+          )}
+
+          {/* Floating Back to Top — appears once the Stack layout's own
+              scroll container (not the window) has been scrolled past the
+              hero; fixed to the viewport corner, offset above
+              GlobalPlayerBar + SiteFooter's combined height so it doesn't
+              sit on top of them. */}
+          {layoutMode === 'stack' && showBackToTop && (
+            <button
+              onClick={() => scrollToStackSection('aione')}
+              aria-label="Back to top"
+              className="fixed z-30 flex items-center justify-center w-10 h-10 transition-all border rounded-full shadow-lg cursor-pointer bottom-28 right-6 bg-neutral-900/90 border-neutral-700 text-neutral-300 hover:text-white hover:border-neutral-500 backdrop-blur-sm"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
           )}
 
           {/* Always mounted above SiteFooter, on every tab, from initial

@@ -2,7 +2,10 @@
 
 import React, { useState } from 'react';
 import CosmicCanvas from './CosmicCanvas';
+import { useTypewriter } from '@/lib/useTypewriter';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
+
+const HERO_TAGLINE = 'Cosmic Creation & Broadcast Hub';
 
 interface CenterHeroProps {
   onNavigateToVaultDrawer: (drawer: VaultDrawer) => void;
@@ -39,6 +42,7 @@ export default function CenterHero({
   // is inside one of those; the globe itself (CosmicCanvas) stays mounted
   // and just shows a different internal view.
   const [cosmicView, setCosmicView] = useState<'clock' | 'weather' | 'kali'>('clock');
+  const typedTagline = useTypewriter(HERO_TAGLINE, cosmicView === 'clock');
 
   const handleViewChange = (view: 'clock' | 'weather' | 'kali') => {
     setCosmicView(view);
@@ -73,7 +77,8 @@ export default function CenterHero({
               className="font-mono text-xs tracking-widest uppercase md:text-sm text-slate-300"
               style={{ textShadow: '0 1px 8px rgba(0,0,0,0.7)' }}
             >
-              Cosmic Creation & Broadcast Hub
+              {typedTagline}
+              {typedTagline.length < HERO_TAGLINE.length && <span className="text-white animate-pulse">▋</span>}
             </p>
           </div>
         </div>
