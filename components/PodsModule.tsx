@@ -10,31 +10,10 @@ import { useRadioPlayer } from './radio/RadioPlayerContext';
 // Shared with StarTrackerView's own YT.Player mount (Sky Fest's Space
 // Media tab) — see that file for why this lives in one place.
 import type { YouTubePlayer, YouTubePlayerEvent } from '@/lib/youtubeIframeApi';
-
-interface ContentSegment {
-  // Seconds into playback when this segment becomes the active one.
-  time: number;
-  text: string;
-}
-
-interface Track {
-  id: string;
-  title: string;
-  frequency: string;
-  description: string;
-  src: string;
-  contentToRead: string;
-  playlistId: string;
-  isLocal?: boolean;
-  embedUrl?: string;
-  watchUrl?: string;
-  // Optional — when present, the Reading Material pane renders these as
-  // individually-scrollable blocks and auto-scrolls/highlights whichever one
-  // matches the current playback time instead of showing contentToRead as a
-  // single static blob. No current track has this authored yet; it's inert
-  // (falls back to contentToRead) until segment data exists for a track.
-  contentSegments?: ContentSegment[];
-}
+// Track/INITIAL_TRACKS live in lib/podsTracks.ts, shared with
+// HomeBroadcastPanel (a read-only feed of this same track list on the Home
+// tab) — this file's own behavior/localStorage handling is unchanged.
+import { INITIAL_TRACKS, type Track } from '@/lib/podsTracks';
 
 interface Playlist {
   id: string;
@@ -49,53 +28,6 @@ const DEFAULT_PLAYLISTS: Playlist[] = [
   { id: 'all', name: 'All Tracks', description: 'Master stream feed' },
   { id: 'pods', name: 'Pods', description: 'Main Podcast & Cosmic Lore Streams' },
   { id: 'main-playlist', name: 'Playlist', description: 'User Custom Media & Audio' },
-];
-
-const INITIAL_TRACKS: Track[] = [
-  {
-    id: '1',
-    title: 'The Art & Science of Forest Bathing',
-    frequency: 'Video / Science',
-    description: 'Dr Qing Li on the biology of phytoncides and shinrin-yoku forest medicine. (Penguin Books UK)',
-    src: '',
-    embedUrl: 'https://www.youtube.com/embed/12CCjoixpkA',
-    watchUrl: 'https://www.youtube.com/watch?v=12CCjoixpkA',
-    playlistId: 'pods',
-    contentToRead: `### Forest Bathing & Human Immunity\n\nDr Qing Li, the world's foremost expert in forest medicine, explains how trees emit airborne organic compounds (phytoncides) that lower stress hormones and enhance human immune function.`
-  },
-  {
-    id: '2',
-    title: 'Aeon Byte: A Gnostic View of the Soul',
-    frequency: 'Video / Dialogue',
-    description: 'Aeon Byte Gnostic Radio on the Hymn of the Pearl and the Exegesis from the Nag Hammadi library.',
-    src: '',
-    embedUrl: 'https://www.youtube.com/embed/CY2P9q7bEVY',
-    watchUrl: 'https://www.youtube.com/watch?v=CY2P9q7bEVY',
-    playlistId: 'pods',
-    contentToRead: `### Historical & Cosmological Discourse\n\nAeon Byte Gnostic Radio examines two key Nag Hammadi scriptures on the fall and redemption of the soul: the Hymn of the Pearl and the Exegesis.`
-  },
-  {
-    id: '3',
-    title: 'Anil Seth: The Mystery of Consciousness',
-    frequency: 'Video / Lecture',
-    description: 'The TED Interview with neuroscientist Anil Seth on perception, prediction, and machine consciousness.',
-    src: '',
-    embedUrl: 'https://www.youtube.com/embed/aQVedpfKt88',
-    watchUrl: 'https://www.youtube.com/watch?v=aQVedpfKt88',
-    playlistId: 'pods',
-    contentToRead: `### Cognitive Perception & Self-Awareness\n\nNeuroscientist Anil Seth explores his theory that consciousness is a controlled hallucination — the brain constantly predicting and constructing our perceived reality.`
-  },
-  {
-    id: '4',
-    title: 'The Precession of Equinox',
-    frequency: 'Video / Ambient',
-    description: 'A short visual on the slow astronomical cycle behind the Great Year. (The Randall Carlson)',
-    src: '',
-    embedUrl: 'https://www.youtube.com/embed/jnIBFXVWZXg',
-    watchUrl: 'https://www.youtube.com/watch?v=jnIBFXVWZXg',
-    playlistId: 'pods',
-    contentToRead: `### The Great Year & Astronomical Alignment\n\nAncient timekeeping systems tracked vast epochs through the slow movement of the equinoxes across the zodiac constellations.`
-  }
 ];
 
 const formatTime = (seconds: number) => {

@@ -19,11 +19,11 @@ body {
    root element) — no body/html/layout selectors touched, so no other
    route or tab is affected.
 
-   Dawn phase uses rose/magenta, not the amber/orange/sienna named in the
-   spec this was built from ("Dawn Burnt Sienna", "Warm Amber Glow") — this
-   app's standing rule is zero yellow/amber/gold anywhere, white/neutral
-   (and here, cyan/purple/pink) only. This is the same substitution made
-   the first two times this exact palette came up.
+   The original Layer 0 (a 4-hour cascading dusk-to-dawn sky gradient) was
+   removed entirely — its rose/magenta stops kept bleeding through into
+   Weather/Kali whenever .home-page's real content overflow (from the
+   dust-puff layer below, since clipped) let it scroll into view. The
+   starfield + shadow-slide layers below carry the background on their own.
 
    Layer 2's shadow slideshow uses the three real images in public/
    (shadow-purple.png, shadow-milkyway.png, shadow-ice.png) — note the
@@ -38,39 +38,6 @@ body {
 }
 
 /* ------------------------------------------
-   LAYER 0: 4-hour cascading sky (14,400s = one full dusk-to-dawn arc)
-   ------------------------------------------ */
-.home-page .sky-layer {
-  position: absolute;
-  inset: -5%; /* overbleed so the scale(1.1)/translateZ below never clips a visible edge */
-  z-index: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    rgba(8, 20, 38, 0.95) 0%,     /* Dusk Blue */
-    rgba(22, 42, 77, 0.85) 25%,   /* Deep Twilight */
-    rgba(157, 23, 77, 0.9) 50%,   /* Dawn Rose */
-    rgba(219, 39, 119, 0.75) 75%, /* Soft Magenta Glow */
-    rgba(1, 2, 4, 1) 100%         /* Pitch Black Deep Space */
-  );
-  background-size: 100% 500%;
-  animation: home-sky-arc 14400s ease-in-out infinite alternate;
-  transform: translateZ(-100px) scale(1.1);
-}
-
-@keyframes home-sky-arc {
-  0% {
-    background-position: 0% 0%;
-  }
-  50% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 0% 100%;
-  }
-}
-
-/* ------------------------------------------
    LAYER 1: independent twinkling starfield
    ------------------------------------------ */
 .home-page .star-layer {
@@ -82,8 +49,8 @@ body {
      to read as basically empty wherever nothing else compensated (the hero
      banner, once its own dedicated dense Starfield instance was removed).
      Bumped to 16, weighted toward the top ~35% so that area has real,
-     visible star coverage of its own rather than relying on layers below
-     an already-near-opaque sky-layer gradient. */
+     visible star coverage of its own now that it's the only background
+     color/light source in this stack. */
   background-image: radial-gradient(1.2px 1.2px at 5% 10%, rgba(255, 255, 255, 0.7), transparent),
     radial-gradient(1.8px 1.8px at 25% 8%, rgba(255, 255, 255, 0.85), transparent),
     radial-gradient(1px 1px at 50% 15%, rgba(255, 255, 255, 0.6), transparent),
@@ -162,6 +129,12 @@ body {
   inset: -10%;
   z-index: 18;
   pointer-events: none;
+  /* Puffs are placed at up to top:100%/left:100% with sizes up to ~320px,
+     which without clipping can land past this box's own edges even after
+     the -10% overbleed — that silently forced .home-page (overflow-y:auto)
+     to have real scrollable content past the viewport, letting scroll
+     reveal the sky-layer/shadow-slide's normally off-screen bottom band. */
+  overflow: hidden;
 }
 
 .home-page .dust-puff {

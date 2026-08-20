@@ -131,14 +131,17 @@ export default function AiOneHome({
   }, [pricingRequestToken]);
 
   return (
-    <div className="home-page relative z-10 w-full h-full overflow-y-auto text-slate-100 flex flex-col font-sans">
-      {/* Layers 0-2: the 4-hour cascading sky, independent starfield, and
-          shadow-slideshow (see .home-page rules in app/globals.css) — all
-          sit behind Layer 4's content below. CosmicCanvas (the Earth Hub
-          globe) still has its own opaque background and isn't touched, so
-          these layers are only visible through the hero banner/sub-nav's
-          translucent chrome above them, not through the globe view. */}
-      <div className="sky-layer" />
+    <div className="home-page relative z-10 w-full h-full overflow-hidden text-slate-100 flex flex-col font-sans">
+      {/* Layers 1-2: independent starfield and shadow-slideshow (see
+          .home-page rules in app/globals.css) — sit behind Layer 4's content
+          below. The old Layer 0 (4-hour cascading sky gradient) was removed
+          entirely — its rose/magenta stops were bleeding through into
+          Weather/Kali whenever this container's real content overflow
+          (from the dust-puff layer, since fixed) let it scroll into view;
+          the starfield/shadow-slide carry the background on their own now.
+          overflow-hidden (not overflow-y-auto) since nothing here is meant
+          to scroll at this level — AiOneChat owns its own message-list
+          scroll internally. */}
       <div className="star-layer" />
       <div className="dust-layer" />
       <div className={`dust-event${dustEventActive ? ' active' : ''}`}>

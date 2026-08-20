@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import NoaaWidget from './NoaaWidget';
 import AiOneChat from './AiOneChat';
-import AncientGlyphRain from './AncientGlyphRain';
+import HomeHeroFrame from './HomeHeroFrame';
 import { useGeolocation } from '@/lib/useGeolocation';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
@@ -134,12 +134,16 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
                 easing toward burnt sienna and back, tied to wall-clock time
                 (see getAmbientColor). Scoped to this view only, so Star
                 Tracker (a fully separate, opaque full-screen overlay
-                mounted from TopHeader) is never touched by it. */}
+                mounted from TopHeader) is never touched by it. Was 0.45 —
+                dark enough to visibly flatten the shadow-slide background
+                image within just this region, reading as a seam/dark band
+                against the un-dimmed hero banner above. Now a light touch
+                of mood color instead of an opaque-looking wash. */}
             <div
               className="absolute inset-0 pointer-events-none transition-colors duration-[3000ms] ease-in-out"
               style={{
                 background: `radial-gradient(ellipse 80% 60% at 50% 40%, ${ambientColor} 0%, transparent 72%)`,
-                opacity: 0.45,
+                opacity: 0.12,
               }}
             />
 
@@ -180,6 +184,13 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
             <div className="absolute w-5 h-5 overflow-hidden rounded-full top-8 right-8 bg-gradient-to-br from-white via-slate-200 to-slate-400 shadow-[0_0_8px_rgba(255,255,255,0.35)] animate-cinematic-drift">
               <div className="absolute w-5 h-5 rounded-full bg-[#0a0a0c] -top-1 -right-2" />
             </div>
+
+            {/* Home hero frame — Phase 1 of the Home tab rebuild. Needs real
+                pointer events, unlike the decorative layers above, so it's
+                the one non-pointer-events-none child here. */}
+            <div className="relative z-10 flex justify-center w-full px-4">
+              <HomeHeroFrame />
+            </div>
           </main>
         </>
       )}
@@ -194,22 +205,24 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
         <NoaaWidget initialCoords={userCoords} />
       </div>
 
-      {/* Kali Yuga — takes over the whole section: epoch readout on top, Ai
-          One chat filling the rest. No bordered/backdrop-blurred card
-          wrapping this anymore — AncientGlyphRain and the content sit
-          directly on the full-bleed cosmic background instead of being
-          boxed into a centered panel. */}
+      {/* Kali — takes over the whole section: epoch readout on top, Ai One
+          chat filling the rest. No bordered/backdrop-blurred card wrapping
+          this anymore, and no matrix glyph-rain canvas either — the clean
+          starfield/nebula background shows through directly, unobstructed.
+          A subtle transparent-to-black gradient grounds the content
+          instead — deepens toward the bottom near the input bar, not a
+          solid/tinted glass panel like Pods'. */}
       {activeView === 'kali' && (
         // flex-1 min-h-0, not h-full — see the weather view above for why.
         <div className="relative z-30 flex flex-col flex-1 w-full min-h-0 p-4">
-          <AncientGlyphRain />
+          <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-b from-transparent via-black/55 to-black/95" />
 
           <div className="relative z-10 flex flex-col flex-1 min-h-0">
             <div className="shrink-0">
               <span className="text-[10px] font-mono tracking-widest text-cyan-400/80 uppercase">
                 Current Epoch
               </span>
-              <h2 className="text-2xl font-bold tracking-wider text-white">KALI YUGA</h2>
+              <h2 className="text-2xl font-bold tracking-wider text-white">KALI</h2>
               <p className="text-xs font-mono text-cyan-100 mt-1">YEAR 5,128 / 432,000</p>
               <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/40">
                 <div className="h-full w-[1.18%] bg-cyan-400" />
