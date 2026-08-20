@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import AiOneChat from './AiOneChat';
+import { KaliSpecsButton, KaliSpecsContent } from './KaliSpecsPanel';
 
 // Extracted out of CosmicCanvas.tsx's Kali sub-view so it can also be
 // mounted as its own standalone section in the Continuous Stack layout
@@ -14,6 +15,8 @@ import AiOneChat from './AiOneChat';
 // the same as flex-1 did) and standalone inside a plain min-h-full stack
 // section wrapper, which isn't itself a flex container.
 export default function KaliSection() {
+  const [specsOpen, setSpecsOpen] = useState(false);
+
   return (
     <div className="relative z-30 flex flex-col w-full h-full min-h-0 p-4">
       <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-b from-transparent via-black/55 to-black/95" />
@@ -21,7 +24,11 @@ export default function KaliSection() {
       <div className="relative z-10 flex flex-col flex-1 min-h-0">
         <div className="shrink-0">
           <span className="text-[10px] font-mono tracking-widest text-cyan-400/80 uppercase">Current Epoch</span>
-          <h2 className="text-2xl font-bold tracking-wider text-white">KALI</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-2xl font-bold tracking-wider text-white">KALI</h2>
+            <KaliSpecsButton open={specsOpen} onToggle={() => setSpecsOpen((v) => !v)} />
+          </div>
+          {specsOpen && <KaliSpecsContent />}
           <p className="text-xs font-mono text-cyan-100 mt-1">YEAR 5,128 / 432,000</p>
           <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/40">
             <div className="h-full w-[1.18%] bg-cyan-400" />
