@@ -17,6 +17,7 @@ import GlobalPlayerBar from '@/components/radio/GlobalPlayerBar';
 import { CartProvider } from '@/lib/cart';
 import { supabase } from '@/lib/supabase';
 import { checkSubscriptionStatus } from '@/lib/subscriptionStatus';
+import { useWeatherLocation } from '@/lib/useWeatherLocation';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
 function HomeInner() {
@@ -69,6 +70,11 @@ function HomeInner() {
     setActiveTab('aione');
     setHomeViewRequest({ view, token: Date.now() });
   };
+
+  // Umbrella icon's inline search + footer forecast stream — persistent
+  // chrome, not a "home view" like Weather used to be, so it lives here
+  // rather than in homeViewRequest and is available on every tab.
+  const weather = useWeatherLocation();
 
   const [isVaultSearchOpen, setIsVaultSearchOpen] = useState(false);
   useEffect(() => {
@@ -147,6 +153,9 @@ useContextMenuShare();
           onOpenVaultForOwner={openVaultForOwner}
           onOpenHomeView={openHomeView}
           onGroundZero={goToGroundZero}
+          onWeatherClick={weather.toggleSearch}
+          onWeatherDoubleClick={weather.quickView}
+          weatherActive={weather.weatherActive}
         />
 
         <div className="flex flex-col flex-1 overflow-hidden">
@@ -195,7 +204,14 @@ useContextMenuShare();
               (z-10) whenever it's open, and /products is a fully separate
               Next.js route that never renders this tree at all. */}
           <GlobalPlayerBar />
-          <SiteFooter />
+          <SiteFooter
+            weatherSearchOpen={weather.searchOpen}
+            weatherLoading={weather.loading}
+            weatherError={weather.error}
+            weatherForecastText={weather.forecastText}
+            weatherCurrentTemp={weather.currentTemp}
+            onWeatherSubmit={weather.submitLocation}
+          />
         </div>
         </main>
       </div>

@@ -36,14 +36,23 @@ interface LeftNavProps {
   onUnlockVault?: (roleKey: string) => void;
   // Owner Vault Access Rule — see PreferencesModal.
   onOpenVaultForOwner?: () => void;
-  // Opens the Home tab's Weather/Kali Yuga sub-views directly, replacing
-  // the pill buttons that used to float over the 3D Earth canvas.
+  // Opens the Home tab's Kali Yuga sub-view directly, replacing the pill
+  // buttons that used to float over the 3D Earth canvas. Weather no longer
+  // goes through here — see onWeatherClick/onWeatherDoubleClick below.
   onOpenHomeView?: (view: 'weather' | 'kali') => void;
   // The Home icon's dedicated "ground zero" behavior — always returns to
-  // the main clock view, collapsing out of Weather/Kali/Products/Pricing/
-  // Cart, not just switching tabs. Those sub-views no longer have their own
-  // Back button, so this is now the only way out of them.
+  // the main clock view, collapsing out of Kali/Products/Pricing/Cart, not
+  // just switching tabs. Those sub-views no longer have their own Back
+  // button, so this is now the only way out of them.
   onGroundZero?: () => void;
+  // Umbrella icon — single click toggles the inline search (rendered in
+  // SiteFooter, not a popup here, per the "no overlay" rule); double click
+  // quick-views the last searched location. Deliberately does not navigate
+  // or switch tabs — this is persistent chrome, available everywhere.
+  onWeatherClick?: () => void;
+  onWeatherDoubleClick?: () => void;
+  // Drives the icon's green "active" state once a forecast is showing.
+  weatherActive?: boolean;
 }
 
 // Cosmic Vault is intentionally absent from this list — see the Vault
@@ -61,6 +70,9 @@ export default function LeftNav({
   onOpenVaultForOwner,
   onOpenHomeView,
   onGroundZero,
+  onWeatherClick,
+  onWeatherDoubleClick,
+  weatherActive = false,
 }: LeftNavProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
@@ -162,8 +174,17 @@ export default function LeftNav({
           </Link>
 
           <button
-            onClick={() => handleHomeViewClick('weather')}
-            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+            onClick={() => {
+              setIsDrawerOpen(false);
+              onWeatherClick?.();
+            }}
+            onDoubleClick={() => {
+              setIsDrawerOpen(false);
+              onWeatherDoubleClick?.();
+            }}
+            className={`flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent hover:bg-neutral-900/50 ${
+              weatherActive ? 'text-green-400 hover:text-green-300' : 'text-neutral-400 hover:text-neutral-200'
+            }`}
           >
             <Umbrella className="w-4 h-4 shrink-0" />
             <span className="text-sm">Weather</span>
@@ -251,9 +272,12 @@ export default function LeftNav({
                 if the user was on Products/Pricing/Cart. */}
             <div className="relative group">
               <button
-                onClick={() => onOpenHomeView?.('weather')}
+                onClick={() => onWeatherClick?.()}
+                onDoubleClick={() => onWeatherDoubleClick?.()}
                 aria-label="Weather"
-                className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+                className={`flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer hover:bg-neutral-900/50 ${
+                  weatherActive ? 'text-green-400 hover:text-green-300' : 'text-neutral-400 hover:text-neutral-200'
+                }`}
               >
                 <Umbrella className="w-4 h-4" />
               </button>

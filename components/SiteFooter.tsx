@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Apple, Music2, Smartphone } from 'lucide-react';
+import { FORECAST_STREAM_MS } from '@/lib/useWeatherLocation';
 
 function useLiveClock() {
   const [label, setLabel] = useState('');
@@ -32,8 +33,35 @@ const SOCIAL_LINKS = [
   { name: 'YouTube', glyph: 'YT', href: 'https://youtube.com/@your-channel' },
 ];
 
-export default function SiteFooter() {
+interface SiteFooterProps {
+  // Umbrella-icon-driven inline search + forecast stream — see
+  // lib/useWeatherLocation.ts. All optional so SiteFooter still renders
+  // fine without a weather hook wired in (e.g. isolated testing).
+  weatherSearchOpen?: boolean;
+  weatherLoading?: boolean;
+  weatherError?: string | null;
+  weatherForecastText?: string | null;
+  weatherCurrentTemp?: { value: number; unit: string } | null;
+  onWeatherSubmit?: (query: string) => void;
+}
+
+export default function SiteFooter({
+  weatherSearchOpen,
+  weatherLoading,
+  weatherError,
+  weatherForecastText,
+  weatherCurrentTemp,
+  onWeatherSubmit,
+}: SiteFooterProps) {
   const clockLabel = useLiveClock();
+  const [locationInput, setLocationInput] = useState('');
+
+  const handleWeatherSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!locationInput.trim()) return;
+    onWeatherSubmit?.(locationInput);
+    setLocationInput('');
+  };
 
   return (
     <footer className="relative z-10 w-full shrink-0 bg-[#04060A] border-t border-slate-800/80 px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-3 text-xs font-mono">
@@ -48,7 +76,81 @@ export default function SiteFooter() {
           <span className="text-slate-500">KALI YUGA</span>
           <span className="text-slate-100 font-medium">YEAR 5,128</span>
         </div>
+
+        {/* Weather — inline in the footer's normal document flow (not an
+            absolutely-positioned overlay/popup), per the standing "dedicated
+            surfaces, no floating popups" rule. Three mutually exclusive
+            states: the search input (umbrella click), the full forecast
+            line (fades out on its own via CSS after FORECAST_STREAM_MS),
+            then just the persistent temp once it's gone. */}
+        {weatherSearchOpen && (
+          <form onSubmit={handleWeatherSubmit} className="flex items-center gap-2">
+            <input
+              type="text"
+              value={locationInput}
+              onChange={(e) => setLocationInput(e.target.value)}
+              placeholder="ZIP OR CITY, STATE"
+              autoFocus
+              className="w-40 px-2 py-1 text-[11px] bg-black/60 border border-slate-700 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-green-500/60"
+            />
+            <button
+              type="submit"
+              disabled={weatherLoading}
+              className="px-2 py-1 text-[10px] font-bold uppercase rounded bg-white text-black hover:bg-neutral-200 disabled:opacity-50"
+            >
+              {weatherLoading ? '…' : 'Go'}
+            </button>
+          </form>
+        )}
+
+        {!weatherSearchOpen && weatherError && (
+          <span className="text-red-400">{weatherError}</span>
+        )}
+
+        {!weatherSearchOpen && !weatherError && weatherForecastText && (
+          <span
+            key={weatherForecastText}
+            className="text-green-300 footer-forecast-fade"
+            style={{ animationDuration: `${FORECAST_STREAM_MS}ms` }}
+          >
+            {weatherForecastText}
+          </span>
+        )}
+
+        {!weatherSearchOpen && !weatherError && !weatherForecastText && weatherCurrentTemp && (
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.8)]" />
+            <span className="text-green-300 font-bold">
+              {weatherCurrentTemp.value}°{weatherCurrentTemp.unit}
+            </span>
+          </div>
+        )}
       </div>
+
+      <style jsx>{`
+        @keyframes footerForecastFade {
+          0%,
+          80% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+          }
+        }
+        .footer-forecast-fade {
+          /* Duration is set via inline style on the element (see the span
+             below), not interpolated here — styled-jsx's dynamic-value
+             substitution silently produced animation-duration: 0s for an
+             imported constant like FORECAST_STREAM_MS (as opposed to a
+             local prop/state value), which made the animation jump straight
+             to its "forwards"-filled end state (opacity: 0) with no visible
+             fade at all. The 8s here is just a static fallback. */
+          animation-name: footerForecastFade;
+          animation-duration: 8s;
+          animation-timing-function: ease-in;
+          animation-fill-mode: forwards;
+        }
+      `}</style>
 
       <div className="flex items-center gap-4 text-slate-500">
         {SOCIAL_LINKS.map((s) => (

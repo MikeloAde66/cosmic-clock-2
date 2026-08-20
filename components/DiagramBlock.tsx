@@ -24,8 +24,28 @@ function getMermaid() {
 // (and the raw ```svg path below, which is a model writing arbitrary markup
 // directly) both go through DOMPurify's SVG profile before ever reaching
 // dangerouslySetInnerHTML.
+//
+// Mermaid's flowchart/sequence renderers put node/label text inside
+// <foreignObject><div><span class="nodeLabel">...</span></div></foreignObject>
+// (HTML embedded in the SVG, for proper text wrapping) rather than plain SVG
+// <text>. Getting that to survive sanitization needs two separate things:
+//   1. 'foreignobject'/div/span/p in the tag allowlist (svg profile alone
+//      doesn't have foreignObject; html profile has the rest).
+//   2. HTML_INTEGRATION_POINTS: { foreignobject: true } — DOMPurify's
+//      namespace check force-removes ANY html-namespaced element (the div,
+//      regardless of tag allowlist) whose SVG-namespace parent isn't a
+//      recognized "HTML integration point", and foreignObject is NOT one of
+//      DOMPurify's defaults (only MathML's annotation-xml is) — a deliberate
+//      anti-mXSS default, not a bug, that has to be opted into per-tag.
+// Without #2, the tag itself survives empty and every node/edge label
+// silently vanishes — which is what ADD_TAGS/USE_PROFILES alone produced.
 function sanitizeSvg(markup: string): string {
-  return DOMPurify.sanitize(markup, { USE_PROFILES: { svg: true, svgFilters: true } });
+  return DOMPurify.sanitize(markup, {
+    USE_PROFILES: { html: true, svg: true, svgFilters: true },
+    ADD_TAGS: ['foreignobject'],
+    ADD_ATTR: ['xmlns'],
+    HTML_INTEGRATION_POINTS: { foreignobject: true },
+  });
 }
 
 interface DiagramBlockProps {

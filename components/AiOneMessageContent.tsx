@@ -2,6 +2,10 @@
 
 import React from 'react';
 import Markdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import DiagramBlock from './DiagramBlock';
 
 // Fenced code blocks always come through as <pre><code className="language-x">
@@ -35,8 +39,23 @@ const COMPONENTS: Components = {
   h1: (props) => <h3 className="mt-2 mb-1 text-sm font-bold text-white" {...props} />,
   h2: (props) => <h3 className="mt-2 mb-1 text-sm font-bold text-white" {...props} />,
   h3: (props) => <h3 className="mt-2 mb-1 text-sm font-bold text-white" {...props} />,
+  // GFM tables (remark-gfm) — plain react-markdown has no table support at
+  // all, which is why these were rendering as raw pipe-delimited text.
+  table: (props) => (
+    <div className="my-1.5 overflow-x-auto">
+      <table className="border-collapse text-xs" {...props} />
+    </div>
+  ),
+  thead: (props) => <thead className="border-b border-cyan-500/30" {...props} />,
+  tr: (props) => <tr className="border-b border-slate-700/50 last:border-0" {...props} />,
+  th: (props) => <th className="px-2 py-1 font-bold text-left text-white whitespace-nowrap" {...props} />,
+  td: (props) => <td className="px-2 py-1 align-top text-slate-200" {...props} />,
 };
 
 export default function AiOneMessageContent({ text }: { text: string }) {
-  return <Markdown components={COMPONENTS}>{text}</Markdown>;
+  return (
+    <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={COMPONENTS}>
+      {text}
+    </Markdown>
+  );
 }
