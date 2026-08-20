@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Check } from 'lucide-react';
 import Starfield from '@/components/Starfield';
+import ProductTelemetryDemo from '@/components/ProductTelemetryDemo';
 import type { HardwareProduct } from '@/lib/hardwareProducts';
 
 function formatPrice(cents: number) {
@@ -72,6 +73,14 @@ export default function HardwareProductDetail({ product }: { product: HardwarePr
             </div>
           </div>
         </div>
+
+        {/* Compact interactive demo — hydronode-pro/builder-kit get the
+            water variant, aione-core gets the quantum variant. Every other
+            product routed through this shared component (there are only
+            these three) renders neither; Star Tracker never reaches this
+            component at all. */}
+        {(product.id === 'hydronode-pro' || product.id === 'builder-kit') && <ProductTelemetryDemo variant="water" />}
+        {product.id === 'aione-core' && <ProductTelemetryDemo variant="quantum" />}
 
         {/* Specifications & Bill of Materials */}
         <div className="space-y-3">
