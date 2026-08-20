@@ -53,6 +53,12 @@ interface LeftNavProps {
   onWeatherDoubleClick?: () => void;
   // Drives the icon's green "active" state once a forecast is showing.
   weatherActive?: boolean;
+  // Continuous Stack mode has a real embedded Products section (unlike
+  // Weather/Vault) — when active, Products becomes a scroll-to button
+  // instead of a real <Link> away to /products, consistent with every
+  // other nav item staying on the same continuous page in this mode.
+  isStackMode?: boolean;
+  onProductsClick?: () => void;
 }
 
 // Cosmic Vault is intentionally absent from this list — see the Vault
@@ -73,6 +79,8 @@ export default function LeftNav({
   onWeatherClick,
   onWeatherDoubleClick,
   weatherActive = false,
+  isStackMode = false,
+  onProductsClick,
 }: LeftNavProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
@@ -164,14 +172,27 @@ export default function LeftNav({
             </button>
           ))}
 
-          <Link
-            href="/products"
-            onClick={() => setIsDrawerOpen(false)}
-            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
-          >
-            <LayoutGrid className="w-4 h-4 shrink-0" />
-            <span className="text-sm">Products</span>
-          </Link>
+          {isStackMode ? (
+            <button
+              onClick={() => {
+                setIsDrawerOpen(false);
+                onProductsClick?.();
+              }}
+              className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+            >
+              <LayoutGrid className="w-4 h-4 shrink-0" />
+              <span className="text-sm">Products</span>
+            </button>
+          ) : (
+            <Link
+              href="/products"
+              onClick={() => setIsDrawerOpen(false)}
+              className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+            >
+              <LayoutGrid className="w-4 h-4 shrink-0" />
+              <span className="text-sm">Products</span>
+            </Link>
+          )}
 
           <button
             onClick={() => {
@@ -249,17 +270,29 @@ export default function LeftNav({
               </div>
             ))}
 
-            {/* Products/Showcase — a real standalone route (/products), not
-                an activeTab switch like Home/Radio/Pods above, so this is a
-                genuine navigation via <Link> rather than handleNavClick. */}
+            {/* Products/Showcase — a real standalone route (/products)
+                normally, so a genuine navigation via <Link>; in Stack mode
+                there's a real embedded Products section instead, so this
+                becomes a scroll-to button like Home/Radio/Pods, keeping the
+                user on the same continuous page. */}
             <div className="relative group">
-              <Link
-                href="/products"
-                aria-label="Products"
-                className="flex items-center justify-center w-10 h-10 rounded transition-all cursor-pointer border text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </Link>
+              {isStackMode ? (
+                <button
+                  onClick={() => onProductsClick?.()}
+                  aria-label="Products"
+                  className="flex items-center justify-center w-10 h-10 rounded transition-all cursor-pointer border text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+              ) : (
+                <Link
+                  href="/products"
+                  aria-label="Products"
+                  className="flex items-center justify-center w-10 h-10 rounded transition-all cursor-pointer border text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </Link>
+              )}
               <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
                 Products
               </span>

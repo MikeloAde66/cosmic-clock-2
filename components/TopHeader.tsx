@@ -7,6 +7,7 @@ import ISSFeedModal from './ISSFeedModal';
 import LoginModal from './LoginModal';
 import SignUpModal from './SignUpModal';
 import StarTrackerView from './StarTrackerView';
+import LayoutModeToggle, { type LayoutMode } from './LayoutModeToggle';
 import { supabase } from '@/lib/supabase';
 
 interface TopHeaderProps {
@@ -16,9 +17,14 @@ interface TopHeaderProps {
   // triggers it from here now that the button lives in the header instead
   // of AiOneHome's own sub-nav.
   onOpenPricing?: () => void;
+  // Layout Toggle feature — mode state itself lives in page.tsx (the
+  // common ancestor that also decides what to render based on it), this
+  // just hosts the selector UI in persistent chrome.
+  layoutMode?: LayoutMode;
+  onLayoutModeChange?: (mode: LayoutMode) => void;
 }
 
-export default function TopHeader({ activeTab, onOpenPricing }: TopHeaderProps) {
+export default function TopHeader({ activeTab, onOpenPricing, layoutMode, onLayoutModeChange }: TopHeaderProps) {
   const [isIssOpen, setIsIssOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
@@ -154,8 +160,12 @@ export default function TopHeader({ activeTab, onOpenPricing }: TopHeaderProps) 
             )}
         </div>
 
-        {/* Right Side: Auth Controls (search now lives on the Radio page only) */}
+        {/* Right Side: Layout Toggle + Auth Controls (search now lives on
+            the Radio page only) */}
         <div className="flex items-center space-x-2">
+          {layoutMode && onLayoutModeChange && (
+            <LayoutModeToggle mode={layoutMode} onChange={onLayoutModeChange} />
+          )}
           {isHome ? (
             <>
               <button

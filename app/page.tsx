@@ -4,6 +4,20 @@ import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import TopHeader from '@/components/TopHeader';
 import LeftNav from '@/components/LeftNav';
+import type { LayoutMode } from '@/components/LayoutModeToggle';
+import GalleryGrid from '@/components/GalleryGrid';
+import KaliSection from '@/components/KaliSection';
+import ProductsSection from '@/components/ProductsSection';
+
+// Continuous Stack (Layout 1) mounts Home/Radio/Pods as sibling sections
+// (ids stack-section-aione/radio/pods — see the layoutMode === 'stack'
+// block below) instead of swapping a single active one. Sidebar nav calls
+// this unconditionally on every click regardless of layout mode; it's a
+// harmless no-op the rest of the time since those ids only exist in the
+// DOM when Stack mode is actually rendered.
+function scrollToStackSection(tab: string) {
+  document.getElementById(`stack-section-${tab}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 import Starfield from '@/components/Starfield';
 import FactChecker from '@/components/FactChecker';
 import PodsModule from '@/components/PodsModule';
@@ -42,6 +56,7 @@ function HomeInner() {
   const goToGroundZero = () => {
     setActiveTab('aione');
     setGroundZeroToken(Date.now());
+    scrollToStackSection('aione');
   };
 
   // Set by LeftNav's Preferences modal — the only remaining front door into
@@ -69,12 +84,43 @@ function HomeInner() {
   const openHomeView = (view: 'weather' | 'kali') => {
     setActiveTab('aione');
     setHomeViewRequest({ view, token: Date.now() });
+    // Kali has its own standalone Stack section (KaliSection, also used
+    // nested inside CosmicCanvas for Hub/Gallery mode) — Weather doesn't,
+    // it's persistent footer chrome in every layout, so 'aione' is a
+    // harmless fallback there (that scroll call is moot either way since
+    // the weather view itself is a no-op inside CosmicCanvas).
+    scrollToStackSection(view === 'kali' ? 'kali' : 'aione');
+  };
+
+  // Sidebar's Radio/Pods nav items call this (via LeftNav's setActiveTab
+  // prop) — in Stack mode there's no "active" tab to swap to, just a
+  // section to scroll to; still updates activeTab too so the sidebar's own
+  // highlight styling and the Pods mounted-but-hidden logic (Hub mode)
+  // keep working unchanged.
+  const navigateTab = (tab: string) => {
+    setActiveTab(tab);
+    scrollToStackSection(tab);
   };
 
   // Umbrella icon's inline search + footer forecast stream — persistent
   // chrome, not a "home view" like Weather used to be, so it lives here
   // rather than in homeViewRequest and is available on every tab.
   const weather = useWeatherLocation();
+
+  // Layout Toggle feature — 'hub' (default) is the existing tab-swap
+  // behavior below, completely unchanged. Persisted across reloads via
+  // localStorage (SSR-safe: starts at the 'hub' default, then upgrades
+  // once the real stored value is read on mount, same pattern as the
+  // weather location's saved-search persistence).
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('hub');
+  useEffect(() => {
+    const stored = localStorage.getItem('aione_layout_mode');
+    if (stored === 'hub' || stored === 'gallery' || stored === 'stack') setLayoutMode(stored);
+  }, []);
+  const changeLayoutMode = (mode: LayoutMode) => {
+    setLayoutMode(mode);
+    localStorage.setItem('aione_layout_mode', mode);
+  };
 
   const [isVaultSearchOpen, setIsVaultSearchOpen] = useState(false);
   useEffect(() => {
@@ -148,7 +194,7 @@ useContextMenuShare();
         <Starfield />
         <LeftNav
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={navigateTab}
           onUnlockVault={unlockVault}
           onOpenVaultForOwner={openVaultForOwner}
           onOpenHomeView={openHomeView}
@@ -156,45 +202,126 @@ useContextMenuShare();
           onWeatherClick={weather.toggleSearch}
           onWeatherDoubleClick={weather.quickView}
           weatherActive={weather.weatherActive}
+          isStackMode={layoutMode === 'stack'}
+          onProductsClick={() => scrollToStackSection('products')}
         />
 
         <div className="flex flex-col flex-1 overflow-hidden">
-          <TopHeader activeTab={activeTab} onOpenPricing={openPricing} />
+          <TopHeader
+            activeTab={activeTab}
+            onOpenPricing={openPricing}
+            layoutMode={layoutMode}
+            onLayoutModeChange={changeLayoutMode}
+          />
 
-          <div className="relative flex-1 overflow-hidden">
-            {activeTab === 'radio' && <RadioStreams />}
+          {/* Classic Hub (default, unchanged) — the existing tab-swap
+              behavior below, exactly as it's always worked. Gallery/Stack
+              are being built one at a time per the agreed pacing; this
+              round only wires up the toggle + persistence + an honest
+              placeholder for the other two modes, not their real layouts
+              yet. */}
+          {layoutMode === 'hub' && (
+            <div className="relative flex-1 overflow-hidden">
+              {activeTab === 'radio' && <RadioStreams />}
 
-            {activeTab === 'vault' && (
-              <CosmicVaultAuth
-                initialDrawer={pendingVaultDrawer ?? undefined}
-                initialRoleKey={pendingVaultKey ?? undefined}
-              />
-            )}
+              {activeTab === 'vault' && (
+                <CosmicVaultAuth
+                  initialDrawer={pendingVaultDrawer ?? undefined}
+                  initialRoleKey={pendingVaultKey ?? undefined}
+                />
+              )}
 
-            {activeTab === 'aione' && (
-              <AiOneHome
-                onNavigateToVaultDrawer={navigateToVaultDrawer}
-                homeViewRequest={homeViewRequest}
-                groundZeroToken={groundZeroToken}
-                pricingRequestToken={pricingRequestToken}
-              />
-            )}
+              {activeTab === 'aione' && (
+                <AiOneHome
+                  onNavigateToVaultDrawer={navigateToVaultDrawer}
+                  homeViewRequest={homeViewRequest}
+                  groundZeroToken={groundZeroToken}
+                  pricingRequestToken={pricingRequestToken}
+                />
+              )}
 
-            {activeTab === 'fact-checker' && (
-              <div className="w-full h-full p-6 overflow-auto">
-                <FactChecker />
+              {activeTab === 'fact-checker' && (
+                <div className="w-full h-full p-6 overflow-auto">
+                  <FactChecker />
+                </div>
+              )}
+
+              {/* Pods stays mounted (just hidden) instead of unmounting on tab
+                  switch — it holds local file uploads as in-memory blob URLs,
+                  which die the instant the component unmounts. Unlike a real
+                  page reload (where blob URLs are gone regardless), switching
+                  tabs within this single-page app doesn't need to destroy them. */}
+              <div className={activeTab === 'pods' ? 'w-full h-full' : 'hidden'}>
+                <PodsModule isActive={activeTab === 'pods'} />
               </div>
-            )}
-
-            {/* Pods stays mounted (just hidden) instead of unmounting on tab
-                switch — it holds local file uploads as in-memory blob URLs,
-                which die the instant the component unmounts. Unlike a real
-                page reload (where blob URLs are gone regardless), switching
-                tabs within this single-page app doesn't need to destroy them. */}
-            <div className={activeTab === 'pods' ? 'w-full h-full' : 'hidden'}>
-              <PodsModule isActive={activeTab === 'pods'} />
             </div>
-          </div>
+          )}
+
+          {layoutMode === 'gallery' && (
+            <div className="relative flex-1 overflow-hidden">
+              <GalleryGrid
+                onOpenRadio={() => {
+                  setActiveTab('radio');
+                  changeLayoutMode('hub');
+                }}
+                onOpenPods={() => {
+                  setActiveTab('pods');
+                  changeLayoutMode('hub');
+                }}
+                onOpenKali={() => {
+                  changeLayoutMode('hub');
+                  openHomeView('kali');
+                }}
+                onWeatherClick={weather.toggleSearch}
+                weatherActive={weather.weatherActive}
+              />
+            </div>
+          )}
+
+          {/* Continuous Stack (Layout 1) — Home/Radio/Pods/Products/Kali
+              mounted together as sibling sections in one scrollable
+              container, rather than one active tab swapping inside it.
+              Each is min-h-full (at least the height a single Hub-mode view
+              would get, more if its real content needs it) so scrolling
+              from one to the next lands cleanly at its top, with a visible
+              border-t divider and each section's own internal padding
+              (Radio/Pods' existing headers, Products' py-16, Kali's p-4)
+              keeping content from crowding across the seam. Sidebar nav
+              (via navigateTab/goToGroundZero/openHomeView above) scrolls
+              here by id instead of switching activeTab.
+              Vault deliberately isn't a stacked section — it's
+              access-gated and never a public nav destination (see
+              LeftNav's NAV_ITEMS comment) — and Weather stays persistent
+              footer chrome exactly as in every other layout mode, not a
+              section of its own. Products is real product data (not the
+              literal /products route component — see ProductsSection.tsx
+              for why) and Kali is now a genuine standalone section
+              (KaliSection.tsx, extracted out of CosmicCanvas so Hub/Gallery
+              mode's nested Kali sub-view can share the same component). */}
+          {layoutMode === 'stack' && (
+            <div className="relative flex-1 overflow-y-auto">
+              <div id="stack-section-aione" className="w-full min-h-full">
+                <AiOneHome
+                  onNavigateToVaultDrawer={navigateToVaultDrawer}
+                  homeViewRequest={homeViewRequest}
+                  groundZeroToken={groundZeroToken}
+                  pricingRequestToken={pricingRequestToken}
+                />
+              </div>
+              <div id="stack-section-radio" className="w-full min-h-full border-t border-slate-800/80">
+                <RadioStreams />
+              </div>
+              <div id="stack-section-pods" className="w-full min-h-full border-t border-slate-800/80">
+                <PodsModule isActive />
+              </div>
+              <div id="stack-section-products" className="w-full min-h-full border-t border-slate-800/80">
+                <ProductsSection />
+              </div>
+              <div id="stack-section-kali" className="w-full min-h-full border-t border-slate-800/80">
+                <KaliSection />
+              </div>
+            </div>
+          )}
 
           {/* Always mounted above SiteFooter, on every tab, from initial
               page load — shows an idle/paused strip until a station is

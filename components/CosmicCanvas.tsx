@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import NoaaWidget from './NoaaWidget';
-import AiOneChat from './AiOneChat';
+import KaliSection from './KaliSection';
 import { useGeolocation } from '@/lib/useGeolocation';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
@@ -197,49 +197,10 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
         <NoaaWidget initialCoords={userCoords} />
       </div>
 
-      {/* Kali — takes over the whole section: epoch readout on top, Ai One
-          chat filling the rest. No bordered/backdrop-blurred card wrapping
-          this anymore, and no matrix glyph-rain canvas either — the clean
-          starfield/nebula background shows through directly, unobstructed.
-          A subtle transparent-to-black gradient grounds the content
-          instead — deepens toward the bottom near the input bar, not a
-          solid/tinted glass panel like Pods'. */}
-      {activeView === 'kali' && (
-        // flex-1 min-h-0, not h-full — see the weather view above for why.
-        <div className="relative z-30 flex flex-col flex-1 w-full min-h-0 p-4">
-          <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-b from-transparent via-black/55 to-black/95" />
-
-          <div className="relative z-10 flex flex-col flex-1 min-h-0">
-            <div className="shrink-0">
-              <span className="text-[10px] font-mono tracking-widest text-cyan-400/80 uppercase">
-                Current Epoch
-              </span>
-              <h2 className="text-2xl font-bold tracking-wider text-white">KALI</h2>
-              <p className="text-xs font-mono text-cyan-100 mt-1">YEAR 5,128 / 432,000</p>
-              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/40">
-                <div className="h-full w-[1.18%] bg-cyan-400" />
-              </div>
-              <span className="mt-1 block text-[9px] font-mono text-cyan-500/70">PROGRESS: 1.1870%</span>
-
-              {/* Standard orthographic projection math, restated here in
-                  3D spherical-to-Cartesian form as flavor text for the
-                  Kali Yuga epoch readout. */}
-              <div className="mt-3 space-y-1 rounded border border-cyan-500/10 bg-black/40 p-3 font-mono text-[11px] text-cyan-400">
-                <div className="text-[10px] uppercase tracking-wider text-cyan-500/70">
-                  Orthographic Projection Math
-                </div>
-                <div>x = R · cos(lat) · cos(lng)</div>
-                <div>y = R · sin(lat)</div>
-                <div>z = -R · cos(lat) · sin(lng)</div>
-              </div>
-            </div>
-
-            <div className="flex-1 min-h-0 pt-3 mt-3 border-t border-cyan-500/20">
-              <AiOneChat />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Kali — extracted into its own component (KaliSection.tsx) so the
+          Continuous Stack layout can also mount it as a standalone section;
+          this is the exact same component, unchanged here. */}
+      {activeView === 'kali' && <KaliSection />}
 
       <style jsx>{`
         @keyframes cinematicDrift {

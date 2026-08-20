@@ -1,47 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Gift } from 'lucide-react';
+import { useDonation } from '@/lib/useDonation';
 
 // compact renders as a LeftNav-style 40x40 icon button with a hover
 // tooltip, matching that sidebar's other items — for mounting this
 // somewhere narrower than the wide text-button default (e.g. underneath
 // the Kali Yuga icon). row renders as an icon+label list item matching
 // LeftNav's mobile drawer rows. All three reuse the same donation-session
-// handler.
+// handler (see lib/useDonation.ts — also shared by the Gallery Grid
+// layout's Donate card).
 export default function DonationButton({ compact = false, row = false }: { compact?: boolean; row?: boolean }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleDonation = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch('/api/v1/create-donation-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount_in_cents: 500, // $5.00 test donation
-          is_recurring: false,
-        }),
-      });
-
-      if (!res.ok) {
-        const detail = await res.text().catch(() => '');
-        throw new Error(detail || 'Checkout session failed.');
-      }
-
-      const { url } = await res.json();
-      if (url) {
-        window.location.href = url;
-      } else {
-        throw new Error('No checkout URL returned.');
-      }
-    } catch {
-      setError('DONATIONS UNREACHABLE.');
-      setLoading(false);
-    }
-  };
+  const { loading, error, donate: handleDonation } = useDonation();
 
   if (compact) {
     return (
