@@ -40,9 +40,25 @@ async function fetchForecast(lat: number, lon: number, label: string) {
   const forecastRes = await fetch(pointData.properties.forecast, { headers: NWS_HEADERS });
   const forecastData = await forecastRes.json();
   const period = forecastData.properties.periods[0];
+
+  // period.temperature is the forecast period's daytime high / overnight
+  // low, not a live reading — the real current temperature comes from the
+  // nearest station's latest actual observation, a completely separate
+  // endpoint. properties.value there is always Celsius regardless of the
+  // point/forecast endpoints' own units, hence the explicit conversion.
+  const stationsRes = await fetch(pointData.properties.observationStations, { headers: NWS_HEADERS });
+  const stationsData = await stationsRes.json();
+  const stationUrl = stationsData.features?.[0]?.id;
+  if (!stationUrl) throw new Error('No observation station found for this location.');
+  const obsRes = await fetch(`${stationUrl}/observations/latest`, { headers: NWS_HEADERS });
+  const obsData = await obsRes.json();
+  const celsius = obsData.properties?.temperature?.value;
+  if (celsius == null) throw new Error('Current observation unavailable for this station.');
+  const fahrenheit = Math.round((celsius * 9) / 5 + 32);
+
   return {
-    forecastText: `${label.toUpperCase()} — ${period.name.toUpperCase()}: ${period.shortForecast}, ${period.temperature}°${period.temperatureUnit}`,
-    temp: { value: period.temperature, unit: period.temperatureUnit } as CurrentTemp,
+    forecastText: `${label.toUpperCase()} — CURRENTLY ${fahrenheit}°F, ${period.name.toUpperCase()}: ${period.shortForecast}`,
+    temp: { value: fahrenheit, unit: 'F' } as CurrentTemp,
   };
 }
 

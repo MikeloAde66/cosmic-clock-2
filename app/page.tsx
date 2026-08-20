@@ -28,6 +28,8 @@ import CosmicVaultAuth from '@/components/CosmicVaultAuth';
 import AiOneHome from '@/components/AiOneHome';
 import RadioStreams from '@/components/RadioStreams';
 import SiteFooter from '@/components/SiteFooter';
+import ISSFeedModal from '@/components/ISSFeedModal';
+import StarTrackerView from '@/components/StarTrackerView';
 import VaultSearchModal from '@/components/VaultSearchModal';
 import { RadioPlayerProvider } from '@/components/radio/RadioPlayerContext';
 import GlobalPlayerBar from '@/components/radio/GlobalPlayerBar';
@@ -134,6 +136,13 @@ function HomeInner() {
     setShowBackToTop((stackScrollRef.current?.scrollTop ?? 0) > 400);
   };
 
+  // Star Tracker / Live ISS — moved out of TopHeader (which used to own
+  // both) into LeftNav's icon rail; state lives here now since LeftNav and
+  // TopHeader are siblings, and this is also where StarTrackerView/
+  // ISSFeedModal are rendered directly rather than from inside TopHeader.
+  const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(false);
+  const [isIssOpen, setIsIssOpen] = useState(false);
+
   const [isVaultSearchOpen, setIsVaultSearchOpen] = useState(false);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -216,6 +225,9 @@ useContextMenuShare();
           weatherActive={weather.weatherActive}
           isStackMode={layoutMode === 'stack'}
           onProductsClick={() => scrollToStackSection('products')}
+          isStarTrackerOpen={isStarTrackerOpen}
+          onToggleStarTracker={() => setIsStarTrackerOpen((v) => !v)}
+          onOpenLiveIss={() => setIsIssOpen(true)}
         />
 
         <div className="flex flex-col flex-1 overflow-hidden">
@@ -391,6 +403,12 @@ useContextMenuShare();
         onClose={() => setIsVaultSearchOpen(false)}
         onNavigateToVaultDrawer={navigateToVaultDrawer}
       />
+
+      {/* ISS Stream Modal + Star Tracker — both moved here from TopHeader,
+          now triggered from LeftNav instead. Star Tracker is a dedicated
+          full-screen view (fixed z-50), not a stacked modal. */}
+      <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
+      {isStarTrackerOpen && <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} />}
     </CartProvider>
     </RadioPlayerProvider>
   );

@@ -2,7 +2,19 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Home, LayoutGrid, Menu, Mic, Radio as RadioIcon, Settings, Sparkles, Umbrella, X as CloseIcon } from 'lucide-react';
+import {
+  Home,
+  LayoutGrid,
+  Menu,
+  Mic,
+  Radio as RadioIcon,
+  Satellite,
+  Settings,
+  Sparkles,
+  Telescope,
+  Umbrella,
+  X as CloseIcon,
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import PreferencesModal from './PreferencesModal';
 import DonationButton from './DonationButton';
@@ -59,6 +71,12 @@ interface LeftNavProps {
   // other nav item staying on the same continuous page in this mode.
   isStackMode?: boolean;
   onProductsClick?: () => void;
+  // Star Tracker/Live ISS — moved here from TopHeader's pills. Star
+  // Tracker is a real on/off toggle (green dot open, red dot closed);
+  // Live ISS just opens its existing modal, same as before, only relocated.
+  isStarTrackerOpen?: boolean;
+  onToggleStarTracker?: () => void;
+  onOpenLiveIss?: () => void;
 }
 
 // Cosmic Vault is intentionally absent from this list — see the Vault
@@ -81,6 +99,9 @@ export default function LeftNav({
   weatherActive = false,
   isStackMode = false,
   onProductsClick,
+  isStarTrackerOpen = false,
+  onToggleStarTracker,
+  onOpenLiveIss,
 }: LeftNavProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
@@ -197,6 +218,35 @@ export default function LeftNav({
           <button
             onClick={() => {
               setIsDrawerOpen(false);
+              onToggleStarTracker?.();
+            }}
+            className="relative flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+          >
+            <span className="relative shrink-0">
+              <Telescope className="w-4 h-4" />
+              <span
+                className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
+                  isStarTrackerOpen ? 'bg-green-500' : 'bg-red-500'
+                }`}
+              />
+            </span>
+            <span className="text-sm">Star Tracker</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsDrawerOpen(false);
+              onOpenLiveIss?.();
+            }}
+            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+          >
+            <Satellite className="w-4 h-4 shrink-0" />
+            <span className="text-sm">Live ISS</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsDrawerOpen(false);
               onWeatherClick?.();
             }}
             onDoubleClick={() => {
@@ -295,6 +345,40 @@ export default function LeftNav({
               )}
               <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
                 Products
+              </span>
+            </div>
+
+            {/* Star Tracker / Live ISS — moved here from TopHeader's pills.
+                Star Tracker keeps a real on/off toggle (green dot open, red
+                closed); Live ISS just opens its existing modal. */}
+            <div className="relative group">
+              <button
+                onClick={() => onToggleStarTracker?.()}
+                aria-label="Star Tracker"
+                className="relative flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+              >
+                <Telescope className="w-4 h-4" />
+                <span
+                  className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${
+                    isStarTrackerOpen ? 'bg-green-500' : 'bg-red-500'
+                  }`}
+                />
+              </button>
+              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
+                Star Tracker
+              </span>
+            </div>
+
+            <div className="relative group">
+              <button
+                onClick={() => onOpenLiveIss?.()}
+                aria-label="Live ISS"
+                className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+              >
+                <Satellite className="w-4 h-4" />
+              </button>
+              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
+                Live ISS
               </span>
             </div>
 
