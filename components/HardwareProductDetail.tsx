@@ -67,7 +67,7 @@ export default function HardwareProductDetail({ product }: { product: HardwarePr
               </button>
               {product.comingSoon && (
                 <p className="text-center text-[11px] font-mono text-slate-500">
-                  Not yet available for purchase — pre-orders open soon.
+                  Digital platform — no physical shipping required. Not yet available for purchase; pre-orders open soon.
                 </p>
               )}
             </div>
