@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import NoaaWidget from './NoaaWidget';
 import AiOneChat from './AiOneChat';
-import HomeHeroFrame from './HomeHeroFrame';
 import { useGeolocation } from '@/lib/useGeolocation';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
@@ -183,13 +182,6 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
                 main, still breathing via the same cinematic-drift animation. */}
             <div className="absolute w-5 h-5 overflow-hidden rounded-full top-8 right-8 bg-gradient-to-br from-white via-slate-200 to-slate-400 shadow-[0_0_8px_rgba(255,255,255,0.35)] animate-cinematic-drift">
               <div className="absolute w-5 h-5 rounded-full bg-[#0a0a0c] -top-1 -right-2" />
-            </div>
-
-            {/* Home hero frame — Phase 1 of the Home tab rebuild. Needs real
-                pointer events, unlike the decorative layers above, so it's
-                the one non-pointer-events-none child here. */}
-            <div className="relative z-10 flex justify-center w-full px-4">
-              <HomeHeroFrame />
             </div>
           </main>
         </>
