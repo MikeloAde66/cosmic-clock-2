@@ -116,6 +116,36 @@ export const RADIO_STATIONS: RadioStation[] = [
     badge: '977',
     badgeColor: '#7c4a1e',
   },
+  // Same StreamTheWorld network as .977 Comedy above — same
+  // Access-Control-Allow-Origin: * headers, same verified-via-real-
+  // browser-canplay reliability tier.
+  {
+    kind: 'live',
+    id: 'rb-977-smoothjazz',
+    name: '.977 Smooth Jazz',
+    network: 'Radio-Browser',
+    tagline: 'Smooth jazz, low and easy, around the clock',
+    genre: 'Jazz / Chill',
+    category: 'COSMIC CHILL',
+    streamUrl: 'http://14543.live.streamtheworld.com/977_SMOOJAZZ_SC',
+    badge: '977',
+    badgeColor: '#7c4a1e',
+  },
+  // Hosted on Radiojar (an established streaming platform, not a small
+  // indie server) — genuine history programming, a direct thematic fit
+  // for Ancient Wisdom. Verified via real browser <audio> canplay.
+  {
+    kind: 'live',
+    id: 'rb-historyradio',
+    name: 'History Radio',
+    network: 'Radio-Browser',
+    tagline: 'Documentary-style history programming',
+    genre: 'History / Lore',
+    category: 'ANCIENT WISDOM',
+    streamUrl: 'http://stream.radiojar.com/6bmecgg3wd5tv',
+    badge: 'HST',
+    badgeColor: '#5c4a2e',
+  },
   {
     kind: 'vault',
     id: 'vault-432hz',
