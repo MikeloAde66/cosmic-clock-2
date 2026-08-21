@@ -12,6 +12,8 @@ import {
 } from '@/lib/radioStations';
 import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 import { getAllStoredPlaylists, saveStoredPlaylist, type StoredPlaylist } from '@/lib/customPlaylistDB';
+import { searchRadioBrowserStations, type DirectoryStation } from '@/lib/radioDirectories';
+import type { LiveRadioStation } from '@/lib/radioStations';
 
 interface CustomTrack {
   id: string;
@@ -109,11 +111,65 @@ function VaultFolderCard({
 }
 
 export default function RadioStreams() {
-  const [activeCategory, setActiveCategory] = useState<string>('ALL');
+  const [activeCategory, setActiveCategory] = useState<string>('ALL CHANNELS');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showBrowseMenu, setShowBrowseMenu] = useState<boolean>(false);
   const browseMenuRef = useRef<HTMLDivElement | null>(null);
   const { station: playingStation, status, playStation, togglePlayPause } = useRadioPlayer();
+
+  // Live global search (Radio-Browser) — separate from the plain
+  // client-side name/tagline filter on the curated RADIO_STATIONS list
+  // below, which stays exactly as it worked before. Debounced so this
+  // doesn't fire an API call on every keystroke, and only once the query
+  // is long enough to return something meaningful.
+  const [dynamicResults, setDynamicResults] = useState<DirectoryStation[]>([]);
+  const [dynamicLoading, setDynamicLoading] = useState(false);
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      setDynamicResults([]);
+      setDynamicLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setDynamicLoading(true);
+    const timeout = setTimeout(async () => {
+      const results = await searchRadioBrowserStations(trimmed);
+      if (!cancelled) {
+        setDynamicResults(results);
+        setDynamicLoading(false);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [searchQuery]);
+
+  // A live search result isn't a curated RadioStation — no badge/genre/
+  // network of its own — so this synthesizes the minimum valid shape
+  // playStation needs. /api/radio/queue's fallback path (see that route)
+  // is what actually makes an id outside RADIO_STATIONS playable.
+  const playDynamicResult = (result: DirectoryStation) => {
+    const id = `rb-search-${result.id}`;
+    if (playingStation?.id === id) {
+      togglePlayPause();
+      return;
+    }
+    const station: LiveRadioStation = {
+      kind: 'live',
+      id,
+      name: result.name,
+      network: 'Radio-Browser',
+      tagline: result.tags || 'Live search result',
+      genre: result.tags || '',
+      category: 'ALL CHANNELS',
+      streamUrl: result.streamUrl,
+      badge: '●',
+      badgeColor: '#3a3a3a',
+    };
+    playStation(station);
+  };
 
   // Custom playlists — strictly client-side, no network calls anywhere in
   // this flow. React state drives the UI; user-created playlists (not the
@@ -265,7 +321,7 @@ export default function RadioStreams() {
   const query = searchQuery.trim().toLowerCase();
 
   const filteredStations = RADIO_STATIONS.filter((s) => {
-    const matchesCategory = activeCategory === 'ALL' || s.category === activeCategory;
+    const matchesCategory = activeCategory === 'ALL CHANNELS' || s.category === activeCategory;
     const matchesSearch =
       !query || s.name.toLowerCase().includes(query) || s.tagline.toLowerCase().includes(query);
     return matchesCategory && matchesSearch;
@@ -381,6 +437,65 @@ export default function RadioStreams() {
             )}
           </div>
         </div>
+
+        {searchQuery.trim().length >= 2 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono tracking-widest uppercase text-slate-500">
+                Live Search — Radio-Browser
+              </span>
+              {dynamicLoading && <span className="text-[10px] font-mono text-slate-600 animate-pulse">Searching…</span>}
+            </div>
+            {!dynamicLoading && dynamicResults.length === 0 && (
+              <p className="text-xs font-mono text-slate-600">No live stations found for &quot;{searchQuery.trim()}&quot;.</p>
+            )}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {dynamicResults.map((result) => {
+                const dynamicId = `rb-search-${result.id}`;
+                const isActiveStation = playingStation?.id === dynamicId;
+                const isPlaying = isActiveStation && status === 'playing';
+                const isLoadingStation = isActiveStation && status === 'loading';
+                // Some third-party stations don't send CORS headers in a way
+                // compatible with this app's single shared <audio
+                // crossOrigin="anonymous"> element (needed for the spectrum
+                // visualizer) — that fails as a real network error, not just
+                // a flat visualizer. Surface it instead of silently
+                // reverting to an unstyled "Tune In" with no explanation.
+                const isErrorStation = isActiveStation && status === 'error';
+                return (
+                  <div
+                    key={result.id}
+                    className={`flex items-center justify-between gap-3 p-3 border rounded-lg bg-slate-900/40 ${
+                      isPlaying ? 'border-neutral-700' : 'border-slate-800'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold truncate text-slate-100">{result.name}</h4>
+                      {result.tags && <p className="text-[10px] truncate text-slate-500">{result.tags}</p>}
+                      {isErrorStation && (
+                        <p className="text-[10px] font-mono text-red-400 mt-0.5">
+                          Couldn&apos;t connect — this station may not support browser playback.
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => playDynamicResult(result)}
+                      className={`h-7 px-2.5 text-[10px] font-mono uppercase tracking-wide rounded border shrink-0 transition ${
+                        isPlaying
+                          ? 'bg-white text-black border-neutral-700 font-bold'
+                          : isErrorStation
+                            ? 'bg-red-950/60 border-red-900 text-red-400'
+                            : 'bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      {isPlaying ? '■ Pause' : isLoadingStation ? '… Tuning' : isErrorStation ? '⚠ Offline' : '▶ Tune In'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {filteredStations.map((station) => {

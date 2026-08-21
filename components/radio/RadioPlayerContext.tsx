@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import Hls from 'hls.js';
 import type { RadioStation } from '@/lib/radioStations';
 
 export interface QueueTrack {
@@ -47,8 +48,32 @@ const RadioPlayerContext = createContext<RadioPlayerContextValue | null>(null);
 // everything except Pods currently does.
 export function RadioPlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const queueRef = useRef<QueueTrack[]>([]);
   const currentIndexRef = useRef(0);
+
+  // No station in the static RADIO_STATIONS list is HLS today, but
+  // dynamically-fetched directory results (Radio-Browser, a future
+  // AzuraCast install) can be — this reuses the SAME <audio> element and
+  // ref rather than standing up a second, parallel audio engine. Tears
+  // down any previous hls.js instance first so switching from one HLS
+  // stream to a plain one (or another HLS stream) doesn't leak instances.
+  const setAudioSource = useCallback((url: string) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    if (url.endsWith('.m3u8') && Hls.isSupported()) {
+      const hls = new Hls();
+      hls.loadSource(url);
+      hls.attachMedia(audio);
+      hlsRef.current = hls;
+    } else {
+      audio.src = url;
+    }
+  }, []);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -103,9 +128,9 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     setCurrentIndex(index);
     setStatus('loading');
     ensureAnalyser();
-    audioRef.current.src = track.fileUrl;
+    setAudioSource(track.fileUrl);
     audioRef.current.play().catch(() => setStatus('error'));
-  }, [ensureAnalyser]);
+  }, [ensureAnalyser, setAudioSource]);
 
   const playStation = useCallback(async (nextStation: RadioStation) => {
     setStatus('loading');
@@ -113,7 +138,17 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     ensureAnalyser();
 
     try {
-      const res = await fetch(`/api/radio/queue?station=${encodeURIComponent(nextStation.id)}`);
+      // streamUrl/name are only ever used server-side as a fallback for
+      // stations that aren't in the curated RADIO_STATIONS list (live
+      // Radio-Browser search results — see RadioStreams.tsx) — harmless to
+      // always include for curated stations too, since the server only
+      // reaches for them after its own RADIO_STATIONS.find lookup fails.
+      const params = new URLSearchParams({ station: nextStation.id });
+      if (nextStation.kind === 'live') {
+        params.set('streamUrl', nextStation.streamUrl);
+        params.set('name', nextStation.name);
+      }
+      const res = await fetch(`/api/radio/queue?${params.toString()}`);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
 
@@ -122,7 +157,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
         setQueue([]);
         setCurrentIndex(0);
         if (audioRef.current) {
-          audioRef.current.src = data.streamUrl;
+          setAudioSource(data.streamUrl);
           await audioRef.current.play();
         }
         return;
@@ -140,7 +175,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
       console.error('Failed to play station:', err);
       setStatus('error');
     }
-  }, [playIndex, ensureAnalyser]);
+  }, [playIndex, ensureAnalyser, setAudioSource]);
 
   const next = useCallback(() => {
     if (queueRef.current.length === 0) return;

@@ -50,9 +50,33 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const stationId = url.searchParams.get('station');
   const countParam = url.searchParams.get('count');
+  // Fallback for stations found via the live Radio-Browser search bar
+  // (RadioStreams.tsx) rather than the curated RADIO_STATIONS list below —
+  // the client already knows the real streamUrl from that search result
+  // (Radio-Browser's own url_resolved), so when the id isn't a curated
+  // station, this echoes it back in the same {kind:'live', streamUrl}
+  // shape rather than 404ing. Curated stations never hit this path: their
+  // id always matches RADIO_STATIONS.find below first.
+  const fallbackStreamUrl = url.searchParams.get('streamUrl');
+  const fallbackName = url.searchParams.get('name');
 
   const station = RADIO_STATIONS.find((s) => s.id === stationId);
   if (!station) {
+    if (stationId && fallbackStreamUrl) {
+      const adHocStation = {
+        kind: 'live' as const,
+        id: stationId,
+        name: fallbackName || 'Live Station',
+        network: 'Radio-Browser',
+        tagline: 'Found via live search',
+        genre: '',
+        category: 'ALL CHANNELS',
+        streamUrl: fallbackStreamUrl,
+        badge: '●',
+        badgeColor: '#3a3a3a',
+      };
+      return Response.json({ station: adHocStation, kind: 'live', streamUrl: fallbackStreamUrl });
+    }
     return new Response(`Unknown station. Valid ids: ${RADIO_STATIONS.map((s) => s.id).join(', ')}`, { status: 404 });
   }
 

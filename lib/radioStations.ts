@@ -25,15 +25,19 @@ export interface VaultRadioStation extends BaseStation {
 
 export type RadioStation = LiveRadioStation | VaultRadioStation;
 
-export const CATEGORIES = ['ALL', 'CURRENT AFFAIRS', 'VAULT STATIONS'];
+// Radio Hub is a relaxation/entertainment sanctuary, not a news dashboard —
+// hard-news categories (the old CURRENT AFFAIRS tab) were dropped from this
+// list entirely per that direction. BBC/NPR stay in RADIO_STATIONS below
+// (still real, still playable, nothing deleted) but with no matching
+// category here, they no longer get a dedicated tab — reachable only via
+// ALL CHANNELS, i.e. deprioritized rather than removed.
+export const CATEGORIES = ['ALL CHANNELS', 'LAUGHTER & FUN', 'HEARTY TALK', 'ANCIENT WISDOM', 'COSMIC CHILL'];
 
 // Display-only relabeling — CATEGORIES' own values still drive filtering
 // (station.category === activeCategory) and every RadioStation's category
 // field, so this only changes the filter button's rendered text, not the
 // underlying matching logic. Categories not listed here render as-is.
-export const CATEGORY_LABELS: Record<string, string> = {
-  'VAULT STATIONS': 'STATIONS',
-};
+export const CATEGORY_LABELS: Record<string, string> = {};
 
 export interface OutkastLink {
   label: string;
@@ -93,6 +97,25 @@ export const RADIO_STATIONS: RadioStation[] = [
     badge: 'NPR',
     badgeColor: '#1b3668',
   },
+  // Replaces the earlier WALM - Old Time Radio pick — that was a real,
+  // working station, but a small independent Icecast server with genuine
+  // intermittent uptime (confirmed: worked earlier this session, later
+  // couldn't even be reached via curl). .977 Comedy runs on StreamTheWorld,
+  // an established commercial CDN, real Access-Control-Allow-Origin: *,
+  // and verified via an actual browser <audio> canplay event (not just a
+  // curl 200 — that alone wasn't enough to catch SomaFM's hotlink block).
+  {
+    kind: 'live',
+    id: 'rb-977-comedy',
+    name: '.977 Comedy',
+    network: 'Radio-Browser',
+    tagline: 'Stand-up, sketch, and comedy talk, 24/7',
+    genre: 'Comedy',
+    category: 'LAUGHTER & FUN',
+    streamUrl: 'http://26433.live.streamtheworld.com/977_COMEDY_SC',
+    badge: '977',
+    badgeColor: '#7c4a1e',
+  },
   {
     kind: 'vault',
     id: 'vault-432hz',
@@ -100,7 +123,7 @@ export const RADIO_STATIONS: RadioStation[] = [
     network: 'Cosmic Vault',
     tagline: 'Mastered 432Hz tuned instrumentals, continuous rotation',
     genre: 'Ambient / Instrumental',
-    category: 'VAULT STATIONS',
+    category: 'COSMIC CHILL',
     sku: 'MUS-432-01',
     drawer: 'MUSIC',
     badge: '432',
