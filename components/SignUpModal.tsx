@@ -95,6 +95,18 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
         .upsert({ id: userData.user.id, mailing_address: address, preferences })
         .then(null, () => {});
     }
+    // Best-effort lead event — sign-up has already succeeded above
+    // regardless of whether this call or its n8n forward succeeds.
+    // userData.user.email covers the magic-link path, where the email
+    // step (and its local `email` state) was skipped entirely.
+    const leadEmail = userData?.user?.email ?? email.trim();
+    if (leadEmail) {
+      fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: leadEmail, source: 'signup', address, preferences }),
+      }).catch(() => {});
+    }
     setLoading(false);
     setStep('done');
   };
