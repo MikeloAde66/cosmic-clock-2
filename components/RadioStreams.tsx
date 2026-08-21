@@ -338,7 +338,7 @@ export default function RadioStreams() {
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase">
-            Radio
+            Radio Central
           </h2>
           <div className="relative w-64">
             <Search className="absolute w-3.5 h-3.5 text-slate-500 left-2.5 top-2" />

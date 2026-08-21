@@ -1090,7 +1090,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       {/* Header Bar */}
       <div className="flex items-center justify-between min-h-[44px] gap-4">
         <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase whitespace-nowrap">
-          AUDIO & CONTENT PODS
+          STUDIO ONE
         </h2>
 
         {/* Reserved banner slot — dormant for now, activated later */}

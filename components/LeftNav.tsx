@@ -83,8 +83,8 @@ interface LeftNavProps {
 // Access field in the Preferences modal below, the only remaining way in.
 const NAV_ITEMS = [
   { key: 'aione', label: 'Home', Icon: Home },
-  { key: 'radio', label: 'Radio', Icon: RadioIcon },
-  { key: 'pods', label: 'Pods Studio', Icon: Mic },
+  { key: 'radio', label: 'Radio Central', Icon: RadioIcon },
+  { key: 'pods', label: 'Studio One', Icon: Mic },
 ];
 
 export default function LeftNav({

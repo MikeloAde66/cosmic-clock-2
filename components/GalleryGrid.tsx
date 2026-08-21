@@ -71,7 +71,7 @@ export default function GalleryGrid({ onOpenRadio, onOpenPods, onOpenKali, onWea
         <button onClick={onOpenRadio} className={cardClass}>
           <CardHeader Icon={RadioIcon} />
           <div className="mt-4">
-            <div className="text-sm font-bold text-white">Radio</div>
+            <div className="text-sm font-bold text-white">Radio Central</div>
             <p className="mt-1 text-xs text-slate-400">Live streaming stations, curated ambient/cosmic channels.</p>
           </div>
         </button>
@@ -79,7 +79,7 @@ export default function GalleryGrid({ onOpenRadio, onOpenPods, onOpenKali, onWea
         <button onClick={onOpenPods} className={cardClass}>
           <CardHeader Icon={Mic} />
           <div className="mt-4">
-            <div className="text-sm font-bold text-white">Pods Studio</div>
+            <div className="text-sm font-bold text-white">Studio One</div>
             <p className="mt-1 text-xs text-slate-400">Your track library, uploads, and playlists.</p>
           </div>
         </button>

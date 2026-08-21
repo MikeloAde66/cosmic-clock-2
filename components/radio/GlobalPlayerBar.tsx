@@ -31,7 +31,7 @@ export default function GlobalPlayerBar() {
         aria-label="Show radio player"
       >
         <RadioIcon className="w-3.5 h-3.5" />
-        <span className="text-[10px] font-mono uppercase tracking-wider">Radio</span>
+        <span className="text-[10px] font-mono uppercase tracking-wider">Radio Central</span>
       </button>
     );
   }
@@ -41,7 +41,7 @@ export default function GlobalPlayerBar() {
       <div className="relative z-10 flex items-center gap-2 px-2 py-2 border-t sm:gap-4 sm:px-4 shrink-0 bg-[#04060A] border-slate-800/80">
         <div className="flex items-center min-w-0 gap-2">
           <RadioIcon className="w-4 h-4 text-slate-500 shrink-0" />
-          <p className="text-xs text-slate-500 truncate">Radio — press play to start streaming</p>
+          <p className="text-xs text-slate-500 truncate">Radio Central — press play to start streaming</p>
         </div>
         <div className="flex-1" />
         <button
