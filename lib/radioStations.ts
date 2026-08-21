@@ -31,7 +31,15 @@ export type RadioStation = LiveRadioStation | VaultRadioStation;
 // (still real, still playable, nothing deleted) but with no matching
 // category here, they no longer get a dedicated tab — reachable only via
 // ALL CHANNELS, i.e. deprioritized rather than removed.
-export const CATEGORIES = ['ALL CHANNELS', 'LAUGHTER & FUN', 'HEARTY TALK', 'ANCIENT WISDOM', 'COSMIC CHILL'];
+//
+// HEARTY TALK was dropped too — it never had a real station (the one
+// candidate content for it, Gnostic/esoteric lore, has no working live
+// stream anywhere: zero Radio-Browser results for esoteric/metaphysical/
+// mystic tags, and the two specific URLs proposed for it — a Zeno.fm
+// mount and Ancient FM — were dead/CORS-blocked respectively when
+// verified). An empty tab isn't a real category; ANCIENT WISDOM already
+// covers this thematic ground with a real, verified station.
+export const CATEGORIES = ['ALL CHANNELS', 'LAUGHTER & FUN', 'ANCIENT WISDOM', 'COSMIC CHILL'];
 
 // Display-only relabeling — CATEGORIES' own values still drive filtering
 // (station.category === activeCategory) and every RadioStation's category
