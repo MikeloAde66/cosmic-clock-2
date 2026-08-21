@@ -1,5 +1,6 @@
 import dbConnect from '@/lib/dbConnect';
 import VaultProduct, { type VaultTrackSub } from '@/lib/models/VaultProduct';
+import AdminRadioStation from '@/lib/models/AdminRadioStation';
 import { getSupabaseAdmin, VAULT_BUCKET } from '@/lib/supabaseAdmin';
 import { RADIO_STATIONS } from '@/lib/radioStations';
 
@@ -62,6 +63,32 @@ export async function GET(request: Request) {
 
   const station = RADIO_STATIONS.find((s) => s.id === stationId);
   if (!station) {
+    // Program Manager-curated stations (see /api/admin/radio-stations) —
+    // resolved server-side from Mongo rather than trusting a client-
+    // supplied streamUrl, same integrity guarantee curated stations get.
+    if (stationId?.startsWith('admin-') && process.env.MONGODB_URI) {
+      try {
+        await dbConnect();
+        const doc = await AdminRadioStation.findById(stationId.slice('admin-'.length)).lean();
+        if (doc) {
+          const adminStation = {
+            kind: 'live' as const,
+            id: `admin-${doc._id}`,
+            name: doc.name,
+            network: doc.network,
+            tagline: doc.tagline,
+            genre: doc.genre,
+            category: doc.category,
+            streamUrl: doc.streamUrl,
+            badge: doc.badge,
+            badgeColor: doc.badgeColor,
+          };
+          return Response.json({ station: adminStation, kind: 'live', streamUrl: doc.streamUrl });
+        }
+      } catch (err) {
+        console.error('Admin radio station lookup error:', err);
+      }
+    }
     if (stationId && fallbackStreamUrl) {
       const adHocStation = {
         kind: 'live' as const,

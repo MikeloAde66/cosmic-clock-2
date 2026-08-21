@@ -117,6 +117,23 @@ export default function RadioStreams() {
   const browseMenuRef = useRef<HTMLDivElement | null>(null);
   const { station: playingStation, status, playStation, togglePlayPause } = useRadioPlayer();
 
+  // Program Manager-curated stations (see /api/admin/radio-stations) — a
+  // separate, DB-backed layer that renders alongside the hand-picked
+  // RADIO_STATIONS list below, not a replacement for it.
+  const [adminStations, setAdminStations] = useState<LiveRadioStation[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/admin/radio-stations')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && Array.isArray(data.stations)) setAdminStations(data.stations);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Live global search (Radio-Browser) — separate from the plain
   // client-side name/tagline filter on the curated RADIO_STATIONS list
   // below, which stays exactly as it worked before. Debounced so this
@@ -320,7 +337,7 @@ export default function RadioStreams() {
 
   const query = searchQuery.trim().toLowerCase();
 
-  const filteredStations = RADIO_STATIONS.filter((s) => {
+  const filteredStations = [...RADIO_STATIONS, ...adminStations].filter((s) => {
     const matchesCategory = activeCategory === 'ALL CHANNELS' || s.category === activeCategory;
     const matchesSearch =
       !query || s.name.toLowerCase().includes(query) || s.tagline.toLowerCase().includes(query);
