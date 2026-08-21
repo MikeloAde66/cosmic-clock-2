@@ -190,13 +190,18 @@ body {
    LAYER 2: translucent shadow projection + acute 3D tilt.
    Locked to a single static image (shadow-milkyway.png) — no rotation, no
    crossfade, no timer. Was a 3-image rotation; that JS interval was removed
-   from AiOneHome entirely per the single-image-lock request.
+   from AiOneHome entirely per the single-image-lock request. The image
+   itself later got a slow cinematic pulse/zoom (see .cinematic-pulse
+   below) — a deliberate, explicit reversal of "no animation at all" on
+   this layer, not a regression of the single-image lock, which still
+   holds (still shadow-milkyway.png, still no rotation/crossfade/timer).
    ------------------------------------------ */
 .home-page .shadow-slideshow-container {
   position: absolute;
   inset: 0;
   z-index: 20;
   pointer-events: none;
+  overflow: hidden; /* clips .shadow-slide's cinematic-pulse scale(1.03) peak so it never spills past this container's edges */
   transform: rotateX(3deg) rotateY(-2deg) translateZ(0px);
   transform-style: preserve-3d;
 }
@@ -210,6 +215,21 @@ body {
   /* Full native strength, no blend mode/filter — renders the source PNG's
      own color/contrast/sharpness directly. */
   opacity: 0.95;
+  animation: cinematicPulse 24s ease-in-out infinite;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+@keyframes cinematicPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03); /* subtle zoom inward toward viewer */
+  }
+  100% {
+    transform: scale(1); /* slow recession back away */
+  }
 }
 
 /* ------------------------------------------
