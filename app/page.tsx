@@ -294,7 +294,7 @@ useContextMenuShare();
                 }}
                 onOpenKali={() => {
                   changeLayoutMode('hub');
-                  goToGroundZero();
+                  openHomeView('kali');
                 }}
                 onWeatherClick={weather.toggleSearch}
                 weatherActive={weather.weatherActive}
