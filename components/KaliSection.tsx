@@ -21,7 +21,10 @@ export default function KaliSection() {
     <div className="relative z-30 flex flex-col w-full h-full min-h-0 p-4">
       <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-b from-transparent via-black/55 to-black/95" />
 
-      <div className="relative z-10 flex flex-col flex-1 min-h-0">
+      {/* max-w-5xl mx-auto matches Radio Central's own container so Kali
+          aligns the same way — the full-bleed gradient vignette above
+          stays edge-to-edge; only the actual content is constrained. */}
+      <div className="relative z-10 flex flex-col flex-1 w-full max-w-5xl min-h-0 mx-auto">
         <div className="shrink-0">
           <span className="text-[10px] font-mono tracking-widest text-cyan-400/80 uppercase">Current Epoch</span>
           <div className="flex items-center justify-between gap-2">

@@ -50,8 +50,9 @@ export default function GalleryGrid({ onOpenRadio, onOpenPods, onOpenKali, onWea
 
   return (
     <div className="w-full h-full overflow-y-auto">
-      {/* Hero */}
-      <div className="flex flex-col items-center justify-center gap-2 px-4 pt-14 pb-10 text-center">
+      {/* Hero — max-w-5xl mx-auto matches the card grid below so both
+          align at the same edges instead of the banner bleeding wider. */}
+      <div className="flex flex-col items-center justify-center max-w-5xl gap-2 px-4 pt-14 pb-10 mx-auto text-center">
         <h1
           className="text-4xl text-white md:text-5xl"
           style={{
