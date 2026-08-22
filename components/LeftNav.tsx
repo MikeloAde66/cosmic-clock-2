@@ -274,7 +274,10 @@ export default function LeftNav({
           </button>
 
           <button
-            onClick={() => handleHomeViewClick('kali')}
+            onClick={() => {
+              setIsDrawerOpen(false);
+              onGroundZero?.();
+            }}
             className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-white hover:bg-neutral-900/50"
           >
             <Sparkles className="w-4 h-4 shrink-0 animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
@@ -432,7 +435,7 @@ export default function LeftNav({
 
             <div className="relative group">
               <button
-                onClick={() => onOpenHomeView?.('kali')}
+                onClick={() => onGroundZero?.()}
                 aria-label="Ai"
                 className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-white hover:bg-neutral-900/50"
               >
