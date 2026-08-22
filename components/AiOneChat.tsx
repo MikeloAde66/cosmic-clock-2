@@ -1,7 +1,22 @@
 'use client';
 
 import React, { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { Download, History as HistoryIcon, Image as ImageIcon, Mic, MicOff, Plus, SquarePen, Volume2, VolumeX, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import {
+  Download,
+  History as HistoryIcon,
+  Image as ImageIcon,
+  Maximize2,
+  Mic,
+  MicOff,
+  Minimize2,
+  Plus,
+  Printer,
+  SquarePen,
+  Volume2,
+  VolumeX,
+  X,
+} from 'lucide-react';
 import { useSpeechToText } from './useSpeechToText';
 import AiOneMessageContent from './AiOneMessageContent';
 import ChatHistoryPanel from './ChatHistoryPanel';
@@ -62,6 +77,11 @@ export default function AiOneChat() {
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [mode, setMode] = useState<DiscoveryMode>('synthesis');
   const [isStreaming, setIsStreaming] = useState(false);
+  // Maximize toggle — fixed-position overlay over whatever this is mounted
+  // inside (KaliOracleView's side columns are only 260px, too narrow for
+  // comfortably reading long replies), rather than a layout change that
+  // would need every parent container to cooperate.
+  const [isExpanded, setIsExpanded] = useState(false);
   const [error, setError] = useState('');
   const [view, setView] = useState<WidgetView>('chat');
   // Index of the message currently being read aloud via window.speechSynthesis
@@ -174,12 +194,42 @@ export default function AiOneChat() {
     downloadMarkdown(md, `ai-one-${threadIdRef.current}.md`);
   };
 
+  // Prints just the transcript in a clean, minimal document — not
+  // window.print() on the live page, which would try to print the 3D
+  // canvas/starfield/HUD chrome this is embedded in along with it. Reuses
+  // the exact same real transcript text as the Download/export button
+  // (threadToMarkdown), just rendered as plain preformatted text rather
+  // than downloaded as a .md file.
+  const printCurrentThread = () => {
+    const title = deriveTitle(messages);
+    const md = threadToMarkdown({ title, createdAt: createdAtRef.current, messages });
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<title>${title}</title>
+<meta charset="utf-8" />
+<style>
+  body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap;
+         max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #111; }
+  h1 { font-size: 1.1rem; }
+</style>
+</head>
+<body>${md.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</body>
+</html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onload = () => printWindow.print();
+  };
+
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
     const text = input.trim();
     if ((!text && attachedFiles.length === 0) || isStreaming) return;
 
     setError('');
+    setIsExpanded(true); // auto-expand into the full reading view the moment a reply starts generating
 
     // What actually shows in the transcript vs. what's sent to the model —
     // normally identical, but /wiki keeps the visible bubble as the raw
@@ -281,24 +331,56 @@ export default function AiOneChat() {
     return <ChatImagesPanel onBack={() => setView('chat')} />;
   }
 
-  return (
-    <div className="flex flex-col h-full min-h-[220px]">
+  // display: contents when not expanded means this wrapper is invisible to
+  // layout — every parent that already embeds AiOneChat keeps working
+  // exactly as before. When expanded, it becomes a real fixed overlay so
+  // the panel gets real screen height/width regardless of how narrow its
+  // normal host container is (e.g. KaliOracleView's 260px side columns).
+  const chatPanel = (
+    <div
+      className={
+        isExpanded
+          ? 'flex flex-col w-full max-w-4xl h-[85vh] p-4 border shadow-2xl rounded-xl bg-[#0a0a0c] border-slate-800'
+          : 'flex flex-col h-full min-h-[220px]'
+      }
+    >
       <div className="flex items-center justify-between gap-1 pb-2 shrink-0">
-        <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value as DiscoveryMode)}
-          title={translate('kali.tooltip.reasoningMode', language)}
-          className="px-2 py-1 text-[9px] font-mono uppercase tracking-wider bg-black/40 border rounded border-slate-700 text-slate-200 focus:outline-none focus:border-white/50"
-        >
-          {MODE_KEYS.map((key) => {
-            const t = MODE_TRANSLATION_KEYS[key];
-            return (
-              <option key={key} value={key} title={translate(t.title, language)}>
-                {translate(t.label, language)}
-              </option>
-            );
-          })}
-        </select>
+        <div className="flex items-center gap-1">
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value as DiscoveryMode)}
+            title={translate('kali.tooltip.reasoningMode', language)}
+            className="px-2 py-1 text-[9px] font-mono uppercase tracking-wider bg-black/40 border rounded border-slate-700 text-slate-200 focus:outline-none focus:border-white/50"
+          >
+            {MODE_KEYS.map((key) => {
+              const t = MODE_TRANSLATION_KEYS[key];
+              return (
+                <option key={key} value={key} title={translate(t.title, language)}>
+                  {translate(t.label, language)}
+                </option>
+              );
+            })}
+          </select>
+          {isExpanded ? (
+            <button
+              type="button"
+              onClick={() => setIsExpanded(false)}
+              className="flex items-center gap-1 px-2 py-1 text-[9px] font-mono font-bold uppercase tracking-wide transition rounded text-slate-300 hover:text-white hover:bg-slate-800"
+            >
+              <Minimize2 className="w-3 h-3" />
+              Back to Kali
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsExpanded(true)}
+              title="Expand for easier reading"
+              className="flex items-center justify-center w-6 h-6 transition rounded text-slate-400 hover:text-white hover:bg-slate-800"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
 
         <div className="flex items-center gap-0.5">
           <button
@@ -332,6 +414,14 @@ export default function AiOneChat() {
             className="flex items-center justify-center w-6 h-6 transition rounded text-slate-400 hover:text-white hover:bg-slate-800"
           >
             <Download className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={printCurrentThread}
+            title="Print transcript"
+            className="flex items-center justify-center w-6 h-6 transition rounded text-slate-400 hover:text-white hover:bg-slate-800"
+          >
+            <Printer className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -456,4 +546,22 @@ export default function AiOneChat() {
       </form>
     </div>
   );
+
+  // Portal to document.body when expanded — CosmicCanvas's 3D-transformed
+  // layers create a new containing block for position:fixed descendants
+  // (a documented CSS behavior: a transformed ancestor makes fixed
+  // children position relative to it, not the viewport), which made a
+  // plain fixed overlay render underneath the real app header instead of
+  // above it. Escaping to a portal sidesteps that entirely. Not expanded:
+  // render inline exactly as before, no portal, no behavior change.
+  if (isExpanded && typeof document !== 'undefined') {
+    return createPortal(
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm sm:p-6">
+        {chatPanel}
+      </div>,
+      document.body
+    );
+  }
+
+  return chatPanel;
 }
