@@ -26,7 +26,7 @@ import FactChecker from '@/components/FactChecker';
 import PodsModule from '@/components/PodsModule';
 import CosmicVaultAuth from '@/components/CosmicVaultAuth';
 import AiOneHome from '@/components/AiOneHome';
-import RadioStreams from '@/components/RadioStreams';
+import RadioCentralConsoleView from '@/components/radio/RadioCentralConsoleView';
 import SiteFooter from '@/components/SiteFooter';
 import ISSFeedModal from '@/components/ISSFeedModal';
 import StarTrackerView from '@/components/StarTrackerView';
@@ -246,7 +246,7 @@ useContextMenuShare();
               yet. */}
           {layoutMode === 'hub' && (
             <div className="relative flex-1 overflow-hidden">
-              {activeTab === 'radio' && <RadioStreams />}
+              {activeTab === 'radio' && <RadioCentralConsoleView />}
 
               {activeTab === 'vault' && (
                 <CosmicVaultAuth
@@ -336,7 +336,7 @@ useContextMenuShare();
               </div>
               <div id="stack-section-radio" className="w-full min-h-full border-t border-slate-800/80">
                 <Reveal className="w-full h-full">
-                  <RadioStreams />
+                  <RadioCentralConsoleView />
                 </Reveal>
               </div>
               <div id="stack-section-pods" className="w-full min-h-full border-t border-slate-800/80">

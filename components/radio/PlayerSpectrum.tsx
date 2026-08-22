@@ -5,6 +5,10 @@ import { useEffect, useRef } from 'react';
 interface PlayerSpectrumProps {
   analyserRef: React.RefObject<AnalyserNode | null>;
   isPlaying: boolean;
+  // Defaults match the original compact player-bar sizing exactly — both
+  // optional so the existing GlobalPlayerBar usage is unaffected.
+  width?: number;
+  height?: number;
 }
 
 // Compact bar-graph visualizer for the player bar — reads live frequency
@@ -12,7 +16,7 @@ interface PlayerSpectrumProps {
 // (see ensureAnalyser there). Renders a flat/empty canvas whenever there's
 // no analyser yet or nothing playing, rather than an error — this is a
 // decorative element, not one that should ever block the player bar.
-export default function PlayerSpectrum({ analyserRef, isPlaying }: PlayerSpectrumProps) {
+export default function PlayerSpectrum({ analyserRef, isPlaying, width = 72, height = 20 }: PlayerSpectrumProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -55,5 +59,5 @@ export default function PlayerSpectrum({ analyserRef, isPlaying }: PlayerSpectru
     return () => cancelAnimationFrame(animationId);
   }, [analyserRef, isPlaying]);
 
-  return <canvas ref={canvasRef} width={72} height={20} className="opacity-70 pointer-events-none shrink-0" />;
+  return <canvas ref={canvasRef} width={width} height={height} className="opacity-70 pointer-events-none shrink-0" />;
 }
