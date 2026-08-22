@@ -38,6 +38,12 @@ interface RadioPlayerContextValue {
   // directly (cross-origin YouTube iframes), so they can still cede
   // priority to the radio the same way any native <video>/<audio> does.
   pauseForExternalMedia: () => void;
+  // Program Manager — the toggle-gated 24-hour automated broadcast clock.
+  // Off by default; activeProgramLabel names the current block/override
+  // (e.g. "Ai OneKast", "BBC World Service") while enabled, null while off.
+  programManagerEnabled: boolean;
+  activeProgramLabel: string | null;
+  toggleProgramManager: () => void;
 }
 
 const RadioPlayerContext = createContext<RadioPlayerContextValue | null>(null);
@@ -239,6 +245,134 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     audioRef.current?.pause();
   }, []);
 
+  // Program Manager — a toggle-gated 24-hour automated broadcast clock,
+  // built entirely from real stations already in RADIO_STATIONS (curated
+  // live streams + the real Vault-backed 432Hz music station, branded here
+  // as "Ai OneKast"). OFF by default; toggling it ON is itself the
+  // explicit user gesture that authorizes it to immediately tune to
+  // whatever block covers the current time — the same as turning on a
+  // real radio and getting whatever's currently airing, not unsolicited
+  // autoplay. Toggling it OFF just stops auto-switching; it doesn't stop
+  // whatever's currently playing.
+  //
+  // Two disclosed simplifications, since the literal spec isn't fully
+  // buildable: the 2:39-4pm "Comedy & Weather" block runs Comedy only —
+  // there's no text-to-speech or audio weather content anywhere in this
+  // app, only the visual NOAA widget. And 11pm/1am aren't real replays of
+  // the 4pm/7pm segments (that would require actually recording those
+  // live streams, which doesn't exist) — they're just BBC/NPR live again.
+  const PROGRAM_BLOCKS: { startMinutes: number; endMinutes: number; label: string; stationId: string }[] = [
+    { startMinutes: 2 * 60, endMinutes: 4 * 60, label: 'History Channel', stationId: 'rb-historyradio' },
+    { startMinutes: 5 * 60, endMinutes: 8 * 60, label: 'Comedy Skits Block', stationId: 'rb-977-comedy' },
+    { startMinutes: 8 * 60 + 5, endMinutes: 10 * 60 + 35, label: '.977 Jazz Stream', stationId: 'rb-977-smoothjazz' },
+    { startMinutes: 10 * 60 + 36, endMinutes: 12 * 60 + 36, label: 'Ai OneKast', stationId: 'vault-432hz' },
+    { startMinutes: 12 * 60 + 37, endMinutes: 14 * 60 + 37, label: 'BBC News & World Culture', stationId: 'bbc-world' },
+    { startMinutes: 14 * 60 + 39, endMinutes: 16 * 60, label: 'Comedy Block', stationId: 'rb-977-comedy' },
+  ];
+  // Gaps between the blocks above (and overnight, 4-5am/1:15-2am) default
+  // to Ai OneKast — a reasonable fallback rotation, not something the
+  // schedule itself specified.
+  const DEFAULT_BLOCK_STATION_ID = 'vault-432hz';
+
+  const NEWS_OVERRIDES: { startMinutes: number; stationId: 'bbc-world' | 'npr-news' }[] = [
+    { startMinutes: 16 * 60, stationId: 'bbc-world' }, // 4:00pm
+    { startMinutes: 19 * 60, stationId: 'npr-news' }, // 7:00pm
+    { startMinutes: 23 * 60, stationId: 'bbc-world' }, // 11:00pm
+    { startMinutes: 25 * 60, stationId: 'npr-news' }, // 1:00am (next day)
+  ];
+  const NEWS_OVERRIDE_MINUTES = 15;
+
+  const [programManagerEnabled, setProgramManagerEnabled] = useState(false);
+  const [activeProgramLabel, setActiveProgramLabel] = useState<string | null>(null);
+  const lastTriggeredOverrideRef = useRef<string | null>(null);
+  // Non-null while a news override's 15-minute window is running — this is
+  // the single source of truth for "are we mid-override", checked first on
+  // every tick so the base block schedule can never interrupt a news
+  // broadcast partway through (a real bug in an earlier draft: matching
+  // only the exact starting minute meant the very next 30s tick fell
+  // through to block-matching and instantly cut the news off).
+  const overrideReturnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAppliedBlockStationIdRef = useRef<string | null>(null);
+
+  const findStation = useCallback(
+    (id: string) => RADIO_STATIONS.find((s) => s.id === id) ?? null,
+    []
+  );
+
+  const evaluateProgramManager = useCallback(() => {
+    if (overrideReturnTimerRef.current) return; // mid-override — wait for its own return timer
+
+    const now = new Date();
+    const minutesNow = now.getHours() * 60 + now.getMinutes();
+    // Also matches the +24h form so "1am" (minutesNow=60) matches the
+    // 25*60 slot the same way "11pm today" does, without needing a
+    // separate wraparound-day branch.
+    const overrideSlot = NEWS_OVERRIDES.find(
+      (o) => o.startMinutes === minutesNow || o.startMinutes === minutesNow + 24 * 60
+    );
+
+    if (overrideSlot) {
+      const overrideKey = `${now.toDateString()} ${overrideSlot.startMinutes}`;
+      if (lastTriggeredOverrideRef.current === overrideKey) return; // already ran this exact slot
+      lastTriggeredOverrideRef.current = overrideKey;
+
+      const newsStation = findStation(overrideSlot.stationId);
+      if (newsStation) {
+        playStation(newsStation);
+        setActiveProgramLabel(newsStation.name);
+      }
+      overrideReturnTimerRef.current = setTimeout(() => {
+        overrideReturnTimerRef.current = null;
+        evaluateProgramManagerRef.current?.(); // re-evaluate fresh — the base block may have changed in the meantime
+      }, NEWS_OVERRIDE_MINUTES * 60 * 1000);
+      return;
+    }
+
+    const block = PROGRAM_BLOCKS.find((b) => minutesNow >= b.startMinutes && minutesNow < b.endMinutes);
+    const targetStationId = block?.stationId ?? DEFAULT_BLOCK_STATION_ID;
+    const targetLabel = block?.label ?? 'Ai OneKast';
+
+    if (lastAppliedBlockStationIdRef.current !== targetStationId) {
+      lastAppliedBlockStationIdRef.current = targetStationId;
+      const targetStation = findStation(targetStationId);
+      if (targetStation) {
+        playStation(targetStation);
+        setActiveProgramLabel(targetLabel);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findStation, playStation]);
+
+  // A ref mirror so the override-return setTimeout above always calls the
+  // latest evaluateProgramManager (which closes over current refs/state)
+  // without needing to be a dependency of its own setTimeout closure.
+  const evaluateProgramManagerRef = useRef(evaluateProgramManager);
+  useEffect(() => {
+    evaluateProgramManagerRef.current = evaluateProgramManager;
+  }, [evaluateProgramManager]);
+
+  const toggleProgramManager = useCallback(() => {
+    setProgramManagerEnabled((prev) => {
+      const next = !prev;
+      if (!next) {
+        // Turning off: stop auto-switching, but don't touch what's
+        // already playing.
+        if (overrideReturnTimerRef.current) clearTimeout(overrideReturnTimerRef.current);
+        overrideReturnTimerRef.current = null;
+        setActiveProgramLabel(null);
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!programManagerEnabled) return;
+    lastAppliedBlockStationIdRef.current = null; // force an immediate re-evaluation on enable
+    evaluateProgramManagerRef.current();
+    const interval = setInterval(() => evaluateProgramManagerRef.current(), 30 * 1000);
+    return () => clearInterval(interval);
+  }, [programManagerEnabled]);
+
   // Global audio priority: any other <video>/<audio> element starting
   // playback anywhere in the app takes priority over the radio. The
   // 'play' event doesn't bubble, but a capture-phase listener on document
@@ -285,6 +419,9 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
         setVolume,
         stop,
         pauseForExternalMedia,
+        programManagerEnabled,
+        activeProgramLabel,
+        toggleProgramManager,
       }}
     >
       {/* crossOrigin lets createMediaElementSource read real frequency data
