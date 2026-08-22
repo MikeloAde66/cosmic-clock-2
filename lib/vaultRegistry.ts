@@ -20,7 +20,11 @@ export type VaultDrawer =
   // ProductsStorefront (its own catalog, cart, and checkout/fulfillment
   // path, unchanged) inside the Vault shell — see CosmicVaultAuth's
   // selectedCategory === 'MERCH' branch.
-  | 'MERCH';
+  | 'MERCH'
+  // Same non-track-pack pattern as MERCH — renders a ticket form + a
+  // lightweight support assistant instead of the track-pack grid. See
+  // CosmicVaultAuth's selectedCategory === 'SUPPORT' branch.
+  | 'SUPPORT';
 
 export const VAULT_DRAWERS: VaultDrawer[] = [
   'ADMIN',
@@ -34,6 +38,7 @@ export const VAULT_DRAWERS: VaultDrawer[] = [
   'PLANNERS',
   'PHOTOS',
   'MERCH',
+  'SUPPORT',
 ];
 
 export interface VaultTrack {

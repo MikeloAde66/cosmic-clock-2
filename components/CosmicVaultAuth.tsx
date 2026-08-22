@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Key, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import ProductsStorefront from './ProductsStorefront';
+import VaultSupportDrawer from './VaultSupportDrawer';
 import { uploadFilesDirectToStorage } from '@/lib/vaultDirectUpload';
 import { getRoleKeys, matchRole, regenerateRoleKey, type VaultRole } from '@/lib/vaultRoleKeys';
 import {
@@ -929,7 +930,7 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
               >
                 ALL DRAWERS
               </button>
-              {VAULT_DRAWERS.map((drawer) => (
+              {VAULT_DRAWERS.filter((drawer) => drawer !== 'ADMIN' || isAdmin).map((drawer) => (
                 <button
                   key={drawer}
                   onClick={() => setSelectedCategory(drawer)}
@@ -952,6 +953,9 @@ export default function CosmicVaultAuth({ initialDrawer, initialRoleKey }: Cosmi
               <div className="-mx-6 border rounded-xl border-slate-800 overflow-hidden">
                 <ProductsStorefront />
               </div>
+            ) : selectedCategory === 'SUPPORT' ? (
+              // Same non-track-pack pattern as MERCH — see VaultSupportDrawer.
+              <VaultSupportDrawer />
             ) : isLoadingInventory ? (
               <p className="font-mono text-xs text-slate-500">Loading inventory…</p>
             ) : visibleProducts.length === 0 ? (
