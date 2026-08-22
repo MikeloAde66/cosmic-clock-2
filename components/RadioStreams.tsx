@@ -337,8 +337,13 @@ export default function RadioStreams() {
 
   const query = searchQuery.trim().toLowerCase();
 
-  const filteredStations = [...RADIO_STATIONS, ...adminStations].filter((s) => {
-    const matchesCategory = activeCategory === 'ALL CHANNELS' || s.category === activeCategory;
+  // ALL CHANNELS is the default landing view, not a literal "show every
+  // station" filter — NEWS stays one click (or one dropdown pick) away
+  // rather than crowding the ambient/history/comedy front door. See
+  // lib/radioStations.ts's CATEGORIES comment for the reasoning.
+  const allStations = [...RADIO_STATIONS, ...adminStations];
+  const filteredStations = allStations.filter((s) => {
+    const matchesCategory = activeCategory === 'ALL CHANNELS' ? s.category !== 'NEWS' : s.category === activeCategory;
     const matchesSearch =
       !query || s.name.toLowerCase().includes(query) || s.tagline.toLowerCase().includes(query);
     return matchesCategory && matchesSearch;
@@ -370,7 +375,37 @@ export default function RadioStreams() {
         </div>
 
         <div className="flex gap-2 pb-2 overflow-x-auto border-b border-slate-800">
-          {CATEGORIES.map((cat) => (
+          {/* ALL CHANNELS — a quick-jump selector as well as the default-
+              view filter: picking a station here tunes in immediately
+              (via the same handleTuneIn every station card uses below);
+              the placeholder option re-applies the default filtered view.
+              Always controlled back to "" so it never visually sticks on
+              the last station picked, unlike a plain uncontrolled select. */}
+          <select
+            value=""
+            onChange={(e) => {
+              if (!e.target.value) {
+                setActiveCategory('ALL CHANNELS');
+                return;
+              }
+              const station = allStations.find((s) => s.id === e.target.value);
+              if (station) handleTuneIn(station);
+            }}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-mono uppercase tracking-wide transition whitespace-nowrap border outline-none ${
+              activeCategory === 'ALL CHANNELS'
+                ? 'bg-white/20 text-white border-neutral-700'
+                : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:border-slate-700'
+            }`}
+          >
+            <option value="">ALL CHANNELS ▾</option>
+            {allStations.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} — {s.category}
+              </option>
+            ))}
+          </select>
+
+          {CATEGORIES.filter((cat) => cat !== 'ALL CHANNELS').map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}

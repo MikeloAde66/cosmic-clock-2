@@ -25,12 +25,11 @@ export interface VaultRadioStation extends BaseStation {
 
 export type RadioStation = LiveRadioStation | VaultRadioStation;
 
-// Radio Hub is a relaxation/entertainment sanctuary, not a news dashboard —
-// hard-news categories (the old CURRENT AFFAIRS tab) were dropped from this
-// list entirely per that direction. BBC/NPR stay in RADIO_STATIONS below
-// (still real, still playable, nothing deleted) but with no matching
-// category here, they no longer get a dedicated tab — reachable only via
-// ALL CHANNELS, i.e. deprioritized rather than removed.
+// News (BBC/NPR) gets its own dedicated NEWS tab, but ALL CHANNELS' default
+// view still deliberately excludes it — Radio Central opens on the
+// ambient/history/comedy/custom vault streams first, keeping the original
+// relaxation-sanctuary feel as the front door; NEWS is one click away, not
+// gone. See RadioStreams.tsx's activeCategory filter for the actual logic.
 //
 // HEARTY TALK was dropped too — it never had a real station (the one
 // candidate content for it, Gnostic/esoteric lore, has no working live
@@ -39,7 +38,7 @@ export type RadioStation = LiveRadioStation | VaultRadioStation;
 // mount and Ancient FM — were dead/CORS-blocked respectively when
 // verified). An empty tab isn't a real category; ANCIENT WISDOM already
 // covers this thematic ground with a real, verified station.
-export const CATEGORIES = ['ALL CHANNELS', 'LAUGHTER & FUN', 'ANCIENT WISDOM', 'COSMIC CHILL'];
+export const CATEGORIES = ['ALL CHANNELS', 'NEWS', 'LAUGHTER & FUN', 'ANCIENT WISDOM', 'COSMIC CHILL'];
 
 // Display-only relabeling — CATEGORIES' own values still drive filtering
 // (station.category === activeCategory) and every RadioStation's category
@@ -88,7 +87,7 @@ export const RADIO_STATIONS: RadioStation[] = [
     network: 'BBC',
     tagline: 'Global News & Analysis',
     genre: 'News / Current Affairs',
-    category: 'CURRENT AFFAIRS',
+    category: 'NEWS',
     streamUrl: 'https://stream.live.vc.bbcmedia.co.uk/bbc_world_service',
     badge: 'BBC',
     badgeColor: '#bb1919',
@@ -100,7 +99,7 @@ export const RADIO_STATIONS: RadioStation[] = [
     network: 'NPR',
     tagline: 'National Public Radio Live',
     genre: 'Public Radio / Talk',
-    category: 'CURRENT AFFAIRS',
+    category: 'NEWS',
     streamUrl: 'https://npr-ice.streamguys1.com/live.mp3',
     badge: 'NPR',
     badgeColor: '#1b3668',

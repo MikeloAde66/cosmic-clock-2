@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
-import type { RadioStation } from '@/lib/radioStations';
+import { RADIO_STATIONS, type RadioStation } from '@/lib/radioStations';
 
 export interface QueueTrack {
   queueIndex: number;
@@ -120,6 +120,24 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(1);
+
+  // Primes .977 Comedy into the persistent bottom bar on load — its name
+  // and preloaded audio src are ready the instant the app opens, so the
+  // very first Play click is instant. Deliberately does NOT call .play()
+  // here: real autoplay-with-sound with no prior user gesture is blocked
+  // by every major browser, and forcing it would either silently fail or
+  // surface as a false "error" badge on a station that's actually fine —
+  // see ensureAnalyser's own comment above for the same user-gesture
+  // constraint. A real Play click (already wired in GlobalPlayerBar)
+  // starts it for real.
+  useEffect(() => {
+    const defaultStation = RADIO_STATIONS.find((s) => s.id === 'rb-977-comedy');
+    if (defaultStation?.kind === 'live') {
+      setStation(defaultStation);
+      setAudioSource(defaultStation.streamUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const playIndex = useCallback((index: number) => {
     const track = queueRef.current[index];
