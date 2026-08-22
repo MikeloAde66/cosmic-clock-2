@@ -7,7 +7,7 @@ import TopHeader from '@/components/TopHeader';
 import LeftNav from '@/components/LeftNav';
 import type { LayoutMode } from '@/components/LayoutModeToggle';
 import GalleryGrid from '@/components/GalleryGrid';
-import KaliSection from '@/components/KaliSection';
+import KaliOracleView from '@/components/KaliOracleView';
 import ProductsSection from '@/components/ProductsSection';
 import TenForwardSection from '@/components/TenForwardSection';
 import Reveal from '@/components/Reveal';
@@ -351,7 +351,7 @@ useContextMenuShare();
               </div>
               <div id="stack-section-kali" className="w-full min-h-full border-t border-slate-800/80">
                 <Reveal className="w-full h-full">
-                  <KaliSection />
+                  <KaliOracleView />
                 </Reveal>
               </div>
               <div id="stack-section-tenforward" className="w-full min-h-full border-t border-slate-800/80">

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import NoaaWidget from './NoaaWidget';
-import KaliSection from './KaliSection';
+import KaliOracleView from './KaliOracleView';
 import { useGeolocation } from '@/lib/useGeolocation';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
@@ -200,7 +200,7 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
       {/* Kali — extracted into its own component (KaliSection.tsx) so the
           Continuous Stack layout can also mount it as a standalone section;
           this is the exact same component, unchanged here. */}
-      {activeView === 'kali' && <KaliSection />}
+      {activeView === 'kali' && <KaliOracleView />}
 
       <style jsx>{`
         @keyframes cinematicDrift {
