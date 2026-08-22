@@ -93,33 +93,24 @@ export default function ProductGatePage() {
       </div>
 
       <div className="relative z-10 max-w-5xl px-6 pb-24 mx-auto space-y-24">
-        {/* Hero — a moonrise-over-mountains mood built from CSS (radial
-            glow + a clipped silhouette) plus the app's own real Starfield,
-            not a stock/generated photo. */}
-        <div className="relative -mx-6 md:mx-0 h-[420px] overflow-hidden rounded-2xl border border-slate-800 flex flex-col items-center pt-16">
-          <Starfield contained starCount={180} />
-          {/* Crescent moon accent — a small circle with an offset shadow
-              circle cut into it, not an image asset. */}
+        {/* Hero — real artwork background (cropped to pure scenery, no
+            text baked in) plus the app's own real Starfield for extra
+            depth, with the real headline/button as HTML on top. */}
+        <div
+          className="relative -mx-6 md:mx-0 h-[420px] overflow-hidden rounded-2xl border border-slate-800 flex flex-col items-center pt-16 bg-[#0a0a0c]"
+          style={{
+            backgroundImage: 'url(/images/aione-landing-bg.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center 70%',
+          }}
+        >
+          <Starfield contained starCount={90} />
+          {/* Vignette for text legibility over the bright planet glow. */}
           <div
-            className="absolute w-10 h-10 rounded-full pointer-events-none left-[18%] top-[22%]"
+            className="absolute inset-0 pointer-events-none"
             style={{
-              background: '#e2e8f0',
-              boxShadow: 'inset 6px -3px 0 3px #0a0a0c, 0 0 16px rgba(226,232,240,0.4)',
-            }}
-          />
-          <div
-            className="absolute left-1/2 bottom-0 w-[130%] aspect-square rounded-full pointer-events-none"
-            style={{
-              transform: 'translate(-50%, 58%)',
               background:
-                'radial-gradient(circle at 50% 30%, rgba(226,232,240,0.28) 0%, rgba(129,140,248,0.16) 35%, transparent 70%)',
-            }}
-          />
-          <div
-            className="absolute inset-x-0 bottom-0 h-20 bg-[#0a0a0c] pointer-events-none"
-            style={{
-              clipPath:
-                'polygon(0% 100%, 0% 65%, 9% 78%, 20% 45%, 33% 70%, 47% 32%, 59% 74%, 73% 48%, 87% 68%, 100% 58%, 100% 100%)',
+                'radial-gradient(ellipse 70% 60% at 50% 30%, rgba(10,10,12,0.55) 0%, transparent 55%), linear-gradient(to bottom, rgba(10,10,12,0.35) 0%, transparent 30%)',
             }}
           />
           <div className="relative z-10 max-w-xl px-6 space-y-6 text-center">
