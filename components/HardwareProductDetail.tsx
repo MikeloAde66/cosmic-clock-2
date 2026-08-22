@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Play } from 'lucide-react';
 import Starfield from '@/components/Starfield';
 import ProductTelemetryDemo from '@/components/ProductTelemetryDemo';
 import type { HardwareProduct } from '@/lib/hardwareProducts';
@@ -13,6 +13,8 @@ function formatPrice(cents: number) {
 }
 
 export default function HardwareProductDetail({ product }: { product: HardwareProduct }) {
+  const [videoRequested, setVideoRequested] = useState(false);
+
   return (
     <div className="relative w-full min-h-screen overflow-hidden bg-[#0a0a0c] text-slate-100">
       <Starfield />
@@ -29,15 +31,37 @@ export default function HardwareProductDetail({ product }: { product: HardwarePr
         <div className="grid gap-8 md:grid-cols-2 md:items-center">
           <div className="relative w-full h-80 overflow-hidden border rounded-xl border-slate-800 bg-[#0B0E14]">
             {product.videoSrc ? (
-              <video
-                src={product.videoSrc}
-                poster={product.heroImageSrc}
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="absolute inset-0 object-contain w-full h-full"
-              />
+              videoRequested ? (
+                <video
+                  src={product.videoSrc}
+                  poster={product.heroImageSrc}
+                  controls
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 object-contain w-full h-full"
+                />
+              ) : (
+                <button
+                  onClick={() => setVideoRequested(true)}
+                  aria-label={`Play ${product.brandedTitle} preview video`}
+                  className="absolute inset-0 w-full h-full group"
+                >
+                  <Image
+                    src={product.heroImageSrc}
+                    alt={product.heroTagline}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-contain"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center transition-colors bg-black/20 group-hover:bg-black/35">
+                    <span className="flex items-center justify-center border rounded-full w-14 h-14 bg-white/90 border-white/20 shadow-lg group-hover:bg-white">
+                      <Play className="w-5 h-5 ml-0.5 text-black" fill="currentColor" />
+                    </span>
+                  </div>
+                </button>
+              )
             ) : (
               <Image src={product.heroImageSrc} alt={product.heroTagline} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-contain" />
             )}

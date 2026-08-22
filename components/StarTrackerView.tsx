@@ -26,7 +26,7 @@ import TelescopeConnectPanel from './telescope/TelescopeConnectPanel';
 // The same real NASA ISS live feed already used by ISSFeedModal (the
 // header's "LIVE ISS" button) — reused here so the video is inline inside
 // Star Tracker's ISS layer instead of a separate popup elsewhere in the app.
-const ISS_STREAM_URL = 'https://www.youtube.com/embed/awQzjn72bI0?autoplay=1&mute=1';
+const ISS_STREAM_URL = 'https://www.youtube.com/embed/awQzjn72bI0';
 
 // Same deterministic PRNG + twinkle approach as CosmicCanvas's own
 // starfield, kept local here rather than shared — it's an 8-line pure

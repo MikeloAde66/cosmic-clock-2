@@ -1582,7 +1582,6 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
                     ref={broadcastVideoRef}
                     src={localVideoUrl}
                     controls
-                    autoPlay
                     className="w-full h-full object-cover"
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}

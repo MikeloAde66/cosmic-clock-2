@@ -166,10 +166,12 @@ export default function ProductsStorefront() {
                 <div className="relative flex items-center justify-center overflow-hidden border-b aspect-square bg-slate-900/60 border-slate-800">
                   {product.imageUrl ? (
                     product.imageUrl.endsWith('.mp4') ? (
+                      // No autoplay: this whole card's click target opens
+                      // the detail modal (see the wrapping div's onClick) —
+                      // shows its static first frame instead.
                       <video
                         src={product.imageUrl}
-                        autoPlay
-                        loop
+                        preload="metadata"
                         muted
                         playsInline
                         className="object-cover w-full h-full pointer-events-none"

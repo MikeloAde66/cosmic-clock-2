@@ -29,11 +29,14 @@ export default function ProductHeroCard({
         className="relative block w-full max-w-md h-[480px] overflow-hidden transition border rounded-xl border-slate-800 bg-[#0B0E14] hover:border-neutral-500"
       >
         {videoSrc ? (
+          // No autoplay: this card's own click target is the surrounding
+          // Link (navigate to the product page), not "watch this video" —
+          // a nested play control would conflict with that. It shows its
+          // static poster frame instead, same as the Image fallback below.
           <video
             src={videoSrc}
             poster={heroImageSrc}
-            autoPlay
-            loop
+            preload="metadata"
             muted
             playsInline
             className="absolute inset-0 object-contain w-full h-full"

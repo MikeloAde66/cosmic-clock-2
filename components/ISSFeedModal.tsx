@@ -53,7 +53,7 @@ export default function ISSFeedModal({ isOpen, onClose }: ISSModalProps) {
             <div className="relative w-full bg-black aspect-video">
               <iframe
                 className="absolute top-0 left-0 w-full h-full border-0"
-                src="https://www.youtube.com/embed/awQzjn72bI0?autoplay=1&mute=1"
+                src="https://www.youtube.com/embed/awQzjn72bI0"
                 title="Live ISS HD Video Feed"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
