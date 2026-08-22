@@ -79,7 +79,7 @@ export default function ProductGatePage() {
         <Link
           href="/"
           aria-label="Home"
-          className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+          className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded-lg border transition bg-white/[0.04] backdrop-blur-xl border-white/10 text-white/70 hover:border-indigo-400/40 hover:text-white hover:bg-white/[0.08] shadow-[0_0_16px_rgba(99,102,241,0.08)] hover:shadow-[0_0_20px_rgba(129,140,248,0.25)]"
         >
           <Home className="w-3.5 h-3.5" />
           Home
@@ -97,7 +97,7 @@ export default function ProductGatePage() {
             text baked in) plus the app's own real Starfield for extra
             depth, with the real headline/button as HTML on top. */}
         <div
-          className="relative -mx-6 md:mx-0 h-[420px] overflow-hidden rounded-2xl border border-slate-800 flex flex-col items-center pt-16 bg-[#0a0a0c]"
+          className="relative -mx-6 md:mx-0 h-[420px] overflow-hidden rounded-2xl border border-white/10 flex flex-col items-center pt-16 bg-[#0a0a0c] shadow-[0_0_50px_rgba(99,102,241,0.12)]"
           style={{
             backgroundImage: 'url(/images/aione-landing-bg.png)',
             backgroundSize: 'cover',
@@ -122,7 +122,7 @@ export default function ProductGatePage() {
             </h1>
             <button
               onClick={() => setIsSignUpOpen(true)}
-              className="px-5 py-2.5 text-xs font-mono font-bold uppercase tracking-wide rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 transition"
+              className="px-5 py-2.5 text-xs font-mono font-bold uppercase tracking-wide rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 shadow-[0_0_24px_rgba(124,58,237,0.45)] hover:shadow-[0_0_34px_rgba(124,58,237,0.65)] hover:opacity-95 transition"
             >
               Subscribe
             </button>
@@ -136,7 +136,7 @@ export default function ProductGatePage() {
         <div className="text-center">
           <Link
             href="/star-tracker"
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-[11px] font-mono uppercase tracking-wide rounded-lg border border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10 transition"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-[11px] font-mono uppercase tracking-wide rounded-lg border transition bg-white/[0.04] backdrop-blur-xl border-white/10 text-white/70 hover:border-indigo-400/40 hover:text-white hover:bg-white/[0.08] shadow-[0_0_16px_rgba(99,102,241,0.08)] hover:shadow-[0_0_20px_rgba(129,140,248,0.25)]"
           >
             Try Star Tracker — Free
           </Link>
@@ -153,7 +153,7 @@ export default function ProductGatePage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {FEATURES.map(({ title, description, Icon, href, comingSoon }) => {
               const cardClass =
-                'flex items-start gap-4 p-5 border rounded-xl bg-slate-900/40 backdrop-blur-sm border-slate-800';
+                'flex items-start gap-4 p-5 border rounded-xl bg-white/[0.04] backdrop-blur-xl border-white/10 shadow-[0_0_20px_rgba(99,102,241,0.06)]';
               const content = (
                 <>
                   <div
@@ -180,7 +180,11 @@ export default function ProductGatePage() {
                 </>
               );
               return href ? (
-                <Link key={title} href={href} className={`${cardClass} hover:border-slate-700 transition`}>
+                <Link
+                  key={title}
+                  href={href}
+                  className={`${cardClass} transition hover:border-indigo-400/30 hover:shadow-[0_0_28px_rgba(129,140,248,0.18)]`}
+                >
                   {content}
                 </Link>
               ) : (
@@ -201,7 +205,7 @@ export default function ProductGatePage() {
               {SYNTHESIS_INPUTS.map(({ label, Icon }) => (
                 <span
                   key={label}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wide border rounded border-slate-800 bg-slate-900/40 text-slate-400"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wide border rounded-lg border-white/10 bg-white/[0.04] backdrop-blur-xl text-slate-400 shadow-[0_0_14px_rgba(99,102,241,0.06)]"
                 >
                   <Icon className="w-3 h-3" />
                   {label}
@@ -209,8 +213,8 @@ export default function ProductGatePage() {
               ))}
             </div>
             <div className="text-slate-600">→</div>
-            <div className="flex flex-col items-center gap-2 px-6 py-5 border rounded-full border-neutral-600 bg-gradient-to-br from-blue-600/20 to-purple-600/20">
-              <Brain className="w-6 h-6 text-white" />
+            <div className="flex flex-col items-center gap-2 px-6 py-5 border rounded-full border-indigo-400/30 bg-white/[0.04] backdrop-blur-xl shadow-[0_0_36px_rgba(124,58,237,0.3)]">
+              <Brain className="w-6 h-6 text-white drop-shadow-[0_0_8px_rgba(129,140,248,0.7)]" />
               <span className="text-[10px] font-mono font-bold uppercase tracking-wide text-center text-white">
                 Synthesis
                 <br />
@@ -219,11 +223,11 @@ export default function ProductGatePage() {
             </div>
             <div className="text-slate-600">→</div>
             <div className="flex flex-col gap-2">
-              <span className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wide border rounded border-slate-800 bg-slate-900/40 text-slate-300">
+              <span className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wide border rounded-lg border-white/10 bg-white/[0.04] backdrop-blur-xl text-slate-300 shadow-[0_0_14px_rgba(99,102,241,0.06)]">
                 <TrendingUp className="w-3 h-3" />
                 Knowledge Output
               </span>
-              <span className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wide border rounded border-slate-800 bg-slate-900/40 text-slate-300">
+              <span className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wide border rounded-lg border-white/10 bg-white/[0.04] backdrop-blur-xl text-slate-300 shadow-[0_0_14px_rgba(99,102,241,0.06)]">
                 <Lightbulb className="w-3 h-3" />
                 New Insights
               </span>
@@ -236,7 +240,7 @@ export default function ProductGatePage() {
             what checkout actually charges. */}
         <div className="space-y-6 -mx-6">
           <h2 className="text-xl font-bold text-center text-white">Unlock Your Cosmic Guide</h2>
-          <div className="h-[560px] rounded-xl overflow-hidden border border-slate-800">
+          <div className="h-[560px] rounded-xl overflow-hidden border border-white/10 bg-white/[0.03] backdrop-blur-xl shadow-[0_0_40px_rgba(99,102,241,0.08)]">
             <PricingPlans />
           </div>
         </div>
@@ -250,9 +254,9 @@ export default function ProductGatePage() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="flex flex-col items-center justify-center gap-2 p-6 text-center border border-dashed rounded-xl h-40 border-slate-800 bg-slate-900/20"
+                className="flex flex-col items-center justify-center gap-2 p-6 text-center border border-dashed rounded-xl h-40 border-white/10 bg-white/[0.03] backdrop-blur-xl shadow-[0_0_16px_rgba(99,102,241,0.05)]"
               >
-                <div className="w-10 h-10 border rounded-full border-slate-700 bg-slate-900/60" />
+                <div className="w-10 h-10 border rounded-full border-white/10 bg-white/[0.04]" />
                 <span className="text-[10px] font-mono uppercase tracking-wider text-slate-600">
                   Testimonial slot {i}
                 </span>
@@ -267,7 +271,7 @@ export default function ProductGatePage() {
           <p className="text-sm text-slate-400">The answers are infinite. Start your journey today.</p>
           <Link
             href="/"
-            className="inline-block px-6 py-3 text-xs font-mono font-bold uppercase tracking-wide rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 transition"
+            className="inline-block px-6 py-3 text-xs font-mono font-bold uppercase tracking-wide rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 shadow-[0_0_24px_rgba(124,58,237,0.45)] hover:shadow-[0_0_34px_rgba(124,58,237,0.65)] hover:opacity-95 transition"
           >
             Launch AiOne Hub
           </Link>
