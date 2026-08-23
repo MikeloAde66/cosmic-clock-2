@@ -1,0 +1,101 @@
+STAR TRACKER — QUICK START GUIDE
+Ai One
+
+===============================================================
+
+WHAT THIS IS
+
+Star Tracker is a real-time sky map driven by your actual location
+and the current time — not stock imagery or a static almanac. Every
+position on screen is computed live via client-side astronomical
+algorithms (astronomy-engine for the sun/moon/planets, a local SGP4
+propagator for the ISS).
+
+===============================================================
+
+GETTING ORIENTED
+
+- The dome is your sky, centered on the Zenith (straight overhead).
+  The outer edge is your horizon.
+- N / E / S / W around the dome mark compass direction along the
+  horizon. Azimuth increases clockwise from North (0°) through
+  East (90°), South (180°), and West (270°).
+- Drag anywhere on the dome to pan. Scroll/pinch to zoom (1x–5x).
+  Double-click (or double-tap) the dome to reset pan and zoom.
+
+===============================================================
+
+OBSERVATORY HORIZON NODES
+
+By default, Star Tracker uses your live location (GPS, or an
+approximate IP-based location if GPS isn't available/granted). You
+can instead view the sky from a real preset observatory — Mauna Kea,
+Palomar, Royal Observatory Greenwich, Griffith, or the Very Large
+Telescope in Chile — via the observatory picker near the top of the
+view. Each preset uses that site's real coordinates and elevation.
+
+===============================================================
+
+TRACKING THE ISS
+
+Toggle the "ISS" layer to plot the International Space Station's
+live position on the dome, including its ground trajectory and a
+telemetry readout (elevation, azimuth, altitude, velocity, range).
+The same toggle also enables an embedded live NASA video feed from
+the ISS. This uses real orbital propagation, not a scripted path.
+
+===============================================================
+
+CELESTIAL BODIES & THE CASUAL/EXPERT TOGGLE
+
+Tap any Sun/Moon/planet marker to see its details. Use the
+Casual/Expert switch to control how much you see:
+
+- Casual: a plain-language summary — what it is, which direction to
+  look, and roughly how far away it is.
+- Expert: the full technical readout — azimuth, altitude, magnitude,
+  precise distance, and next rise/set times.
+
+Both modes show the exact same real, live-computed data — Casual
+just shows less of it at once.
+
+===============================================================
+
+SKY MAPS OVERLAY
+
+The Sky Maps selector overlays real constellation line data:
+Big Dipper/Polaris, the Zodiac/ecliptic, the brightest stars, Messier
+deep-sky objects (nebulae, galaxies, star clusters), or all
+constellations at once.
+
+===============================================================
+
+SPACE WEATHER
+
+Toggle Space Weather to see a live NOAA geomagnetic Kp index reading
+with a human-readable storm-level status — real data from NOAA's
+public feed, refreshed periodically.
+
+===============================================================
+
+SKY FEST
+
+Opens a panel with real upcoming solar/lunar eclipses and active
+meteor showers (with their parent body), plus a media tab for
+space-related video playlists.
+
+===============================================================
+
+TELESCOPE CONNECTION (OPTIONAL)
+
+If you own a compatible telescope mount, Star Tracker can connect to
+it directly over Web Serial or Web Bluetooth (Chrome/Edge), using
+real LX200/NexStar protocol support — live position polling and
+goto/slew commands. A Simulator mode is also available if you just
+want to try the interface without real hardware connected.
+
+===============================================================
+
+Questions or something not working as expected? Reach out through
+the Ai One Support drawer in the Vault, or via the site's contact
+channels.

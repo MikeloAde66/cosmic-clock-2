@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Download } from 'lucide-react';
 import Starfield from '@/components/Starfield';
 import { supabase } from '@/lib/supabase';
 import { createStandaloneCheckoutSession } from '@/app/actions/checkout';
@@ -81,12 +81,26 @@ export default function StarTrackerProductPage() {
             <span className="text-4xl font-bold text-white">${(product.amountCents / 100).toFixed(2)}</span>
             <span className="text-sm text-neutral-500">one-time</span>
           </div>
-          <button
-            type="submit"
-            className="w-full py-3 text-sm font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition"
-          >
-            Purchase Star Tracker →
-          </button>
+          {/* Real guide content (accurate to the actual features above),
+              served as a plain-text download — not labeled "(PDF)" since
+              there's no PDF-generation tool available to produce a real
+              binary PDF. */}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              type="submit"
+              className="w-full py-3 text-sm font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition sm:flex-1"
+            >
+              Purchase Star Tracker →
+            </button>
+            <a
+              href="/docs/Star_Tracker_QuickStart_Guide.txt"
+              download="Star_Tracker_QuickStart_Guide.txt"
+              className="flex items-center justify-center w-full gap-2 px-6 py-3 text-sm font-medium transition border rounded-lg sm:w-auto border-neutral-700 bg-neutral-900/60 text-neutral-300 hover:bg-neutral-800 hover:text-white"
+            >
+              <Download className="w-4 h-4 text-cyan-400" />
+              Quick Start Guide
+            </a>
+          </div>
         </form>
       </div>
     </div>
