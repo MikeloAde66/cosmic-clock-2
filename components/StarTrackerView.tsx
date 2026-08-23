@@ -41,7 +41,7 @@ function mulberry32(seed: number) {
   };
 }
 
-const STAR_COUNT = 110;
+const STAR_COUNT = 380;
 const randomStar = mulberry32(20260814);
 const BACKGROUND_STARS = Array.from({ length: STAR_COUNT }, () => {
   const twinkles = randomStar() < 0.2;
@@ -521,7 +521,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
     if (!el) return;
     const handler = (e: WheelEvent) => {
       e.preventDefault();
-      setView((v) => ({ ...v, scale: Math.min(3, Math.max(1, v.scale - e.deltaY * 0.001)) }));
+      setView((v) => ({ ...v, scale: Math.min(5, Math.max(1, v.scale - e.deltaY * 0.001)) }));
     };
     el.addEventListener('wheel', handler, { passive: false });
     return () => el.removeEventListener('wheel', handler);
@@ -586,7 +586,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Time Sync header */}
-        <div className="grid grid-cols-3 gap-2 p-3 border rounded-lg border-cyan-500/20 bg-black/30">
+        <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg border-cyan-500/20 bg-black/30">
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">Local Time</div>
             <div className="font-mono text-sm text-white">{now.toLocaleTimeString()}</div>
@@ -601,8 +601,10 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
-        {/* Layer toggles */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Layer toggles — spread with justify-between + a larger gap
+            instead of a tight cluster, more breathing room on wide
+            viewports while still wrapping cleanly on narrow ones. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
           <button
             type="button"
             onClick={() => setIssLayerOn((v) => !v)}
@@ -864,7 +866,89 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        <div className="p-4 border rounded-lg border-cyan-500/20 bg-black/30">
+        {/* Lens bezel — a stylized camera/telescope frame around the sky
+            dome, not true photorealism (that needs a real photographed
+            texture, which doesn't exist and can't be generated here). The
+            outer ring's rotation is a real readout of view.scale (1x-5x,
+            the same real wheel-zoom already wired to the dome below), not
+            purely decorative. */}
+        <div className="relative p-3 rounded-2xl" style={{ background: 'radial-gradient(circle at 32% 28%, rgba(148,163,184,0.14), rgba(8,12,18,0.5) 65%)' }}>
+          {/* Green-coated-optics edge glare — fades in from the bezel rim,
+              transparent at center so it doesn't wash out the reticle. */}
+          <div
+            className="absolute inset-0 rounded-2xl pointer-events-none"
+            style={{ background: 'radial-gradient(circle, transparent 55%, rgba(16,185,129,0.15) 85%, rgba(6,78,59,0.3) 100%)' }}
+          />
+          <svg
+            viewBox="0 0 100 100"
+            className="absolute inset-0 w-full h-full pointer-events-none transition-transform duration-300 ease-out"
+            style={{ transform: `rotate(${(view.scale - 1) * 60}deg)` }}
+            aria-hidden="true"
+          >
+            <circle cx={50} cy={50} r={48.5} fill="none" stroke="rgba(34,211,238,0.3)" strokeWidth={0.6} />
+            {/* Cardinal degree labels — 0°N at top (screen-up), matching the
+                real dome's own N/E/S/W convention below, azimuth increasing
+                clockwise (E=90, S=180, W=270). */}
+            {[
+              { deg: 0, label: '0°N' },
+              { deg: 90, label: '90°E' },
+              { deg: 180, label: '180°S' },
+              { deg: 270, label: '270°W' },
+            ].map(({ deg, label }) => {
+              const angle = (deg - 90) * (Math.PI / 180);
+              const x = 50 + Math.cos(angle) * 38;
+              const y = 50 + Math.sin(angle) * 38;
+              // Counter-rotates against the outer ring's own rotation so
+              // the label stays upright/readable at any zoom level,
+              // instead of tipping over as the bezel spins.
+              const counterRotateDeg = -(view.scale - 1) * 60;
+              return (
+                <text
+                  key={deg}
+                  x={x}
+                  y={y}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill="rgba(103,232,249,0.7)"
+                  fontSize={4}
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                  style={{
+                    filter: 'drop-shadow(0 0 1.5px rgba(6,182,212,0.9))',
+                    transform: `rotate(${counterRotateDeg}deg)`,
+                    transformOrigin: `${x}px ${y}px`,
+                  }}
+                >
+                  {label}
+                </text>
+              );
+            })}
+            {Array.from({ length: 32 }).map((_, i) => {
+              const angle = (i / 32) * Math.PI * 2;
+              const x1 = 50 + Math.cos(angle) * 46;
+              const y1 = 50 + Math.sin(angle) * 46;
+              const x2 = 50 + Math.cos(angle) * (i % 4 === 0 ? 42 : 44);
+              const y2 = 50 + Math.sin(angle) * (i % 4 === 0 ? 42 : 44);
+              return (
+                <line
+                  key={i}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke="rgba(34,211,238,0.35)"
+                  strokeWidth={i % 4 === 0 ? 0.8 : 0.4}
+                />
+              );
+            })}
+          </svg>
+          {/* Target FOV = Base FOV / Zoom Ratio — Base FOV is 180°, the
+              real full horizon-to-zenith-to-horizon sweep this dome
+              projects at 1x. A real, derived value, not an arbitrary one. */}
+          <span className="absolute px-1.5 py-0.5 text-[8px] font-mono uppercase tracking-widest rounded top-1 right-1 text-cyan-300/70 bg-black/40">
+            {view.scale.toFixed(1)}× · FOV {(180 / view.scale).toFixed(0)}°
+          </span>
+          <div className="p-4 border rounded-lg border-cyan-500/20 bg-black/30">
           <svg
             ref={domeRef}
             viewBox={`0 0 ${size} ${size}`}
@@ -876,7 +960,11 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
             onDoubleClick={resetView}
           >
             <g transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`} style={{ transformOrigin: `${center}px ${center}px` }}>
-              <circle cx={center} cy={center} r={radius} fill="rgba(6,20,28,0.6)" stroke="rgba(34,211,238,0.3)" strokeWidth={1} />
+              {/* Deep obsidian core — darker than before so the real
+                  page-wide starfield behind it (BACKGROUND_STARS) reads
+                  with more contrast through the dome, closer to real
+                  deep-sky astrophotography than the previous lighter teal. */}
+              <circle cx={center} cy={center} r={radius} fill="rgba(2,6,23,0.85)" stroke="rgba(34,211,238,0.3)" strokeWidth={1} />
               <circle cx={center} cy={center} r={radius * 0.5} fill="none" stroke="rgba(34,211,238,0.12)" strokeWidth={1} />
               {/* Zenith marker — straight overhead, the center of this
                   projection by construction (altitude 90° maps to r=0). */}
@@ -1021,7 +1109,15 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                 const labelY = label?.renderedY ?? y - 9;
                 return (
                   <g key={b.name} onClick={() => setSelected({ kind: 'body', body: b })} className="cursor-pointer">
-                    <circle cx={x} cy={y} r={isLuminary ? 6 : 4.5} fill={isLuminary ? '#67e8f9' : '#e2e8f0'} stroke="transparent" strokeWidth={8} />
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={isLuminary ? 6 : 4.5}
+                      fill={isLuminary ? '#67e8f9' : '#e2e8f0'}
+                      stroke="transparent"
+                      strokeWidth={8}
+                      style={{ filter: `drop-shadow(0 0 3px ${isLuminary ? 'rgba(103,232,249,0.7)' : 'rgba(226,232,240,0.6)'})` }}
+                    />
                     {label?.needsLeaderLine && (
                       <line
                         x1={x}
@@ -1104,6 +1200,7 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                 })()}
             </g>
           </svg>
+          </div>
         </div>
 
         {/* Map key — only covers what's actually drawn above, nothing invented */}
