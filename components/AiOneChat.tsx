@@ -63,7 +63,18 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export default function AiOneChat() {
+interface AiOneChatProps {
+  // Set by a caller elsewhere on the page (e.g. StarTrackerView's "Ask Kali"
+  // tooltip action, routed through KaliOracleView) that wants to hand this
+  // chat a real query built from live data. Prefills the input and focuses
+  // it — deliberately does NOT auto-submit, so a query built from a click
+  // never fires an API call without the user reviewing/confirming it first.
+  // A token (not just the text) so asking the same question twice in a row
+  // still re-triggers the effect.
+  prefillQuery?: { text: string; token: number } | null;
+}
+
+export default function AiOneChat({ prefillQuery }: AiOneChatProps = {}) {
   const { language } = useLanguage();
   // A plain function, not a module-level constant — needs the current
   // language at call time, both for the initial mount and for "New chat"
@@ -87,6 +98,8 @@ export default function AiOneChat() {
   // Index of the message currently being read aloud via window.speechSynthesis
   // — null when nothing is speaking. Only one message speaks at a time.
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const lastPrefillToken = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -118,6 +131,14 @@ export default function AiOneChat() {
       createdAt: createdAtRef.current,
     });
   }, [messages, isStreaming, mode]);
+
+  useEffect(() => {
+    if (!prefillQuery || prefillQuery.token === lastPrefillToken.current) return;
+    lastPrefillToken.current = prefillQuery.token;
+    setInput(prefillQuery.text);
+    setIsExpanded(true);
+    chatInputRef.current?.focus();
+  }, [prefillQuery]);
 
   // Speech never outlives this component — cancel on unmount so switching
   // away from Kali (or navigating elsewhere) doesn't leave her talking.
@@ -526,6 +547,7 @@ export default function AiOneChat() {
         )}
 
         <input
+          ref={chatInputRef}
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}

@@ -68,6 +68,8 @@ interface AiOneHomeProps {
   // signed-in visitor with no active plan back here) — jumps straight to
   // the Pricing section instead of leaving them stranded on Home.
   pricingRequestToken?: number;
+  // See CenterHero's own kaliPrefillQuery prop — threaded straight through.
+  kaliPrefillQuery?: { text: string; token: number } | null;
 }
 
 export default function AiOneHome({
@@ -75,6 +77,7 @@ export default function AiOneHome({
   homeViewRequest,
   groundZeroToken,
   pricingRequestToken,
+  kaliPrefillQuery,
 }: AiOneHomeProps) {
   const [activeSection, setActiveSection] = useState<'home' | 'pricing'>('home');
   // Mirrors CenterHero/CosmicCanvas's own activeView — used only to hide
@@ -199,6 +202,7 @@ export default function AiOneHome({
           groundZeroToken={groundZeroToken}
           visible={activeSection === 'home'}
           onCosmicViewChange={setCosmicView}
+          kaliPrefillQuery={kaliPrefillQuery}
         />
 
         {activeSection !== 'home' && (

@@ -86,6 +86,17 @@ function HomeInner() {
   // effect that opens it inside CosmicCanvas, which stays mounted between
   // clicks.
   const [homeViewRequest, setHomeViewRequest] = useState<{ view: 'weather' | 'kali'; token: number } | null>(null);
+  // Set by StarTrackerView's "Ask Kali" tooltip action — a real query built
+  // from the live sky-body/telemetry data the user was looking at, handed
+  // to whichever AiOneChat instance is actually on screen once openHomeView
+  // below switches over to Kali. Prefills the input only; AiOneChat itself
+  // decides not to auto-send it.
+  const [kaliPrefillQuery, setKaliPrefillQuery] = useState<{ text: string; token: number } | null>(null);
+  const askKali = (query: string) => {
+    setIsStarTrackerOpen(false);
+    setKaliPrefillQuery({ text: query, token: Date.now() });
+    openHomeView('kali');
+  };
   const openHomeView = (view: 'weather' | 'kali') => {
     setActiveTab('aione');
     setHomeViewRequest({ view, token: Date.now() });
@@ -261,6 +272,7 @@ useContextMenuShare();
                   homeViewRequest={homeViewRequest}
                   groundZeroToken={groundZeroToken}
                   pricingRequestToken={pricingRequestToken}
+                  kaliPrefillQuery={kaliPrefillQuery}
                 />
               )}
 
@@ -331,6 +343,7 @@ useContextMenuShare();
                     homeViewRequest={homeViewRequest}
                     groundZeroToken={groundZeroToken}
                     pricingRequestToken={pricingRequestToken}
+                    kaliPrefillQuery={kaliPrefillQuery}
                   />
                 </Reveal>
               </div>
@@ -351,7 +364,7 @@ useContextMenuShare();
               </div>
               <div id="stack-section-kali" className="w-full min-h-full border-t border-slate-800/80">
                 <Reveal className="w-full h-full">
-                  <KaliOracleView />
+                  <KaliOracleView prefillQuery={kaliPrefillQuery} />
                 </Reveal>
               </div>
               <div id="stack-section-tenforward" className="w-full min-h-full border-t border-slate-800/80">
@@ -408,7 +421,7 @@ useContextMenuShare();
           now triggered from LeftNav instead. Star Tracker is a dedicated
           full-screen view (fixed z-50), not a stacked modal. */}
       <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
-      {isStarTrackerOpen && <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} />}
+      {isStarTrackerOpen && <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} onAskKali={askKali} />}
     </CartProvider>
     </RadioPlayerProvider>
   );

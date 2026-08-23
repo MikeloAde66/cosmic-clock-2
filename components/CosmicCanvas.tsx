@@ -81,9 +81,17 @@ interface CosmicCanvasProps {
   // so Home is the only way out of them, and needs to reset this
   // component's own view state directly.
   groundZeroToken?: number;
+  // See KaliOracleView's own prefillQuery prop — threaded straight through.
+  kaliPrefillQuery?: { text: string; token: number } | null;
 }
 
-export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, requestedView, groundZeroToken }: CosmicCanvasProps) {
+export default function CosmicCanvas({
+  onNavigateToVaultDrawer,
+  onViewChange,
+  requestedView,
+  groundZeroToken,
+  kaliPrefillQuery,
+}: CosmicCanvasProps) {
   const [activeView, setActiveView] = useState<CosmicCanvasView>('clock');
 
   useEffect(() => {
@@ -200,7 +208,7 @@ export default function CosmicCanvas({ onNavigateToVaultDrawer, onViewChange, re
       {/* Kali — extracted into its own component (KaliSection.tsx) so the
           Continuous Stack layout can also mount it as a standalone section;
           this is the exact same component, unchanged here. */}
-      {activeView === 'kali' && <KaliOracleView />}
+      {activeView === 'kali' && <KaliOracleView prefillQuery={kaliPrefillQuery} />}
 
       <style jsx>{`
         @keyframes cinematicDrift {

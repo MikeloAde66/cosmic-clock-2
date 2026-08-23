@@ -26,6 +26,8 @@ interface CenterHeroProps {
   // the clock view — CenterHero itself already tracks this locally for its
   // own hero-title-visibility logic, this just also reports it upward.
   onCosmicViewChange?: (view: 'clock' | 'weather' | 'kali') => void;
+  // See CosmicCanvas's own kaliPrefillQuery prop — threaded straight through.
+  kaliPrefillQuery?: { text: string; token: number } | null;
 }
 
 export default function CenterHero({
@@ -34,6 +36,7 @@ export default function CenterHero({
   groundZeroToken,
   visible = true,
   onCosmicViewChange,
+  kaliPrefillQuery,
 }: CenterHeroProps) {
   // CosmicCanvas's Weather/Kali sub-views already have their own BackButton
   // — keeping the hero title above them too just stacked a second
@@ -93,6 +96,7 @@ export default function CenterHero({
           onViewChange={handleViewChange}
           requestedView={homeViewRequest}
           groundZeroToken={groundZeroToken}
+          kaliPrefillQuery={kaliPrefillQuery}
         />
       </div>
     </>

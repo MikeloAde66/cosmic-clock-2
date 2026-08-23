@@ -28,7 +28,15 @@ import { KaliSpecsButton, KaliSpecsContent } from './KaliSpecsPanel';
 const STATUS_MARKERS = ['AWARENESS', 'HARMONY', 'ALIGNMENT'];
 const RIGHT_INDICATORS = ['QUANTUM SYNC', 'DATA WEAVE', 'AKASHIC LINK', 'ORACLE MODE', 'PRESENCE LOCK'];
 
-export default function KaliOracleView() {
+interface KaliOracleViewProps {
+  // Threaded down from wherever a real cross-view "Ask Kali" action fires
+  // (currently StarTrackerView's tooltip Ask Kali button, via app/page.tsx
+  // and CosmicCanvas/CenterHero/AiOneHome for Hub mode, or directly for
+  // Stack mode's stack-section-kali). See AiOneChat's own prefillQuery prop.
+  prefillQuery?: { text: string; token: number } | null;
+}
+
+export default function KaliOracleView({ prefillQuery }: KaliOracleViewProps = {}) {
   const [specsOpen, setSpecsOpen] = useState(false);
 
   return (
@@ -108,7 +116,7 @@ export default function KaliOracleView() {
                 speech-to-text mic button. This is the interactive footer
                 the spec asked for; no separate fake input bar. */}
             <div className="flex-1 w-full min-h-0 mt-4">
-              <AiOneChat />
+              <AiOneChat prefillQuery={prefillQuery} />
             </div>
           </div>
 

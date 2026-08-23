@@ -22,6 +22,7 @@ import { MESSIER_OBJECTS } from '@/lib/messierCatalog';
 import ObservatoryPicker, { OBSERVATORIES, type Observatory } from './ObservatoryPicker';
 import { useTelescopeConnection } from '@/lib/useTelescopeConnection';
 import TelescopeConnectPanel from './telescope/TelescopeConnectPanel';
+import InfoTooltip from './InfoTooltip';
 
 // The same real NASA ISS live feed already used by ISSFeedModal (the
 // header's "LIVE ISS" button) — reused here so the video is inline inside
@@ -254,7 +255,17 @@ function resolveLabelCollisions(
   return resolved;
 }
 
-export default function StarTrackerView({ onBack }: { onBack: () => void }) {
+interface StarTrackerViewProps {
+  onBack: () => void;
+  // Real cross-view handoff to Kali chat — see InfoTooltip's askKaliQuery
+  // prop and AiOneChat's prefillQuery prop. Optional: the standalone
+  // /star-tracker route has no parent shell (no Kali anywhere on that
+  // domain) and simply omits it, which hides the "Ask Kali" row entirely
+  // rather than rendering a button that goes nowhere.
+  onAskKali?: (query: string) => void;
+}
+
+export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewProps) {
   const [status, setStatus] = useState<LocationStatus>('requesting');
   // Real, live-tracked coords (GPS or the IP-geolocation fallback below) —
   // always kept up to date regardless of which observatory is selected,
@@ -273,6 +284,16 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   // Hover-only (not click-persisted like `selected` above) — which Messier
   // diamond currently has its dark-themed preview overlay showing.
   const [hoveredMessierId, setHoveredMessierId] = useState<string | null>(null);
+  // Fires once real location is resolved, so the detail panel isn't empty
+  // on first load and Casual/Expert has something to visibly act on right
+  // away. Picks whichever real body is actually most prominent right now —
+  // not a fixed "always the Sun" default.
+  const hasAutoSelectedRef = useRef(false);
+  // Shown when Casual/Expert is toggled with nothing selected — toggling it
+  // still changes hudMode underneath, there's just nothing on screen for
+  // that to visibly change until a body is picked.
+  const [hudHint, setHudHint] = useState<string | null>(null);
+  const hudHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Pan/zoom state for the sky dome — drag to pan, wheel to zoom.
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
@@ -480,6 +501,37 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const visible = sky.filter((b) => b.altitude > 0);
   const belowHorizon = sky.filter((b) => b.altitude <= 0);
 
+  // Auto-select a default target once real location is known — waits on
+  // `status` leaving 'requesting' so this doesn't fire against the
+  // placeholder {lat:0, lon:0} coords and pick the wrong body. Sun during
+  // the day, Moon at night, else the brightest currently-visible planet,
+  // else just whatever's highest/least-below-horizon if nothing is up.
+  useEffect(() => {
+    if (hasAutoSelectedRef.current || status === 'requesting' || sky.length === 0) return;
+    hasAutoSelectedRef.current = true;
+    const sunBody = sky.find((b) => b.name === AstroBody.Sun);
+    const moonBody = sky.find((b) => b.name === AstroBody.Moon);
+    let defaultBody: SkyBody | undefined;
+    if (sunBody && sunBody.altitude > 0) {
+      defaultBody = sunBody;
+    } else if (moonBody && moonBody.altitude > 0) {
+      defaultBody = moonBody;
+    } else {
+      const visiblePlanets = sky.filter((b) => b.altitude > 0 && b.magnitude !== null);
+      defaultBody =
+        visiblePlanets.length > 0
+          ? visiblePlanets.reduce((brightest, b) => (b.magnitude! < brightest.magnitude! ? b : brightest))
+          : sky[0];
+    }
+    if (defaultBody) setSelected({ kind: 'body', body: defaultBody });
+  }, [sky, status]);
+
+  useEffect(() => {
+    return () => {
+      if (hudHintTimerRef.current) clearTimeout(hudHintTimerRef.current);
+    };
+  }, []);
+
   // Real SGP4 propagation from a live CelesTrak TLE, not a REST position
   // poll — enabled only while the layer is toggled on (see useIssTracker's
   // own `enabled` param), so this app isn't fetching from CelesTrak or
@@ -609,11 +661,25 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
             <div className="font-mono text-sm text-white">{now.toLocaleTimeString()}</div>
           </div>
           <div>
-            <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">Sidereal Time</div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">
+              <InfoTooltip
+                term="Sidereal Time"
+                explanation="Earth's rotation measured against the distant stars instead of the Sun. A sidereal day (~23h56m) is about 4 minutes shorter than a solar day, since Earth also moves along its orbit each day."
+                askKaliQuery={`My local sidereal time is ${localSiderealTime(now, effectiveCoords.lon)} right now — what does that tell me about what's overhead?`}
+                onAskKali={onAskKali}
+              />
+            </div>
             <div className="font-mono text-sm text-cyan-300">{localSiderealTime(now, effectiveCoords.lon)}</div>
           </div>
           <div>
-            <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">Kali Yuga Epoch</div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">
+              <InfoTooltip
+                term="Kali Yuga Epoch"
+                explanation="A 432,000-year cycle from Hindu cosmology, reckoned from 3102 BCE. This shows how far the current calendar year is through that cycle — a cosmological/calendrical reference, not a scientific measurement."
+                askKaliQuery={`We're ${cosmic.kaliYugaProgressPercent}% through the current Kali Yuga cycle — tell me more about what that means.`}
+                onAskKali={onAskKali}
+              />
+            </div>
             <div className="font-mono text-sm text-white">{cosmic.kaliYugaProgressPercent}%</div>
           </div>
         </div>
@@ -679,7 +745,14 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
               <button
                 key={m}
                 type="button"
-                onClick={() => setHudMode(m)}
+                onClick={() => {
+                  setHudMode(m);
+                  if (!selected) {
+                    if (hudHintTimerRef.current) clearTimeout(hudHintTimerRef.current);
+                    setHudHint(`Select any object on the sky dome to view its ${m} breakdown.`);
+                    hudHintTimerRef.current = setTimeout(() => setHudHint(null), 3000);
+                  }
+                }}
                 className={`px-3 py-1 text-[10px] font-mono uppercase tracking-wide transition ${
                   hudMode === m ? 'bg-cyan-500/10 text-cyan-300' : 'text-slate-400 hover:text-slate-200'
                 }`}
@@ -1339,6 +1412,12 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
           <span>N/E/S/W = compass direction along the horizon</span>
         </div>
 
+        {hudHint && (
+          <div className="px-3 py-2 text-xs text-center border rounded-lg border-cyan-500/30 bg-cyan-950/30 text-cyan-200">
+            {hudHint}
+          </div>
+        )}
+
         {/* Detail panel for the selected body/satellite — inline, not a modal */}
         {selected && (
           <div className="relative p-4 border rounded-lg border-cyan-500/40 bg-cyan-950/20">
@@ -1350,35 +1429,55 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
               <X className="w-3.5 h-3.5" />
             </button>
             {selected.kind === 'body' ? (
-              hudMode === 'casual' ? (
-                <div className="space-y-1.5">
-                  <h3 className="text-lg font-bold text-white">{selected.body.name}</h3>
-                  <p className="text-xs text-slate-300">{BODY_TYPE_FACTS[selected.body.name] ?? 'Celestial object'}</p>
-                  <p className="text-xs text-slate-300">
-                    Look toward the {compassDirection(selected.body.azimuth)}
-                    {selected.body.altitude > 0 ? ', up in the sky right now.' : ' — currently below your horizon.'}
-                  </p>
-                  <p className="text-xs text-slate-300">It&apos;s about {formatDistance(selected.body.distanceAu)} away.</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-white">{selected.body.name}</h3>
-                  <p className="font-mono text-xs text-cyan-100">{BODY_TYPE_FACTS[selected.body.name] ?? 'Celestial object'}</p>
-                  <p className="font-mono text-xs text-cyan-100">
-                    {compassDirection(selected.body.azimuth)} ({selected.body.azimuth.toFixed(1)}°) · altitude {selected.body.altitude.toFixed(1)}°
-                  </p>
-                  {selected.body.magnitude !== null && (
-                    <p className="font-mono text-xs text-cyan-100">Magnitude {selected.body.magnitude.toFixed(2)}</p>
-                  )}
-                  <p className="font-mono text-xs text-cyan-100">Distance {formatDistance(selected.body.distanceAu)}</p>
-                  {selected.body.nextRise && (
-                    <p className="font-mono text-xs text-slate-400">Next rise {selected.body.nextRise.toLocaleTimeString()}</p>
-                  )}
-                  {selected.body.nextSet && (
-                    <p className="font-mono text-xs text-slate-400">Next set {selected.body.nextSet.toLocaleTimeString()}</p>
-                  )}
-                </div>
-              )
+              <>
+                {hudMode === 'casual' ? (
+                  <div className="space-y-1.5">
+                    <h3 className="text-lg font-bold text-white">{selected.body.name}</h3>
+                    <p className="text-xs text-slate-300">{BODY_TYPE_FACTS[selected.body.name] ?? 'Celestial object'}</p>
+                    <p className="text-xs text-slate-300">
+                      Look toward the {compassDirection(selected.body.azimuth)}
+                      {selected.body.altitude > 0 ? ', up in the sky right now.' : ' — currently below your horizon.'}
+                    </p>
+                    <p className="text-xs text-slate-300">It&apos;s about {formatDistance(selected.body.distanceAu)} away.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold text-white">{selected.body.name}</h3>
+                    <p className="font-mono text-xs text-cyan-100">{BODY_TYPE_FACTS[selected.body.name] ?? 'Celestial object'}</p>
+                    <p className="font-mono text-xs text-cyan-100">
+                      {compassDirection(selected.body.azimuth)} ({selected.body.azimuth.toFixed(1)}°) · altitude {selected.body.altitude.toFixed(1)}°
+                    </p>
+                    {selected.body.magnitude !== null && (
+                      <p className="font-mono text-xs text-cyan-100">Magnitude {selected.body.magnitude.toFixed(2)}</p>
+                    )}
+                    <p className="font-mono text-xs text-cyan-100">Distance {formatDistance(selected.body.distanceAu)}</p>
+                    {selected.body.nextRise && (
+                      <p className="font-mono text-xs text-slate-400">Next rise {selected.body.nextRise.toLocaleTimeString()}</p>
+                    )}
+                    {selected.body.nextSet && (
+                      <p className="font-mono text-xs text-slate-400">Next set {selected.body.nextSet.toLocaleTimeString()}</p>
+                    )}
+                  </div>
+                )}
+                {onAskKali && (
+                  <div className="flex justify-end pt-2 mt-2 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onAskKali(
+                          `Tell me about ${selected.body.name} — it's ${compassDirection(selected.body.azimuth)} at ` +
+                            `${selected.body.altitude.toFixed(1)}° altitude` +
+                            `${selected.body.magnitude !== null ? `, magnitude ${selected.body.magnitude.toFixed(2)}` : ''}, ` +
+                            `${formatDistance(selected.body.distanceAu)} away.`
+                        )
+                      }
+                      className="text-[10px] text-cyan-400 font-mono hover:underline hover:text-cyan-300"
+                    >
+                      Ask Kali →
+                    </button>
+                  </div>
+                )}
+              </>
             ) : selected.kind === 'iss' ? (
               issTracker.telemetry && (
                 <div className="space-y-1">
