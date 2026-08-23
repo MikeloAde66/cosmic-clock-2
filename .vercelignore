@@ -3,6 +3,10 @@ node_modules
 .git
 _local-archive
 
+# Separate standalone Vite build for startracker.protolabsglobal.com — its
+# own project, deployed to static/cPanel hosting, not this Vercel project.
+star-tracker-standalone
+
 # Unreferenced media files over Vercel's 100MB per-file deploy limit —
 # confirmed unused anywhere in app/components/lib before excluding.
 public/assets/who am i.mp4

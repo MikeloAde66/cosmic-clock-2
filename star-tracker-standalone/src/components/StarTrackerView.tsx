@@ -1,0 +1,1586 @@
+
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, CalendarClock, Satellite, Sparkles, Sun as SunIcon, X } from 'lucide-react';
+import { Body as AstroBody, Equator, Horizon, Illumination, Observer, SearchRiseSet, SiderealTime } from 'astronomy-engine';
+import { calculateCosmicTime } from '@/lib/cosmicMath';
+import { useIssTracker } from '@/lib/useIssTracker';
+import { describeKp, fetchLatestKp, type KpReading } from '@/lib/spaceWeather';
+import {
+  lonToRaHours,
+  loadConstellationLines,
+  loadConstellationNames,
+  loadStars,
+  type ConstellationLine,
+  type ConstellationNames,
+  type StarTuple,
+} from '@/lib/skyChart';
+import { daysUntil, getUpcomingEclipses, getUpcomingMeteorShowers, type UpcomingEclipse, type UpcomingMeteorShower } from '@/lib/skyEvents';
+import { listPlaylist, parseYouTubeId, removePlaylistItem, savePlaylistItem, type PlaylistItem } from '@/lib/spaceMediaPlaylist';
+import type { YouTubePlayer } from '@/lib/youtubeIframeApi';
+import { MESSIER_OBJECTS } from '@/lib/messierCatalog';
+import ObservatoryPicker, { OBSERVATORIES, type Observatory } from './ObservatoryPicker';
+import { useTelescopeConnection } from '@/lib/useTelescopeConnection';
+import TelescopeConnectPanel from './telescope/TelescopeConnectPanel';
+import InfoTooltip from './InfoTooltip';
+
+// The same real NASA ISS live feed already used by ISSFeedModal (the
+// header's "LIVE ISS" button) — reused here so the video is inline inside
+// Star Tracker's ISS layer instead of a separate popup elsewhere in the app.
+const ISS_STREAM_URL = 'https://www.youtube.com/embed/awQzjn72bI0';
+
+// Same deterministic PRNG + twinkle approach as CosmicCanvas's own
+// starfield, kept local here rather than shared — it's an 8-line pure
+// function, and this view has no other dependency on that component.
+function mulberry32(seed: number) {
+  return function () {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const STAR_COUNT = 380;
+const randomStar = mulberry32(20260814);
+const BACKGROUND_STARS = Array.from({ length: STAR_COUNT }, () => {
+  const twinkles = randomStar() < 0.2;
+  return {
+    top: `${(randomStar() * 100).toFixed(2)}%`,
+    left: `${(randomStar() * 100).toFixed(2)}%`,
+    size: `${(1 + randomStar() * 1.5).toFixed(2)}px`,
+    opacity: 0.15 + randomStar() * 0.7,
+    twinkles,
+    delay: `${(randomStar() * 4).toFixed(2)}s`,
+    duration: `${(2.5 + randomStar() * 2.5).toFixed(2)}s`,
+  };
+});
+
+const TRACKED_BODIES: AstroBody[] = [
+  AstroBody.Sun,
+  AstroBody.Moon,
+  AstroBody.Mercury,
+  AstroBody.Venus,
+  AstroBody.Mars,
+  AstroBody.Jupiter,
+  AstroBody.Saturn,
+];
+
+const AU_IN_KM = 149_597_870;
+
+// Real, static classification facts — not sensor-derived, just what each
+// body actually is. "Spectral type" only applies to the Sun (a real star);
+// the others get their real physical classification instead.
+const BODY_TYPE_FACTS: Record<string, string> = {
+  Sun: 'G2V main-sequence star',
+  Moon: "Earth's natural satellite",
+  Mercury: 'Terrestrial planet',
+  Venus: 'Terrestrial planet',
+  Mars: 'Terrestrial planet',
+  Jupiter: 'Gas giant',
+  Saturn: 'Gas giant, ringed',
+};
+
+interface SkyBody {
+  name: string;
+  azimuth: number;
+  altitude: number;
+  magnitude: number | null;
+  distanceAu: number;
+  nextRise: Date | null;
+  nextSet: Date | null;
+}
+
+function compassDirection(azimuth: number): string {
+  const points = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  return points[Math.round(azimuth / 45) % 8];
+}
+
+function formatDistance(au: number): string {
+  return au < 0.01 ? `${Math.round(au * AU_IN_KM).toLocaleString()} km` : `${au.toFixed(3)} AU`;
+}
+
+function formatLightYears(ly: number): string {
+  if (ly >= 1_000_000) return `${(ly / 1_000_000).toFixed(1)} million ly`;
+  return `${ly.toLocaleString()} ly`;
+}
+
+// NASA's Hubble Messier Catalog pages key off the bare catalog number, not
+// the "M" prefix (verified against the real M42 page before wiring this in).
+function messierArchiveUrl(id: string): string {
+  const number = id.replace(/^M/i, '');
+  return `https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-${number}/`;
+}
+
+function computeSky(observer: Observer, now: Date): SkyBody[] {
+  return TRACKED_BODIES.map((body) => {
+    const eq = Equator(body, now, observer, true, true);
+    const hor = Horizon(now, observer, eq.ra, eq.dec, 'normal');
+    // Magnitude isn't a meaningful "how bright" cue for the Sun/Moon the way
+    // it is for planets (both are always far brighter than the scale really
+    // describes), so it's only shown for the five planets.
+    const magnitude = body === AstroBody.Sun || body === AstroBody.Moon ? null : Illumination(body, now).mag;
+    const nextRise = SearchRiseSet(body, observer, 1, now, 1);
+    const nextSet = SearchRiseSet(body, observer, -1, now, 1);
+    return {
+      name: body,
+      azimuth: hor.azimuth,
+      altitude: hor.altitude,
+      magnitude,
+      distanceAu: eq.dist,
+      nextRise: nextRise ? nextRise.date : null,
+      nextSet: nextSet ? nextSet.date : null,
+    };
+  }).sort((a, b) => b.altitude - a.altitude);
+}
+
+// Local Sidereal Time = Greenwich Apparent Sidereal Time (astronomy-engine's
+// SiderealTime, in sidereal hours) shifted by the observer's longitude —
+// each 15° of longitude is 1 sidereal hour.
+function localSiderealTime(now: Date, longitude: number): string {
+  const gast = SiderealTime(now);
+  const lst = (((gast + longitude / 15) % 24) + 24) % 24;
+  const hours = Math.floor(lst);
+  const minutes = Math.floor((lst - hours) * 60);
+  const seconds = Math.floor((((lst - hours) * 60 - minutes) * 60));
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function azAltToXY(azimuth: number, altitude: number, center: number, radius: number) {
+  // North at top (azimuth 0 -> -90° in SVG angle space), clockwise; zenith
+  // (altitude 90°) at the center, horizon (altitude 0°) at the rim.
+  const angle = (azimuth - 90) * (Math.PI / 180);
+  const r = radius * (1 - Math.max(altitude, 0) / 90);
+  return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle) };
+}
+
+// 'ip-fallback' is distinct from 'granted' — city-level IP geolocation is
+// far less precise than real GPS, and the UI says so rather than silently
+// presenting it as an exact position.
+type LocationStatus = 'requesting' | 'granted' | 'ip-fallback' | 'denied' | 'unavailable';
+type SelectedItem = { kind: 'body'; body: SkyBody } | { kind: 'iss' } | { kind: 'constellation'; id: string } | null;
+
+// Fixed background stars/constellations have real RA/Dec already (unlike
+// the tracked solar-system bodies, which need Equator() first to derive
+// their current position) — this goes straight to Horizon().
+function equatorialToXY(raHours: number, decDeg: number, observer: Observer, now: Date, center: number, radius: number) {
+  const hor = Horizon(now, observer, raHours, decDeg, 'normal');
+  if (hor.altitude <= 0) return null;
+  return azAltToXY(hor.azimuth, hor.altitude, center, radius);
+}
+
+// Splits a constellation line strip into contiguous above-horizon runs —
+// a strip that dips below the horizon partway through would otherwise draw
+// a nonsensical line straight across the dome connecting its last visible
+// point to its next one.
+function projectLineStrip(points: number[][], observer: Observer, now: Date, center: number, radius: number): { x: number; y: number }[][] {
+  const runs: { x: number; y: number }[][] = [];
+  let current: { x: number; y: number }[] = [];
+  for (const [lon, lat] of points) {
+    const xy = equatorialToXY(lonToRaHours(lon), lat, observer, now, center, radius);
+    if (xy) {
+      current.push(xy);
+    } else if (current.length > 1) {
+      runs.push(current);
+      current = [];
+    } else {
+      current = [];
+    }
+  }
+  if (current.length > 1) runs.push(current);
+  return runs;
+}
+
+// Individual focus modes replacing the old blanket on/off toggle.
+// BRIGHT_STARS and MESSIER render points from their own catalogs instead
+// of constellation lines — neither has a constellation-line filter.
+type SkyFocusMode = 'OFF' | 'BIG_DIPPER' | 'ZODIAC' | 'BRIGHT_STARS' | 'MESSIER' | 'ALL';
+
+// ConstellationLine only carries a real IAU 3-letter abbreviation (id) and
+// raw line-strip coordinates — there's no groupId/target/isEcliptic field
+// in the actual dataset (lib/skyChart.ts), so these modes are built
+// against the one real, identifying field that exists.
+//
+// The trimmed star/constellation data has no separate "Big Dipper" line
+// set — the Dipper is just 7 of Ursa Major's stars, not a distinct IAU
+// figure — so this mode shows the whole Ursa Major (+ Ursa Minor, for
+// Polaris at its tip) constellation lines, the closest honest match the
+// real data supports.
+const BIG_DIPPER_IDS = new Set(['UMa', 'UMi']);
+
+// The 12 real IAU zodiac constellations (their standard 3-letter
+// abbreviations), not a fabricated field.
+const ZODIAC_IDS = new Set(['Ari', 'Tau', 'Gem', 'Cnc', 'Leo', 'Vir', 'Lib', 'Sco', 'Sgr', 'Cap', 'Aqr', 'Psc']);
+
+function shouldDrawConstellation(id: string, mode: SkyFocusMode): boolean {
+  if (mode === 'ALL') return true;
+  if (mode === 'BIG_DIPPER') return BIG_DIPPER_IDS.has(id);
+  if (mode === 'ZODIAC') return ZODIAC_IDS.has(id);
+  return false; // OFF, BRIGHT_STARS, MESSIER
+}
+
+// Naked-eye "bright star" cutoff — real astronomical convention (lower
+// magnitude = brighter; ~2.0 is a standard threshold for the brightest,
+// most recognizable stars).
+const BRIGHT_STAR_MAGNITUDE_LIMIT = 2.0;
+
+interface ResolvedLabel {
+  renderedY: number;
+  needsLeaderLine: boolean;
+}
+
+// Stacks overlapping body labels (e.g. Mercury sitting almost exactly on
+// top of the Sun from Earth's sky) into a vertically staggered column with
+// a short leader line back to the actual marker, instead of drawing
+// unreadable overlapping text. Operates on each body's *label* position
+// (marker y minus the label's fixed offset), not the marker itself — the
+// marker stays exactly where it astronomically belongs either way.
+function resolveLabelCollisions(
+  points: { key: string; x: number; labelY: number }[],
+  minSpacing = 22,
+  maxDx = 40
+): Map<string, ResolvedLabel> {
+  const sorted = [...points].sort((a, b) => a.labelY - b.labelY);
+  const resolved = new Map<string, ResolvedLabel>();
+  let lastX = Number.NEGATIVE_INFINITY;
+  let lastRenderedY = Number.NEGATIVE_INFINITY;
+  for (const p of sorted) {
+    const collides = Math.abs(p.x - lastX) < maxDx && p.labelY - lastRenderedY < minSpacing;
+    const renderedY = collides ? lastRenderedY + minSpacing : p.labelY;
+    resolved.set(p.key, { renderedY, needsLeaderLine: collides });
+    lastX = p.x;
+    lastRenderedY = renderedY;
+  }
+  return resolved;
+}
+
+interface StarTrackerViewProps {
+  onBack: () => void;
+  // Real cross-view handoff to Kali chat — see InfoTooltip's askKaliQuery
+  // prop and AiOneChat's prefillQuery prop. Optional: the standalone
+  // /star-tracker route has no parent shell (no Kali anywhere on that
+  // domain) and simply omits it, which hides the "Ask Kali" row entirely
+  // rather than rendering a button that goes nowhere.
+  onAskKali?: (query: string) => void;
+}
+
+export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewProps) {
+  const [status, setStatus] = useState<LocationStatus>('requesting');
+  // Real, live-tracked coords (GPS or the IP-geolocation fallback below) —
+  // always kept up to date regardless of which observatory is selected,
+  // so switching back to "Local Observer" is instant rather than needing
+  // to re-run geolocation.
+  const [coords, setCoords] = useState<{ lat: number; lon: number }>({ lat: 0, lon: 0 });
+  // Manual observatory override — 'local' defers entirely to the live
+  // coords/status above; anything else is a fixed real-world site.
+  const [selectedObservatoryId, setSelectedObservatoryId] = useState('local');
+  const [now, setNow] = useState(() => new Date());
+  const [selected, setSelected] = useState<SelectedItem>(null);
+  // Casual/Expert only change how much of the already-real data is shown
+  // (plain description vs full RA/Dec/magnitude/rise-set readout) — no
+  // separate data source, no simulated telemetry either mode.
+  const [hudMode, setHudMode] = useState<'casual' | 'expert'>('expert');
+  // Hover-only (not click-persisted like `selected` above) — which Messier
+  // diamond currently has its dark-themed preview overlay showing.
+  const [hoveredMessierId, setHoveredMessierId] = useState<string | null>(null);
+  // Fires once real location is resolved, so the detail panel isn't empty
+  // on first load and Casual/Expert has something to visibly act on right
+  // away. Picks whichever real body is actually most prominent right now —
+  // not a fixed "always the Sun" default.
+  const hasAutoSelectedRef = useRef(false);
+
+  // Pan/zoom state for the sky dome — drag to pan, wheel to zoom.
+  const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const domeRef = useRef<SVGSVGElement | null>(null);
+
+  const [issLayerOn, setIssLayerOn] = useState(false);
+
+  const [spaceWeatherOn, setSpaceWeatherOn] = useState(false);
+  const [kp, setKp] = useState<KpReading | null>(null);
+  const [kpError, setKpError] = useState(false);
+
+  const [skyFocusMode, setSkyFocusMode] = useState<SkyFocusMode>('OFF');
+  const [skyMapsLoading, setSkyMapsLoading] = useState(false);
+  const [skyMapsError, setSkyMapsError] = useState(false);
+  const [constellationLines, setConstellationLines] = useState<ConstellationLine[] | null>(null);
+  const [constellationNames, setConstellationNames] = useState<ConstellationNames | null>(null);
+  const [stars, setStars] = useState<StarTuple[] | null>(null);
+
+  const [skyFestOpen, setSkyFestOpen] = useState(false);
+  const telescope = useTelescopeConnection();
+  const [skyFestTab, setSkyFestTab] = useState<'eclipses' | 'meteors' | 'media'>('eclipses');
+
+  const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
+  const [nowPlayingVideoId, setNowPlayingVideoId] = useState<string | null>(null);
+  const [playlistUrlInput, setPlaylistUrlInput] = useState('');
+  const [playlistTitleInput, setPlaylistTitleInput] = useState('');
+  const [playlistFormError, setPlaylistFormError] = useState('');
+
+  // Real YT.Player instance (not a plain <iframe>) — needed so onReady can
+  // actually call setVolume(); a bare iframe src has no JS handle at all.
+  // Same pattern PodsModule.tsx already uses for its Broadcast Monitor.
+  const ytContainerRef = useRef<HTMLDivElement | null>(null);
+  const ytPlayerRef = useRef<YouTubePlayer | null>(null);
+
+  useEffect(() => {
+    if (skyFestTab !== 'media' || !nowPlayingVideoId) return;
+    let cancelled = false;
+
+    const bindPlayer = () => {
+      if (cancelled || !ytContainerRef.current) return;
+      ytContainerRef.current.replaceChildren();
+      const playerHost = document.createElement('div');
+      playerHost.style.width = '100%';
+      playerHost.style.height = '100%';
+      ytContainerRef.current.appendChild(playerHost);
+      ytPlayerRef.current = new window.YT!.Player(playerHost, {
+        videoId: nowPlayingVideoId,
+        playerVars: { autoplay: 1 },
+        events: {
+          // Loads at a lower default rather than full blast — native
+          // controls stay fully visible/enabled for manual adjustment
+          // from there.
+          onReady: (event) => event.target.setVolume(70),
+        },
+      });
+    };
+
+    if (window.YT?.Player) {
+      bindPlayer();
+    } else {
+      const previousCallback = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        previousCallback?.();
+        bindPlayer();
+      };
+      if (!document.getElementById('youtube-iframe-api-script')) {
+        const script = document.createElement('script');
+        script.id = 'youtube-iframe-api-script';
+        script.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(script);
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      ytPlayerRef.current?.destroy();
+      ytPlayerRef.current = null;
+      ytContainerRef.current?.replaceChildren();
+    };
+    // Re-binds a fresh player on every video/tab change rather than
+    // reusing one via loadVideoById — this container can itself unmount
+    // (switching Sky Fest tabs, or back to the "paste a link" placeholder
+    // when nowPlayingVideoId is cleared), so a single long-lived instance
+    // isn't a safe assumption here the way it is in PodsModule's
+    // always-mounted Broadcast Monitor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nowPlayingVideoId, skyFestTab]);
+
+  useEffect(() => {
+    queueMicrotask(() => setPlaylist(listPlaylist()));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    // City-level fallback when GPS is denied/unavailable — real public
+    // service (ipapi.co, no key required for this volume), not a
+    // fabricated endpoint. Genuinely less precise than GPS, so this is
+    // labeled 'ip-fallback' rather than 'granted'; if it also fails, this
+    // falls through to the honest "location unavailable, showing sky at
+    // 0°N, 0°E" state that already existed.
+    const tryIpFallback = async (deniedStatus: 'denied' | 'unavailable') => {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (!res.ok) throw new Error(`ipapi.co responded ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+        if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+          setCoords({ lat: data.latitude, lon: data.longitude });
+          setStatus('ip-fallback');
+        } else {
+          setStatus(deniedStatus);
+        }
+      } catch {
+        if (!cancelled) setStatus(deniedStatus);
+      }
+    };
+
+    if (!navigator.geolocation) {
+      tryIpFallback('unavailable');
+      return () => {
+        cancelled = true;
+      };
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (cancelled) return;
+        setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        setStatus('granted');
+      },
+      () => tryIpFallback('denied'),
+      { timeout: 8000 }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Constellation/star data is ~46KB total — fetched lazily on first toggle
+  // rather than on mount, and cached in state afterward so switching the
+  // layer off and back on doesn't re-fetch.
+  useEffect(() => {
+    if (skyFocusMode === 'OFF' || constellationLines) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setSkyMapsLoading(true);
+    });
+    Promise.all([loadConstellationLines(), loadConstellationNames(), loadStars()])
+      .then(([lines, names, starData]) => {
+        if (cancelled) return;
+        setConstellationLines(lines);
+        setConstellationNames(names);
+        setStars(starData);
+        setSkyMapsError(false);
+      })
+      .catch(() => {
+        if (!cancelled) setSkyMapsError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setSkyMapsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [skyFocusMode, constellationLines]);
+
+  useEffect(() => {
+    if (!spaceWeatherOn) return;
+    let cancelled = false;
+    fetchLatestKp()
+      .then((data) => {
+        if (!cancelled) {
+          setKp(data);
+          setKpError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setKpError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [spaceWeatherOn]);
+
+  const selectedObservatory = OBSERVATORIES.find((o) => o.id === selectedObservatoryId) ?? OBSERVATORIES[0];
+  const isCustomObservatory = selectedObservatory.id !== 'local';
+  // 'local' always uses the real, live-tracked coords — a preset
+  // observatory's own lat/lon/elevation only ever apply when one is
+  // actually selected.
+  const effectiveCoords = isCustomObservatory ? { lat: selectedObservatory.lat, lon: selectedObservatory.lon } : coords;
+  const effectiveElevationKm = isCustomObservatory ? selectedObservatory.elevationMeters / 1000 : 0;
+
+  const observer = useMemo(
+    () => new Observer(effectiveCoords.lat, effectiveCoords.lon, effectiveElevationKm),
+    [effectiveCoords.lat, effectiveCoords.lon, effectiveElevationKm]
+  );
+  const sky = useMemo(() => computeSky(observer, now), [observer, now]);
+  const visible = sky.filter((b) => b.altitude > 0);
+  const belowHorizon = sky.filter((b) => b.altitude <= 0);
+
+  // Auto-select a default target once real location is known — waits on
+  // `status` leaving 'requesting' so this doesn't fire against the
+  // placeholder {lat:0, lon:0} coords and pick the wrong body. Sun during
+  // the day, Moon at night, else the brightest currently-visible planet,
+  // else just whatever's highest/least-below-horizon if nothing is up.
+  useEffect(() => {
+    if (hasAutoSelectedRef.current || status === 'requesting' || sky.length === 0) return;
+    hasAutoSelectedRef.current = true;
+    const sunBody = sky.find((b) => b.name === AstroBody.Sun);
+    const moonBody = sky.find((b) => b.name === AstroBody.Moon);
+    let defaultBody: SkyBody | undefined;
+    if (sunBody && sunBody.altitude > 0) {
+      defaultBody = sunBody;
+    } else if (moonBody && moonBody.altitude > 0) {
+      defaultBody = moonBody;
+    } else {
+      const visiblePlanets = sky.filter((b) => b.altitude > 0 && b.magnitude !== null);
+      defaultBody =
+        visiblePlanets.length > 0
+          ? visiblePlanets.reduce((brightest, b) => (b.magnitude! < brightest.magnitude! ? b : brightest))
+          : sky[0];
+    }
+    if (defaultBody) setSelected({ kind: 'body', body: defaultBody });
+  }, [sky, status]);
+
+  // Real SGP4 propagation from a live CelesTrak TLE, not a REST position
+  // poll — enabled only while the layer is toggled on (see useIssTracker's
+  // own `enabled` param), so this app isn't fetching from CelesTrak or
+  // running propagation in the background for a feature no one has opened.
+  const issTracker = useIssTracker(
+    { latitude: effectiveCoords.lat, longitude: effectiveCoords.lon, altitudeKm: effectiveElevationKm },
+    1000,
+    issLayerOn
+  );
+
+  const cosmic = calculateCosmicTime();
+  const locationLabel = isCustomObservatory
+    ? `${selectedObservatory.name} — ${effectiveCoords.lat.toFixed(2)}°, ${effectiveCoords.lon.toFixed(2)}° · Elev ${selectedObservatory.elevationMeters}m`
+    : status === 'granted'
+      ? `${coords.lat.toFixed(2)}°, ${coords.lon.toFixed(2)}°`
+      : status === 'ip-fallback'
+        ? `${coords.lat.toFixed(2)}°, ${coords.lon.toFixed(2)}° (approximate, from IP)`
+        : status === 'requesting'
+          ? 'Locating…'
+          : 'Location unavailable — showing sky at 0°N, 0°E';
+  // While a Messier diamond is hovered, the location line temporarily
+  // reports a target lock on it instead — reverts the instant the hover
+  // ends, since the underlying locationLabel above is unaffected.
+  const hoveredMessier = hoveredMessierId ? MESSIER_OBJECTS.find((m) => m.id === hoveredMessierId) : null;
+  const statusLine = hoveredMessier ? `🎯 TARGET LOCK: ${hoveredMessier.id} — ${hoveredMessier.name}` : locationLabel;
+
+  // Dome geometry + pan/zoom handlers
+  // Logical SVG units, not pixels — the viewBox keeps all coordinate math
+  // (azAltToXY etc.) correct regardless of the actual rendered size, which
+  // is now driven entirely by the CSS below (w-full + aspect-square) rather
+  // than a fixed pixel cap.
+  const size = 500;
+  const center = size / 2;
+  const radius = size / 2 - 24;
+
+  // Resolves overlapping body labels (e.g. Mercury sitting almost exactly
+  // on the Sun from Earth's sky) into a staggered column with leader
+  // lines — see resolveLabelCollisions above.
+  const resolvedLabels = useMemo(
+    () =>
+      resolveLabelCollisions(
+        visible.map((b) => {
+          const { x, y } = azAltToXY(b.azimuth, b.altitude, center, radius);
+          return { key: b.name, x, labelY: y - 9 };
+        })
+      ),
+    [visible, center, radius]
+  );
+
+  // React attaches wheel listeners as passive by default (for scroll
+  // performance), which silently no-ops preventDefault on a JSX onWheel —
+  // the page would scroll behind the dome while zooming it. A native
+  // listener with passive:false is the only way to actually stop that.
+  useEffect(() => {
+    const el = domeRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      setView((v) => ({ ...v, scale: Math.min(5, Math.max(1, v.scale - e.deltaY * 0.001)) }));
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
+
+  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    dragRef.current = { x: e.clientX - view.tx, y: e.clientY - view.ty };
+  };
+  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!dragRef.current) return;
+    setView((v) => ({ ...v, tx: e.clientX - dragRef.current!.x, ty: e.clientY - dragRef.current!.y }));
+  };
+  const endDrag = () => {
+    dragRef.current = null;
+  };
+  const resetView = () => setView({ scale: 1, tx: 0, ty: 0 });
+
+  const eclipses = useMemo<UpcomingEclipse[]>(() => getUpcomingEclipses(now, 2), [now]);
+  const meteorShowers = useMemo<UpcomingMeteorShower[]>(() => getUpcomingMeteorShowers(now, 4), [now]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col w-full h-full p-4 overflow-y-auto bg-[#050810] text-slate-100">
+      {/* Ambient starfield backdrop — fixed to the viewport, not the scroll
+          container, so it stays put while the content above scrolls over it */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        {BACKGROUND_STARS.map((star, idx) => (
+          <div
+            key={idx}
+            className={`absolute rounded-full bg-white shadow-[0_0_4px_#ffffff] ${star.twinkles ? 'animate-star-twinkle' : ''}`}
+            style={{
+              top: star.top,
+              left: star.left,
+              width: star.size,
+              height: star.size,
+              opacity: star.twinkles ? undefined : star.opacity,
+              animationDelay: star.twinkles ? star.delay : undefined,
+              animationDuration: star.twinkles ? star.duration : undefined,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="relative z-10 flex items-center gap-2 mb-4 shrink-0">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back
+        </button>
+      </div>
+
+      <div className="relative z-10 w-full max-w-3xl mx-auto space-y-6">
+        <div className="space-y-3">
+          <div>
+            <span className="text-[10px] font-mono tracking-widest uppercase text-cyan-400/80">Sky Above You</span>
+            <h2 className="text-2xl font-bold tracking-wider text-white">Star Tracker</h2>
+            <p className="mt-1 font-mono text-xs text-cyan-100/80">{statusLine}</p>
+          </div>
+          <ObservatoryPicker selectedId={selectedObservatoryId} onSelectObservatory={(obs: Observatory) => setSelectedObservatoryId(obs.id)} />
+        </div>
+
+        {/* Time Sync header */}
+        <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg border-cyan-500/20 bg-black/30">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">Local Time</div>
+            <div className="font-mono text-sm text-white">{now.toLocaleTimeString()}</div>
+          </div>
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">
+              <InfoTooltip
+                term="Sidereal Time"
+                explanation="Earth's rotation measured against the distant stars instead of the Sun. A sidereal day (~23h56m) is about 4 minutes shorter than a solar day, since Earth also moves along its orbit each day."
+                askKaliQuery={`My local sidereal time is ${localSiderealTime(now, effectiveCoords.lon)} right now — what does that tell me about what's overhead?`}
+                onAskKali={onAskKali}
+              />
+            </div>
+            <div className="font-mono text-sm text-cyan-300">{localSiderealTime(now, effectiveCoords.lon)}</div>
+          </div>
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">
+              <InfoTooltip
+                term="Kali Yuga Epoch"
+                explanation="A 432,000-year cycle from Hindu cosmology, reckoned from 3102 BCE. This shows how far the current calendar year is through that cycle — a cosmological/calendrical reference, not a scientific measurement."
+                askKaliQuery={`We're ${cosmic.kaliYugaProgressPercent}% through the current Kali Yuga cycle — tell me more about what that means.`}
+                onAskKali={onAskKali}
+              />
+            </div>
+            <div className="font-mono text-sm text-white">{cosmic.kaliYugaProgressPercent}%</div>
+          </div>
+        </div>
+
+        {/* Layer toggles — spread with justify-between + a larger gap
+            instead of a tight cluster, more breathing room on wide
+            viewports while still wrapping cleanly on narrow ones. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+          <button
+            type="button"
+            onClick={() => setIssLayerOn((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition ${
+              issLayerOn ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300' : 'border-slate-700 text-slate-400 hover:border-slate-500'
+            }`}
+          >
+            <Satellite className="w-3 h-3" />
+            ISS
+          </button>
+          <button
+            type="button"
+            onClick={() => setSpaceWeatherOn((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition ${
+              spaceWeatherOn ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300' : 'border-slate-700 text-slate-400 hover:border-slate-500'
+            }`}
+          >
+            <SunIcon className="w-3 h-3" />
+            Space Weather
+          </button>
+          <div className="relative flex items-center">
+            <Sparkles className="absolute w-3 h-3 pointer-events-none left-2.5 text-cyan-300" />
+            <select
+              value={skyFocusMode}
+              onChange={(e) => setSkyFocusMode(e.target.value as SkyFocusMode)}
+              title="Double-click the sky dome to reset pan/zoom"
+              className={`appearance-none pl-7 pr-2 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition cursor-pointer ${
+                skyFocusMode !== 'OFF'
+                  ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300'
+                  : 'border-slate-700 text-slate-400 hover:border-slate-500'
+              }`}
+            >
+              <option value="OFF">Sky Maps: Off</option>
+              <option value="BIG_DIPPER">Big Dipper / Polaris</option>
+              <option value="ZODIAC">Zodiac / Ecliptic</option>
+              <option value="BRIGHT_STARS">Brightest Stars</option>
+              <option value="MESSIER">Messier Deep-Sky</option>
+              <option value="ALL">All Constellations</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSkyFestOpen((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition ${
+              skyFestOpen ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300' : 'border-slate-700 text-slate-400 hover:border-slate-500'
+            }`}
+          >
+            <CalendarClock className="w-3 h-3" />
+            Sky Fest
+          </button>
+          {/* Casual/Expert only changes display density on the same real
+              data below — not a separate feature or data source. */}
+          <div className="flex items-center border rounded-full border-slate-700 overflow-hidden">
+            {(['casual', 'expert'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setHudMode(m)}
+                className={`px-3 py-1 text-[10px] font-mono uppercase tracking-wide transition ${
+                  hudMode === m ? 'bg-cyan-500/10 text-cyan-300' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <TelescopeConnectPanel connection={telescope} />
+
+        {skyFestOpen && (
+          <div className="overflow-hidden border rounded-lg border-cyan-500/20 bg-black/30">
+            <div className="flex border-b border-cyan-500/20">
+              {(['eclipses', 'meteors', 'media'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setSkyFestTab(tab)}
+                  className={`flex-1 px-3 py-2 text-[10px] font-mono uppercase tracking-wide transition ${
+                    skyFestTab === tab ? 'bg-cyan-500/10 text-cyan-300' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {tab === 'eclipses' ? '🌘 Eclipses' : tab === 'meteors' ? '☄️ Meteors' : '🛰️ Space Media'}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-3 space-y-2">
+              {skyFestTab === 'eclipses' &&
+                eclipses.map((e, i) => (
+                  <div key={i} className="p-2 border rounded border-slate-800 bg-slate-900/40">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-white capitalize">
+                        {e.type} eclipse — {e.kind}
+                      </span>
+                      <span className="font-mono text-[10px] text-cyan-300">{daysUntil(now, e.peak)}d</span>
+                    </div>
+                    <p className="font-mono text-[11px] text-slate-400">
+                      {e.peak.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                    {e.obscuration !== null && (
+                      <p className="font-mono text-[11px] text-slate-400">Obscuration {(e.obscuration * 100).toFixed(0)}%</p>
+                    )}
+                    {e.latitude !== null && e.longitude !== null && (
+                      <p className="font-mono text-[11px] text-slate-400">
+                        Peak visibility near {e.latitude.toFixed(1)}°, {e.longitude.toFixed(1)}°
+                      </p>
+                    )}
+                  </div>
+                ))}
+
+              {skyFestTab === 'meteors' &&
+                meteorShowers.map((m) => (
+                  <div key={m.name} className="p-2 border rounded border-slate-800 bg-slate-900/40">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-white">{m.name}</span>
+                      <span className="font-mono text-[10px] text-cyan-300">{daysUntil(now, m.nextPeak)}d</span>
+                    </div>
+                    <p className="font-mono text-[11px] text-slate-400">
+                      Peaks {m.nextPeak.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })} · parent body: {m.parentBody}
+                    </p>
+                  </div>
+                ))}
+
+              {skyFestTab === 'media' && (
+                <div className="space-y-3">
+                  {nowPlayingVideoId ? (
+                    <div className="relative w-full overflow-hidden bg-black rounded aspect-video">
+                      {/* React owns this wrapper but never puts JSX children
+                          inside it — YT.Player replaces whatever element
+                          it's given with its own <iframe>, entirely outside
+                          React's reconciliation (see the mount effect
+                          above). */}
+                      <div ref={ytContainerRef} className="absolute inset-0 w-full h-full" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center border rounded aspect-video border-slate-800 bg-slate-950/60">
+                      <p className="px-4 text-xs text-center font-mono text-slate-500">
+                        Paste a YouTube link below — Mars rover clips, Hubble highlights, any stream link — to save and play it here.
+                      </p>
+                    </div>
+                  )}
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const videoId = parseYouTubeId(playlistUrlInput);
+                      if (!videoId) {
+                        setPlaylistFormError('That doesn’t look like a valid YouTube link.');
+                        return;
+                      }
+                      // Falling back to the raw pasted URL as the title
+                      // (the previous behavior here) meant an unnamed
+                      // save showed a full youtube.com link in the chip
+                      // instead of a clean label.
+                      const cleanTitle = playlistTitleInput.trim() || `Space Stream #${playlist.length + 1}`;
+                      setPlaylist(savePlaylistItem(cleanTitle, videoId));
+                      setNowPlayingVideoId(videoId);
+                      setPlaylistUrlInput('');
+                      setPlaylistTitleInput('');
+                      setPlaylistFormError('');
+                    }}
+                    className="flex flex-col gap-1.5 sm:flex-row"
+                  >
+                    <input
+                      type="text"
+                      value={playlistTitleInput}
+                      onChange={(e) => setPlaylistTitleInput(e.target.value)}
+                      placeholder="Name (optional)"
+                      className="w-full sm:w-32 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-white/50"
+                    />
+                    <input
+                      type="text"
+                      value={playlistUrlInput}
+                      onChange={(e) => setPlaylistUrlInput(e.target.value)}
+                      placeholder="Paste video link / YouTube URL"
+                      className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono bg-black/60 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-white/50"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase rounded bg-white text-black hover:bg-neutral-200 whitespace-nowrap"
+                    >
+                      Add to Playlist
+                    </button>
+                  </form>
+                  {playlistFormError && <p className="font-mono text-[10px] text-red-400">{playlistFormError}</p>}
+
+                  {playlist.length > 0 && (
+                    <div className="space-y-1">
+                      {playlist.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`flex items-center justify-between gap-2 px-2 py-1.5 border rounded ${
+                            item.videoId === nowPlayingVideoId ? 'border-cyan-500/50 bg-cyan-500/10' : 'border-slate-800 bg-slate-900/40'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setNowPlayingVideoId(item.videoId)}
+                            className="flex-1 min-w-0 text-xs text-left truncate text-slate-100 hover:text-white"
+                          >
+                            {item.title}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPlaylist(removePlaylistItem(item.id))}
+                            className="text-slate-600 hover:text-red-400"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="font-mono text-[10px] text-slate-600">
+                    Live comet tracking isn&apos;t included — no free, reliable live data source exists for it. Saved links are
+                    stored in this browser only.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {spaceWeatherOn && (
+          <div className="px-3 py-2 border rounded-lg border-cyan-500/20 bg-black/30">
+            {kpError ? (
+              <p className="font-mono text-xs text-red-400">Space weather data unavailable right now.</p>
+            ) : kp ? (
+              <p className="font-mono text-xs text-cyan-100">
+                Planetary K-index: <span className="font-bold text-white">{kp.kp.toFixed(2)}</span> — {describeKp(kp.kp)}
+              </p>
+            ) : (
+              <p className="font-mono text-xs text-slate-500">Loading space weather…</p>
+            )}
+          </div>
+        )}
+
+        {issLayerOn && (
+          <div className="p-2 space-y-2 border rounded-lg border-cyan-500/20 bg-black/30">
+            {issTracker.error ? (
+              <p className="px-1 font-mono text-xs text-red-400">ISS position unavailable right now.</p>
+            ) : issTracker.telemetry ? (
+              <p className="px-1 font-mono text-xs text-cyan-100">
+                ISS is {issTracker.telemetry.elevation > 0 ? 'above your horizon' : 'below your horizon'} —{' '}
+                {compassDirection(issTracker.telemetry.azimuth)}
+                {issTracker.telemetry.elevation > 0 ? `, alt ${issTracker.telemetry.elevation.toFixed(0)}°` : ''} ·{' '}
+                {issTracker.telemetry.velocityKmS.toFixed(2)} km/s
+              </p>
+            ) : (
+              <p className="px-1 font-mono text-xs text-slate-500">Locating ISS…</p>
+            )}
+            {/* Inline live feed — the same real NASA stream the header's
+                "LIVE ISS" button opens, embedded here instead of a separate
+                popup so it's part of this view. */}
+            <div className="relative w-full overflow-hidden bg-black rounded aspect-video">
+              <iframe
+                className="absolute top-0 left-0 w-full h-full border-0"
+                src={ISS_STREAM_URL}
+                title="Live ISS HD Video Feed"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        )}
+
+        {skyFocusMode !== 'OFF' && (skyMapsLoading || skyMapsError) && (
+          <div className="px-3 py-2 border rounded-lg border-cyan-500/20 bg-black/30">
+            {skyMapsError ? (
+              <p className="font-mono text-xs text-red-400">Constellation data unavailable right now.</p>
+            ) : (
+              <p className="font-mono text-xs text-slate-500">Loading constellations…</p>
+            )}
+          </div>
+        )}
+
+        {/* Lens bezel — a stylized camera/telescope frame around the sky
+            dome, not true photorealism (that needs a real photographed
+            texture, which doesn't exist and can't be generated here). The
+            outer ring's rotation is a real readout of view.scale (1x-5x,
+            the same real wheel-zoom already wired to the dome below), not
+            purely decorative. */}
+        <div className="relative p-3 rounded-2xl" style={{ background: 'radial-gradient(circle at 32% 28%, rgba(148,163,184,0.14), rgba(8,12,18,0.5) 65%)' }}>
+          {/* Green-coated-optics edge glare — fades in from the bezel rim,
+              transparent at center so it doesn't wash out the reticle. */}
+          <div
+            className="absolute inset-0 rounded-2xl pointer-events-none"
+            style={{ background: 'radial-gradient(circle, transparent 55%, rgba(16,185,129,0.15) 85%, rgba(6,78,59,0.3) 100%)' }}
+          />
+          <svg
+            viewBox="0 0 100 100"
+            className="absolute inset-0 w-full h-full pointer-events-none transition-transform duration-300 ease-out"
+            style={{ transform: `rotate(${(view.scale - 1) * 60}deg)` }}
+            aria-hidden="true"
+          >
+            <circle cx={50} cy={50} r={48.5} fill="none" stroke="rgba(34,211,238,0.3)" strokeWidth={0.6} />
+            {/* Cardinal labels — letters only, no degree numbers (matches
+                the inner holographic azimuth ring's own N/E/S/W/NE/etc
+                convention, professional-instrument style rather than a
+                basic numbered compass dial). N at top, azimuth increasing
+                clockwise (E=90, S=180, W=270). */}
+            {[
+              { deg: 0, label: 'N' },
+              { deg: 90, label: 'E' },
+              { deg: 180, label: 'S' },
+              { deg: 270, label: 'W' },
+            ].map(({ deg, label }) => {
+              const angle = (deg - 90) * (Math.PI / 180);
+              const x = 50 + Math.cos(angle) * 38;
+              const y = 50 + Math.sin(angle) * 38;
+              // Counter-rotates against the outer ring's own rotation so
+              // the label stays upright/readable at any zoom level,
+              // instead of tipping over as the bezel spins.
+              const counterRotateDeg = -(view.scale - 1) * 60;
+              return (
+                <text
+                  key={deg}
+                  x={x}
+                  y={y}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill="rgba(103,232,249,0.7)"
+                  fontSize={4}
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                  style={{
+                    filter: 'drop-shadow(0 0 1.5px rgba(6,182,212,0.9))',
+                    transform: `rotate(${counterRotateDeg}deg)`,
+                    transformOrigin: `${x}px ${y}px`,
+                  }}
+                >
+                  {label}
+                </text>
+              );
+            })}
+            {Array.from({ length: 32 }).map((_, i) => {
+              const angle = (i / 32) * Math.PI * 2;
+              const x1 = 50 + Math.cos(angle) * 46;
+              const y1 = 50 + Math.sin(angle) * 46;
+              const x2 = 50 + Math.cos(angle) * (i % 4 === 0 ? 42 : 44);
+              const y2 = 50 + Math.sin(angle) * (i % 4 === 0 ? 42 : 44);
+              return (
+                <line
+                  key={i}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke="rgba(34,211,238,0.35)"
+                  strokeWidth={i % 4 === 0 ? 0.8 : 0.4}
+                />
+              );
+            })}
+          </svg>
+          {/* Target FOV = Base FOV / Zoom Ratio — Base FOV is 180°, the
+              real full horizon-to-zenith-to-horizon sweep this dome
+              projects at 1x. A real, derived value, not an arbitrary one. */}
+          <span className="absolute px-1.5 py-0.5 text-[8px] font-mono uppercase tracking-widest rounded top-1 right-1 text-cyan-300/70 bg-black/40">
+            {view.scale.toFixed(1)}× · FOV {(180 / view.scale).toFixed(0)}°
+          </span>
+          <div className="p-4 border rounded-lg border-cyan-500/20 bg-black/30">
+          <svg
+            ref={domeRef}
+            viewBox={`0 0 ${size} ${size}`}
+            className="w-full aspect-square touch-none cursor-grab active:cursor-grabbing"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerLeave={endDrag}
+            onDoubleClick={resetView}
+          >
+            <g transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`} style={{ transformOrigin: `${center}px ${center}px` }}>
+              {/* Deep obsidian core — darker than before so the real
+                  page-wide starfield behind it (BACKGROUND_STARS) reads
+                  with more contrast through the dome, closer to real
+                  deep-sky astrophotography than the previous lighter teal. */}
+              <circle cx={center} cy={center} r={radius} fill="rgba(2,6,23,0.85)" stroke="rgba(34,211,238,0.3)" strokeWidth={1} />
+              <circle cx={center} cy={center} r={radius * 0.5} fill="none" stroke="rgba(34,211,238,0.12)" strokeWidth={1} />
+              {/* Zenith marker — straight overhead, the center of this
+                  projection by construction (altitude 90° maps to r=0). */}
+              <g className="pointer-events-none">
+                <line x1={center - 6} y1={center} x2={center + 6} y2={center} stroke="rgba(34,211,238,0.5)" strokeWidth={1} />
+                <line x1={center} y1={center - 6} x2={center} y2={center + 6} stroke="rgba(34,211,238,0.5)" strokeWidth={1} />
+                <text x={center} y={center + 16} textAnchor="middle" className="fill-cyan-500/50" fontSize={8} fontFamily="monospace">
+                  ZENITH
+                </text>
+              </g>
+              {/* Holographic azimuth ring — replaces the plain N/E/S/W
+                  labels. A glowing double ring at the horizon boundary,
+                  15deg tick marks (major every 45deg), 8-point compass
+                  labels, and a slow rotating highlight sweep for the
+                  "holographic" feel. Real azimuth convention (0=N,
+                  90=E clockwise), same as the rest of this view. */}
+              <g className="pointer-events-none">
+                <circle cx={center} cy={center} r={radius + 8} fill="none" stroke="rgba(34,211,238,0.15)" strokeWidth={4} />
+                <circle cx={center} cy={center} r={radius + 8} fill="none" stroke="rgba(34,211,238,0.5)" strokeWidth={1} />
+                {Array.from({ length: 24 }).map((_, i) => {
+                  const deg = i * 15;
+                  const angle = (deg - 90) * (Math.PI / 180);
+                  const isMajor = deg % 45 === 0;
+                  const outer = radius + 8 + (isMajor ? 5 : 3);
+                  const inner = radius + 8 - (isMajor ? 5 : 3);
+                  return (
+                    <line
+                      key={deg}
+                      x1={center + Math.cos(angle) * outer}
+                      y1={center + Math.sin(angle) * outer}
+                      x2={center + Math.cos(angle) * inner}
+                      y2={center + Math.sin(angle) * inner}
+                      stroke={isMajor ? 'rgba(103,232,249,0.8)' : 'rgba(34,211,238,0.4)'}
+                      strokeWidth={isMajor ? 1.2 : 0.6}
+                    />
+                  );
+                })}
+                {[
+                  { deg: 0, label: 'N' },
+                  { deg: 45, label: 'NE' },
+                  { deg: 90, label: 'E' },
+                  { deg: 135, label: 'SE' },
+                  { deg: 180, label: 'S' },
+                  { deg: 225, label: 'SW' },
+                  { deg: 270, label: 'W' },
+                  { deg: 315, label: 'NW' },
+                ].map(({ deg, label }) => {
+                  const angle = (deg - 90) * (Math.PI / 180);
+                  const x = center + Math.cos(angle) * (radius + 20);
+                  const y = center + Math.sin(angle) * (radius + 20);
+                  return (
+                    <text
+                      key={label}
+                      x={x}
+                      y={y}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill={label.length === 1 ? '#67e8f9' : 'rgba(103,232,249,0.6)'}
+                      fontSize={label.length === 1 ? 10 : 7}
+                      fontFamily="monospace"
+                      fontWeight={label.length === 1 ? 'bold' : 'normal'}
+                      style={{ filter: 'drop-shadow(0 0 2px rgba(34,211,238,0.7))' }}
+                    >
+                      {label}
+                    </text>
+                  );
+                })}
+                {/* Rotating highlight sweep — purely decorative motion, not
+                    tied to any real value, unlike the outer bezel ring. */}
+                <g className="animate-azimuth-sweep" style={{ transformOrigin: `${center}px ${center}px` }}>
+                  <circle
+                    cx={center}
+                    cy={center}
+                    r={radius + 8}
+                    fill="none"
+                    stroke="rgba(103,232,249,0.9)"
+                    strokeWidth={2}
+                    strokeDasharray={`${(radius + 8) * 0.15} ${(radius + 8) * 6.13}`}
+                  />
+                </g>
+              </g>
+              {skyFocusMode !== 'OFF' &&
+                stars
+                  ?.filter(([, , mag]) => skyFocusMode !== 'BRIGHT_STARS' || mag <= BRIGHT_STAR_MAGNITUDE_LIMIT)
+                  .map(([lon, lat, mag], idx) => {
+                    const xy = equatorialToXY(lonToRaHours(lon), lat, observer, now, center, radius);
+                    if (!xy) return null;
+                    // Brightest Stars mode draws the same real magnitude
+                    // data larger/more prominent, since the whole point of
+                    // that mode is to make the naked-eye-brightest stars
+                    // easy to pick out rather than blending into the field.
+                    const r =
+                      skyFocusMode === 'BRIGHT_STARS' ? Math.max(1.2, 3.2 - mag * 0.5) : Math.max(0.4, 2.2 - mag * 0.35);
+                    return (
+                      <circle
+                        key={idx}
+                        cx={xy.x}
+                        cy={xy.y}
+                        r={r}
+                        fill={skyFocusMode === 'BRIGHT_STARS' ? '#67e8f9' : '#e2e8f0'}
+                        opacity={skyFocusMode === 'BRIGHT_STARS' ? 1 : 0.85}
+                      />
+                    );
+                  })}
+              {skyFocusMode !== 'OFF' &&
+                skyFocusMode !== 'BRIGHT_STARS' &&
+                skyFocusMode !== 'MESSIER' &&
+                constellationLines
+                  ?.filter((c) => shouldDrawConstellation(c.id, skyFocusMode))
+                  .map((c) =>
+                    c.lines.map((strip, stripIdx) =>
+                      projectLineStrip(strip, observer, now, center, radius).map((run, runIdx) => (
+                        <polyline
+                          key={`${c.id}-${stripIdx}-${runIdx}`}
+                          points={run.map((p) => `${p.x},${p.y}`).join(' ')}
+                          fill="none"
+                          stroke={skyFocusMode === 'ALL' ? 'rgba(103,232,249,0.35)' : 'rgba(34,211,238,0.75)'}
+                          strokeWidth={skyFocusMode === 'ALL' ? 0.75 : 1.5}
+                          className="cursor-pointer hover:stroke-cyan-300"
+                          onClick={() => setSelected({ kind: 'constellation', id: c.id })}
+                        />
+                      ))
+                    )
+                  )}
+              {skyFocusMode === 'MESSIER' &&
+                MESSIER_OBJECTS.map((m) => {
+                  // Same real Horizon()-backed projection already used for
+                  // the star catalog and constellation lines above — not a
+                  // separate hand-rolled az/alt formula — using the live
+                  // `now`/`observer`, not a fixed/simulated time.
+                  const xy = equatorialToXY(m.raHours, m.decDeg, observer, now, center, radius);
+                  if (!xy) return null;
+                  const isHovered = hoveredMessierId === m.id;
+                  // Tooltip box in the same logical (viewBox) units as the
+                  // dome itself, clamped so it never runs off the edge —
+                  // above-right of the node by default, flipping to
+                  // below/left near the dome's boundary.
+                  const boxW = 148;
+                  const boxH = 78;
+                  const boxX = Math.min(Math.max(xy.x + 8, 4), size - boxW - 4);
+                  const boxY = xy.y - boxH - 8 < 0 ? xy.y + 12 : xy.y - boxH - 8;
+                  return (
+                    <g
+                      key={m.id}
+                      className="cursor-pointer"
+                      onClick={() => window.open(messierArchiveUrl(m.id), '_blank', 'noopener,noreferrer')}
+                      onMouseEnter={() => setHoveredMessierId(m.id)}
+                      onMouseLeave={() => setHoveredMessierId((prev) => (prev === m.id ? null : prev))}
+                    >
+                      {/* Transparent, wider hit area — the visible diamond is
+                          only 6x6, too small to reliably hover/click on its
+                          own, matching the wider-stroke hit targets used for
+                          the celestial-body markers below. */}
+                      <circle cx={xy.x} cy={xy.y} r={9} fill="transparent" />
+                      {isHovered && (
+                        <circle
+                          cx={xy.x}
+                          cy={xy.y}
+                          r={5}
+                          fill="none"
+                          stroke="#c084fc"
+                          strokeWidth={1}
+                          className="pointer-events-none animate-messier-pulse"
+                        />
+                      )}
+                      <rect
+                        x={xy.x - 3}
+                        y={xy.y - 3}
+                        width={6}
+                        height={6}
+                        transform={`rotate(45 ${xy.x} ${xy.y})`}
+                        fill={isHovered ? 'rgba(192,132,252,0.55)' : 'rgba(192,132,252,0.3)'}
+                        stroke="#c084fc"
+                        strokeWidth={isHovered ? 1.5 : 1}
+                      />
+                      <text
+                        x={xy.x + 7}
+                        y={xy.y + 3}
+                        className="pointer-events-none fill-purple-300"
+                        fontSize={8}
+                        fontFamily="monospace"
+                      >
+                        {m.id}
+                      </text>
+                      {isHovered && (
+                        <foreignObject x={boxX} y={boxY} width={boxW} height={boxH} className="pointer-events-none">
+                          <div className="p-2 space-y-0.5 text-[7px] font-mono leading-tight text-purple-100 border rounded shadow-lg border-purple-500/40 bg-slate-950/95">
+                            <div className="text-[8px] font-bold text-white">
+                              🌌 {m.id} • Click to launch deep space archive
+                            </div>
+                            <div className="pt-0.5">{m.name} — {m.type}</div>
+                            <div>Distance: {formatLightYears(m.distanceLy)}</div>
+                          </div>
+                        </foreignObject>
+                      )}
+                    </g>
+                  );
+                })}
+              {visible.map((b) => {
+                const { x, y } = azAltToXY(b.azimuth, b.altitude, center, radius);
+                const isLuminary = b.name === 'Sun' || b.name === 'Moon';
+                const label = resolvedLabels.get(b.name);
+                const labelY = label?.renderedY ?? y - 9;
+                const isSelected = selected?.kind === 'body' && selected.body.name === b.name;
+                return (
+                  <g key={b.name} onClick={() => setSelected({ kind: 'body', body: b })} className="cursor-pointer">
+                    {isSelected && (
+                      <circle
+                        cx={x}
+                        cy={y}
+                        r={7}
+                        fill="none"
+                        stroke="rgba(34,211,238,0.9)"
+                        strokeWidth={0.8}
+                        className="pointer-events-none animate-target-pulse"
+                      />
+                    )}
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={isLuminary ? 6 : 4.5}
+                      fill={isLuminary ? '#67e8f9' : '#e2e8f0'}
+                      stroke="transparent"
+                      strokeWidth={8}
+                      style={{ filter: `drop-shadow(0 0 3px ${isLuminary ? 'rgba(103,232,249,0.7)' : 'rgba(226,232,240,0.6)'})` }}
+                    />
+                    {label?.needsLeaderLine && (
+                      <line
+                        x1={x}
+                        y1={y - 9}
+                        x2={x + 10}
+                        y2={labelY - 4}
+                        stroke="rgba(34,211,238,0.4)"
+                        strokeWidth={1}
+                        className="pointer-events-none"
+                      />
+                    )}
+                    <text
+                      x={label?.needsLeaderLine ? x + 14 : x}
+                      y={labelY}
+                      textAnchor={label?.needsLeaderLine ? 'start' : 'middle'}
+                      className="pointer-events-none fill-slate-300"
+                      fontSize={9}
+                      fontFamily="monospace"
+                    >
+                      {b.name}
+                    </text>
+                  </g>
+                );
+              })}
+              {issLayerOn && issTracker.trajectory.length > 1 && (
+                <polyline
+                  points={issTracker.trajectory
+                    .map((p) => {
+                      const { x, y } = azAltToXY(p.azimuth, p.elevation, center, radius);
+                      return `${x},${y}`;
+                    })
+                    .join(' ')}
+                  fill="none"
+                  stroke="rgba(34,211,238,0.4)"
+                  strokeWidth={1}
+                  strokeDasharray="3 3"
+                  className="pointer-events-none"
+                />
+              )}
+              {issLayerOn && issTracker.telemetry && issTracker.telemetry.elevation > 0 && (
+                <g onClick={() => setSelected({ kind: 'iss' })} className="cursor-pointer">
+                  {(() => {
+                    const { x, y } = azAltToXY(issTracker.telemetry.azimuth, issTracker.telemetry.elevation, center, radius);
+                    return (
+                      <>
+                        <rect x={x - 4} y={y - 4} width={8} height={8} fill="#22d3ee" stroke="transparent" strokeWidth={8} />
+                        <text x={x} y={y - 10} textAnchor="middle" className="pointer-events-none fill-cyan-300" fontSize={9} fontFamily="monospace">
+                          ISS
+                        </text>
+                      </>
+                    );
+                  })()}
+                </g>
+              )}
+              {(telescope.mode === 'connected' || telescope.mode === 'simulator') &&
+                telescope.position &&
+                (() => {
+                  const xy = equatorialToXY(telescope.position.raHours, telescope.position.decDeg, observer, now, center, radius);
+                  if (!xy) return null;
+                  return (
+                    <g className="pointer-events-none">
+                      <circle
+                        cx={xy.x}
+                        cy={xy.y}
+                        r={telescope.slewing ? 10 : 8}
+                        fill="none"
+                        stroke={telescope.slewing ? '#c084fc' : '#22d3ee'}
+                        strokeWidth={1.5}
+                        strokeDasharray={telescope.slewing ? '3 2' : undefined}
+                      />
+                      <line x1={xy.x - 13} y1={xy.y} x2={xy.x - 5} y2={xy.y} stroke={telescope.slewing ? '#c084fc' : '#22d3ee'} strokeWidth={1.5} />
+                      <line x1={xy.x + 5} y1={xy.y} x2={xy.x + 13} y2={xy.y} stroke={telescope.slewing ? '#c084fc' : '#22d3ee'} strokeWidth={1.5} />
+                      <line x1={xy.x} y1={xy.y - 13} x2={xy.x} y2={xy.y - 5} stroke={telescope.slewing ? '#c084fc' : '#22d3ee'} strokeWidth={1.5} />
+                      <line x1={xy.x} y1={xy.y + 5} x2={xy.x} y2={xy.y + 13} stroke={telescope.slewing ? '#c084fc' : '#22d3ee'} strokeWidth={1.5} />
+                      <text x={xy.x} y={xy.y + 24} textAnchor="middle" fill={telescope.slewing ? '#c084fc' : '#22d3ee'} fontSize={8} fontFamily="monospace">
+                        {telescope.slewing ? 'SLEWING' : 'SCOPE'}
+                      </text>
+                    </g>
+                  );
+                })()}
+            </g>
+          </svg>
+          </div>
+          {!selected && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1.5 text-[10px] font-mono text-center rounded-full pointer-events-none bg-black/50 text-cyan-200/70 backdrop-blur-sm">
+              Select any object on the sky dome to view telemetry
+            </div>
+          )}
+        </div>
+
+        {/* Map key — only covers what's actually drawn above, nothing invented */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[10px] font-mono text-slate-500">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#67e8f9]" /> Sun / Moon
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#e2e8f0]" /> Planet
+          </span>
+          {skyFocusMode !== 'OFF' && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#e2e8f0] opacity-85" />
+              {skyFocusMode === 'BRIGHT_STARS' ? 'Bright star (mag ≤ 2.0)' : 'Background star (larger = brighter)'}
+            </span>
+          )}
+          {skyFocusMode !== 'OFF' && skyFocusMode !== 'BRIGHT_STARS' && skyFocusMode !== 'MESSIER' && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-3 h-px bg-cyan-400/40" /> Constellation line (click to identify)
+            </span>
+          )}
+          {skyFocusMode === 'MESSIER' && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rotate-45 border border-purple-400 bg-purple-500/30" /> Messier object (hover for details, click for NASA archive)
+            </span>
+          )}
+          {issLayerOn && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 bg-[#22d3ee]" /> ISS
+            </span>
+          )}
+          {(telescope.mode === 'connected' || telescope.mode === 'simulator') && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 border rounded-full border-cyan-400" /> Telescope target
+            </span>
+          )}
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 border rounded-full border-cyan-500/50" /> Zenith (straight overhead)
+          </span>
+          <span>N/E/S/W = compass direction along the horizon</span>
+        </div>
+
+
+        {/* Detail panel for the selected body/satellite — inline, not a modal */}
+        {selected && (
+          <div className="relative p-4 border rounded-lg border-cyan-500/40 bg-cyan-950/20">
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="absolute flex items-center justify-center w-6 h-6 rounded top-2 right-2 text-slate-400 hover:text-white hover:bg-black/40"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+            {selected.kind === 'body' ? (
+              <>
+                {hudMode === 'casual' ? (
+                  <div className="space-y-1.5">
+                    <h3 className="text-lg font-bold text-white">{selected.body.name}</h3>
+                    <p className="text-xs text-slate-300">{BODY_TYPE_FACTS[selected.body.name] ?? 'Celestial object'}</p>
+                    <p className="text-xs text-slate-300">
+                      Look toward the {compassDirection(selected.body.azimuth)}
+                      {selected.body.altitude > 0 ? ', up in the sky right now.' : ' — currently below your horizon.'}
+                    </p>
+                    <p className="text-xs text-slate-300">It&apos;s about {formatDistance(selected.body.distanceAu)} away.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold text-white">{selected.body.name}</h3>
+                    <p className="font-mono text-xs text-cyan-100">{BODY_TYPE_FACTS[selected.body.name] ?? 'Celestial object'}</p>
+                    <p className="font-mono text-xs text-cyan-100">
+                      {compassDirection(selected.body.azimuth)} ({selected.body.azimuth.toFixed(1)}°) · altitude {selected.body.altitude.toFixed(1)}°
+                    </p>
+                    {selected.body.magnitude !== null && (
+                      <p className="font-mono text-xs text-cyan-100">Magnitude {selected.body.magnitude.toFixed(2)}</p>
+                    )}
+                    <p className="font-mono text-xs text-cyan-100">Distance {formatDistance(selected.body.distanceAu)}</p>
+                    {selected.body.nextRise && (
+                      <p className="font-mono text-xs text-slate-400">Next rise {selected.body.nextRise.toLocaleTimeString()}</p>
+                    )}
+                    {selected.body.nextSet && (
+                      <p className="font-mono text-xs text-slate-400">Next set {selected.body.nextSet.toLocaleTimeString()}</p>
+                    )}
+                  </div>
+                )}
+                {onAskKali && (
+                  <div className="flex justify-end pt-2 mt-2 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onAskKali(
+                          `Tell me about ${selected.body.name} — it's ${compassDirection(selected.body.azimuth)} at ` +
+                            `${selected.body.altitude.toFixed(1)}° altitude` +
+                            `${selected.body.magnitude !== null ? `, magnitude ${selected.body.magnitude.toFixed(2)}` : ''}, ` +
+                            `${formatDistance(selected.body.distanceAu)} away.`
+                        )
+                      }
+                      className="text-[10px] text-cyan-400 font-mono hover:underline hover:text-cyan-300"
+                    >
+                      Ask Kali →
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : selected.kind === 'iss' ? (
+              issTracker.telemetry && (
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-white">International Space Station</h3>
+                  <p className="font-mono text-xs text-cyan-100">
+                    {compassDirection(issTracker.telemetry.azimuth)} ({issTracker.telemetry.azimuth.toFixed(1)}°) · altitude{' '}
+                    {issTracker.telemetry.elevation.toFixed(1)}°
+                  </p>
+                  <p className="font-mono text-xs text-cyan-100">Range {Math.round(issTracker.telemetry.rangeKm).toLocaleString()} km</p>
+                  <p className="font-mono text-xs text-cyan-100">Orbital altitude {Math.round(issTracker.telemetry.altitudeKm)} km</p>
+                  <p className="font-mono text-xs text-cyan-100">Velocity {issTracker.telemetry.velocityKmS.toFixed(2)} km/s</p>
+                </div>
+              )
+            ) : (
+              constellationNames?.[selected.id] && (
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-white">{constellationNames[selected.id].name}</h3>
+                  <p className="font-mono text-xs text-cyan-100">Genitive: {constellationNames[selected.id].genitive}</p>
+                  <p className="font-mono text-xs text-cyan-100">IAU designation: {selected.id}</p>
+                  <p className="font-mono text-xs text-slate-400">Brightness rank: {constellationNames[selected.id].rank}</p>
+                </div>
+              )
+            )}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <h3 className="text-[10px] font-mono uppercase tracking-widest text-cyan-500/70">
+            Visible now ({visible.length})
+          </h3>
+          {visible.length === 0 && <p className="text-xs text-slate-500">Nothing tracked is above the horizon right now.</p>}
+          {visible.map((b) => (
+            <button
+              type="button"
+              key={b.name}
+              onClick={() => setSelected({ kind: 'body', body: b })}
+              className="flex items-center justify-between w-full px-3 py-2 text-left transition border rounded border-slate-800 bg-slate-900/40 hover:border-cyan-500/40"
+            >
+              <div>
+                <span className="text-sm font-bold text-white">{b.name}</span>
+                <span className="ml-2 font-mono text-[11px] text-slate-400">
+                  {compassDirection(b.azimuth)} · alt {b.altitude.toFixed(0)}°
+                  {b.magnitude !== null && ` · mag ${b.magnitude.toFixed(1)}`}
+                </span>
+              </div>
+              {b.nextSet && (
+                <span className="font-mono text-[10px] text-slate-500">sets {b.nextSet.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {belowHorizon.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-[10px] font-mono uppercase tracking-widest text-slate-600">Below the horizon</h3>
+            {belowHorizon.map((b) => (
+              <button
+                type="button"
+                key={b.name}
+                onClick={() => setSelected({ kind: 'body', body: b })}
+                className="flex items-center justify-between w-full px-3 py-2 text-left transition border rounded border-slate-900 bg-slate-950/40 hover:border-slate-700"
+              >
+                <span className="text-sm text-slate-500">{b.name}</span>
+                {b.nextRise && (
+                  <span className="font-mono text-[10px] text-slate-600">
+                    rises {b.nextRise.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Plain global <style> tag — no styled-jsx transform in this
+          standalone Vite build. Fine here since this component is the
+          entire page; there's nothing else on screen for these keyframes
+          to leak into. */}
+      <style>{`
+        @keyframes star-twinkle {
+          0%, 100% { opacity: 0.15; transform: scale(0.8); }
+          50% { opacity: 0.85; transform: scale(1.2); }
+        }
+        .animate-star-twinkle {
+          animation-name: star-twinkle;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
+        @keyframes messier-pulse {
+          0% { r: 5; stroke-opacity: 0.9; }
+          100% { r: 11; stroke-opacity: 0; }
+        }
+        .animate-messier-pulse {
+          animation: messier-pulse 1.1s ease-out infinite;
+        }
+        @keyframes target-pulse {
+          0% { r: 7; stroke-opacity: 0.9; }
+          100% { r: 16; stroke-opacity: 0; }
+        }
+        .animate-target-pulse {
+          animation: target-pulse 1.4s ease-out infinite;
+        }
+        @keyframes azimuth-sweep {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-azimuth-sweep {
+          animation: azimuth-sweep 8s linear infinite;
+        }
+      `}</style>
+    </div>
+  );
+}
