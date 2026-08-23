@@ -289,11 +289,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   // away. Picks whichever real body is actually most prominent right now —
   // not a fixed "always the Sun" default.
   const hasAutoSelectedRef = useRef(false);
-  // Shown when Casual/Expert is toggled with nothing selected — toggling it
-  // still changes hudMode underneath, there's just nothing on screen for
-  // that to visibly change until a body is picked.
-  const [hudHint, setHudHint] = useState<string | null>(null);
-  const hudHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Pan/zoom state for the sky dome — drag to pan, wheel to zoom.
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
@@ -526,12 +521,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
     if (defaultBody) setSelected({ kind: 'body', body: defaultBody });
   }, [sky, status]);
 
-  useEffect(() => {
-    return () => {
-      if (hudHintTimerRef.current) clearTimeout(hudHintTimerRef.current);
-    };
-  }, []);
-
   // Real SGP4 propagation from a live CelesTrak TLE, not a REST position
   // poll — enabled only while the layer is toggled on (see useIssTracker's
   // own `enabled` param), so this app isn't fetching from CelesTrak or
@@ -745,14 +734,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               <button
                 key={m}
                 type="button"
-                onClick={() => {
-                  setHudMode(m);
-                  if (!selected) {
-                    if (hudHintTimerRef.current) clearTimeout(hudHintTimerRef.current);
-                    setHudHint(`Select any object on the sky dome to view its ${m} breakdown.`);
-                    hudHintTimerRef.current = setTimeout(() => setHudHint(null), 3000);
-                  }
-                }}
+                onClick={() => setHudMode(m)}
                 className={`px-3 py-1 text-[10px] font-mono uppercase tracking-wide transition ${
                   hudMode === m ? 'bg-cyan-500/10 text-cyan-300' : 'text-slate-400 hover:text-slate-200'
                 }`}
@@ -1276,8 +1258,20 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                 const isLuminary = b.name === 'Sun' || b.name === 'Moon';
                 const label = resolvedLabels.get(b.name);
                 const labelY = label?.renderedY ?? y - 9;
+                const isSelected = selected?.kind === 'body' && selected.body.name === b.name;
                 return (
                   <g key={b.name} onClick={() => setSelected({ kind: 'body', body: b })} className="cursor-pointer">
+                    {isSelected && (
+                      <circle
+                        cx={x}
+                        cy={y}
+                        r={7}
+                        fill="none"
+                        stroke="rgba(34,211,238,0.9)"
+                        strokeWidth={0.8}
+                        className="pointer-events-none animate-target-pulse"
+                      />
+                    )}
                     <circle
                       cx={x}
                       cy={y}
@@ -1370,6 +1364,11 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
             </g>
           </svg>
           </div>
+          {!selected && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1.5 text-[10px] font-mono text-center rounded-full pointer-events-none bg-black/50 text-cyan-200/70 backdrop-blur-sm">
+              Select any object on the sky dome to view telemetry
+            </div>
+          )}
         </div>
 
         {/* Map key — only covers what's actually drawn above, nothing invented */}
@@ -1412,11 +1411,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
           <span>N/E/S/W = compass direction along the horizon</span>
         </div>
 
-        {hudHint && (
-          <div className="px-3 py-2 text-xs text-center border rounded-lg border-cyan-500/30 bg-cyan-950/30 text-cyan-200">
-            {hudHint}
-          </div>
-        )}
 
         {/* Detail panel for the selected body/satellite — inline, not a modal */}
         {selected && (
@@ -1568,6 +1562,13 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         }
         .animate-messier-pulse {
           animation: messier-pulse 1.1s ease-out infinite;
+        }
+        @keyframes target-pulse {
+          0% { r: 7; stroke-opacity: 0.9; }
+          100% { r: 16; stroke-opacity: 0; }
+        }
+        .animate-target-pulse {
+          animation: target-pulse 1.4s ease-out infinite;
         }
         @keyframes azimuth-sweep {
           from { transform: rotate(0deg); }
