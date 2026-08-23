@@ -18,11 +18,31 @@ QUANTUM_SERVICE_API_KEY=dev-only uvicorn main:app --reload --port 8080
 
 `curl -X POST localhost:8080/run-circuit -H "Content-Type: application/json" -H "X-API-Key: dev-only" -d '{"circuit_code": "circuit = Circuit().h(0).cnot(0, 1)"}'`
 
-## Deploying
+## Deploying (Render)
 
 This is a plain FastAPI + `requirements.txt` + `Procfile` app — deployable
 to Render, Fly.io, Railway, or any host that runs a Python web service.
-Render is the simplest for a small always-on service:
+Render is the simplest for a small always-on service.
+
+### Option A — Blueprint (`render.yaml`, recommended)
+
+A `render.yaml` blueprint lives at the repo root and already declares this
+service (`rootDir: quantum-service`, build/start commands, health check).
+
+1. In the Render dashboard: **New → Blueprint**, connect this repo.
+2. Render reads `render.yaml` and shows one service, `kali-quantum-service`.
+3. It'll prompt for `QUANTUM_SERVICE_API_KEY` (left blank in the file on
+   purpose — never commit a real secret). Set it to a real random value,
+   e.g. `openssl rand -hex 32`.
+4. Deploy. Note the service's public URL once it's live.
+
+The blueprint uses the `starter` plan (~$7/mo, stays online 24/7 — no
+cold-start spin-down). Switch it to `free` in the dashboard after deploying
+if occasional cold starts are an acceptable tradeoff for $0/mo; the free
+tier spins down after inactivity, so the first request after idle time can
+take several seconds.
+
+### Option B — Manual
 
 1. Push this repo (or just this subdirectory) to a place Render can see it.
 2. New Web Service → point Root Directory at `quantum-service/`.
@@ -44,6 +64,14 @@ to the values from the deployed service:
 Without `QUANTUM_SERVICE_URL` set, Kali's quantum tool returns a clear
 "not configured" error to the model instead of failing silently or
 throwing — the rest of Kali's chat keeps working normally either way.
+
+Via the Vercel CLI, once you have the real Render URL and secret:
+
+```bash
+vercel env add QUANTUM_SERVICE_URL production
+vercel env add QUANTUM_SERVICE_API_KEY production
+vercel --prod   # redeploy so the new env vars take effect
+```
 
 ## Security note
 
