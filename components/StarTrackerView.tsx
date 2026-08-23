@@ -68,6 +68,19 @@ const TRACKED_BODIES: AstroBody[] = [
 
 const AU_IN_KM = 149_597_870;
 
+// Real, static classification facts — not sensor-derived, just what each
+// body actually is. "Spectral type" only applies to the Sun (a real star);
+// the others get their real physical classification instead.
+const BODY_TYPE_FACTS: Record<string, string> = {
+  Sun: 'G2V main-sequence star',
+  Moon: "Earth's natural satellite",
+  Mercury: 'Terrestrial planet',
+  Venus: 'Terrestrial planet',
+  Mars: 'Terrestrial planet',
+  Jupiter: 'Gas giant',
+  Saturn: 'Gas giant, ringed',
+};
+
 interface SkyBody {
   name: string;
   azimuth: number;
@@ -253,6 +266,10 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
   const [selectedObservatoryId, setSelectedObservatoryId] = useState('local');
   const [now, setNow] = useState(() => new Date());
   const [selected, setSelected] = useState<SelectedItem>(null);
+  // Casual/Expert only change how much of the already-real data is shown
+  // (plain description vs full RA/Dec/magnitude/rise-set readout) — no
+  // separate data source, no simulated telemetry either mode.
+  const [hudMode, setHudMode] = useState<'casual' | 'expert'>('expert');
   // Hover-only (not click-persisted like `selected` above) — which Messier
   // diamond currently has its dark-themed preview overlay showing.
   const [hoveredMessierId, setHoveredMessierId] = useState<string | null>(null);
@@ -655,6 +672,22 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
             <CalendarClock className="w-3 h-3" />
             Sky Fest
           </button>
+          {/* Casual/Expert only changes display density on the same real
+              data below — not a separate feature or data source. */}
+          <div className="flex items-center border rounded-full border-slate-700 overflow-hidden">
+            {(['casual', 'expert'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setHudMode(m)}
+                className={`px-3 py-1 text-[10px] font-mono uppercase tracking-wide transition ${
+                  hudMode === m ? 'bg-cyan-500/10 text-cyan-300' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
         </div>
 
         <TelescopeConnectPanel connection={telescope} />
@@ -1317,22 +1350,35 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
               <X className="w-3.5 h-3.5" />
             </button>
             {selected.kind === 'body' ? (
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold text-white">{selected.body.name}</h3>
-                <p className="font-mono text-xs text-cyan-100">
-                  {compassDirection(selected.body.azimuth)} ({selected.body.azimuth.toFixed(1)}°) · altitude {selected.body.altitude.toFixed(1)}°
-                </p>
-                {selected.body.magnitude !== null && (
-                  <p className="font-mono text-xs text-cyan-100">Magnitude {selected.body.magnitude.toFixed(2)}</p>
-                )}
-                <p className="font-mono text-xs text-cyan-100">Distance {formatDistance(selected.body.distanceAu)}</p>
-                {selected.body.nextRise && (
-                  <p className="font-mono text-xs text-slate-400">Next rise {selected.body.nextRise.toLocaleTimeString()}</p>
-                )}
-                {selected.body.nextSet && (
-                  <p className="font-mono text-xs text-slate-400">Next set {selected.body.nextSet.toLocaleTimeString()}</p>
-                )}
-              </div>
+              hudMode === 'casual' ? (
+                <div className="space-y-1.5">
+                  <h3 className="text-lg font-bold text-white">{selected.body.name}</h3>
+                  <p className="text-xs text-slate-300">{BODY_TYPE_FACTS[selected.body.name] ?? 'Celestial object'}</p>
+                  <p className="text-xs text-slate-300">
+                    Look toward the {compassDirection(selected.body.azimuth)}
+                    {selected.body.altitude > 0 ? ', up in the sky right now.' : ' — currently below your horizon.'}
+                  </p>
+                  <p className="text-xs text-slate-300">It&apos;s about {formatDistance(selected.body.distanceAu)} away.</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-white">{selected.body.name}</h3>
+                  <p className="font-mono text-xs text-cyan-100">{BODY_TYPE_FACTS[selected.body.name] ?? 'Celestial object'}</p>
+                  <p className="font-mono text-xs text-cyan-100">
+                    {compassDirection(selected.body.azimuth)} ({selected.body.azimuth.toFixed(1)}°) · altitude {selected.body.altitude.toFixed(1)}°
+                  </p>
+                  {selected.body.magnitude !== null && (
+                    <p className="font-mono text-xs text-cyan-100">Magnitude {selected.body.magnitude.toFixed(2)}</p>
+                  )}
+                  <p className="font-mono text-xs text-cyan-100">Distance {formatDistance(selected.body.distanceAu)}</p>
+                  {selected.body.nextRise && (
+                    <p className="font-mono text-xs text-slate-400">Next rise {selected.body.nextRise.toLocaleTimeString()}</p>
+                  )}
+                  {selected.body.nextSet && (
+                    <p className="font-mono text-xs text-slate-400">Next set {selected.body.nextSet.toLocaleTimeString()}</p>
+                  )}
+                </div>
+              )
             ) : selected.kind === 'iss' ? (
               issTracker.telemetry && (
                 <div className="space-y-1">
