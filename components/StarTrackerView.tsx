@@ -886,14 +886,16 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
             aria-hidden="true"
           >
             <circle cx={50} cy={50} r={48.5} fill="none" stroke="rgba(34,211,238,0.3)" strokeWidth={0.6} />
-            {/* Cardinal degree labels — 0°N at top (screen-up), matching the
-                real dome's own N/E/S/W convention below, azimuth increasing
+            {/* Cardinal labels — letters only, no degree numbers (matches
+                the inner holographic azimuth ring's own N/E/S/W/NE/etc
+                convention, professional-instrument style rather than a
+                basic numbered compass dial). N at top, azimuth increasing
                 clockwise (E=90, S=180, W=270). */}
             {[
-              { deg: 0, label: '0°N' },
-              { deg: 90, label: '90°E' },
-              { deg: 180, label: '180°S' },
-              { deg: 270, label: '270°W' },
+              { deg: 0, label: 'N' },
+              { deg: 90, label: 'E' },
+              { deg: 180, label: 'S' },
+              { deg: 270, label: 'W' },
             ].map(({ deg, label }) => {
               const angle = (deg - 90) * (Math.PI / 180);
               const x = 50 + Math.cos(angle) * 38;
@@ -975,16 +977,77 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
                   ZENITH
                 </text>
               </g>
-              {['N', 'E', 'S', 'W'].map((label, i) => {
-                const angle = (i * 90 - 90) * (Math.PI / 180);
-                const x = center + (radius + 12) * Math.cos(angle);
-                const y = center + (radius + 12) * Math.sin(angle);
-                return (
-                  <text key={label} x={x} y={y} textAnchor="middle" dominantBaseline="middle" className="fill-cyan-500/70" fontSize={10} fontFamily="monospace">
-                    {label}
-                  </text>
-                );
-              })}
+              {/* Holographic azimuth ring — replaces the plain N/E/S/W
+                  labels. A glowing double ring at the horizon boundary,
+                  15deg tick marks (major every 45deg), 8-point compass
+                  labels, and a slow rotating highlight sweep for the
+                  "holographic" feel. Real azimuth convention (0=N,
+                  90=E clockwise), same as the rest of this view. */}
+              <g className="pointer-events-none">
+                <circle cx={center} cy={center} r={radius + 8} fill="none" stroke="rgba(34,211,238,0.15)" strokeWidth={4} />
+                <circle cx={center} cy={center} r={radius + 8} fill="none" stroke="rgba(34,211,238,0.5)" strokeWidth={1} />
+                {Array.from({ length: 24 }).map((_, i) => {
+                  const deg = i * 15;
+                  const angle = (deg - 90) * (Math.PI / 180);
+                  const isMajor = deg % 45 === 0;
+                  const outer = radius + 8 + (isMajor ? 5 : 3);
+                  const inner = radius + 8 - (isMajor ? 5 : 3);
+                  return (
+                    <line
+                      key={deg}
+                      x1={center + Math.cos(angle) * outer}
+                      y1={center + Math.sin(angle) * outer}
+                      x2={center + Math.cos(angle) * inner}
+                      y2={center + Math.sin(angle) * inner}
+                      stroke={isMajor ? 'rgba(103,232,249,0.8)' : 'rgba(34,211,238,0.4)'}
+                      strokeWidth={isMajor ? 1.2 : 0.6}
+                    />
+                  );
+                })}
+                {[
+                  { deg: 0, label: 'N' },
+                  { deg: 45, label: 'NE' },
+                  { deg: 90, label: 'E' },
+                  { deg: 135, label: 'SE' },
+                  { deg: 180, label: 'S' },
+                  { deg: 225, label: 'SW' },
+                  { deg: 270, label: 'W' },
+                  { deg: 315, label: 'NW' },
+                ].map(({ deg, label }) => {
+                  const angle = (deg - 90) * (Math.PI / 180);
+                  const x = center + Math.cos(angle) * (radius + 20);
+                  const y = center + Math.sin(angle) * (radius + 20);
+                  return (
+                    <text
+                      key={label}
+                      x={x}
+                      y={y}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill={label.length === 1 ? '#67e8f9' : 'rgba(103,232,249,0.6)'}
+                      fontSize={label.length === 1 ? 10 : 7}
+                      fontFamily="monospace"
+                      fontWeight={label.length === 1 ? 'bold' : 'normal'}
+                      style={{ filter: 'drop-shadow(0 0 2px rgba(34,211,238,0.7))' }}
+                    >
+                      {label}
+                    </text>
+                  );
+                })}
+                {/* Rotating highlight sweep — purely decorative motion, not
+                    tied to any real value, unlike the outer bezel ring. */}
+                <g className="animate-azimuth-sweep" style={{ transformOrigin: `${center}px ${center}px` }}>
+                  <circle
+                    cx={center}
+                    cy={center}
+                    r={radius + 8}
+                    fill="none"
+                    stroke="rgba(103,232,249,0.9)"
+                    strokeWidth={2}
+                    strokeDasharray={`${(radius + 8) * 0.15} ${(radius + 8) * 6.13}`}
+                  />
+                </g>
+              </g>
               {skyFocusMode !== 'OFF' &&
                 stars
                   ?.filter(([, , mag]) => skyFocusMode !== 'BRIGHT_STARS' || mag <= BRIGHT_STAR_MAGNITUDE_LIMIT)
@@ -1360,6 +1423,13 @@ export default function StarTrackerView({ onBack }: { onBack: () => void }) {
         }
         .animate-messier-pulse {
           animation: messier-pulse 1.1s ease-out infinite;
+        }
+        @keyframes azimuth-sweep {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-azimuth-sweep {
+          animation: azimuth-sweep 8s linear infinite;
         }
       `}</style>
     </div>
