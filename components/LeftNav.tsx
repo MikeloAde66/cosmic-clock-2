@@ -21,26 +21,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import PreferencesModal from './PreferencesModal';
 import DonationButton from './DonationButton';
-
-// The Ai One emblem — an angled open loop ("a") paired with a parallel
-// diagonal stem and dot ("i"). No background shape of its own; the
-// off-white color is set by the wrapping badge's text color below via
-// currentColor, so it inherits theme changes rather than being hardcoded
-// twice.
-function AiOneEmblem() {
-  return (
-    <svg viewBox="0 0 64 64" fill="none" className="w-6 h-6" aria-hidden="true">
-      <path
-        d="M 27.29 54.12 A 13 17 -22 1 1 35.29 37.38"
-        stroke="currentColor"
-        strokeWidth="7"
-        strokeLinecap="round"
-      />
-      <path d="M 46 16 L 33 50" stroke="currentColor" strokeWidth="7" strokeLinecap="round" />
-      <circle cx="49" cy="8" r="4.5" fill="currentColor" />
-    </svg>
-  );
-}
+import ProtoLabsLogo from './ProtoLabsLogo';
 
 interface LeftNavProps {
   activeTab?: string;
@@ -174,11 +155,8 @@ export default function LeftNav({
         }`}
       >
         <div className="flex items-center justify-between px-4">
-          <div
-            title="AIONE — Cosmic HUD"
-            className="flex items-center justify-center w-10 h-10 border rounded-full border-neutral-700 bg-neutral-900 text-[#EBE7DF]"
-          >
-            <AiOneEmblem />
+          <div title="Proto Labs Global">
+            <ProtoLabsLogo />
           </div>
           <button
             onClick={() => setIsDrawerOpen(false)}
@@ -335,11 +313,8 @@ export default function LeftNav({
           overlay, but there's no reason to fight it in dev either). */}
       <aside className="relative z-10 hidden flex-col items-center justify-between w-16 min-h-screen pt-4 pb-16 bg-neutral-950/30 backdrop-blur-sm md:flex">
         <div className="flex flex-col items-center gap-6">
-          <div
-            title="AIONE — Cosmic HUD"
-            className="flex items-center justify-center w-10 h-10 border rounded-full border-neutral-700 bg-neutral-900 text-[#EBE7DF]"
-          >
-            <AiOneEmblem />
+          <div title="Proto Labs Global">
+            <ProtoLabsLogo />
           </div>
 
           <nav className="flex flex-col gap-2">

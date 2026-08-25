@@ -43,7 +43,11 @@ body {
 .home-page .star-layer {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  /* Above Layer 2's hero image (z-index: 20 below) rather than under it —
+     at 95% opacity that image was fully occluding this layer, so the
+     twinkle motion never actually showed. Still under Layer 4's real
+     foreground content (z-index: 40). */
+  z-index: 22;
   pointer-events: none;
   /* Was only 5 points spread across the entire page height — sparse enough
      to read as basically empty wherever nothing else compensated (the hero
@@ -310,3 +314,68 @@ body {
   z-index: 900;
   pointer-events: none;
 }
+
+/* ------------------------------------------
+   Proto Labs Global logo mark (see components/ProtoLabsLogo.tsx) — the
+   real chrome pyramid (CSS 3D tetrahedron, ported from
+   protolabsglobal-main-shell), with the outer ring as a separate element
+   so it can spin independently while the pyramid itself stays static.
+   ------------------------------------------ */
+.logo-container {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.spinning-chrome-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.25));
+  animation: spinChrome 12s linear infinite;
+}
+
+@keyframes spinChrome {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* No animation here at all — this is the fix for the ring's rotation
+   otherwise carrying the pyramid around with it: the pyramid is a
+   sibling of the ring, not a child, so the ring's transform never
+   touches it in the first place. */
+.static-pyramid-icon {
+  position: relative;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  perspective: 220px;
+}
+
+.ptlg-pyramid {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateX(-16deg) rotateY(20deg);
+}
+
+.ptlg-face {
+  display: block;
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #a6b4c9 45%, #3b485a 50%, #e2e8f0 100%);
+  transform-origin: 50% 100%;
+  backface-visibility: hidden;
+}
+
+.ptlg-face:nth-child(1) { transform: rotateY(0deg) translateZ(6px) rotateX(24deg); }
+.ptlg-face:nth-child(2) { transform: rotateY(90deg) translateZ(6px) rotateX(24deg); }
+.ptlg-face:nth-child(3) { transform: rotateY(180deg) translateZ(6px) rotateX(24deg); }
+.ptlg-face:nth-child(4) { transform: rotateY(270deg) translateZ(6px) rotateX(24deg); }
