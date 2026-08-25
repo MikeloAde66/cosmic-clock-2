@@ -339,12 +339,6 @@ body {
      stroke ring (there's no padding-box to put a literal inset box-shadow
      into), pushed up to match the requested intensity. */
   filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.45));
-  animation: spinChrome 12s linear infinite;
-}
-
-@keyframes spinChrome {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 .static-pyramid-icon {
@@ -362,14 +356,8 @@ body {
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  animation: spinPyramid 1.4s linear infinite !important;
-  transform-origin: 50% 50% !important;
-  will-change: transform;
-}
-
-@keyframes spinPyramid {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(359.9deg); }
+  animation: none !important;
+  transform: none !important;
 }
 
 .ptlg-face {
