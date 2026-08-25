@@ -335,7 +335,10 @@ body {
   position: absolute;
   inset: 0;
   z-index: 1;
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.25));
+  /* Brighter/stronger glow — drop-shadow is the real analog for an SVG
+     stroke ring (there's no padding-box to put a literal inset box-shadow
+     into), pushed up to match the requested intensity. */
+  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.45));
   animation: spinChrome 12s linear infinite;
 }
 
@@ -344,16 +347,13 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* No animation here at all — this is the fix for the ring's rotation
-   otherwise carrying the pyramid around with it: the pyramid is a
-   sibling of the ring, not a child, so the ring's transform never
-   touches it in the first place. */
 .static-pyramid-icon {
   position: relative;
   z-index: 2;
   width: 22px;
   height: 22px;
   perspective: 220px;
+  filter: drop-shadow(0px 0px 6px rgba(255, 255, 255, 0.3));
 }
 
 .ptlg-pyramid {
@@ -362,7 +362,17 @@ body {
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transform: rotateX(-16deg) rotateY(20deg);
+  transform-origin: center;
+  /* rotateY, not a flat rotate() — this is a real 3D solid (preserve-3d +
+     4 angled faces), so spinning it like a turntable around its vertical
+     axis is what actually shows all four faces as it turns; a flat
+     Z-axis rotate() here would just spin it in place face-on. */
+  animation: ptlg-rotate-fast 3s linear infinite;
+}
+
+@keyframes ptlg-rotate-fast {
+  from { transform: rotateX(-16deg) rotateY(0deg); }
+  to { transform: rotateX(-16deg) rotateY(360deg); }
 }
 
 .ptlg-face {
