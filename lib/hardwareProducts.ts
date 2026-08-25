@@ -1,9 +1,10 @@
-// Visual placeholders only — neither product has a real Stripe Price yet
-// (unlike STANDALONE_PRODUCTS/PRICING_TIERS, which are always real,
-// already-provisioned Stripe ids). Give each a real entry there once
-// pricing/checkout is real — until then the detail page's CTA does
-// nothing on click (no handler wired) rather than pretending to charge
-// anyone, even though it's styled as a bold, fully "live" button.
+// Real one-time Stripe charge now runs for all three (see
+// app/actions/hardwareCheckout.ts — inline price_data, no persisted Stripe
+// Price object needed). What's still missing is fulfillment: no OS image,
+// STL files, or webhook exists to hand anything over automatically once a
+// charge succeeds. manualFulfillment marks that gap so the detail page can
+// keep being honest about it (real charge today, delivery follows by email)
+// instead of implying an instant unlock that doesn't exist.
 export interface HardwareProduct {
   id: string;
   categoryBadge: string;
@@ -27,7 +28,7 @@ export interface HardwareProduct {
   callout: string;
   preOrderCta: string;
   featured?: boolean;
-  comingSoon?: boolean;
+  manualFulfillment?: boolean;
 }
 
 export const HARDWARE_PRODUCTS: HardwareProduct[] = [
@@ -49,7 +50,7 @@ export const HARDWARE_PRODUCTS: HardwareProduct[] = [
     ],
     callout: '100% Data Sovereignty — zero cloud dependencies, native 12V solar-ready power draw under 5 Watts.',
     preOrderCta: 'Pre-Order Builder Kit →',
-    comingSoon: true,
+    manualFulfillment: true,
   },
   {
     id: 'hydronode-pro',
@@ -70,7 +71,7 @@ export const HARDWARE_PRODUCTS: HardwareProduct[] = [
     callout: '100% Data Sovereignty — zero cloud dependencies, fully offline local mesh dashboard reachable from any smartphone or browser.',
     preOrderCta: 'Get HydroNode Pro →',
     featured: true,
-    comingSoon: true,
+    manualFulfillment: true,
   },
   {
     id: 'aione-core',
@@ -97,6 +98,6 @@ export const HARDWARE_PRODUCTS: HardwareProduct[] = [
     ],
     callout: '100% Data Sovereignty — offline Matrix server and local WebXR sandbox, no cloud round-trip required.',
     preOrderCta: 'Pre-Order Ai One Core →',
-    comingSoon: true,
+    manualFulfillment: true,
   },
 ];

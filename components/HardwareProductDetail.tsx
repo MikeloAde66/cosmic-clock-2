@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { ArrowLeft, Check, Play } from 'lucide-react';
 import Starfield from '@/components/Starfield';
 import ProductTelemetryDemo from '@/components/ProductTelemetryDemo';
+import CommercialPlayer from '@/components/CommercialPlayer';
+import { createHardwareCheckoutSession } from '@/app/actions/hardwareCheckout';
+import { COMMERCIAL_CAPTIONS } from '@/lib/commercialScripts';
 import type { HardwareProduct } from '@/lib/hardwareProducts';
 
 function formatPrice(cents: number) {
@@ -83,20 +86,26 @@ export default function HardwareProductDetail({ product }: { product: HardwarePr
                 <span className="text-4xl font-bold text-white">${formatPrice(product.priceCents)}</span>
                 <span className="text-sm text-neutral-500">one-time</span>
               </div>
-              <button
-                type="button"
-                className="w-full py-3 text-sm font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition"
-              >
-                {product.preOrderCta}
-              </button>
-              {product.comingSoon && (
+              <form action={createHardwareCheckoutSession}>
+                <input type="hidden" name="productId" value={product.id} />
+                <button
+                  type="submit"
+                  className="w-full py-3 text-sm font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition"
+                >
+                  {product.preOrderCta}
+                </button>
+              </form>
+              {product.manualFulfillment && (
                 <p className="text-center text-[11px] font-mono text-slate-500">
-                  Digital platform — no physical shipping required. Not yet available for purchase; pre-orders open soon.
+                  Real charge today, not a hold &mdash; this is a pre-order. We&rsquo;ll email you
+                  directly with delivery/access details; nothing ships or unlocks automatically yet.
                 </p>
               )}
             </div>
           </div>
         </div>
+
+        <CommercialPlayer title={product.name} captions={COMMERCIAL_CAPTIONS[product.id] ?? []} />
 
         {/* Compact interactive demo — hydronode-pro/builder-kit get the
             water variant, aione-core gets the quantum variant. Every other

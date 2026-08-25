@@ -250,3 +250,63 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
 }
+
+/* ------------------------------------------
+   Product catalog 3D page-flip (ProductFlipbook)
+   ------------------------------------------ */
+.flipbook-stage {
+  position: relative;
+  width: 100%;
+  height: 560px;
+  perspective: 2200px;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.flipbook-page {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  backface-visibility: hidden;
+  transition: transform 0.7s cubic-bezier(0.645, 0.045, 0.355, 1);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #0a0a0c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.flipbook-page-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+/* Self-shadow that darkens the turning page near its spine while it's
+   mid-flip, simulating light falloff on a curling page — fades out once
+   the flip settles (the page is either fully flat or fully hidden). */
+.flipbook-page-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.65), transparent 55%);
+  opacity: 0;
+  transition: opacity 0.7s ease;
+  pointer-events: none;
+}
+
+.flipbook-page-shade.is-turning {
+  opacity: 1;
+}
+
+/* Permanent binding shadow along the spine for depth, regardless of which
+   page is turning. */
+.flipbook-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 24px;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.55), transparent);
+  z-index: 900;
+  pointer-events: none;
+}
