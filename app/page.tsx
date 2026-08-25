@@ -1,7 +1,7 @@
 'use client';
 import { useContextMenuShare } from '@/components/useContextMenuShare';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { ArrowUp } from 'lucide-react';
 import TopHeader from '@/components/TopHeader';
 import LeftNav from '@/components/LeftNav';
@@ -30,19 +30,17 @@ import RadioCentralConsoleView from '@/components/radio/RadioCentralConsoleView'
 import SiteFooter from '@/components/SiteFooter';
 import ISSFeedModal from '@/components/ISSFeedModal';
 import StarTrackerView from '@/components/StarTrackerView';
+import TriviaView from '@/components/TriviaView';
 import VaultSearchModal from '@/components/VaultSearchModal';
 import { RadioPlayerProvider } from '@/components/radio/RadioPlayerContext';
 import GlobalPlayerBar from '@/components/radio/GlobalPlayerBar';
 import { CartProvider } from '@/lib/cart';
-import { supabase } from '@/lib/supabase';
-import { checkSubscriptionStatus } from '@/lib/subscriptionStatus';
 import { useWeatherLocation } from '@/lib/useWeatherLocation';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
 function HomeInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<string>('aione');
+  const [activeTab, setActiveTab] = useState<string>('radio');
   // Set by a Home globe Vault marker's "Open Drawer" link, or a Cmd+K search
   // result, consumed once as CosmicVaultAuth's initial filter — see that
   // component's initialDrawer prop.
@@ -153,6 +151,8 @@ function HomeInner() {
   // ISSFeedModal are rendered directly rather than from inside TopHeader.
   const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(false);
   const [isIssOpen, setIsIssOpen] = useState(false);
+  const [isTriviaOpen, setIsTriviaOpen] = useState(false);
+  const [isLetsChatOpen, setIsLetsChatOpen] = useState(false);
 
   const [isVaultSearchOpen, setIsVaultSearchOpen] = useState(false);
   useEffect(() => {
@@ -166,25 +166,6 @@ function HomeInner() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 useContextMenuShare();
-
-  // Smart Auth & Access Guard: a signed-in visitor with a real active
-  // subscription skips the landing page entirely. Runs silently in the
-  // background rather than gating the initial render — the common case
-  // (an unauthenticated visitor) shouldn't wait on an auth round-trip just
-  // to see the landing page it was already about to show.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase.auth.getUser();
-      const user = data.user;
-      if (!user || cancelled) return;
-      const status = await checkSubscriptionStatus(user.id);
-      if (!cancelled && status.active) router.replace('/dashboard');
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
 
   // /dashboard's "Radio Broadcast Hub" link, and Stripe's cancel_url /
   // dashboard's required-plan redirect, land back here with a query param
@@ -239,6 +220,8 @@ useContextMenuShare();
           isStarTrackerOpen={isStarTrackerOpen}
           onToggleStarTracker={() => setIsStarTrackerOpen((v) => !v)}
           onOpenLiveIss={() => setIsIssOpen(true)}
+          onOpenTrivia={() => setIsTriviaOpen(true)}
+          onOpenLetsChat={() => setIsLetsChatOpen(true)}
         />
 
         <div className="flex flex-col flex-1 overflow-hidden">
@@ -422,6 +405,8 @@ useContextMenuShare();
           full-screen view (fixed z-50), not a stacked modal. */}
       <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
       {isStarTrackerOpen && <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} onAskKali={askKali} />}
+      {isTriviaOpen && <TriviaView onBack={() => setIsTriviaOpen(false)} />}
+      {isLetsChatOpen && <TenForwardSection onBack={() => setIsLetsChatOpen(false)} />}
     </CartProvider>
     </RadioPlayerProvider>
   );

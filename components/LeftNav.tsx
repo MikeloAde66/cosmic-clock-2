@@ -3,9 +3,11 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
+  Gamepad2,
   Home,
   LayoutGrid,
   Menu,
+  MessageCircle,
   Mic,
   Radio as RadioIcon,
   Rocket,
@@ -78,6 +80,13 @@ interface LeftNavProps {
   isStarTrackerOpen?: boolean;
   onToggleStarTracker?: () => void;
   onOpenLiveIss?: () => void;
+  // Opens the dedicated Trivia view (real questions from /api/trivia,
+  // which itself calls Open Trivia DB directly — no local Python service).
+  onOpenTrivia?: () => void;
+  // Opens the dedicated "Let's Chat" community view (TenForwardSection,
+  // renamed — was only reachable via Continuous Stack's scroll flow
+  // before, now a real nav destination from any layout mode).
+  onOpenLetsChat?: () => void;
 }
 
 // Cosmic Vault is intentionally absent from this list — see the Vault
@@ -103,6 +112,8 @@ export default function LeftNav({
   isStarTrackerOpen = false,
   onToggleStarTracker,
   onOpenLiveIss,
+  onOpenTrivia,
+  onOpenLetsChat,
 }: LeftNavProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
@@ -232,6 +243,28 @@ export default function LeftNav({
               />
             </span>
             <span className="text-sm">Star Tracker</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsDrawerOpen(false);
+              onOpenTrivia?.();
+            }}
+            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+          >
+            <Gamepad2 className="w-4 h-4 shrink-0" />
+            <span className="text-sm">Trivia</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsDrawerOpen(false);
+              onOpenLetsChat?.();
+            }}
+            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+          >
+            <MessageCircle className="w-4 h-4 shrink-0" />
+            <span className="text-sm">Let&apos;s Chat</span>
           </button>
 
           <button
@@ -378,6 +411,35 @@ export default function LeftNav({
               </button>
               <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
                 Star Tracker
+              </span>
+            </div>
+
+            {/* Trivia — real questions via /api/trivia (Open Trivia DB
+                directly, no local Python service). Circular, not the
+                square-ish `rounded` the other icons use, per spec. */}
+            <div className="relative group">
+              <button
+                onClick={() => onOpenTrivia?.()}
+                aria-label="Trivia"
+                className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded-full cursor-pointer text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+              >
+                <Gamepad2 className="w-4 h-4" />
+              </button>
+              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
+                Trivia
+              </span>
+            </div>
+
+            <div className="relative group">
+              <button
+                onClick={() => onOpenLetsChat?.()}
+                aria-label="Let's Chat"
+                className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+              >
+                <MessageCircle className="w-4 h-4" />
+              </button>
+              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
+                Let&apos;s Chat
               </span>
             </div>
 
