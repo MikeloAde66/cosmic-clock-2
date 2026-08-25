@@ -362,17 +362,14 @@ body {
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transform-origin: center;
-  /* rotateY, not a flat rotate() — this is a real 3D solid (preserve-3d +
-     4 angled faces), so spinning it like a turntable around its vertical
-     axis is what actually shows all four faces as it turns; a flat
-     Z-axis rotate() here would just spin it in place face-on. */
-  animation: ptlg-rotate-fast 3s linear infinite;
+  animation: spinPyramid 1.4s linear infinite !important;
+  transform-origin: 50% 50% !important;
+  will-change: transform;
 }
 
-@keyframes ptlg-rotate-fast {
-  from { transform: rotateX(-16deg) rotateY(0deg); }
-  to { transform: rotateX(-16deg) rotateY(360deg); }
+@keyframes spinPyramid {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .ptlg-face {
