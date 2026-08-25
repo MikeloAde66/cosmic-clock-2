@@ -201,6 +201,7 @@ useContextMenuShare();
     if (searchParams.get('view') === 'kali') {
       openHomeView('kali');
     }
+
     // Only ever consumed once, on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
