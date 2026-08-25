@@ -194,6 +194,13 @@ useContextMenuShare();
     if (auth === 'login' || auth === 'signup') {
       setAuthModalRequest({ mode: auth, token: Date.now() });
     }
+
+    // ?view=kali — real deep-link for external sites (e.g. the
+    // protolabsglobal-main-shell static site's Kali AI card) to land
+    // directly on the Kali chat section instead of the default tab.
+    if (searchParams.get('view') === 'kali') {
+      openHomeView('kali');
+    }
     // Only ever consumed once, on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
