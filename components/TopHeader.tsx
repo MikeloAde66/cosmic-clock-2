@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import AuthModal from './AuthModal';
 import LayoutModeToggle, { type LayoutMode } from './LayoutModeToggle';
+import NavbarDonateButton from './NavbarDonateButton';
 import { supabase } from '@/lib/supabase';
 
 interface TopHeaderProps {
@@ -89,6 +90,7 @@ export default function TopHeader({
         {/* Right Side: Layout Toggle + Auth Controls (search now lives on
             the Radio page only) */}
         <div className="flex items-center space-x-2">
+          <NavbarDonateButton />
           {layoutMode && onLayoutModeChange && (
             <LayoutModeToggle mode={layoutMode} onChange={onLayoutModeChange} />
           )}
