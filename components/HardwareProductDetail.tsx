@@ -7,13 +7,27 @@ import { ArrowLeft, Check, Play } from 'lucide-react';
 import Starfield from '@/components/Starfield';
 import ProductTelemetryDemo from '@/components/ProductTelemetryDemo';
 import CommercialPlayer from '@/components/CommercialPlayer';
+import PurchaseButton from '@/components/PurchaseButton';
 import { createHardwareCheckoutSession } from '@/app/actions/hardwareCheckout';
 import { COMMERCIAL_CAPTIONS } from '@/lib/commercialScripts';
+import { BUILDER_KIT_LINK, HYDRONODE_PRO_LINK, AIONE_CORE_LINK } from '@/lib/paymentLinks';
 import type { HardwareProduct } from '@/lib/hardwareProducts';
 
 function formatPrice(cents: number) {
   return (cents / 100).toFixed(2);
 }
+
+// Prefers a real Payment Link when one exists for this product (no API key
+// involved at all); falls back to createHardwareCheckoutSession otherwise
+// (inline price_data — currently blocked in production until
+// STRIPE_SECRET_KEY holds a real sk_live_ value). Neither path grants
+// automatic entitlement — both are real charges with manual/email delivery,
+// per product.manualFulfillment.
+const HARDWARE_PAYMENT_LINKS: Record<string, string> = {
+  'builder-kit': BUILDER_KIT_LINK,
+  'hydronode-pro': HYDRONODE_PRO_LINK,
+  'aione-core': AIONE_CORE_LINK,
+};
 
 export default function HardwareProductDetail({ product }: { product: HardwareProduct }) {
   const [videoRequested, setVideoRequested] = useState(false);
@@ -86,15 +100,24 @@ export default function HardwareProductDetail({ product }: { product: HardwarePr
                 <span className="text-4xl font-bold text-white">${formatPrice(product.priceCents)}</span>
                 <span className="text-sm text-neutral-500">one-time</span>
               </div>
-              <form action={createHardwareCheckoutSession}>
-                <input type="hidden" name="productId" value={product.id} />
-                <button
-                  type="submit"
-                  className="w-full py-3 text-sm font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition"
-                >
-                  {product.preOrderCta}
-                </button>
-              </form>
+              {HARDWARE_PAYMENT_LINKS[product.id] ? (
+                <PurchaseButton
+                  label={product.preOrderCta}
+                  link={HARDWARE_PAYMENT_LINKS[product.id]}
+                  featured
+                  pendingLabel={product.preOrderCta}
+                />
+              ) : (
+                <form action={createHardwareCheckoutSession}>
+                  <input type="hidden" name="productId" value={product.id} />
+                  <button
+                    type="submit"
+                    className="w-full py-3 text-sm font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition"
+                  >
+                    {product.preOrderCta}
+                  </button>
+                </form>
+              )}
               {product.manualFulfillment && (
                 <p className="text-center text-[11px] font-mono text-slate-500">
                   Real charge today, not a hold &mdash; this is a pre-order. We&rsquo;ll email you

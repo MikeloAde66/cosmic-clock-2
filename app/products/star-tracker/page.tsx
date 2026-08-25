@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Check, Download } from 'lucide-react';
 import Starfield from '@/components/Starfield';
-import { supabase } from '@/lib/supabase';
-import { createStandaloneCheckoutSession } from '@/app/actions/checkout';
+import PurchaseButton from '@/components/PurchaseButton';
 import { STANDALONE_PRODUCTS } from '@/lib/standaloneProducts';
+import { STAR_TRACKER_LINK } from '@/lib/paymentLinks';
 
 const product = STANDALONE_PRODUCTS.find((p) => p.id === 'star-tracker')!;
 
@@ -27,16 +27,6 @@ const CAPABILITIES = [
 ];
 
 export default function StarTrackerProductPage() {
-  const [userId, setUserId] = useState('');
-  const [userEmail, setUserEmail] = useState('');
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id ?? '');
-      setUserEmail(data.user?.email ?? '');
-    });
-  }, []);
-
   return (
     <div className="relative w-full min-h-screen overflow-hidden bg-[#0a0a0c] text-slate-100">
       <Starfield />
@@ -68,15 +58,11 @@ export default function StarTrackerProductPage() {
         </ul>
 
         <div className="p-4 text-sm border rounded-lg border-neutral-700 bg-neutral-900/60 text-neutral-300">
-          Already unlocked — the full Star Tracker experience is included in every Ai One plan, starting
-          at the $12/mo Hobby tier. This one-time purchase is for standalone access on its own, outside
-          the main app.
+          Already unlocked — the full Star Tracker experience is included in the $12/mo AiOne Pro plan.
+          This one-time purchase is for standalone access on its own, outside the main app.
         </div>
 
-        <form action={createStandaloneCheckoutSession} className="space-y-3">
-          <input type="hidden" name="priceId" value={product.priceId} />
-          <input type="hidden" name="userId" value={userId} />
-          <input type="hidden" name="userEmail" value={userEmail} />
+        <div className="space-y-3">
           <div className="flex items-baseline gap-2">
             <span className="text-4xl font-bold text-white">${(product.amountCents / 100).toFixed(2)}</span>
             <span className="text-sm text-neutral-500">one-time</span>
@@ -86,12 +72,9 @@ export default function StarTrackerProductPage() {
               there's no PDF-generation tool available to produce a real
               binary PDF. */}
           <div className="flex flex-col gap-3 sm:flex-row">
-            <button
-              type="submit"
-              className="w-full py-3 text-sm font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200 transition sm:flex-1"
-            >
-              Purchase Star Tracker →
-            </button>
+            <div className="sm:flex-1">
+              <PurchaseButton label="Purchase Star Tracker →" link={STAR_TRACKER_LINK} featured attachUserId />
+            </div>
             <a
               href="/docs/Star_Tracker_QuickStart_Guide.txt"
               download="Star_Tracker_QuickStart_Guide.txt"
@@ -101,7 +84,7 @@ export default function StarTrackerProductPage() {
               Quick Start Guide
             </a>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
