@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import LoginModal from './LoginModal';
-import SignUpModal from './SignUpModal';
+import AuthModal from './AuthModal';
 import LayoutModeToggle, { type LayoutMode } from './LayoutModeToggle';
 import { supabase } from '@/lib/supabase';
 
@@ -18,6 +17,10 @@ interface TopHeaderProps {
   // just hosts the selector UI in persistent chrome.
   layoutMode?: LayoutMode;
   onLayoutModeChange?: (mode: LayoutMode) => void;
+  // Set by page.tsx from a real ?auth=login/?auth=signup URL param — the
+  // deep-link the protolabsglobal-main-shell static site's Log In/Sign Up
+  // buttons point at, so this modal opens directly on arrival.
+  authModalRequest?: { mode: 'login' | 'signup'; token: number } | null;
 }
 
 // Live ISS and Star Tracker used to live here as header pills — both moved
@@ -27,10 +30,30 @@ interface TopHeaderProps {
 // Pricing is the only item left in this section, so the mobile-only
 // collapse-into-a-dropdown mechanism that used to hold all three together
 // no longer serves a purpose — Pricing renders directly at every size now.
-export default function TopHeader({ activeTab, onOpenPricing, layoutMode, onLayoutModeChange }: TopHeaderProps) {
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [isSignUpOpen, setIsSignUpOpen] = useState(false);
+export default function TopHeader({
+  activeTab,
+  onOpenPricing,
+  layoutMode,
+  onLayoutModeChange,
+  authModalRequest,
+}: TopHeaderProps) {
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const openAuth = (mode: 'login' | 'signup') => {
+    setAuthMode(mode);
+    setIsAuthOpen(true);
+  };
   const isHome = activeTab === 'aione';
+
+  // A real ?auth=login/?auth=signup deep-link — see page.tsx. Reacts to
+  // the token, not just the mode, so requesting the same mode again still
+  // reopens it.
+  const [lastAuthToken, setLastAuthToken] = useState<number | null>(null);
+  useEffect(() => {
+    if (!authModalRequest || authModalRequest.token === lastAuthToken) return;
+    setLastAuthToken(authModalRequest.token);
+    openAuth(authModalRequest.mode);
+  }, [authModalRequest, lastAuthToken]);
 
   // Real session, not just isAdmin (LeftNav's check) — any signed-in
   // account counts here, since this button represents "is someone logged
@@ -48,19 +71,6 @@ export default function TopHeader({ activeTab, onOpenPricing, layoutMode, onLayo
     return () => subscription.subscription.unsubscribe();
   }, []);
   const accountInitials = accountEmail ? accountEmail.slice(0, 2).toUpperCase() : '';
-
-  // Supabase's default email template is a magic link, not a 6-digit code —
-  // a SIGNED_IN event fired from clicking that link is otherwise silent, so
-  // reopen the Sign Up onboarding (terms/profile) whenever the visitor's
-  // last auth action was actually starting the Sign Up flow, not Log In.
-  useEffect(() => {
-    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN' && localStorage.getItem('cosmic_auth_intent') === 'signup') {
-        setIsSignUpOpen(true);
-      }
-    });
-    return () => subscription.subscription.unsubscribe();
-  }, []);
 
   return (
     <>
@@ -85,13 +95,13 @@ export default function TopHeader({ activeTab, onOpenPricing, layoutMode, onLayo
           {isHome ? (
             <>
               <button
-                onClick={() => setIsSignUpOpen(true)}
+                onClick={() => openAuth('signup')}
                 className="px-3 py-1 text-xs font-bold border-b border-neutral-700 text-white hover:text-white transition-colors"
               >
                 Sign Up
               </button>
               <button
-                onClick={() => setIsLoginOpen(true)}
+                onClick={() => openAuth('login')}
                 className="px-3 py-1 ml-1 text-xs border rounded bg-neutral-900 border-neutral-700 hover:border-neutral-500 text-neutral-300"
               >
                 Log In
@@ -103,7 +113,7 @@ export default function TopHeader({ activeTab, onOpenPricing, layoutMode, onLayo
             </button>
           )}
           <button
-            onClick={() => setIsLoginOpen(true)}
+            onClick={() => openAuth('login')}
             title={accountEmail ? 'Account Profile' : 'Log In'}
             className={`flex items-center justify-center w-8 h-8 text-xs font-semibold rounded-full transition border ${
               accountEmail
@@ -116,11 +126,9 @@ export default function TopHeader({ activeTab, onOpenPricing, layoutMode, onLayo
         </div>
       </header>
 
-      {/* Log In Modal */}
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
-
-      {/* Sign Up Modal — moved here from AiOneHome's sub-nav, next to Log In */}
-      <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} />
+      {/* Unified Log In / Create Account modal — tabs between modes, magic
+          link or password, real Supabase calls either way. */}
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} initialMode={authMode} />
     </>
   );
 }

@@ -4,6 +4,7 @@ import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowUp } from 'lucide-react';
 import TopHeader from '@/components/TopHeader';
+import AuthModal from '@/components/AuthModal';
 import LeftNav from '@/components/LeftNav';
 import type { LayoutMode } from '@/components/LayoutModeToggle';
 import GalleryGrid from '@/components/GalleryGrid';
@@ -172,6 +173,13 @@ useContextMenuShare();
   // rather than app state — read it once on mount and translate it into
   // this component's own existing state (activeTab / the Pricing section).
   const [pricingRequestToken, setPricingRequestToken] = useState(0);
+  // ?auth=login / ?auth=signup — the deep-link the protolabsglobal-main-shell
+  // static site's Log In/Sign Up buttons point at, so clicking them opens
+  // this real modal directly on arrival instead of requiring an extra click
+  // once here. A token (not just the mode) so the same mode requested twice
+  // in a row (rare, but e.g. a second click before this state clears) still
+  // re-triggers the open.
+  const [authModalRequest, setAuthModalRequest] = useState<{ mode: 'login' | 'signup'; token: number } | null>(null);
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab === 'radio') setActiveTab('radio');
@@ -180,6 +188,11 @@ useContextMenuShare();
     if (checkout === 'cancelled' || checkout === 'required') {
       setActiveTab('aione');
       setPricingRequestToken(Date.now());
+    }
+
+    const auth = searchParams.get('auth');
+    if (auth === 'login' || auth === 'signup') {
+      setAuthModalRequest({ mode: auth, token: Date.now() });
     }
     // Only ever consumed once, on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -193,6 +206,29 @@ useContextMenuShare();
     setActiveTab('aione');
     setPricingRequestToken(Date.now());
   };
+
+  // ?embed=1&auth=login (or signup) — used when this page is loaded inside
+  // an <iframe> from the protolabsglobal-main-shell static site's own
+  // modal overlay. Renders just the real auth modal, nothing else (no
+  // LeftNav/TopHeader/app chrome), so the iframe shows only the modal
+  // itself. Posts a message to the parent window on close/real sign-in so
+  // the shell can dismiss its overlay too — real cross-window
+  // communication, not a guess at timing.
+  if (searchParams.get('embed') === '1' && authModalRequest) {
+    return (
+      <div className="flex items-center justify-center w-full h-screen bg-transparent">
+        <AuthModal
+          isOpen
+          initialMode={authModalRequest.mode}
+          onClose={() => {
+            if (window.parent !== window) {
+              window.parent.postMessage({ type: 'cosmic-auth-closed' }, '*');
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <RadioPlayerProvider>
@@ -230,6 +266,7 @@ useContextMenuShare();
             onOpenPricing={openPricing}
             layoutMode={layoutMode}
             onLayoutModeChange={changeLayoutMode}
+            authModalRequest={authModalRequest}
           />
 
           {/* Classic Hub (default, unchanged) — the existing tab-swap
