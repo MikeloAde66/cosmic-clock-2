@@ -62,6 +62,37 @@ async function decrementVaultVariantInventoryIfApplicable(productId: string, qua
   }
 }
 
+// Resolves which Supabase account a completed session belongs to. Our own
+// checkout Server Actions (createCheckoutSession/createStandaloneCheckoutSession)
+// stamp session.metadata.supabase_user_id before redirecting to Stripe, so
+// that's checked first. A real Stripe Payment Link (dashboard-created, not
+// one of our sessions) can't set arbitrary session metadata, but it CAN
+// carry session.client_reference_id if the link's URL has a
+// ?client_reference_id=<id> param (see PurchaseButton) — checked second.
+// Neither may be present (a Payment Link clicked while logged out, or one
+// missing that URL param), so the last resort is matching the email the
+// customer actually typed into Stripe's checkout form against a Supabase
+// account with the same email — the Admin API has no direct
+// "get user by email" call, so this pages through listUsers() rather than
+// querying directly; fine at this app's scale, worth revisiting only if
+// the user base grows large enough to make that slow.
+async function resolveUserId(admin: SupabaseAdmin, session: Stripe.Checkout.Session): Promise<string | undefined> {
+  if (session.metadata?.supabase_user_id) return session.metadata.supabase_user_id;
+  if (session.client_reference_id) return session.client_reference_id;
+
+  const email = session.customer_details?.email;
+  if (!email) return undefined;
+
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error || !data?.users?.length) break;
+    const match = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (match) return match.id;
+    if (data.users.length < 200) break; // reached the last page
+  }
+  return undefined;
+}
+
 // Permanent, product-specific feature unlocks live in app_metadata (same
 // mechanism/location as the admin role flag in lib/adminAuth.ts) — settable
 // only via this service-role client, never by the user themselves. Reads
@@ -141,7 +172,7 @@ async function handleProductOrderCompleted(session: Stripe.Checkout.Session, adm
       // No physical shipment — mark delivered immediately.
       await updateOrder(admin, session.id, productId, { fulfillment_status: 'delivered' });
       await decrementVaultVariantInventoryIfApplicable(productId, quantity);
-      await grantEntitlementIfApplicable(admin, productId, session.metadata?.supabase_user_id);
+      await grantEntitlementIfApplicable(admin, productId, await resolveUserId(admin, session));
       continue;
     }
 
@@ -286,7 +317,7 @@ export async function POST(request: Request) {
         const session = event.data.object as Stripe.Checkout.Session;
 
         if (session.mode === 'subscription') {
-          await admin
+          const { data: updatedRows, error: updateError } = await admin
             .from('subscriptions')
             .update({
               stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
@@ -294,7 +325,42 @@ export async function POST(request: Request) {
               status: 'active',
               updated_at: new Date().toISOString(),
             })
-            .eq('stripe_checkout_session_id', session.id);
+            .eq('stripe_checkout_session_id', session.id)
+            .select('id');
+
+          // No row matched — this session didn't come from our own
+          // createCheckoutSession (which always pre-inserts one before
+          // redirecting to Stripe), so it's a real Stripe Payment Link
+          // checkout instead. Insert fresh rather than leaving this
+          // real subscriber unrecorded and permanently invisible to
+          // /api/subscription/status.
+          if (!updateError && updatedRows?.length === 0) {
+            const userId = await resolveUserId(admin, session);
+            if (userId) {
+              let priceId = '';
+              try {
+                const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 });
+                priceId = lineItems.data[0]?.price?.id ?? '';
+              } catch (err) {
+                console.error('Failed to look up line items for a Payment-Link subscription session:', err);
+              }
+              await admin.from('subscriptions').insert({
+                user_id: userId,
+                stripe_checkout_session_id: session.id,
+                stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
+                stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
+                stripe_price_id: priceId,
+                tier: 'aione-pro',
+                billing_interval: 'month',
+                status: 'active',
+              });
+            } else {
+              console.error(
+                'Subscription completed via a real Payment Link but no matching Supabase account was found for',
+                session.customer_details?.email
+              );
+            }
+          }
         } else if (session.mode === 'payment') {
           await handleProductOrderCompleted(session, admin, stripe);
         }

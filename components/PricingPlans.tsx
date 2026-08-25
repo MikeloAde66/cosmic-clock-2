@@ -35,6 +35,7 @@ export default function PricingPlans() {
             link={AIONE_PRO_SUBSCRIPTION_LINK}
             featured
             pendingLabel="Subscription link pending"
+            attachUserId
           />
         </div>
       </div>
