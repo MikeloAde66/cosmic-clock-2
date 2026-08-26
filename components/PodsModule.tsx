@@ -1000,7 +1000,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`p-8 max-w-6xl mx-auto space-y-6 relative transition animate-zero-gravity-unfold ${
+      className={`p-8 max-w-6xl mx-auto space-y-6 relative transition animate-zero-gravity-unfold bg-[#16181c] ${
         isDraggingOver ? 'bg-white/10 border-2 border-dashed border-neutral-700 rounded-2xl' : ''
       }`}
       style={{ perspective: '1200px' }}
@@ -1020,17 +1020,18 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
           transform-style: preserve-3d;
           animation: zeroGravityUnfold 0.6s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        /* Dark brushed-metal studio frame — visual treatment only, no
-           change to any real state/handler underneath it. */
+        /* Dark brushed-titanium studio wall — visual treatment only, no
+           change to any real state/handler underneath it. Opaque so the
+           app's global starfield behind this tab doesn't show through. */
         .pods-studio-frame {
+          position: relative;
           padding: 1.5rem;
           border-radius: 1rem;
-          background: linear-gradient(160deg, #2a2d33 0%, #1a1c20 45%, #232527 100%);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          box-shadow: 0 0 40px rgba(255, 255, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-        }
-        .pods-panel-glow {
-          box-shadow: 0 0 24px rgba(255, 255, 255, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+          background-color: #16181c;
+          background-image:
+            repeating-linear-gradient(0deg, rgba(148, 163, 184, 0.08) 0px, rgba(148, 163, 184, 0.08) 1px, transparent 1px, transparent 64px),
+            repeating-linear-gradient(90deg, rgba(148, 163, 184, 0.08) 0px, rgba(148, 163, 184, 0.08) 1px, transparent 1px, transparent 64px);
+          box-shadow: 0 0 25px rgba(255, 255, 255, 0.45), inset 0 0 15px rgba(255, 255, 255, 0.2);
         }
       `}</style>
 
@@ -1072,7 +1073,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       {activeView === 'player' && (
       <div className="pods-studio-frame">
       {/* Header Bar */}
-      <div className="flex items-center justify-between min-h-[44px] gap-4">
+      <div className="flex items-center justify-between min-h-[44px] gap-4 p-3 rounded-lg bg-[#1e2229] border border-slate-700/50">
         <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase whitespace-nowrap">
           STUDIO ONE
         </h2>
@@ -1216,7 +1217,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         {/* Left Column: Player & EQ */}
         <div className="space-y-4 lg:col-span-5">
           {activeTrack ? (
-            <div className="p-5 space-y-4 border bg-slate-900/90 border-neutral-700 rounded-xl backdrop-blur pods-panel-glow">
+            <div className="p-5 space-y-4 rounded-xl backdrop-blur border-2 border-slate-100 shadow-[0_0_20px_rgba(255,255,255,0.35)] bg-[#121418] drop-shadow-2xl">
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-block px-2 py-0.5 bg-white/10 text-white text-xs font-mono rounded">
                   {activeTrack.frequency}
@@ -1478,7 +1479,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         {/* Right Column: Camera & Reader */}
         <div className="flex flex-col space-y-4 lg:col-span-7">
           {(
-            <div className="p-4 space-y-3 border bg-slate-950 border-neutral-700 rounded-xl pods-panel-glow">
+            <div className="p-4 space-y-3 rounded-xl border-2 border-slate-100 shadow-[0_0_20px_rgba(255,255,255,0.35)] bg-[#121418] drop-shadow-2xl">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 font-mono text-xs tracking-wider uppercase text-white">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
@@ -1540,7 +1541,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
                   value={mediaUrl}
                   onChange={(e) => setMediaUrl(e.target.value)}
                   placeholder="Paste YouTube video/playlist URL or direct media link..."
-                  className="flex-1 min-w-[180px] px-3 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded font-mono text-slate-300 focus:outline-none focus:border-white/50"
+                  className="flex-1 min-w-[180px] px-3 py-1.5 text-xs bg-[#0a0b0d] border border-slate-800 rounded font-mono text-slate-300 focus:outline-none focus:border-white/50"
                 />
                 {(activeEmbedUrl || localVideoUrl) && (
                   <button
