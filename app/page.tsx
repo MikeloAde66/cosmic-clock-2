@@ -31,7 +31,6 @@ import RadioCentralConsoleView from '@/components/radio/RadioCentralConsoleView'
 import SiteFooter from '@/components/SiteFooter';
 import ISSFeedModal from '@/components/ISSFeedModal';
 import StarTrackerView from '@/components/StarTrackerView';
-import TriviaView from '@/components/TriviaView';
 import VaultSearchModal from '@/components/VaultSearchModal';
 import { RadioPlayerProvider } from '@/components/radio/RadioPlayerContext';
 import GlobalPlayerBar from '@/components/radio/GlobalPlayerBar';
@@ -152,7 +151,6 @@ function HomeInner() {
   // ISSFeedModal are rendered directly rather than from inside TopHeader.
   const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(false);
   const [isIssOpen, setIsIssOpen] = useState(false);
-  const [isTriviaOpen, setIsTriviaOpen] = useState(false);
   const [isLetsChatOpen, setIsLetsChatOpen] = useState(false);
 
   const [isVaultSearchOpen, setIsVaultSearchOpen] = useState(false);
@@ -264,7 +262,6 @@ useContextMenuShare();
           isStarTrackerOpen={isStarTrackerOpen}
           onToggleStarTracker={() => setIsStarTrackerOpen((v) => !v)}
           onOpenLiveIss={() => setIsIssOpen(true)}
-          onOpenTrivia={() => setIsTriviaOpen(true)}
           onOpenLetsChat={() => setIsLetsChatOpen(true)}
         />
 
@@ -450,7 +447,6 @@ useContextMenuShare();
           full-screen view (fixed z-50), not a stacked modal. */}
       <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
       {isStarTrackerOpen && <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} onAskKali={askKali} />}
-      {isTriviaOpen && <TriviaView onBack={() => setIsTriviaOpen(false)} />}
       {isLetsChatOpen && <TenForwardSection onBack={() => setIsLetsChatOpen(false)} />}
     </CartProvider>
     </RadioPlayerProvider>

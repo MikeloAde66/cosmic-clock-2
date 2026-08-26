@@ -23,18 +23,14 @@ body {
    removed entirely — its rose/magenta stops kept bleeding through into
    Weather/Kali whenever .home-page's real content overflow (from the
    dust-puff layer below, since clipped) let it scroll into view. The
-   starfield + shadow-slide layers below carry the background on their own.
-
-   Layer 2's shadow slideshow uses the three real images in public/
-   (shadow-purple.png, shadow-milkyway.png, shadow-ice.png) — note the
-   filenames describe content, not literal source filenames; the files as
-   originally saved had their "purple" and "ice" content swapped and a
-   doubled .png.png extension, corrected when copying them into public/.
+   starfield layer below carries the background on its own now — Layer 2's
+   photographic shadow-slide hero image was removed entirely per an
+   explicit request to expose a clean, continuous starfield instead.
    ========================================== */
 .home-page {
   position: relative;
   isolation: isolate; /* clean root stacking context for the z-index layers below */
-  perspective: 1200px; /* 3D depth for Layer 2's acute tilt */
+  perspective: 1200px; /* 3D depth for the star/dust/content layers' translateZ */
 }
 
 /* ------------------------------------------
@@ -191,39 +187,6 @@ body {
     opacity: 0;
     transform: translate(var(--dust-drift-x, 0px), var(--dust-drift-y, 0px)) scale(1.15);
   }
-}
-
-/* ------------------------------------------
-   LAYER 2: translucent shadow projection + acute 3D tilt.
-   Locked to a single static image (shadow-milkyway.png) — no rotation, no
-   crossfade, no timer. Was a 3-image rotation; that JS interval was removed
-   from AiOneHome entirely per the single-image-lock request. The image
-   itself later got a slow cinematic pulse/zoom (see .cinematic-pulse
-   below) — a deliberate, explicit reversal of "no animation at all" on
-   this layer, not a regression of the single-image lock, which still
-   holds (still shadow-milkyway.png, still no rotation/crossfade/timer).
-   ------------------------------------------ */
-.home-page .shadow-slideshow-container {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  pointer-events: none;
-  overflow: hidden; /* clips .shadow-slide's cinematic-pulse scale(1.03) peak so it never spills past this container's edges */
-  transform: rotateX(3deg) rotateY(-2deg) translateZ(0px);
-  transform-style: preserve-3d;
-}
-
-.home-page .shadow-slide {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  background-image: url('/shadow-milkyway.png');
-  /* Full native strength, no blend mode/filter — renders the source PNG's
-     own color/contrast/sharpness directly. Completely static — the
-     "living" motion in this hero comes from the star layer above it
-     (twinkle + screen blend), not from panning/zooming the artwork itself. */
-  opacity: 0.95;
 }
 
 /* ------------------------------------------

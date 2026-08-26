@@ -6,8 +6,8 @@ import { ArrowLeft, MessageSquare, Radio as StreamIcon } from 'lucide-react';
 interface TenForwardSectionProps {
   // Only set when opened as its own dedicated view (via LeftNav's "Let's
   // Chat" icon) — renders the fixed-overlay + Back button chrome that
-  // StarTrackerView/TriviaView use. Omitted when embedded inline as a
-  // Continuous Stack section, where the page itself owns the scroll.
+  // StarTrackerView uses. Omitted when embedded inline as a Continuous
+  // Stack section, where the page itself owns the scroll.
   onBack?: () => void;
 }
 
