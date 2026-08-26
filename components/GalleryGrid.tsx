@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Gift, Telescope, Satellite, ArrowUpRight } from 'lucide-react';
-import { useDonation } from '@/lib/useDonation';
+import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
 
 interface GalleryGridProps {
   onOpenRadio: () => void;
@@ -90,6 +90,44 @@ function CardImage({ src, gradient, Icon }: { src: string; gradient: string; Ico
   );
 }
 
+// Real, public NOAA GOES-16 GeoColor feed — the same CDN URL NoaaWidget
+// (mounted hidden elsewhere, see CosmicCanvas.tsx) already uses for its own
+// satellite view. No API key, refreshed by NOAA itself; a plain <img> (not
+// next/image) so there's no remote-domain allowlist to configure.
+const NOAA_SATELLITE_URL = 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/CONUS/GEOCOLOR/1250x750.jpg';
+
+// Weather's own preview strip — live satellite imagery instead of a
+// gradient cover, with the live current temperature (useNoaaSnapshot,
+// same NWS points->forecastHourly pattern NoaaWidget already proved out)
+// overlaid in the corner once it resolves.
+function WeatherCardImage() {
+  const { temp, unit, loading } = useNoaaSnapshot();
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-gradient-to-br from-sky-900 via-slate-900 to-slate-950">
+      {!failed && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={NOAA_SATELLITE_URL}
+          alt=""
+          className={`relative object-cover w-full h-full transition-opacity duration-500 ${
+            loaded ? 'opacity-80 group-hover:opacity-100' : 'opacity-0'
+          }`}
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+        />
+      )}
+      {!loading && temp != null && (
+        <div className="absolute px-2 py-0.5 text-xs font-bold font-mono text-white rounded bottom-1.5 right-1.5 bg-black/60 backdrop-blur-sm">
+          {temp}°{unit}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CardHeader({ Icon, active }: { Icon: typeof RadioIcon; active?: boolean }) {
   return (
     <div className="flex items-start justify-between">
@@ -144,12 +182,9 @@ export default function GalleryGrid({
   onOpenPods,
   onOpenKali,
   onOpenStarTracker,
-  onOpenIss,
   onWeatherClick,
   weatherActive,
 }: GalleryGridProps) {
-  const { loading: donateLoading, error: donateError, donate } = useDonation();
-
   // One flag per grid slot — flips true once that slot's arrival animation
   // finishes (see ArrivalSlot's onAnimationEnd below), which is also what
   // switches the card from pointer-events-none/cursor-wait to clickable.
@@ -216,6 +251,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={3} docked={docked[3]} onDock={dock}>
           <button onClick={onWeatherClick} className={cardClass}>
+            <WeatherCardImage />
             <CardHeader Icon={Umbrella} active={weatherActive} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Weather</div>
@@ -237,16 +273,16 @@ export default function GalleryGrid({
           </button>
         </ArrivalSlot>
 
+        {/* On hold — temporary empty placeholder, no click action or data
+            fetch (this slot is slated for a different module next pass). */}
         <ArrivalSlot index={5} docked={docked[5]} onDock={dock}>
-          <button onClick={donate} disabled={donateLoading} className={`${cardClass} disabled:opacity-60`}>
+          <div className={`${cardClass} cursor-default`}>
             <CardHeader Icon={Gift} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Donate</div>
-              <p className="mt-1 text-xs text-slate-400">
-                {donateError || (donateLoading ? 'Opening checkout…' : 'Support the project — $5 test donation.')}
-              </p>
+              <p className="mt-1 text-xs text-slate-400">Coming soon.</p>
             </div>
-          </button>
+          </div>
         </ArrivalSlot>
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
@@ -271,15 +307,17 @@ export default function GalleryGrid({
           </Link>
         </ArrivalSlot>
 
+        {/* On hold — temporary empty placeholder, no click action or data
+            fetch (this slot is slated for a different module next pass). */}
         <ArrivalSlot index={8} docked={docked[8]} onDock={dock}>
-          <button onClick={onOpenIss} className={cardClass}>
+          <div className={`${cardClass} cursor-default`}>
             <CardImage src={GALLERY_IMAGES.iss} gradient={CARD_GRADIENTS.iss} Icon={Satellite} />
             <CardHeader Icon={Satellite} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">ISS Stream</div>
-              <p className="mt-1 text-xs text-slate-400">Live HD feed from the International Space Station.</p>
+              <p className="mt-1 text-xs text-slate-400">Coming soon.</p>
             </div>
-          </button>
+          </div>
         </ArrivalSlot>
       </div>
     </div>
