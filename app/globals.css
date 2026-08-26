@@ -13,6 +13,29 @@ body {
   overflow: hidden;
 }
 
+/* Gallery Grid — sequential "deep-space arrival" mount. Each card travels
+   in from a micro-scale focal origin behind the viewer (translateZ -500px)
+   and docks into its slot with a spring overshoot (the 1.56 in the
+   cubic-bezier is what gives the slight over-scale bounce past 1.0 before
+   settling, reading as a soft magnetic "dock" rather than a hard stop). */
+@keyframes gallery-card-arrival {
+  0% {
+    opacity: 0;
+    transform: scale(0.05) translateZ(-500px);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.6) translateZ(-120px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateZ(0);
+  }
+}
+.gallery-card-arrival {
+  animation: gallery-card-arrival 700ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
 /* ==========================================
    HOME PAGE — MULTI-LAYER ATMOSPHERIC CANVAS
    Scoped entirely under .home-page (applied only to AiOneHome.tsx's own

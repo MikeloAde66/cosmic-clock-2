@@ -261,7 +261,6 @@ useContextMenuShare();
           onProductsClick={() => scrollToStackSection('products')}
           isStarTrackerOpen={isStarTrackerOpen}
           onToggleStarTracker={() => setIsStarTrackerOpen((v) => !v)}
-          onOpenLiveIss={() => setIsIssOpen(true)}
           onOpenLetsChat={() => setIsLetsChatOpen(true)}
         />
 
@@ -331,6 +330,8 @@ useContextMenuShare();
                   changeLayoutMode('hub');
                   openHomeView('kali');
                 }}
+                onOpenStarTracker={() => setIsStarTrackerOpen(true)}
+                onOpenIss={() => setIsIssOpen(true)}
                 onWeatherClick={weather.toggleSearch}
                 weatherActive={weather.weatherActive}
               />

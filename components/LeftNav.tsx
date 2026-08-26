@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
+  ChevronDown,
   Home,
   LayoutGrid,
   Menu,
@@ -53,12 +54,13 @@ interface LeftNavProps {
   // other nav item staying on the same continuous page in this mode.
   isStackMode?: boolean;
   onProductsClick?: () => void;
-  // Star Tracker/Live ISS — moved here from TopHeader's pills. Star
-  // Tracker is a real on/off toggle (green dot open, red dot closed);
-  // Live ISS just opens its existing modal, same as before, only relocated.
+  // Star Tracker — moved here from TopHeader's pills; a real on/off toggle
+  // (green dot open, red dot closed). Live ISS has no callback prop
+  // anymore — its nav entry is a non-interactive placeholder now (visible
+  // but pointer-events-none, per the "clean minimal nav" restructure), so
+  // there is nothing left to click for it to call.
   isStarTrackerOpen?: boolean;
   onToggleStarTracker?: () => void;
-  onOpenLiveIss?: () => void;
   // Opens the dedicated "Let's Chat" community view (TenForwardSection,
   // renamed — was only reachable via Continuous Stack's scroll flow
   // before, now a real nav destination from any layout mode).
@@ -87,7 +89,6 @@ export default function LeftNav({
   onProductsClick,
   isStarTrackerOpen = false,
   onToggleStarTracker,
-  onOpenLiveIss,
   onOpenLetsChat,
 }: LeftNavProps) {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -95,6 +96,12 @@ export default function LeftNav({
   // Mobile/tablet only (< md) — the icon rail below is hidden and replaced
   // by a hamburger trigger + slide-out drawer holding the same nav items.
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  // Live ISS (disabled) is the only thing left top-level now — everything
+  // else (Home/Radio/Studio/Products/Star Tracker/Let's Chat/Ai/Weather/
+  // Donate/Preferences) collapses into a single "Home" dropdown (desktop
+  // popover / mobile disclosure) to cut down visual clutter in the rail.
+  const [isHomeMenuOpen, setIsHomeMenuOpen] = useState(false);
+  const [isMobileHomeExpanded, setIsMobileHomeExpanded] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -162,120 +169,137 @@ export default function LeftNav({
         </div>
 
         <nav className="flex flex-col gap-1 px-3">
-          {NAV_ITEMS.map(({ key, label, Icon }) => (
-            <button
-              key={key}
-              onClick={() => handleNavClick(key)}
-              className={`flex items-center gap-3 h-11 px-3 rounded-lg transition-all border ${
-                activeTab === key
-                  ? 'bg-neutral-900 text-white border-neutral-700'
-                  : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent'
-              }`}
-            >
-              <Icon className="w-4 h-4 shrink-0" />
-              <span className="text-sm">{label}</span>
-            </button>
-          ))}
+          {/* "Home" dropdown — folds Home/Radio/Studio/Products/Star
+              Tracker/Let's Chat/Ai/Weather/Donate/Preferences into one
+              disclosure so only Live ISS (disabled) stays top-level. */}
+          <button
+            onClick={() => setIsMobileHomeExpanded((v) => !v)}
+            aria-expanded={isMobileHomeExpanded}
+            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+          >
+            <Home className="w-4 h-4 shrink-0" />
+            <span className="text-sm">Home</span>
+            <ChevronDown className={`w-3.5 h-3.5 ml-auto transition-transform ${isMobileHomeExpanded ? 'rotate-180' : ''}`} />
+          </button>
 
-          {isStackMode ? (
-            <button
-              onClick={() => {
-                setIsDrawerOpen(false);
-                onProductsClick?.();
-              }}
-              className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
-            >
-              <LayoutGrid className="w-4 h-4 shrink-0" />
-              <span className="text-sm">Products</span>
-            </button>
-          ) : (
-            <Link
-              href="/products"
-              onClick={() => setIsDrawerOpen(false)}
-              className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
-            >
-              <LayoutGrid className="w-4 h-4 shrink-0" />
-              <span className="text-sm">Products</span>
-            </Link>
+          {isMobileHomeExpanded && (
+            <div className="flex flex-col gap-1 pl-4 border-l ml-5 border-neutral-800">
+              {NAV_ITEMS.map(({ key, label, Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => handleNavClick(key)}
+                  className={`flex items-center gap-3 h-10 px-3 rounded-lg transition-all border ${
+                    activeTab === key
+                      ? 'bg-neutral-900 text-white border-neutral-700'
+                      : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="text-sm">{label}</span>
+                </button>
+              ))}
+
+              {isStackMode ? (
+                <button
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    onProductsClick?.();
+                  }}
+                  className="flex items-center gap-3 h-10 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+                >
+                  <LayoutGrid className="w-4 h-4 shrink-0" />
+                  <span className="text-sm">Products</span>
+                </button>
+              ) : (
+                <Link
+                  href="/products"
+                  onClick={() => setIsDrawerOpen(false)}
+                  className="flex items-center gap-3 h-10 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+                >
+                  <LayoutGrid className="w-4 h-4 shrink-0" />
+                  <span className="text-sm">Products</span>
+                </Link>
+              )}
+
+              <button
+                onClick={() => {
+                  setIsDrawerOpen(false);
+                  onToggleStarTracker?.();
+                }}
+                className="relative flex items-center gap-3 h-10 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+              >
+                <span className="relative shrink-0">
+                  <Telescope className="w-4 h-4" />
+                  <span
+                    className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
+                      isStarTrackerOpen ? 'bg-green-500' : 'bg-red-500'
+                    }`}
+                  />
+                </span>
+                <span className="text-sm">Star Tracker</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsDrawerOpen(false);
+                  onOpenLetsChat?.();
+                }}
+                className="flex items-center gap-3 h-10 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+              >
+                <MessageCircle className="w-4 h-4 shrink-0" />
+                <span className="text-sm">Let&apos;s Chat</span>
+              </button>
+
+              <button
+                onClick={() => handleHomeViewClick('kali')}
+                className="flex items-center gap-3 h-10 px-3 rounded-lg transition-all border border-transparent text-white hover:bg-neutral-900/50"
+              >
+                <Sparkles className="w-4 h-4 shrink-0 animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
+                <span className="text-sm">Ai</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsDrawerOpen(false);
+                  onWeatherClick?.();
+                }}
+                onDoubleClick={() => {
+                  setIsDrawerOpen(false);
+                  onWeatherDoubleClick?.();
+                }}
+                className={`flex items-center gap-3 h-10 px-3 rounded-lg transition-all border border-transparent hover:bg-neutral-900/50 ${
+                  weatherActive ? 'text-green-400 hover:text-green-300' : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <Umbrella className="w-4 h-4 shrink-0" />
+                <span className="text-sm">Weather</span>
+              </button>
+
+              <DonationButton row />
+
+              <button
+                onClick={() => {
+                  setIsDrawerOpen(false);
+                  setShowPreferences(true);
+                }}
+                className="flex items-center gap-3 h-10 px-3 rounded-lg transition-all text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+              >
+                <Settings className="w-4 h-4 shrink-0" />
+                <span className="text-sm">Preferences</span>
+              </button>
+            </div>
           )}
 
-          <button
-            onClick={() => {
-              setIsDrawerOpen(false);
-              onToggleStarTracker?.();
-            }}
-            className="relative flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
-          >
-            <span className="relative shrink-0">
-              <Telescope className="w-4 h-4" />
-              <span
-                className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
-                  isStarTrackerOpen ? 'bg-green-500' : 'bg-red-500'
-                }`}
-              />
-            </span>
-            <span className="text-sm">Star Tracker</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setIsDrawerOpen(false);
-              onOpenLetsChat?.();
-            }}
-            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
-          >
-            <MessageCircle className="w-4 h-4 shrink-0" />
-            <span className="text-sm">Let&apos;s Chat</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setIsDrawerOpen(false);
-              onOpenLiveIss?.();
-            }}
-            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+          {/* Live ISS — kept visible per spec but non-interactive
+              (pointer-events-none + tabIndex=-1) instead of removed. */}
+          <div
+            aria-disabled="true"
+            tabIndex={-1}
+            className="flex items-center gap-3 h-11 px-3 rounded-lg border border-transparent text-neutral-600 opacity-40 pointer-events-none select-none"
           >
             <Satellite className="w-4 h-4 shrink-0" />
             <span className="text-sm">Live ISS</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setIsDrawerOpen(false);
-              onWeatherClick?.();
-            }}
-            onDoubleClick={() => {
-              setIsDrawerOpen(false);
-              onWeatherDoubleClick?.();
-            }}
-            className={`flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent hover:bg-neutral-900/50 ${
-              weatherActive ? 'text-green-400 hover:text-green-300' : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <Umbrella className="w-4 h-4 shrink-0" />
-            <span className="text-sm">Weather</span>
-          </button>
-
-          <button
-            onClick={() => handleHomeViewClick('kali')}
-            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all border border-transparent text-white hover:bg-neutral-900/50"
-          >
-            <Sparkles className="w-4 h-4 shrink-0 animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
-            <span className="text-sm">Ai</span>
-          </button>
-
-          <DonationButton row />
-
-          <button
-            onClick={() => {
-              setIsDrawerOpen(false);
-              setShowPreferences(true);
-            }}
-            className="flex items-center gap-3 h-11 px-3 rounded-lg transition-all text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
-          >
-            <Settings className="w-4 h-4 shrink-0" />
-            <span className="text-sm">Preferences</span>
-          </button>
+          </div>
         </nav>
       </aside>
 
@@ -290,140 +314,164 @@ export default function LeftNav({
           </div>
 
           <nav className="flex flex-col gap-2">
-            {NAV_ITEMS.map(({ key, label, Icon }) => (
-              <div key={key} className="relative group">
-                <button
-                  onClick={() => handleNavClick(key)}
-                  aria-label={label}
-                  className={`flex items-center justify-center w-10 h-10 rounded transition-all cursor-pointer border ${
-                    activeTab === key
-                      ? 'bg-neutral-900 text-white border-neutral-700'
-                      : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                </button>
-                {/* Hover tooltip drawer — click-to-open activation above is
-                    what changes the view; this is purely a label, so it
-                    never causes layout shift in the main canvas. */}
+            {/* "Home" dropdown — the single collapsible menu holding every
+                folded legacy link (Home/Radio/Studio/Products/Star
+                Tracker/Let's Chat/Ai/Weather/Donate/Preferences), leaving
+                Live ISS (disabled) as the only other top-level item. Click
+                toggles a popover to the right; an invisible full-screen
+                backdrop (below) closes it on any outside click. */}
+            <div className="relative group">
+              <button
+                onClick={() => setIsHomeMenuOpen((v) => !v)}
+                aria-label="Home menu"
+                aria-expanded={isHomeMenuOpen}
+                className={`relative z-40 flex items-center justify-center w-10 h-10 rounded transition-all cursor-pointer border ${
+                  isHomeMenuOpen
+                    ? 'bg-neutral-900 text-white border-neutral-700'
+                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent'
+                }`}
+              >
+                <Home className="w-4 h-4" />
+              </button>
+              {!isHomeMenuOpen && (
                 <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
-                  {label}
+                  Home
                 </span>
-              </div>
-            ))}
-
-            {/* Products/Showcase — a real standalone route (/products)
-                normally, so a genuine navigation via <Link>; in Stack mode
-                there's a real embedded Products section instead, so this
-                becomes a scroll-to button like Home/Radio/Pods, keeping the
-                user on the same continuous page. */}
-            <div className="relative group">
-              {isStackMode ? (
-                <button
-                  onClick={() => onProductsClick?.()}
-                  aria-label="Products"
-                  className="flex items-center justify-center w-10 h-10 rounded transition-all cursor-pointer border text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-              ) : (
-                <Link
-                  href="/products"
-                  aria-label="Products"
-                  className="flex items-center justify-center w-10 h-10 rounded transition-all cursor-pointer border text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </Link>
               )}
-              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
-                Products
-              </span>
+
+              {isHomeMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setIsHomeMenuOpen(false)} />
+                  <div className="absolute z-40 left-full top-0 ml-2 w-48 py-1.5 rounded-lg border bg-zinc-900/95 backdrop-blur-sm border-zinc-800 shadow-xl">
+                    {NAV_ITEMS.map(({ key, label, Icon }) => (
+                      <button
+                        key={key}
+                        onClick={() => {
+                          setIsHomeMenuOpen(false);
+                          handleNavClick(key);
+                        }}
+                        className={`flex items-center w-full gap-3 h-9 px-3 transition-all ${
+                          activeTab === key ? 'text-white bg-neutral-800/60' : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4 shrink-0" />
+                        <span className="text-xs font-mono">{label}</span>
+                      </button>
+                    ))}
+
+                    {isStackMode ? (
+                      <button
+                        onClick={() => {
+                          setIsHomeMenuOpen(false);
+                          onProductsClick?.();
+                        }}
+                        className="flex items-center w-full gap-3 px-3 transition-all h-9 text-neutral-300 hover:text-white hover:bg-neutral-800/60"
+                      >
+                        <LayoutGrid className="w-4 h-4 shrink-0" />
+                        <span className="text-xs font-mono">Products</span>
+                      </button>
+                    ) : (
+                      <Link
+                        href="/products"
+                        onClick={() => setIsHomeMenuOpen(false)}
+                        className="flex items-center w-full gap-3 px-3 transition-all h-9 text-neutral-300 hover:text-white hover:bg-neutral-800/60"
+                      >
+                        <LayoutGrid className="w-4 h-4 shrink-0" />
+                        <span className="text-xs font-mono">Products</span>
+                      </Link>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setIsHomeMenuOpen(false);
+                        onToggleStarTracker?.();
+                      }}
+                      className="relative flex items-center w-full gap-3 px-3 transition-all h-9 text-neutral-300 hover:text-white hover:bg-neutral-800/60"
+                    >
+                      <span className="relative shrink-0">
+                        <Telescope className="w-4 h-4" />
+                        <span
+                          className={`absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full ${
+                            isStarTrackerOpen ? 'bg-green-500' : 'bg-red-500'
+                          }`}
+                        />
+                      </span>
+                      <span className="text-xs font-mono">Star Tracker</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsHomeMenuOpen(false);
+                        onOpenLetsChat?.();
+                      }}
+                      className="flex items-center w-full gap-3 px-3 transition-all h-9 text-neutral-300 hover:text-white hover:bg-neutral-800/60"
+                    >
+                      <MessageCircle className="w-4 h-4 shrink-0" />
+                      <span className="text-xs font-mono">Let&apos;s Chat</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsHomeMenuOpen(false);
+                        onOpenHomeView?.('kali');
+                      }}
+                      className="flex items-center w-full gap-3 px-3 text-white transition-all h-9 hover:bg-neutral-800/60"
+                    >
+                      <Sparkles className="w-4 h-4 shrink-0 animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
+                      <span className="text-xs font-mono">Ai</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsHomeMenuOpen(false);
+                        onWeatherClick?.();
+                      }}
+                      onDoubleClick={() => {
+                        setIsHomeMenuOpen(false);
+                        onWeatherDoubleClick?.();
+                      }}
+                      className={`flex items-center w-full gap-3 px-3 transition-all h-9 hover:bg-neutral-800/60 ${
+                        weatherActive ? 'text-green-400 hover:text-green-300' : 'text-neutral-300 hover:text-white'
+                      }`}
+                    >
+                      <Umbrella className="w-4 h-4 shrink-0" />
+                      <span className="text-xs font-mono">Weather</span>
+                    </button>
+
+                    <DonationButton row />
+
+                    <div className="my-1 border-t border-zinc-800" />
+
+                    <button
+                      onClick={() => {
+                        setIsHomeMenuOpen(false);
+                        setShowPreferences(true);
+                      }}
+                      className="flex items-center w-full gap-3 px-3 transition-all h-9 text-neutral-300 hover:text-white hover:bg-neutral-800/60"
+                    >
+                      <Settings className="w-4 h-4 shrink-0" />
+                      <span className="text-xs font-mono">Preferences</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Star Tracker / Live ISS — moved here from TopHeader's pills.
-                Star Tracker keeps a real on/off toggle (green dot open, red
-                closed); Live ISS just opens its existing modal. */}
+            {/* Live ISS — kept visible per spec but non-interactive
+                (pointer-events-none + tabIndex=-1) instead of removed. */}
             <div className="relative group">
-              <button
-                onClick={() => onToggleStarTracker?.()}
-                aria-label="Star Tracker"
-                className="relative flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
-              >
-                <Telescope className="w-4 h-4" />
-                <span
-                  className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${
-                    isStarTrackerOpen ? 'bg-green-500' : 'bg-red-500'
-                  }`}
-                />
-              </button>
-              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
-                Star Tracker
-              </span>
-            </div>
-
-            <div className="relative group">
-              <button
-                onClick={() => onOpenLetsChat?.()}
-                aria-label="Let's Chat"
-                className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
-              >
-                <MessageCircle className="w-4 h-4" />
-              </button>
-              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
-                Let&apos;s Chat
-              </span>
-            </div>
-
-            <div className="relative group">
-              <button
-                onClick={() => onOpenLiveIss?.()}
+              <div
+                aria-disabled="true"
                 aria-label="Live ISS"
-                className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+                tabIndex={-1}
+                className="flex items-center justify-center w-10 h-10 border border-transparent rounded text-neutral-600 opacity-40 pointer-events-none select-none"
               >
                 <Satellite className="w-4 h-4" />
-              </button>
+              </div>
               <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
                 Live ISS
               </span>
             </div>
-
-            {/* Weather / Kali Yuga — moved here from the floating pill
-                buttons that used to sit over the 3D Earth canvas. Each
-                jumps to the Home tab's matching sub-view via
-                onOpenHomeView, forcing Home back to its main section first
-                if the user was on Products/Pricing/Cart. */}
-            <div className="relative group">
-              <button
-                onClick={() => onWeatherClick?.()}
-                onDoubleClick={() => onWeatherDoubleClick?.()}
-                aria-label="Weather"
-                className={`flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer hover:bg-neutral-900/50 ${
-                  weatherActive ? 'text-green-400 hover:text-green-300' : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                <Umbrella className="w-4 h-4" />
-              </button>
-              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
-                Weather
-              </span>
-            </div>
-
-            <div className="relative group">
-              <button
-                onClick={() => onOpenHomeView?.('kali')}
-                aria-label="Ai"
-                className="flex items-center justify-center w-10 h-10 transition-all border border-transparent rounded cursor-pointer text-white hover:bg-neutral-900/50"
-              >
-                <Sparkles className="w-4 h-4 animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
-              </button>
-              <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
-                Ai
-              </span>
-            </div>
-
-            {/* Donations — relocated here from the Home tab's sub-nav,
-                directly underneath Kali Yuga. */}
-            <DonationButton compact />
           </nav>
         </div>
 
@@ -434,18 +482,6 @@ export default function LeftNav({
               className="w-1.5 h-1.5 rounded-full bg-emerald-500"
             />
           )}
-          <div className="relative group">
-            <button
-              onClick={() => setShowPreferences(true)}
-              aria-label="Preferences"
-              className="flex items-center justify-center w-10 h-10 transition-all rounded text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-            <span className="absolute z-20 px-2.5 py-1 ml-2 text-xs font-mono transition-opacity duration-150 -translate-y-1/2 rounded-md opacity-0 pointer-events-none left-full top-1/2 whitespace-nowrap bg-zinc-900/90 border border-zinc-800 text-white group-hover:opacity-100">
-              Preferences
-            </span>
-          </div>
         </div>
       </aside>
 
