@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight } from 'lucide-react';
 import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
 import WeatherForecastOverlay from './WeatherForecastOverlay';
+import { useKaliPendingApprovals } from '@/lib/useKaliPendingApprovals';
+import QuantumApprovalModal from './kali/QuantumApprovalModal';
 
 interface GalleryGridProps {
   onOpenRadio: () => void;
@@ -204,6 +206,9 @@ export default function GalleryGrid({
   // switches the card from pointer-events-none/cursor-wait to clickable.
   const [docked, setDocked] = useState<boolean[]>(() => Array(9).fill(false));
   const [showWeatherOverlay, setShowWeatherOverlay] = useState(false);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  // Only ever polls anything for a signed-in admin — see the hook itself.
+  const { isAdmin, approvals: pendingApprovals, refetch: refetchApprovals } = useKaliPendingApprovals();
   const dock = (i: number) => setDocked((prev) => (prev[i] ? prev : prev.map((v, idx) => (idx === i ? true : v))));
 
   return (
@@ -276,14 +281,31 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={4} docked={docked[4]} onDock={dock}>
-          <button onClick={onOpenKali} className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.kali} gradient={CARD_GRADIENTS.kali} Icon={Sparkles} />
-            <CardHeader Icon={Sparkles} />
-            <div className="mt-4">
-              <div className="text-sm font-bold text-white">Kali</div>
-              <p className="mt-1 text-xs text-slate-400">Ancient technology, quantum physics, epoch cycles.</p>
-            </div>
-          </button>
+          <div className="relative w-full h-full">
+            <button onClick={onOpenKali} className={cardClass}>
+              <CardImage src={GALLERY_IMAGES.kali} gradient={CARD_GRADIENTS.kali} Icon={Sparkles} />
+              <CardHeader Icon={Sparkles} />
+              <div className="mt-4">
+                <div className="text-sm font-bold text-white">Kali</div>
+                <p className="mt-1 text-xs text-slate-400">Ancient technology, quantum physics, epoch cycles.</p>
+              </div>
+            </button>
+            {/* Admin-only notification badge for pending real-QPU approvals
+                (see aws/README.md) — a separate control from the card's own
+                button (which opens Kali chat), not nested inside it. */}
+            {isAdmin && pendingApprovals.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowApprovalModal(true);
+                }}
+                aria-label={`${pendingApprovals.length} pending quantum task approval${pendingApprovals.length === 1 ? '' : 's'}`}
+                className="absolute z-20 flex items-center justify-center w-6 h-6 text-[10px] font-bold text-black bg-cyan-400 rounded-full top-3 right-3 animate-pulse hover:animate-none shadow-[0_0_10px_rgba(34,211,238,0.8)]"
+              >
+                {pendingApprovals.length}
+              </button>
+            )}
+          </div>
         </ArrivalSlot>
 
         <ArrivalSlot index={5} docked={docked[5]} onDock={dock}>
@@ -332,6 +354,13 @@ export default function GalleryGrid({
       </div>
 
       {showWeatherOverlay && <WeatherForecastOverlay onClose={() => setShowWeatherOverlay(false)} />}
+      {showApprovalModal && (
+        <QuantumApprovalModal
+          approvals={pendingApprovals}
+          onClose={() => setShowApprovalModal(false)}
+          onDecided={refetchApprovals}
+        />
+      )}
     </div>
   );
 }

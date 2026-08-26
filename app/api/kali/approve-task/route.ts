@@ -2,6 +2,7 @@ export const runtime = 'nodejs';
 
 import { SFNClient, SendTaskSuccessCommand, SendTaskFailureCommand } from '@aws-sdk/client-sfn';
 import { requireAdmin, AdminAuthError } from '@/lib/adminAuth';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 // Admin-gated, same as every other sensitive action in this app (see
 // lib/adminAuth.ts) — approving here is what lets
@@ -20,8 +21,9 @@ import { requireAdmin, AdminAuthError } from '@/lib/adminAuth';
 const sfn = new SFNClient({ region: process.env.AWS_REGION || 'us-east-2' });
 
 export async function POST(request: Request) {
+  let user;
   try {
-    await requireAdmin(request);
+    user = await requireAdmin(request);
   } catch (err) {
     if (err instanceof AdminAuthError) return new Response(err.message, { status: err.status });
     throw err;
@@ -34,16 +36,16 @@ export async function POST(request: Request) {
     return new Response('Invalid JSON body.', { status: 400 });
   }
 
-  const { taskToken, approved, reason } = body;
+  const { taskToken, action, reason } = body;
   if (typeof taskToken !== 'string' || !taskToken.trim()) {
     return new Response('taskToken is required.', { status: 400 });
   }
-  if (typeof approved !== 'boolean') {
-    return new Response('approved (boolean) is required.', { status: 400 });
+  if (action !== 'approve' && action !== 'reject') {
+    return new Response("action must be 'approve' or 'reject'.", { status: 400 });
   }
 
   try {
-    if (approved) {
+    if (action === 'approve') {
       await sfn.send(
         new SendTaskSuccessCommand({
           taskToken,
@@ -67,5 +69,20 @@ export async function POST(request: Request) {
     return new Response(err instanceof Error ? err.message : 'Failed to notify Step Functions.', { status: 500 });
   }
 
-  return Response.json({ ok: true, approved });
+  // Best-effort — the real decision already went through to AWS above;
+  // this just keeps the dashboard's own record in sync so a resolved
+  // approval stops showing up in GET /api/kali/pending-approvals. A
+  // failure here doesn't mean the approval/rejection didn't happen.
+  const admin = getSupabaseAdmin();
+  await admin
+    .from('kali_quantum_approvals')
+    .update({
+      status: action === 'approve' ? 'approved' : 'rejected',
+      decided_at: new Date().toISOString(),
+      decided_by: user.id,
+    })
+    .eq('task_token', taskToken)
+    .then(null, () => {});
+
+  return Response.json({ ok: true, action });
 }
