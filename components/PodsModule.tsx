@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowUpDown, Camera, Sparkles, Trash2 } from 'lucide-react';
+import { Camera, Trash2 } from 'lucide-react';
 import CosmicVisualizer from './CosmicVisualizer';
+import StudioOneConsole from './StudioOneConsole';
 import EqOrb from './EqOrb';
 import { useRadioPlayer } from './radio/RadioPlayerContext';
 // Shared with StarTrackerView's own YT.Player mount (Sky Fest's Space
@@ -120,7 +121,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
 
   // Drag & Drop / EQ Visibility
   const [isDraggingOver, setIsDraggingOver] = useState<boolean>(false);
-  const [showEq, setShowEq] = useState<boolean>(false);
+  const [showEq, setShowEq] = useState<boolean>(true);
 
   // Camera / Simulcast Stream State
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
@@ -1000,7 +1001,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`w-full min-h-screen bg-[#07080a] text-slate-200 font-mono flex flex-col items-center justify-center p-4 md:p-8 overflow-x-hidden relative transition animate-zero-gravity-unfold ${
+      className={`relative transition animate-zero-gravity-unfold ${
         isDraggingOver ? 'bg-white/10 border-2 border-dashed border-neutral-700 rounded-2xl' : ''
       }`}
       style={{ perspective: '1200px' }}
@@ -1058,13 +1059,13 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       )}
 
       {activeView === 'player' && (
-      <div className="w-full max-w-[1440px] bg-gradient-to-b from-[#222630] via-[#16181f] to-[#0d0e12] border-4 border-slate-100 rounded-lg p-8 relative shadow-[0_0_60px_rgba(255,255,255,0.85),inset_0_0_25px_rgba(255,255,255,0.25)]">
-        <div className="absolute inset-0 pointer-events-none border border-slate-700/50 rounded-lg">
-          <div className="w-full h-full bg-[linear-gradient(to_right,#2a2e3a_1px,transparent_1px),linear-gradient(to_bottom,#2a2e3a_1px,transparent_1px)] bg-[size:160px_100px] opacity-35" />
-        </div>
-      {/* Header Bar */}
-      <div className="flex items-center justify-between min-h-[44px] gap-4 p-3 rounded-lg bg-[#1e2229] border border-slate-700/50">
-        <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase whitespace-nowrap">
+      <StudioOneConsole>
+      {/* Header Bar — z-30 (not z-10) so its own overflow-menu popover
+          (z-50 within this context) actually escapes above the Broadcast
+          Monitor card's sibling z-10 stacking context, not just within
+          this header's own. */}
+      <div className="relative z-30 flex items-center justify-between min-h-[44px] gap-4 p-3 rounded-lg bg-[#1e2229] border border-slate-700/50">
+        <h2 className="text-lg font-mono font-extrabold tracking-widest text-white uppercase whitespace-nowrap">
           STUDIO ONE
         </h2>
 
@@ -1096,22 +1097,6 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
             + Upload
           </button>
 
-          <button
-            onClick={() => setActiveView('visualizer')}
-            title="Cosmic Visualizer"
-            className="flex items-center h-8 gap-1.5 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Visualizer
-          </button>
-
-          <button
-            onClick={() => mediaFileInputRef.current?.click()}
-            title="Browse a local video file for the Broadcast Monitor"
-            className="flex items-center justify-center w-8 h-8 transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
-          >
-            <ArrowUpDown className="w-4 h-4" />
-          </button>
 
           <div className="relative" ref={overflowMenuRef}>
             <button
@@ -1154,7 +1139,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       </div>
 
       {/* Playlist Selector */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+      <div className="relative z-10 flex items-center justify-between pb-2 border-b border-slate-800">
         <div className="flex gap-2 overflow-x-auto">
           {playlists.map((pl) => (
             <div key={pl.id} className="flex items-center gap-1">
@@ -1202,12 +1187,12 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       </div>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <div className="relative z-10 grid grid-cols-1 gap-6 lg:grid-cols-12">
         
         {/* Left Column: Player & EQ */}
         <div className="space-y-4 lg:col-span-5">
           {activeTrack ? (
-            <div className="bg-[#12141a] border-2 border-white rounded-xl shadow-[0_0_25px_rgba(255,255,255,0.5),inset_0_0_12px_rgba(255,255,255,0.15)] p-5 relative z-10 space-y-4 backdrop-blur">
+            <div className="bg-[#12141a] border-t-2 border-l-2 border-t-white/90 border-l-white/90 border-b-2 border-r-2 border-b-black border-r-black rounded-xl shadow-[-3px_-3px_10px_rgba(255,255,255,0.3),8px_8px_20px_rgba(0,0,0,0.75),inset_1px_1px_2px_rgba(255,255,255,0.2)] p-5 relative z-10 space-y-4 backdrop-blur">
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-block px-2 py-0.5 bg-white/10 text-white text-xs font-mono rounded">
                   {activeTrack.frequency}
@@ -1469,7 +1454,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         {/* Right Column: Camera & Reader */}
         <div className="flex flex-col space-y-4 lg:col-span-7">
           {(
-            <div className="bg-[#12141a] border-2 border-white rounded-xl shadow-[0_0_25px_rgba(255,255,255,0.5),inset_0_0_12px_rgba(255,255,255,0.15)] p-5 relative z-10 space-y-3">
+            <div className="bg-[#12141a] border-t-2 border-l-2 border-t-white/90 border-l-white/90 border-b-2 border-r-2 border-b-black border-r-black rounded-xl shadow-[-3px_-3px_10px_rgba(255,255,255,0.3),8px_8px_20px_rgba(0,0,0,0.75),inset_1px_1px_2px_rgba(255,255,255,0.2)] p-5 relative z-10 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 font-mono text-xs tracking-wider uppercase text-white">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
@@ -1533,14 +1518,14 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
                   placeholder="Paste YouTube video/playlist URL or direct media link..."
                   className="flex-1 min-w-[180px] px-3 py-1.5 text-xs bg-[#0a0b0d] border border-slate-800 rounded font-mono text-slate-300 focus:outline-none focus:border-white/50"
                 />
-                {(activeEmbedUrl || localVideoUrl) && (
-                  <button
-                    onClick={clearMedia}
-                    className="px-3 py-1.5 rounded text-xs font-mono transition bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200 whitespace-nowrap"
-                  >
-                    CLEAR
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={clearMedia}
+                  disabled={!activeEmbedUrl && !localVideoUrl}
+                  className="px-3 py-1.5 rounded text-xs font-mono transition bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  CLEAR
+                </button>
               </form>
 
               {cameraError && (
@@ -1593,20 +1578,17 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
                       className={`w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
                     />
                     {!isCameraActive && (
-                      activeTrack && !activeTrack.embedUrl ? (
-                        <CosmicVisualizer
-                          analyser={analyserRef.current}
-                          isPlaying={isPlaying}
-                          trackTitle={activeTrack.title}
-                        />
-                      ) : (
-                        <div className="p-6 space-y-2 text-center">
-                          <p className="font-mono text-xs text-slate-400">BROADCAST MONITOR STANDBY</p>
-                          <p className="text-slate-600 text-[11px] max-w-sm mx-auto">
-                            Click &quot;Start Camera&quot; above or paste a link to display video input.
-                          </p>
-                        </div>
-                      )
+                      // Plain black screen — no visualizer/particle graphics
+                      // inside the monitor box, per explicit instruction.
+                      // The dedicated full-screen Visualizer view (header
+                      // button) is untouched; this only affects this
+                      // inline fallback.
+                      <div className="p-6 space-y-2 text-center">
+                        <p className="font-mono text-xs text-slate-400">BROADCAST MONITOR STANDBY</p>
+                        <p className="text-slate-600 text-[11px] max-w-sm mx-auto">
+                          Click &quot;Start Camera&quot; above or paste a link to display video input.
+                        </p>
+                      </div>
                     )}
                   </>
                 )}
@@ -1745,7 +1727,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
           </div>
         </div>
       )}
-      </div>
+      </StudioOneConsole>
       )}
     </div>
   );

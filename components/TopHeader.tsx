@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import AuthModal from './AuthModal';
-import LayoutModeToggle, { type LayoutMode } from './LayoutModeToggle';
 import NavbarDonateButton from './NavbarDonateButton';
 import { supabase } from '@/lib/supabase';
 
@@ -13,11 +12,6 @@ interface TopHeaderProps {
   // triggers it from here now that the button lives in the header instead
   // of AiOneHome's own sub-nav.
   onOpenPricing?: () => void;
-  // Layout Toggle feature — mode state itself lives in page.tsx (the
-  // common ancestor that also decides what to render based on it), this
-  // just hosts the selector UI in persistent chrome.
-  layoutMode?: LayoutMode;
-  onLayoutModeChange?: (mode: LayoutMode) => void;
   // Set by page.tsx from a real ?auth=login/?auth=signup URL param — the
   // deep-link the protolabsglobal-main-shell static site's Log In/Sign Up
   // buttons point at, so this modal opens directly on arrival.
@@ -34,8 +28,6 @@ interface TopHeaderProps {
 export default function TopHeader({
   activeTab,
   onOpenPricing,
-  layoutMode,
-  onLayoutModeChange,
   authModalRequest,
 }: TopHeaderProps) {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -91,9 +83,6 @@ export default function TopHeader({
             the Radio page only) */}
         <div className="flex items-center space-x-2">
           <NavbarDonateButton />
-          {layoutMode && onLayoutModeChange && (
-            <LayoutModeToggle mode={layoutMode} onChange={onLayoutModeChange} />
-          )}
           {isHome ? (
             <>
               <button

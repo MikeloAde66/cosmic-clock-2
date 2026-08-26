@@ -272,8 +272,6 @@ useContextMenuShare();
           <TopHeader
             activeTab={activeTab}
             onOpenPricing={openPricing}
-            layoutMode={layoutMode}
-            onLayoutModeChange={changeLayoutMode}
             authModalRequest={authModalRequest}
           />
 
