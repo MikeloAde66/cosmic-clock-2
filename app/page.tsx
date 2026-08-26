@@ -1,7 +1,7 @@
 'use client';
 import { useContextMenuShare } from '@/components/useContextMenuShare';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowUp } from 'lucide-react';
 import TopHeader from '@/components/TopHeader';
 import AuthModal from '@/components/AuthModal';
@@ -38,8 +38,14 @@ import { useWeatherLocation } from '@/lib/useWeatherLocation';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
 function HomeInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<string>('radio');
+  // Radio Central is a real bare standalone route (/radio) now, not a Hub
+  // tab — 'aione' (the Home hero) is the sane Hub-mode fallback in its
+  // place. Its old Hub-tab render below is gone; Continuous Stack mode's
+  // own inline Radio section (further down) is untouched, since that's a
+  // deliberate, separately opted-into "everything on one page" layout.
+  const [activeTab, setActiveTab] = useState<string>('aione');
   // GlobalPlayerBar now mounts globally in app/layout.tsx, above every
   // route — this is the one remaining way this specific tab can still hide
   // it while Pods/Studio One (a video-only workspace) is active. Cleanup
@@ -130,19 +136,19 @@ function HomeInner() {
   // rather than in homeViewRequest and is available on every tab.
   const weather = useWeatherLocation();
 
-  // Layout Toggle feature — 'hub' (default) is the existing tab-swap
-  // behavior below, completely unchanged. Persisted across reloads via
-  // localStorage (SSR-safe: starts at the 'hub' default, then upgrades
-  // once the real stored value is read on mount, same pattern as the
-  // weather location's saved-search persistence).
+  // Layout Toggle feature — 'gallery' is the deliberate, deterministic
+  // landing view for '/' on every load. This used to persist across
+  // reloads via localStorage, but that meant the *first* time anyone ever
+  // clicked into Hub mode (which every Gallery card that isn't Products
+  // does, to land on its feature), 'hub' got written and then silently
+  // overrode this default forever after — on every future visit, root
+  // would flash the gallery cards for a moment (first paint, this default)
+  // and then flip straight to whatever Hub tab was last open. Switching
+  // layout modes within a single visit still works instantly via
+  // changeLayoutMode below; it just doesn't survive a hard refresh anymore.
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('gallery');
-  useEffect(() => {
-    const stored = localStorage.getItem('aione_layout_mode');
-    if (stored === 'hub' || stored === 'gallery' || stored === 'stack') setLayoutMode(stored);
-  }, []);
   const changeLayoutMode = (mode: LayoutMode) => {
     setLayoutMode(mode);
-    localStorage.setItem('aione_layout_mode', mode);
   };
 
   // Floating Back to Top button (Stack mode only) — tracks the Stack
@@ -188,8 +194,12 @@ useContextMenuShare();
   // re-triggers the open.
   const [authModalRequest, setAuthModalRequest] = useState<{ mode: 'login' | 'signup'; token: number } | null>(null);
   useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab === 'radio') setActiveTab('radio');
+    // Radio Central moved to its own standalone route — an old ?tab=radio
+    // link should land there instead of a now-nonexistent Hub tab.
+    if (searchParams.get('tab') === 'radio') {
+      router.replace('/radio');
+      return;
+    }
 
     const checkout = searchParams.get('checkout');
     if (checkout === 'cancelled' || checkout === 'required') {
@@ -289,8 +299,6 @@ useContextMenuShare();
               yet. */}
           {layoutMode === 'hub' && (
             <div className="relative flex-1 overflow-hidden">
-              {activeTab === 'radio' && <RadioCentralConsoleView />}
-
               {activeTab === 'vault' && (
                 <CosmicVaultAuth
                   initialDrawer={pendingVaultDrawer ?? undefined}
@@ -328,10 +336,7 @@ useContextMenuShare();
           {layoutMode === 'gallery' && (
             <div className="relative flex-1 overflow-hidden">
               <GalleryGrid
-                onOpenRadio={() => {
-                  setActiveTab('radio');
-                  changeLayoutMode('hub');
-                }}
+                onOpenRadio={() => router.push('/radio')}
                 onOpenPods={() => {
                   setActiveTab('pods');
                   changeLayoutMode('hub');

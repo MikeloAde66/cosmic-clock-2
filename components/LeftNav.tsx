@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ChevronDown,
   Home,
@@ -78,6 +79,11 @@ interface LeftNavProps {
 
 // Cosmic Vault is intentionally absent from this list — see the Vault
 // Access field in the Preferences modal below, the only remaining way in.
+// Radio Central is a real standalone route (/radio) now — a bare page with
+// no app shell of its own (see app/(standalone)/radio, matching the
+// existing Star Tracker convention for subdomain-ready tools) — so its row
+// below always navigates there directly instead of going through
+// setActiveTab like Home/Studio One do.
 const NAV_ITEMS = [
   { key: 'aione', label: 'Home', Icon: Home },
   { key: 'radio', label: 'Radio Central', Icon: RadioIcon },
@@ -108,6 +114,7 @@ export default function LeftNav({
   layoutMode = 'hub',
   onChangeLayoutMode,
 }: LeftNavProps) {
+  const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
   // Mobile/tablet only (< md) — the icon rail below is hidden and replaced
@@ -132,6 +139,10 @@ export default function LeftNav({
 
   const handleNavClick = (tabKey: string) => {
     setIsDrawerOpen(false);
+    if (tabKey === 'radio') {
+      router.push('/radio');
+      return;
+    }
     // Home is "ground zero" — always collapse back to the main clock view,
     // not just switch tabs, since Weather/Kali/Products/Pricing/Cart no
     // longer have their own way back out.
