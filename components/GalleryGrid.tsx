@@ -19,15 +19,25 @@ interface GalleryGridProps {
 // the actual gallery source images. Drop each file into public/gallery/
 // under its target name and the matching card picks it up automatically:
 // it fades in on top of the gradient cover below, no further code changes
-// needed. Weather/Donate have no source image in the mapping, so they keep
-// the plain icon-only card body (no CardImage call for those two).
+// needed. Weather has no source image in the mapping (it gets a live NOAA
+// feed instead, see WeatherCardImage below), so it keeps the plain
+// icon-only card body.
+//
+// aioneCore/hydronodeBuilderKit point at real, already-approved hero
+// images instead of an unfilled /gallery/ path — the same
+// heroImageSrc files lib/hardwareProducts.ts already uses on those
+// products' own detail pages (public/images/aione-core.png,
+// public/images/hydronode-pro.png), confirmed to exist on disk. Reusing
+// them here, rather than a placeholder gradient, is exactly what "only use
+// approved high-res assets, never stock placeholders" calls for once a
+// real asset is confirmed to exist for that exact module.
 const GALLERY_IMAGES = {
   radio: '/gallery/radio.png',
   studio: '/gallery/studio.png',
   kali: '/gallery/kali.png',
   starTracker: '/gallery/star-tracker.png',
-  aioneCore: '/gallery/products.png',
-  hydronodeBuilderKit: '/gallery/hydronode.png',
+  aioneCore: '/images/aione-core.png',
+  hydronodeBuilderKit: '/images/hydronode-pro.png',
   productsCatalog: '/gallery/products-catalog.png',
   communityHub: '/gallery/community.png',
 } as const;
