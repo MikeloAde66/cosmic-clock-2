@@ -1,11 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
-import { ArrowUpDown, Camera, Lightbulb, Sparkles, Trash2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { ArrowUpDown, Camera, Sparkles, Trash2 } from 'lucide-react';
 import CosmicVisualizer from './CosmicVisualizer';
 import EqOrb from './EqOrb';
-import LumensCalculator from './LumensCalculator';
 import { useRadioPlayer } from './radio/RadioPlayerContext';
 // Shared with StarTrackerView's own YT.Player mount (Sky Fest's Space
 // Media tab) — see that file for why this lives in one place.
@@ -112,7 +110,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
   const [playlists, setPlaylists] = useState<Playlist[]>(DEFAULT_PLAYLISTS);
   const [activePlaylistId, setActivePlaylistId] = useState<string>('pods');
   const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
-  const [activeTrack, setActiveTrack] = useState<Track>(INITIAL_TRACKS[0]);
+  const [activeTrack, setActiveTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('autoplay');
 
@@ -210,7 +208,6 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showLumensCalculator, setShowLumensCalculator] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -695,31 +692,6 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
     wasActiveRef.current = isActive;
   }, [isActive]);
 
-  // Pods Context Sync: which contentSegment (if any) matches the current
-  // playback time — the last segment whose timestamp has been reached.
-  // -1 means no segments exist for this track (reading pane falls back to
-  // the plain contentToRead block) or playback hasn't reached the first one.
-  const activeSegmentIndex = useMemo(() => {
-    const segments = activeTrack?.contentSegments;
-    if (!segments || segments.length === 0) return -1;
-    let idx = -1;
-    for (let i = 0; i < segments.length; i++) {
-      if (segments[i].time <= currentTime) idx = i;
-      else break;
-    }
-    return idx;
-  }, [activeTrack, currentTime]);
-
-  const segmentRefs = useRef<(HTMLDivElement | null)[]>([]);
-
-  // Locks the Reading Material pane to the active segment: scrolls it into
-  // view whenever the computed index actually changes (not on every
-  // timeupdate tick — most ticks land inside the same segment).
-  useEffect(() => {
-    if (activeSegmentIndex === -1) return;
-    segmentRefs.current[activeSegmentIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [activeSegmentIndex]);
-
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
     if (audioRef.current) {
@@ -1131,15 +1103,6 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
           </button>
 
           <button
-            onClick={() => setShowLumensCalculator(true)}
-            title="Q-Flow Lumens Calculator (Beta Demo)"
-            className="flex items-center h-8 gap-1.5 px-3 text-[11px] font-mono uppercase tracking-wide transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
-          >
-            <Lightbulb className="w-3.5 h-3.5" />
-            Q-Flow
-          </button>
-
-          <button
             onClick={() => mediaFileInputRef.current?.click()}
             title="Browse a local video file for the Broadcast Monitor"
             className="flex items-center justify-center w-8 h-8 transition border rounded bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
@@ -1453,8 +1416,15 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
               )}
             </div>
           ) : (
-            <div className="p-6 font-mono text-xs text-center border bg-slate-900/40 border-slate-800 rounded-xl text-slate-500">
-              NO TRACK SELECTED
+            <div className="p-6 space-y-2 text-center border bg-slate-900/60 border-neutral-700 rounded-xl">
+              <span className="inline-block px-2 py-0.5 bg-white/10 text-white text-xs font-mono rounded">
+                Video / Guide
+              </span>
+              <h3 className="text-xl font-bold text-white">Podcaster Studio Setup Guide</h3>
+              <p className="text-xs text-slate-400">2-Min Overview</p>
+              <p className="text-[11px] text-slate-600 max-w-xs mx-auto">
+                Not recorded yet — paste a link or start Pod Cam on the right to begin broadcasting.
+              </p>
             </div>
           )}
 
@@ -1640,44 +1610,6 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
               </div>
             </div>
           )}
-
-          <div className="flex flex-col justify-between flex-1 p-6 border bg-slate-900/60 border-slate-800 rounded-xl">
-            <div>
-              <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
-                <span className="font-mono text-xs tracking-wider uppercase truncate text-white">
-                  Reading Material • {activeTrack?.title || 'No Selection'}
-                </span>
-                <span className="font-mono text-xs text-slate-500">FORMAT: LORE / TEXT</span>
-              </div>
-
-              <div className="space-y-4 overflow-y-auto text-sm leading-relaxed prose prose-invert max-w-none text-slate-300 max-h-64">
-                {activeTrack?.contentSegments && activeTrack.contentSegments.length > 0 ? (
-                  activeTrack.contentSegments.map((segment, i) => (
-                    <div
-                      key={`${activeTrack.id}-${i}`}
-                      ref={(el) => {
-                        segmentRefs.current[i] = el;
-                      }}
-                      className={`rounded px-2 -mx-2 py-1 transition-colors duration-500 ${
-                        i === activeSegmentIndex ? 'bg-white/10 text-white' : ''
-                      }`}
-                    >
-                      <ReactMarkdown>{segment.text}</ReactMarkdown>
-                    </div>
-                  ))
-                ) : (
-                  <ReactMarkdown>
-                    {activeTrack?.contentToRead || 'Select a track to read its synchronized notes.'}
-                  </ReactMarkdown>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-4 mt-8 font-mono text-xs border-t border-slate-800/60 text-slate-500">
-              <span>AUDIO & VIDEO ENGINE: READY</span>
-              <span>5-BAND EQ: {showEq ? 'VISIBLE' : 'HIDDEN'}</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -1748,8 +1680,6 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
           </form>
         </div>
       )}
-
-      <LumensCalculator isOpen={showLumensCalculator} onClose={() => setShowLumensCalculator(false)} />
 
       {/* Upload Files Modal */}
       {showUploadModal && (

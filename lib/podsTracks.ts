@@ -30,52 +30,10 @@ export interface Track {
   contentSegments?: ContentSegment[];
 }
 
-export const INITIAL_TRACKS: Track[] = [
-  {
-    id: '1',
-    title: 'The Art & Science of Forest Bathing',
-    frequency: 'Video / Science',
-    description: 'Dr Qing Li on the biology of phytoncides and shinrin-yoku forest medicine. (Penguin Books UK)',
-    src: '',
-    embedUrl: 'https://www.youtube.com/embed/12CCjoixpkA',
-    watchUrl: 'https://www.youtube.com/watch?v=12CCjoixpkA',
-    playlistId: 'pods',
-    contentToRead: `### Forest Bathing & Human Immunity\n\nDr Qing Li, the world's foremost expert in forest medicine, explains how trees emit airborne organic compounds (phytoncides) that lower stress hormones and enhance human immune function.`
-  },
-  {
-    id: '2',
-    title: 'Aeon Byte: A Gnostic View of the Soul',
-    frequency: 'Video / Dialogue',
-    description: 'Aeon Byte Gnostic Radio on the Hymn of the Pearl and the Exegesis from the Nag Hammadi library.',
-    src: '',
-    embedUrl: 'https://www.youtube.com/embed/CY2P9q7bEVY',
-    watchUrl: 'https://www.youtube.com/watch?v=CY2P9q7bEVY',
-    playlistId: 'pods',
-    contentToRead: `### Historical & Cosmological Discourse\n\nAeon Byte Gnostic Radio examines two key Nag Hammadi scriptures on the fall and redemption of the soul: the Hymn of the Pearl and the Exegesis.`
-  },
-  {
-    id: '3',
-    title: 'Anil Seth: The Mystery of Consciousness',
-    frequency: 'Video / Lecture',
-    description: 'The TED Interview with neuroscientist Anil Seth on perception, prediction, and machine consciousness.',
-    src: '',
-    embedUrl: 'https://www.youtube.com/embed/aQVedpfKt88',
-    watchUrl: 'https://www.youtube.com/watch?v=aQVedpfKt88',
-    playlistId: 'pods',
-    contentToRead: `### Cognitive Perception & Self-Awareness\n\nNeuroscientist Anil Seth explores his theory that consciousness is a controlled hallucination — the brain constantly predicting and constructing our perceived reality.`
-  },
-  {
-    id: '4',
-    title: 'The Precession of Equinox',
-    frequency: 'Video / Ambient',
-    description: 'A short visual on the slow astronomical cycle behind the Great Year. (The Randall Carlson)',
-    src: '',
-    embedUrl: 'https://www.youtube.com/embed/jnIBFXVWZXg',
-    watchUrl: 'https://www.youtube.com/watch?v=jnIBFXVWZXg',
-    playlistId: 'pods',
-    contentToRead: `### The Great Year & Astronomical Alignment\n\nAncient timekeeping systems tracked vast epochs through the slow movement of the equinoxes across the zodiac constellations.`
-  }
-];
+// Genuinely empty by default — no seed/demo tracks. The Pods studio starts
+// clean; the "Podcaster Studio Setup Guide" card PodsModule shows when
+// there's nothing here is a static UI placeholder, not a Track record.
+export const INITIAL_TRACKS: Track[] = [];
 
 // Same key + same "clean out invalid blobs from previous browser sessions"
 // validation PodsModule's own mount effect already does, so a reader (e.g.
