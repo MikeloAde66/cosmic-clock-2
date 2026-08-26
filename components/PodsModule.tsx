@@ -1000,7 +1000,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`w-full min-h-screen bg-[#0b0c0e] text-slate-200 font-mono flex flex-col items-center justify-start p-4 md:p-8 overflow-x-hidden relative transition animate-zero-gravity-unfold ${
+      className={`w-full min-h-screen bg-[#07080a] text-slate-200 font-mono flex flex-col items-center justify-center p-4 md:p-8 overflow-x-hidden relative transition animate-zero-gravity-unfold ${
         isDraggingOver ? 'bg-white/10 border-2 border-dashed border-neutral-700 rounded-2xl' : ''
       }`}
       style={{ perspective: '1200px' }}
@@ -1058,8 +1058,10 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       )}
 
       {activeView === 'player' && (
-      <div className="w-full max-w-[1440px] bg-gradient-to-b from-[#1c2026] via-[#16181d] to-[#101215] border-4 border-slate-100 rounded-lg p-6 relative shadow-[0_0_50px_rgba(255,255,255,0.6),inset_0_0_20px_rgba(255,255,255,0.2)]">
-        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#242832_1px,transparent_1px),linear-gradient(to_bottom,#242832_1px,transparent_1px)] bg-[size:120px_80px] opacity-40 rounded-lg" />
+      <div className="w-full max-w-[1440px] bg-gradient-to-b from-[#222630] via-[#16181f] to-[#0d0e12] border-4 border-slate-100 rounded-lg p-8 relative shadow-[0_0_60px_rgba(255,255,255,0.85),inset_0_0_25px_rgba(255,255,255,0.25)]">
+        <div className="absolute inset-0 pointer-events-none border border-slate-700/50 rounded-lg">
+          <div className="w-full h-full bg-[linear-gradient(to_right,#2a2e3a_1px,transparent_1px),linear-gradient(to_bottom,#2a2e3a_1px,transparent_1px)] bg-[size:160px_100px] opacity-35" />
+        </div>
       {/* Header Bar */}
       <div className="flex items-center justify-between min-h-[44px] gap-4 p-3 rounded-lg bg-[#1e2229] border border-slate-700/50">
         <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase whitespace-nowrap">
@@ -1205,7 +1207,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         {/* Left Column: Player & EQ */}
         <div className="space-y-4 lg:col-span-5">
           {activeTrack ? (
-            <div className="bg-[#101216] border-2 border-slate-100 rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.45),inset_0_0_10px_rgba(255,255,255,0.1)] p-5 relative z-10 space-y-4 backdrop-blur">
+            <div className="bg-[#12141a] border-2 border-white rounded-xl shadow-[0_0_25px_rgba(255,255,255,0.5),inset_0_0_12px_rgba(255,255,255,0.15)] p-5 relative z-10 space-y-4 backdrop-blur">
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-block px-2 py-0.5 bg-white/10 text-white text-xs font-mono rounded">
                   {activeTrack.frequency}
@@ -1467,7 +1469,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         {/* Right Column: Camera & Reader */}
         <div className="flex flex-col space-y-4 lg:col-span-7">
           {(
-            <div className="bg-[#101216] border-2 border-slate-100 rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.45),inset_0_0_10px_rgba(255,255,255,0.1)] p-5 relative z-10 space-y-3">
+            <div className="bg-[#12141a] border-2 border-white rounded-xl shadow-[0_0_25px_rgba(255,255,255,0.5),inset_0_0_12px_rgba(255,255,255,0.15)] p-5 relative z-10 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 font-mono text-xs tracking-wider uppercase text-white">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
