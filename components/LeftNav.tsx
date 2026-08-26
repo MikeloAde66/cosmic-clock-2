@@ -151,7 +151,7 @@ export default function LeftNav({
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col w-64 gap-6 pt-4 pb-8 overflow-y-auto transition-transform duration-200 border-r bg-neutral-950 border-neutral-800 md:hidden ${
+        className={`fixed top-0 left-0 z-50 flex flex-col w-64 max-h-screen gap-6 pt-4 pb-8 overflow-y-auto transition-transform duration-200 border-r border-b bg-neutral-950/85 backdrop-blur-md border-neutral-800 rounded-br-2xl shadow-xl md:hidden ${
           isDrawerOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -342,7 +342,7 @@ export default function LeftNav({
               {isHomeMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setIsHomeMenuOpen(false)} />
-                  <div className="absolute z-40 left-full top-0 ml-2 w-48 py-1.5 rounded-lg border bg-zinc-900/95 backdrop-blur-sm border-zinc-800 shadow-xl">
+                  <div className="absolute z-40 left-full top-0 ml-2 w-48 py-1.5 rounded-lg border bg-zinc-900/75 backdrop-blur-md border-zinc-800 shadow-xl">
                     {NAV_ITEMS.map(({ key, label, Icon }) => (
                       <button
                         key={key}
