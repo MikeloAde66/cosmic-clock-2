@@ -49,6 +49,9 @@ body {
      foreground content (z-index: 40). */
   z-index: 22;
   pointer-events: none;
+  /* screen blend so the stars visibly pass over the mountains/clouds/
+     planet in the hero image beneath, rather than sitting flat on top. */
+  mix-blend-mode: screen;
   /* Was only 5 points spread across the entire page height — sparse enough
      to read as basically empty wherever nothing else compensated (the hero
      banner, once its own dedicated dense Starfield instance was removed).
@@ -77,11 +80,11 @@ body {
 
 @keyframes home-star-pulse {
   0% {
-    opacity: 0.45;
+    opacity: 0.6;
     transform: translateZ(-50px) scale(0.99);
   }
   100% {
-    opacity: 1;
+    opacity: 0.85;
     transform: translateZ(-50px) scale(1.01);
   }
 }
@@ -217,23 +220,10 @@ body {
   background-position: center;
   background-image: url('/shadow-milkyway.png');
   /* Full native strength, no blend mode/filter — renders the source PNG's
-     own color/contrast/sharpness directly. */
+     own color/contrast/sharpness directly. Completely static — the
+     "living" motion in this hero comes from the star layer above it
+     (twinkle + screen blend), not from panning/zooming the artwork itself. */
   opacity: 0.95;
-  animation: cinematicPulse 24s ease-in-out infinite;
-  transform-origin: center center;
-  will-change: transform;
-}
-
-@keyframes cinematicPulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.03); /* subtle zoom inward toward viewer */
-  }
-  100% {
-    transform: scale(1); /* slow recession back away */
-  }
 }
 
 /* ------------------------------------------
