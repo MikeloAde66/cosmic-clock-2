@@ -17,10 +17,10 @@ interface GalleryGridProps {
 
 // Canonical asset paths — real filenames per the explicit mapping given for
 // the actual gallery source images. Drop each file into public/gallery/
-// under its target name and the matching card picks it up automatically,
-// no further code changes needed. Weather/Donate have no source image in
-// the mapping, so they render icon-only (CardImage is simply omitted for
-// those two below).
+// under its target name and the matching card picks it up automatically:
+// it fades in on top of the gradient cover below, no further code changes
+// needed. Weather/Donate have no source image in the mapping, so they keep
+// the plain icon-only card body (no CardImage call for those two).
 const GALLERY_IMAGES = {
   radio: '/gallery/radio.png',
   studio: '/gallery/studio.png',
@@ -31,31 +31,56 @@ const GALLERY_IMAGES = {
   iss: '/gallery/iss.png',
 } as const;
 
+// Per-card gradient covers — a concrete, finished-looking visual for every
+// slot from the very first paint, rather than an empty/blurred frame while
+// the real public/gallery/ photos are staged. Colors echo each feature's
+// own accent elsewhere in the app (cyan for radio, violet for Kali, etc.)
+// rather than being generic. Pure CSS + the icon already imported for that
+// card — no external image requests, so nothing to fail or hotlink.
+const CARD_GRADIENTS: Record<string, string> = {
+  radio: 'linear-gradient(135deg, #22d3ee 0%, #0e7490 55%, #082f49 100%)',
+  studio: 'linear-gradient(135deg, #c084fc 0%, #7e22ce 55%, #2e1065 100%)',
+  starTracker: 'linear-gradient(135deg, #7dd3fc 0%, #1d4ed8 55%, #0f172a 100%)',
+  kali: 'linear-gradient(135deg, #f0abfc 0%, #9333ea 55%, #1e1b4b 100%)',
+  aioneCore: 'linear-gradient(135deg, #818cf8 0%, #4338ca 55%, #0f172a 100%)',
+  hydronodeBuilderKit: 'linear-gradient(135deg, #5eead4 0%, #0f766e 55%, #042f2e 100%)',
+  iss: 'linear-gradient(135deg, #cbd5e1 0%, #475569 55%, #0f172a 100%)',
+};
+
 // Stagger offset between each card's arrival — 180ms sits in the
 // requested 150-200ms window.
 const ARRIVAL_STAGGER_MS = 180;
 
 const cardClass =
-  'group relative flex flex-col justify-between w-full h-full p-5 text-left border rounded-2xl border-slate-800/80 bg-slate-900/40 backdrop-blur-md hover:border-slate-600 hover:bg-slate-900/60 transition-all min-h-[140px] overflow-hidden';
+  'group relative flex flex-col justify-between w-full h-full p-5 text-left border rounded-2xl border-slate-800/80 bg-slate-900/40 backdrop-blur-md hover:border-slate-600 hover:bg-slate-900/60 transition-all min-h-[240px] overflow-hidden';
 
-// Photographic preview strip — a glassmorphic frame is always present
-// underneath, so a slow or missing asset never leaves a bare gap; the real
-// photo simply fades in on top of it once it loads, and the frame is all
-// that's left to see if the file 404s.
-function CardImage({ src }: { src: string }) {
+// Preview strip — a finished-looking gradient cover (see CARD_GRADIENTS)
+// plus a faint star-dot texture and an oversized icon watermark render
+// immediately, so every card shows a concrete, rich visual from the first
+// paint. The real photo from public/gallery/ fades in on top the moment it
+// loads; until then (or if it 404s) the gradient cover is the whole show,
+// not a fallback that reads as "missing."
+function CardImage({ src, gradient, Icon }: { src: string; gradient: string; Icon: typeof ArrowUpRight }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
   return (
-    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-slate-800/40 to-slate-950/60 backdrop-blur-md" />
+    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0" style={{ background: gradient }}>
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1.5px)',
+          backgroundSize: '16px 16px',
+        }}
+      />
+      <Icon className="absolute w-20 h-20 -right-3 -bottom-5 text-white/20" />
       {!failed && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
           alt=""
           className={`relative object-cover w-full h-full transition-opacity duration-500 ${
-            loaded ? 'opacity-80 group-hover:opacity-100' : 'opacity-0'
+            loaded ? 'opacity-90 group-hover:opacity-100' : 'opacity-0'
           }`}
           onLoad={() => setLoaded(true)}
           onError={() => setFailed(true)}
@@ -88,7 +113,7 @@ function CardHeader({ Icon, active }: { Icon: typeof RadioIcon; active?: boolean
 // can't be clicked mid-flight.
 function ArrivalSlot({ index, docked, onDock, children }: { index: number; docked: boolean; onDock: (i: number) => void; children: React.ReactNode }) {
   return (
-    <div className="relative min-h-[140px]">
+    <div className="relative min-h-[240px]">
       <div
         className={`absolute inset-0 rounded-2xl border border-slate-800/40 bg-white/5 backdrop-blur-md transition-opacity duration-300 ${
           docked ? 'opacity-0' : 'opacity-100 animate-pulse'
@@ -158,7 +183,7 @@ export default function GalleryGrid({
       >
         <ArrivalSlot index={0} docked={docked[0]} onDock={dock}>
           <button onClick={onOpenRadio} className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.radio} />
+            <CardImage src={GALLERY_IMAGES.radio} gradient={CARD_GRADIENTS.radio} Icon={RadioIcon} />
             <CardHeader Icon={RadioIcon} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Radio Central</div>
@@ -169,7 +194,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={1} docked={docked[1]} onDock={dock}>
           <button onClick={onOpenPods} className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.studio} />
+            <CardImage src={GALLERY_IMAGES.studio} gradient={CARD_GRADIENTS.studio} Icon={Mic} />
             <CardHeader Icon={Mic} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Studio One</div>
@@ -180,7 +205,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={2} docked={docked[2]} onDock={dock}>
           <button onClick={onOpenStarTracker} className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.starTracker} />
+            <CardImage src={GALLERY_IMAGES.starTracker} gradient={CARD_GRADIENTS.starTracker} Icon={Telescope} />
             <CardHeader Icon={Telescope} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Star Tracker</div>
@@ -203,7 +228,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={4} docked={docked[4]} onDock={dock}>
           <button onClick={onOpenKali} className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.kali} />
+            <CardImage src={GALLERY_IMAGES.kali} gradient={CARD_GRADIENTS.kali} Icon={Sparkles} />
             <CardHeader Icon={Sparkles} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Kali</div>
@@ -226,7 +251,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
           <Link href="/products/aione-core" className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.aioneCore} />
+            <CardImage src={GALLERY_IMAGES.aioneCore} gradient={CARD_GRADIENTS.aioneCore} Icon={LayoutGrid} />
             <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Ai One Core</div>
@@ -237,7 +262,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={7} docked={docked[7]} onDock={dock}>
           <Link href="/products/builder-kit" className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.hydronodeBuilderKit} />
+            <CardImage src={GALLERY_IMAGES.hydronodeBuilderKit} gradient={CARD_GRADIENTS.hydronodeBuilderKit} Icon={LayoutGrid} />
             <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">HydroNode Builder Kit</div>
@@ -248,7 +273,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={8} docked={docked[8]} onDock={dock}>
           <button onClick={onOpenIss} className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.iss} />
+            <CardImage src={GALLERY_IMAGES.iss} gradient={CARD_GRADIENTS.iss} Icon={Satellite} />
             <CardHeader Icon={Satellite} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">ISS Stream</div>

@@ -5,11 +5,13 @@ import Link from 'next/link';
 import {
   ChevronDown,
   Home,
+  Layers,
   LayoutGrid,
   Menu,
   MessageCircle,
   Mic,
   Radio as RadioIcon,
+  Rows3,
   Satellite,
   Settings,
   Sparkles,
@@ -21,6 +23,7 @@ import { supabase } from '@/lib/supabase';
 import PreferencesModal from './PreferencesModal';
 import DonationButton from './DonationButton';
 import ProtoLabsLogo from './ProtoLabsLogo';
+import type { LayoutMode } from './LayoutModeToggle';
 
 interface LeftNavProps {
   activeTab?: string;
@@ -65,6 +68,12 @@ interface LeftNavProps {
   // renamed — was only reachable via Continuous Stack's scroll flow
   // before, now a real nav destination from any layout mode).
   onOpenLetsChat?: () => void;
+  // Classic Hub / Gallery Grid / Continuous Stack — previously a standalone
+  // LayoutModeToggle pill in TopHeader; folded in here as three plain rows
+  // once TopHeader's own toggle was removed, since without this the Gallery
+  // Grid view had no way to ever be reached at all.
+  layoutMode?: LayoutMode;
+  onChangeLayoutMode?: (mode: LayoutMode) => void;
 }
 
 // Cosmic Vault is intentionally absent from this list — see the Vault
@@ -73,6 +82,12 @@ const NAV_ITEMS = [
   { key: 'aione', label: 'Home', Icon: Home },
   { key: 'radio', label: 'Radio Central', Icon: RadioIcon },
   { key: 'pods', label: 'Studio One', Icon: Mic },
+];
+
+const LAYOUT_MODES: { key: LayoutMode; label: string; Icon: typeof Layers }[] = [
+  { key: 'hub', label: 'Classic Hub', Icon: Layers },
+  { key: 'gallery', label: 'Gallery Grid', Icon: LayoutGrid },
+  { key: 'stack', label: 'Continuous Stack', Icon: Rows3 },
 ];
 
 export default function LeftNav({
@@ -90,6 +105,8 @@ export default function LeftNav({
   isStarTrackerOpen = false,
   onToggleStarTracker,
   onOpenLetsChat,
+  layoutMode = 'hub',
+  onChangeLayoutMode,
 }: LeftNavProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
@@ -277,6 +294,26 @@ export default function LeftNav({
 
               <DonationButton row />
 
+              <div className="my-1 border-t border-neutral-800" />
+
+              {LAYOUT_MODES.map(({ key, label, Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    onChangeLayoutMode?.(key);
+                  }}
+                  className={`flex items-center gap-3 h-10 px-3 rounded-lg transition-all border ${
+                    layoutMode === key
+                      ? 'bg-neutral-900 text-white border-neutral-700'
+                      : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 border-transparent'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="text-sm">{label}</span>
+                </button>
+              ))}
+
               <button
                 onClick={() => {
                   setIsDrawerOpen(false);
@@ -439,6 +476,24 @@ export default function LeftNav({
                     </button>
 
                     <DonationButton row />
+
+                    <div className="my-1 border-t border-zinc-800" />
+
+                    {LAYOUT_MODES.map(({ key, label, Icon }) => (
+                      <button
+                        key={key}
+                        onClick={() => {
+                          setIsHomeMenuOpen(false);
+                          onChangeLayoutMode?.(key);
+                        }}
+                        className={`flex items-center w-full gap-3 h-9 px-3 transition-all ${
+                          layoutMode === key ? 'text-white bg-neutral-800/60' : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4 shrink-0" />
+                        <span className="text-xs font-mono">{label}</span>
+                      </button>
+                    ))}
 
                     <div className="my-1 border-t border-zinc-800" />
 

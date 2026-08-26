@@ -135,7 +135,7 @@ function HomeInner() {
   // localStorage (SSR-safe: starts at the 'hub' default, then upgrades
   // once the real stored value is read on mount, same pattern as the
   // weather location's saved-search persistence).
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('hub');
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('gallery');
   useEffect(() => {
     const stored = localStorage.getItem('aione_layout_mode');
     if (stored === 'hub' || stored === 'gallery' || stored === 'stack') setLayoutMode(stored);
@@ -270,6 +270,8 @@ useContextMenuShare();
           isStarTrackerOpen={isStarTrackerOpen}
           onToggleStarTracker={() => setIsStarTrackerOpen((v) => !v)}
           onOpenLetsChat={() => setIsLetsChatOpen(true)}
+          layoutMode={layoutMode}
+          onChangeLayoutMode={changeLayoutMode}
         />
 
         <div className="flex flex-col flex-1 overflow-hidden">
