@@ -1020,6 +1020,18 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
           transform-style: preserve-3d;
           animation: zeroGravityUnfold 0.6s cubic-bezier(0.16, 1, 0.3, 1);
         }
+        /* Dark brushed-metal studio frame — visual treatment only, no
+           change to any real state/handler underneath it. */
+        .pods-studio-frame {
+          padding: 1.5rem;
+          border-radius: 1rem;
+          background: linear-gradient(160deg, #2a2d33 0%, #1a1c20 45%, #232527 100%);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          box-shadow: 0 0 40px rgba(255, 255, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        .pods-panel-glow {
+          box-shadow: 0 0 24px rgba(255, 255, 255, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
       `}</style>
 
       <audio
@@ -1058,7 +1070,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       )}
 
       {activeView === 'player' && (
-      <>
+      <div className="pods-studio-frame">
       {/* Header Bar */}
       <div className="flex items-center justify-between min-h-[44px] gap-4">
         <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase whitespace-nowrap">
@@ -1204,7 +1216,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         {/* Left Column: Player & EQ */}
         <div className="space-y-4 lg:col-span-5">
           {activeTrack ? (
-            <div className="p-5 space-y-4 border bg-slate-900/90 border-neutral-700 rounded-xl backdrop-blur">
+            <div className="p-5 space-y-4 border bg-slate-900/90 border-neutral-700 rounded-xl backdrop-blur pods-panel-glow">
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-block px-2 py-0.5 bg-white/10 text-white text-xs font-mono rounded">
                   {activeTrack.frequency}
@@ -1466,7 +1478,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         {/* Right Column: Camera & Reader */}
         <div className="flex flex-col space-y-4 lg:col-span-7">
           {(
-            <div className="p-4 space-y-3 border bg-slate-950 border-neutral-700 rounded-xl">
+            <div className="p-4 space-y-3 border bg-slate-950 border-neutral-700 rounded-xl pods-panel-glow">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 font-mono text-xs tracking-wider uppercase text-white">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
@@ -1742,7 +1754,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
           </div>
         </div>
       )}
-      </>
+      </div>
       )}
     </div>
   );
