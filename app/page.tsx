@@ -347,7 +347,6 @@ useContextMenuShare();
                 }}
                 onOpenStarTracker={() => setIsStarTrackerOpen(true)}
                 onOpenLetsChat={() => setIsLetsChatOpen(true)}
-                onWeatherClick={weather.toggleSearch}
                 weatherActive={weather.weatherActive}
               />
             </div>

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight } from 'lucide-react';
 import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
+import WeatherForecastOverlay from './WeatherForecastOverlay';
 
 interface GalleryGridProps {
   onOpenRadio: () => void;
@@ -11,7 +12,6 @@ interface GalleryGridProps {
   onOpenKali: () => void;
   onOpenStarTracker: () => void;
   onOpenLetsChat: () => void;
-  onWeatherClick: () => void;
   weatherActive?: boolean;
 }
 
@@ -197,13 +197,13 @@ export default function GalleryGrid({
   onOpenKali,
   onOpenStarTracker,
   onOpenLetsChat,
-  onWeatherClick,
   weatherActive,
 }: GalleryGridProps) {
   // One flag per grid slot — flips true once that slot's arrival animation
   // finishes (see ArrivalSlot's onAnimationEnd below), which is also what
   // switches the card from pointer-events-none/cursor-wait to clickable.
   const [docked, setDocked] = useState<boolean[]>(() => Array(9).fill(false));
+  const [showWeatherOverlay, setShowWeatherOverlay] = useState(false);
   const dock = (i: number) => setDocked((prev) => (prev[i] ? prev : prev.map((v, idx) => (idx === i ? true : v))));
 
   return (
@@ -265,14 +265,12 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={3} docked={docked[3]} onDock={dock}>
-          <button onClick={onWeatherClick} className={cardClass}>
+          <button onClick={() => setShowWeatherOverlay(true)} className={cardClass}>
             <WeatherCardImage />
             <CardHeader Icon={Umbrella} active={weatherActive} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Weather</div>
-              <p className="mt-1 text-xs text-slate-400">
-                {weatherActive ? 'Forecast active — see the footer.' : 'Search a ZIP or city for a live forecast.'}
-              </p>
+              <p className="mt-1 text-xs text-slate-400">Search a ZIP, city, or address for a live NOAA forecast.</p>
             </div>
           </button>
         </ArrivalSlot>
@@ -332,6 +330,8 @@ export default function GalleryGrid({
           </button>
         </ArrivalSlot>
       </div>
+
+      {showWeatherOverlay && <WeatherForecastOverlay onClose={() => setShowWeatherOverlay(false)} />}
     </div>
   );
 }
