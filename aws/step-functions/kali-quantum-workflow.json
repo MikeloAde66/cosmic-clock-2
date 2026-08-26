@@ -1,0 +1,88 @@
+{
+  "Comment": "Kali quantum task pipeline (account 060274391988, region us-east-2): validate a circuit against a local/Braket simulator, pause for an explicit human approval (SNS + waitForTaskToken), then submit to a real Braket QPU only once approved. See aws/step-functions/README.md before deploying this - several placeholders below need real values from your account, and there is no free/local equivalent for Stage 3: a real quantum device task costs real money the moment it runs.",
+  "StartAt": "ValidateCircuit",
+  "States": {
+    "ValidateCircuit": {
+      "Type": "Task",
+      "Comment": "Runs the circuit against a local/Braket simulator first - the SAME kind of validation Kali's existing run_quantum_circuit chat tool already does (see app/api/ai-one-chat/route.ts), just invoked as a state machine step instead of a chat tool call. This calls out to that same external Python/Braket microservice (Vercel's Node runtime can't run Braket's SDK directly) - REPLACE_WITH_YOUR_KALI_VALIDATION_SERVICE_ENDPOINT below with its real, reachable URL. That service must return qubitCount, estimatedCostUsd, and circuitSummary in its response body for the approval notification below to have real numbers in it - if it doesn't already return those fields, they need to be added there (that service isn't part of this repo, so it isn't something this change could add for you).",
+      "Resource": "arn:aws:states:::apigateway:invoke",
+      "Parameters": {
+        "ApiEndpoint": "REPLACE_WITH_YOUR_KALI_VALIDATION_SERVICE_ENDPOINT",
+        "Method": "POST",
+        "RequestBody.$": "$"
+      },
+      "ResultPath": "$.validation",
+      "Next": "RequestApproval",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "ValidationFailed"
+        }
+      ]
+    },
+
+    "ValidationFailed": {
+      "Type": "Fail",
+      "Error": "CircuitValidationFailed",
+      "Cause": "The circuit failed local-simulator validation before ever reaching the approval/QPU stages - no cost was incurred."
+    },
+
+    "RequestApproval": {
+      "Type": "Task",
+      "Comment": "Pauses here until POST /api/kali/approve-task calls SendTaskSuccess or SendTaskFailure against $$.Task.Token - that route is the only thing that can move this forward. TimeoutSeconds below (24h) is a starting point, not a fixed requirement - tune it to how quickly you expect a human to actually respond.",
+      "Resource": "arn:aws:states:::sns:publish.waitForTaskToken",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:us-east-2:060274391988:kali-quantum-approvals",
+        "MessageStructure": "json",
+        "Message": {
+          "default.$": "States.Format('Kali quantum task pending approval: {} qubits, target {}, est. ${}. Approve or reject via the dashboard.', $.validation.qubitCount, $.targetQpu, $.validation.estimatedCostUsd)",
+          "taskToken.$": "$$.Task.Token",
+          "qubitCount.$": "$.validation.qubitCount",
+          "targetQpu.$": "$.targetQpu",
+          "estimatedCostUsd.$": "$.validation.estimatedCostUsd",
+          "circuitSummary.$": "$.validation.circuitSummary"
+        }
+      },
+      "TimeoutSeconds": 86400,
+      "ResultPath": "$.approval",
+      "Next": "ExecuteOnQpu",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.Timeout"],
+          "Next": "ApprovalTimedOut"
+        },
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "Next": "ApprovalRejected"
+        }
+      ]
+    },
+
+    "ApprovalTimedOut": {
+      "Type": "Fail",
+      "Error": "ApprovalTimedOut",
+      "Cause": "No approval decision arrived within the timeout window - no QPU task was ever submitted, no cost was incurred."
+    },
+
+    "ApprovalRejected": {
+      "Type": "Fail",
+      "Error": "ApprovalRejected",
+      "Cause": "An approver explicitly rejected this task via POST /api/kali/approve-task - no QPU task was ever submitted, no cost was incurred."
+    },
+
+    "ExecuteOnQpu": {
+      "Type": "Task",
+      "Comment": "The only state in this whole machine that spends real money - everything above it exists specifically to gate this one call behind an explicit human decision. DeviceArn/Shots/Action come from the original input ($.targetQpu / $.shots / $.circuitPayload), not hardcoded here, since 'target QPU' is meant to vary per request. REPLACE_WITH_YOUR_BRAKET_RESULTS_BUCKET below with a real S3 bucket you own in this account/region.",
+      "Resource": "arn:aws:states:::aws-sdk:braket:createQuantumTask",
+      "Parameters": {
+        "DeviceArn.$": "$.targetQpu",
+        "Shots.$": "$.shots",
+        "Action.$": "$.circuitPayload",
+        "OutputS3Bucket": "REPLACE_WITH_YOUR_BRAKET_RESULTS_BUCKET",
+        "OutputS3KeyPrefix.$": "States.Format('kali-tasks/{}', $$.Execution.Name)"
+      },
+      "End": true
+    }
+  }
+}
