@@ -1000,7 +1000,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`p-8 max-w-6xl mx-auto space-y-6 relative transition animate-zero-gravity-unfold bg-[#16181c] ${
+      className={`w-screen min-h-screen bg-[#0a0c10] text-slate-200 font-mono flex flex-col items-center justify-start p-4 md:p-8 relative transition animate-zero-gravity-unfold ${
         isDraggingOver ? 'bg-white/10 border-2 border-dashed border-neutral-700 rounded-2xl' : ''
       }`}
       style={{ perspective: '1200px' }}
@@ -1027,10 +1027,14 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
           position: relative;
           padding: 1.5rem;
           border-radius: 1rem;
-          background-color: #16181c;
+          background-color: #15181e;
           background-image:
             repeating-linear-gradient(0deg, rgba(148, 163, 184, 0.08) 0px, rgba(148, 163, 184, 0.08) 1px, transparent 1px, transparent 64px),
             repeating-linear-gradient(90deg, rgba(148, 163, 184, 0.08) 0px, rgba(148, 163, 184, 0.08) 1px, transparent 1px, transparent 64px);
+          /* Crisp bright border carries the edge definition — the
+             box-shadow is a secondary glow, not the only signal, so this
+             reads as a neon rim rather than a soft blurred halo. */
+          border: 2px solid rgba(255, 255, 255, 0.85);
           box-shadow: 0 0 25px rgba(255, 255, 255, 0.45), inset 0 0 15px rgba(255, 255, 255, 0.2);
         }
       `}</style>
@@ -1060,7 +1064,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       />
 
       {activeView === 'visualizer' && (
-        <div className="h-[75vh] rounded-2xl overflow-hidden border border-neutral-700">
+        <div className="w-full h-[75vh] rounded-2xl overflow-hidden border border-neutral-700">
           <CosmicVisualizer
             analyser={analyserRef.current}
             isPlaying={isPlaying && !activeTrack?.embedUrl}
@@ -1071,7 +1075,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       )}
 
       {activeView === 'player' && (
-      <div className="pods-studio-frame">
+      <div className="pods-studio-frame w-full">
       {/* Header Bar */}
       <div className="flex items-center justify-between min-h-[44px] gap-4 p-3 rounded-lg bg-[#1e2229] border border-slate-700/50">
         <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase whitespace-nowrap">
@@ -1217,7 +1221,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         {/* Left Column: Player & EQ */}
         <div className="space-y-4 lg:col-span-5">
           {activeTrack ? (
-            <div className="p-5 space-y-4 rounded-xl backdrop-blur border-2 border-slate-100 shadow-[0_0_20px_rgba(255,255,255,0.35)] bg-[#121418] drop-shadow-2xl">
+            <div className="relative p-5 space-y-4 rounded-xl backdrop-blur border-2 border-slate-200 shadow-[0_0_25px_rgba(255,255,255,0.4)] bg-[#12151b] drop-shadow-2xl">
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-block px-2 py-0.5 bg-white/10 text-white text-xs font-mono rounded">
                   {activeTrack.frequency}
@@ -1479,7 +1483,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
         {/* Right Column: Camera & Reader */}
         <div className="flex flex-col space-y-4 lg:col-span-7">
           {(
-            <div className="p-4 space-y-3 rounded-xl border-2 border-slate-100 shadow-[0_0_20px_rgba(255,255,255,0.35)] bg-[#121418] drop-shadow-2xl">
+            <div className="relative p-5 space-y-3 rounded-xl border-2 border-slate-200 shadow-[0_0_25px_rgba(255,255,255,0.4)] bg-[#12151b] drop-shadow-2xl">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 font-mono text-xs tracking-wider uppercase text-white">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
