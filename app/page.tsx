@@ -346,7 +346,7 @@ useContextMenuShare();
                   openHomeView('kali');
                 }}
                 onOpenStarTracker={() => setIsStarTrackerOpen(true)}
-                onOpenIss={() => setIsIssOpen(true)}
+                onOpenLetsChat={() => setIsLetsChatOpen(true)}
                 onWeatherClick={weather.toggleSearch}
                 weatherActive={weather.weatherActive}
               />

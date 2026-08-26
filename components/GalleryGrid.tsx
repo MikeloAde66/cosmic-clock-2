@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Gift, Telescope, Satellite, ArrowUpRight } from 'lucide-react';
+import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight } from 'lucide-react';
 import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
 
 interface GalleryGridProps {
@@ -10,7 +10,7 @@ interface GalleryGridProps {
   onOpenPods: () => void;
   onOpenKali: () => void;
   onOpenStarTracker: () => void;
-  onOpenIss: () => void;
+  onOpenLetsChat: () => void;
   onWeatherClick: () => void;
   weatherActive?: boolean;
 }
@@ -28,7 +28,8 @@ const GALLERY_IMAGES = {
   starTracker: '/gallery/star-tracker.png',
   aioneCore: '/gallery/products.png',
   hydronodeBuilderKit: '/gallery/hydronode.png',
-  iss: '/gallery/iss.png',
+  productsCatalog: '/gallery/products-catalog.png',
+  communityHub: '/gallery/community.png',
 } as const;
 
 // Per-card gradient covers — a concrete, finished-looking visual for every
@@ -44,7 +45,8 @@ const CARD_GRADIENTS: Record<string, string> = {
   kali: 'linear-gradient(135deg, #f0abfc 0%, #9333ea 55%, #1e1b4b 100%)',
   aioneCore: 'linear-gradient(135deg, #818cf8 0%, #4338ca 55%, #0f172a 100%)',
   hydronodeBuilderKit: 'linear-gradient(135deg, #5eead4 0%, #0f766e 55%, #042f2e 100%)',
-  iss: 'linear-gradient(135deg, #cbd5e1 0%, #475569 55%, #0f172a 100%)',
+  productsCatalog: 'linear-gradient(135deg, #cbd5e1 0%, #475569 55%, #0f172a 100%)',
+  communityHub: 'linear-gradient(135deg, #fb7185 0%, #be123c 55%, #4c0519 100%)',
 };
 
 // Stagger offset between each card's arrival — 180ms sits in the
@@ -170,18 +172,21 @@ function ArrivalSlot({ index, docked, onDock, children }: { index: number; docke
 
 // Layout 2 (Gallery Grid) — a dashboard-style entry point into the app's
 // real sections, not fabricated placeholder content. Radio/Pods/Kali/Star
-// Tracker/ISS land you in the dedicated Classic Hub view/overlay for that
-// section (this is a launcher, not a place to cram full players/chat into
-// tiny tiles); Ai One Core/HydroNode Builder Kit are real product routes;
-// Weather and Donate are direct actions (Weather has no standalone view at
-// all — see lib/useWeatherLocation.ts — so its card just opens the same
-// inline footer search the umbrella icon does, without leaving Gallery
-// mode).
+// Tracker/Digital Magazine land you in the dedicated Classic Hub
+// view/overlay for that section (this is a launcher, not a place to cram
+// full players/chat into tiny tiles); Ai One Core/HydroNode Builder
+// Kit/Products are real routes; Weather is a direct action (no standalone
+// view at all — see lib/useWeatherLocation.ts — so its card just opens the
+// same inline footer search the umbrella icon does, without leaving
+// Gallery mode). Digital Magazine opens Let's Chat (TenForwardSection) —
+// still the same honest, no-fabricated-content empty shell that component
+// has always been; there's no forum/community backend to point it at yet.
 export default function GalleryGrid({
   onOpenRadio,
   onOpenPods,
   onOpenKali,
   onOpenStarTracker,
+  onOpenLetsChat,
   onWeatherClick,
   weatherActive,
 }: GalleryGridProps) {
@@ -273,16 +278,15 @@ export default function GalleryGrid({
           </button>
         </ArrivalSlot>
 
-        {/* On hold — temporary empty placeholder, no click action or data
-            fetch (this slot is slated for a different module next pass). */}
         <ArrivalSlot index={5} docked={docked[5]} onDock={dock}>
-          <div className={`${cardClass} cursor-default`}>
-            <CardHeader Icon={Gift} />
+          <Link href="/products" className={cardClass}>
+            <CardImage src={GALLERY_IMAGES.productsCatalog} gradient={CARD_GRADIENTS.productsCatalog} Icon={LayoutGrid} />
+            <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
-              <div className="text-sm font-bold text-white">Donate</div>
-              <p className="mt-1 text-xs text-slate-400">Coming soon.</p>
+              <div className="text-sm font-bold text-white">Products</div>
+              <p className="mt-1 text-xs text-slate-400">Hardware and kits — browse the full catalog.</p>
             </div>
-          </div>
+          </Link>
         </ArrivalSlot>
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
@@ -307,17 +311,15 @@ export default function GalleryGrid({
           </Link>
         </ArrivalSlot>
 
-        {/* On hold — temporary empty placeholder, no click action or data
-            fetch (this slot is slated for a different module next pass). */}
         <ArrivalSlot index={8} docked={docked[8]} onDock={dock}>
-          <div className={`${cardClass} cursor-default`}>
-            <CardImage src={GALLERY_IMAGES.iss} gradient={CARD_GRADIENTS.iss} Icon={Satellite} />
-            <CardHeader Icon={Satellite} />
+          <button onClick={onOpenLetsChat} className={cardClass}>
+            <CardImage src={GALLERY_IMAGES.communityHub} gradient={CARD_GRADIENTS.communityHub} Icon={Newspaper} />
+            <CardHeader Icon={Newspaper} />
             <div className="mt-4">
-              <div className="text-sm font-bold text-white">ISS Stream</div>
-              <p className="mt-1 text-xs text-slate-400">Coming soon.</p>
+              <div className="text-sm font-bold text-white">Digital Magazine</div>
+              <p className="mt-1 text-xs text-slate-400">Community hub — stories, discussions, and Let&apos;s Chat.</p>
             </div>
-          </div>
+          </button>
         </ArrivalSlot>
       </div>
     </div>
