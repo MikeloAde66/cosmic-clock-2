@@ -32,8 +32,7 @@ import SiteFooter from '@/components/SiteFooter';
 import ISSFeedModal from '@/components/ISSFeedModal';
 import StarTrackerView from '@/components/StarTrackerView';
 import VaultSearchModal from '@/components/VaultSearchModal';
-import { RadioPlayerProvider } from '@/components/radio/RadioPlayerContext';
-import GlobalPlayerBar from '@/components/radio/GlobalPlayerBar';
+import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 import { CartProvider } from '@/lib/cart';
 import { useWeatherLocation } from '@/lib/useWeatherLocation';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
@@ -41,6 +40,16 @@ import type { VaultDrawer } from '@/lib/vaultRegistry';
 function HomeInner() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<string>('radio');
+  // GlobalPlayerBar now mounts globally in app/layout.tsx, above every
+  // route — this is the one remaining way this specific tab can still hide
+  // it while Pods/Studio One (a video-only workspace) is active. Cleanup
+  // resets it on unmount so navigating away from '/' entirely (e.g. to
+  // /products) never leaves the bar stuck hidden.
+  const { setPlayerBarHidden } = useRadioPlayer();
+  useEffect(() => {
+    setPlayerBarHidden(activeTab === 'pods');
+    return () => setPlayerBarHidden(false);
+  }, [activeTab, setPlayerBarHidden]);
   // Set by a Home globe Vault marker's "Open Drawer" link, or a Cmd+K search
   // result, consumed once as CosmicVaultAuth's initial filter — see that
   // component's initialDrawer prop.
@@ -237,7 +246,6 @@ useContextMenuShare();
   }
 
   return (
-    <RadioPlayerProvider>
     <CartProvider>
       {/* Edge-to-edge at every viewport size — small screens use the real
           device width/height now that the internal layout (sidebar drawer,
@@ -415,16 +423,14 @@ useContextMenuShare();
             </button>
           )}
 
-          {/* Mounted above SiteFooter on every tab except Studio One
-              (Pods) — that's a video-only workspace, so the audio radio
-              strip doesn't belong there. Otherwise shows an idle/paused
-              strip until a station is picked, per GlobalPlayerBar's own
-              idle-state rendering. Star Tracker and /products need no
-              extra handling here: Star Tracker is a fixed z-50 overlay
-              that already covers this bar (z-10) whenever it's open, and
-              /products is a fully separate Next.js route that never
-              renders this tree at all. */}
-          {activeTab !== 'pods' && <GlobalPlayerBar />}
+          {/* GlobalPlayerBar itself now mounts globally in app/layout.tsx
+              as a fixed-to-viewport overlay (see playerBarHidden effect
+              above, which hides it specifically while this tab is Pods —
+              that's a video-only workspace the audio strip doesn't belong
+              in). This spacer just reserves the same h-14 of room at the
+              bottom of this flex column so SiteFooter isn't covered by it,
+              matching the bar's own fixed height exactly. */}
+          {activeTab !== 'pods' && <div className="h-14 shrink-0" />}
           <SiteFooter
             weatherSearchOpen={weather.searchOpen}
             weatherLoading={weather.loading}
@@ -450,7 +456,6 @@ useContextMenuShare();
       {isStarTrackerOpen && <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} onAskKali={askKali} />}
       {isLetsChatOpen && <TenForwardSection onBack={() => setIsLetsChatOpen(false)} />}
     </CartProvider>
-    </RadioPlayerProvider>
   );
 }
 

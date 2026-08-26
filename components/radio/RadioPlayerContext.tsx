@@ -44,6 +44,14 @@ interface RadioPlayerContextValue {
   programManagerEnabled: boolean;
   activeProgramLabel: string | null;
   toggleProgramManager: () => void;
+  // Set by the home page (the only route with a Pods/Studio One tab) to
+  // hide GlobalPlayerBar while that video-only workspace is active — now
+  // that the bar itself is mounted globally in app/layout.tsx rather than
+  // locally on the home page, this is the only way a specific route/tab
+  // can still opt out of showing it. Defaults to false (visible) so every
+  // other route just shows the bar with no wiring needed.
+  playerBarHidden: boolean;
+  setPlayerBarHidden: (hidden: boolean) => void;
 }
 
 const RadioPlayerContext = createContext<RadioPlayerContextValue | null>(null);
@@ -53,6 +61,7 @@ const RadioPlayerContext = createContext<RadioPlayerContextValue | null>(null);
 // Home/Vault/Pods/Radio, instead of unmounting with the Radio tab the way
 // everything except Pods currently does.
 export function RadioPlayerProvider({ children }: { children: React.ReactNode }) {
+  const [playerBarHidden, setPlayerBarHidden] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const queueRef = useRef<QueueTrack[]>([]);
@@ -422,6 +431,8 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
         programManagerEnabled,
         activeProgramLabel,
         toggleProgramManager,
+        playerBarHidden,
+        setPlayerBarHidden,
       }}
     >
       {/* crossOrigin lets createMediaElementSource read real frequency data

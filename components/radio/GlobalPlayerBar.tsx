@@ -13,21 +13,46 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// Mounted once at the app-shell level and always rendered above SiteFooter —
-// on every tab, from initial page load. With no station picked yet it shows
-// an idle/paused strip rather than nothing, so the bar itself is always
-// visible; actual playback still only ever starts from an explicit Play
-// press (playStation/togglePlayPause), never automatically.
+// Mounted once at the true app-shell level (app/layout.tsx) so the bar —
+// and the <audio> element backing it, via RadioPlayerProvider sitting
+// beside it there — survives every route, not just tab switches within the
+// single-page app. Fixed to the viewport bottom rather than a normal flex
+// child, since every route has its own independent page layout/scroll
+// model; playerBarHidden (see RadioPlayerContext) is the one escape hatch
+// a specific route/tab still has to opt out of showing it (Pods/Studio One
+// on the home page, a video-only workspace the audio strip doesn't belong
+// in). With no station picked yet it shows an idle/paused strip rather
+// than nothing, so the bar itself is always visible otherwise; actual
+// playback still only ever starts from an explicit Play press
+// (playStation/togglePlayPause), never automatically.
 export default function GlobalPlayerBar() {
-  const { station, queue, currentIndex, status, currentTime, duration, volume, analyserRef, playStation, togglePlayPause, next, prev, seek, setVolume, stop } =
-    useRadioPlayer();
+  const {
+    station,
+    queue,
+    currentIndex,
+    status,
+    currentTime,
+    duration,
+    volume,
+    analyserRef,
+    playStation,
+    togglePlayPause,
+    next,
+    prev,
+    seek,
+    setVolume,
+    stop,
+    playerBarHidden,
+  } = useRadioPlayer();
   const [collapsed, setCollapsed] = useState(false);
+
+  if (playerBarHidden) return null;
 
   if (collapsed) {
     return (
       <button
         onClick={() => setCollapsed(false)}
-        className="relative z-10 flex items-center gap-2 px-4 py-1.5 border-t shrink-0 bg-[#04060A] border-slate-800/80 text-slate-500 hover:text-white transition-colors"
+        className="fixed bottom-0 inset-x-0 z-50 flex items-center h-14 gap-2 px-4 border-t bg-[#04060A] border-slate-800/80 text-slate-500 hover:text-white transition-colors"
         aria-label="Show radio player"
       >
         <RadioIcon className="w-3.5 h-3.5" />
@@ -38,7 +63,7 @@ export default function GlobalPlayerBar() {
 
   if (!station) {
     return (
-      <div className="relative z-10 flex items-center gap-2 px-2 py-2 border-t sm:gap-4 sm:px-4 shrink-0 bg-[#04060A] border-slate-800/80">
+      <div className="fixed bottom-0 inset-x-0 z-50 flex items-center h-14 gap-2 px-2 border-t sm:gap-4 sm:px-4 bg-[#04060A] border-slate-800/80">
         <div className="flex items-center min-w-0 gap-2">
           <RadioIcon className="w-4 h-4 text-slate-500 shrink-0" />
           <p className="text-xs text-slate-500 truncate">Radio Central — press play to start streaming</p>
@@ -62,7 +87,7 @@ export default function GlobalPlayerBar() {
   const hasQueue = queue.length > 0;
 
   return (
-    <div className="relative z-10 flex items-center gap-4 px-4 py-2 border-t shrink-0 bg-[#04060A] border-slate-800/80">
+    <div className="fixed bottom-0 inset-x-0 z-50 flex items-center h-14 gap-4 px-4 border-t bg-[#04060A] border-slate-800/80">
       <div className="flex items-center min-w-0 gap-2 w-20 sm:w-40 md:w-56">
         <div className="min-w-0">
           <p className="text-xs font-bold text-white truncate">{station.name}</p>

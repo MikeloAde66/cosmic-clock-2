@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { LanguageProvider } from "@/lib/languageContext";
+import { RadioPlayerProvider } from "@/components/radio/RadioPlayerContext";
+import GlobalPlayerBar from "@/components/radio/GlobalPlayerBar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,7 +31,19 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider>
+          {/* Mounted at the true app-shell level, above every route, so the
+              <audio> element (and playback/volume/queue state) survives
+              navigating between the SPA and standalone pages like
+              /products — previously scoped inside app/page.tsx, so it
+              unmounted entirely on any real route change. GlobalPlayerBar
+              itself is fixed-positioned (see that component) precisely
+              because every route below has its own independent layout. */}
+          <RadioPlayerProvider>
+            {children}
+            <GlobalPlayerBar />
+          </RadioPlayerProvider>
+        </LanguageProvider>
       </body>
     </html>
   );
