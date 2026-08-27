@@ -284,7 +284,7 @@ useContextMenuShare();
           onChangeLayoutMode={changeLayoutMode}
         />
 
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <TopHeader
             activeTab={activeTab}
             onOpenPricing={openPricing}
@@ -334,7 +334,16 @@ useContextMenuShare();
           )}
 
           {layoutMode === 'gallery' && (
-            <div className="relative flex-1 overflow-hidden">
+            // min-h-0 overrides flexbox's default min-height:auto on a
+            // flex-1 child — without it, this wrapper (and the h-screen
+            // chain above it) refuses to actually shrink to the space
+            // it's allocated, so GalleryGrid's own content pushes past
+            // the visible viewport instead of scrolling inside its own
+            // overflow-y-auto. That's what was shoving the reserved
+            // spacer + SiteFooter down behind the fixed-position
+            // GlobalPlayerBar, making the footer's social icons
+            // unreachable on real (non-tiny) viewport heights.
+            <div className="relative flex-1 min-h-0 overflow-hidden">
               <GalleryGrid
                 onOpenRadio={() => router.push('/radio')}
                 onOpenPods={() => {
@@ -429,14 +438,6 @@ useContextMenuShare();
             </button>
           )}
 
-          {/* GlobalPlayerBar itself now mounts globally in app/layout.tsx
-              as a fixed-to-viewport overlay (see playerBarHidden effect
-              above, which hides it specifically while this tab is Pods —
-              that's a video-only workspace the audio strip doesn't belong
-              in). This spacer just reserves the same h-14 of room at the
-              bottom of this flex column so SiteFooter isn't covered by it,
-              matching the bar's own fixed height exactly. */}
-          {activeTab !== 'pods' && <div className="h-14 shrink-0" />}
           <SiteFooter
             weatherSearchOpen={weather.searchOpen}
             weatherLoading={weather.loading}
@@ -445,6 +446,18 @@ useContextMenuShare();
             weatherCurrentTemp={weather.currentTemp}
             onWeatherSubmit={weather.submitLocation}
           />
+          {/* GlobalPlayerBar itself now mounts globally in app/layout.tsx
+              as a fixed-to-viewport overlay (see playerBarHidden effect
+              above, which hides it specifically while this tab is Pods —
+              that's a video-only workspace the audio strip doesn't belong
+              in). This spacer reserves the same h-14 of room at the very
+              bottom of the flex column so SiteFooter isn't covered by it -
+              it has to come AFTER SiteFooter (not before) to actually push
+              the footer up above where the fixed bar sits; placed before
+              it instead just pushed SiteFooter down into that exact
+              region, which is what was covering the footer's own social
+              icons. */}
+          {activeTab !== 'pods' && <div className="h-14 shrink-0" />}
         </div>
         </main>
       </div>
