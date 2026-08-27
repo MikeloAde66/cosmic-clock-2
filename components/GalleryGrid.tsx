@@ -728,7 +728,7 @@ export default function GalleryGrid({
         >
           Ai One
         </h1>
-        <p className="font-mono text-xs tracking-widest uppercase text-slate-400">Cosmic Creation &amp; Broadcast Hub</p>
+        <p className="font-mono text-xs tracking-widest uppercase text-zinc-300">Cosmic Creation &amp; Broadcast Hub</p>
       </div>
 
       {/* 9-card grid — perspective on the grid itself is what gives each

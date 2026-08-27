@@ -385,7 +385,21 @@ body {
   position: absolute;
   inset: 0;
   clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  background: linear-gradient(135deg, #ffffff 0%, #a6b4c9 45%, #3b485a 50%, #e2e8f0 100%);
+  /* Same stops as .metallic-gold-text (globals.css), applied as a plain
+     fill rather than background-clip:text since these are solid
+     triangular faces, not glyphs — deliberate match with the "Ai One"
+     header logo and the Kali equation, all three sharing one gold
+     treatment. */
+  background: linear-gradient(
+    135deg,
+    #7a5c2e 0%,
+    #caa43d 20%,
+    #f5d576 40%,
+    #fdf6e3 52%,
+    #f5d576 64%,
+    #caa43d 80%,
+    #7a5c2e 100%
+  );
   transform-origin: 50% 100%;
   backface-visibility: hidden;
 }
