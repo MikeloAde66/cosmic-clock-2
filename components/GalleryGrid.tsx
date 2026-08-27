@@ -546,11 +546,13 @@ function KaliQuantumEquationCardImage() {
   return (
     <div className="relative flex items-center justify-center w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-black">
       <div
-        className="px-4 font-mono text-base tracking-wide text-center kali-equation-drift text-cyan-100"
-        style={{ textShadow: '0 0 6px rgba(103,232,249,0.6), 0 0 16px rgba(34,211,238,0.3)' }}
+        className="px-4 font-mono text-base tracking-wide text-center kali-equation-drift metallic-gold-text"
+        style={{ textShadow: '0 0 8px rgba(212,175,55,0.45), 0 0 18px rgba(184,134,11,0.28)' }}
       >
         {fullText.slice(0, displayedLength)}
-        <span className="kali-equation-cursor">|</span>
+        <span className="kali-equation-cursor" style={{ color: '#f5d576', textShadow: '0 0 6px rgba(212,175,55,0.6)' }}>
+          |
+        </span>
       </div>
     </div>
   );
@@ -716,12 +718,12 @@ export default function GalleryGrid({
           align at the same edges instead of the banner bleeding wider. */}
       <div className="flex flex-col items-center justify-center max-w-5xl gap-2 px-4 pt-14 pb-10 mx-auto text-center">
         <h1
-          className="text-4xl text-white md:text-5xl"
+          className="text-4xl md:text-5xl metallic-gold-text"
           style={{
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif',
             fontWeight: 800,
             letterSpacing: '-0.025em',
-            textShadow: '0 2px 24px rgba(0,0,0,0.6), 0 0 40px rgba(96,165,250,0.25)',
+            textShadow: '0 2px 24px rgba(0,0,0,0.6), 0 0 18px rgba(212,175,55,0.45), 0 0 36px rgba(184,134,11,0.25)',
           }}
         >
           Ai One

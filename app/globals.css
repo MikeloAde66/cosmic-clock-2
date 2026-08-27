@@ -478,3 +478,30 @@ body {
 .kali-equation-cursor {
   animation: kali-equation-cursor-blink 0.8s step-end infinite;
 }
+
+/* Shared "metallic gold" text fill — used by the Kali equation and the
+   main "Ai One" hero logo (see GalleryGrid.tsx). A deliberate, confirmed
+   exception to this project's zero-amber rule (see
+   feedback_zero-yellow-crisp-white memory) for these two elements only.
+   The symmetric dark-gold -> amber -> bright -> champagne-highlight ->
+   bright -> amber -> dark-gold stops are what read as a reflective
+   metallic sheen rather than a flat gold fill. This class only owns the
+   gradient/clip (the fill) — each usage layers its own text-shadow glow
+   via inline style, tuned differently for a small dark-background
+   equation vs. a large hero heading over a starfield. */
+.metallic-gold-text {
+  background-image: linear-gradient(
+    135deg,
+    #7a5c2e 0%,
+    #caa43d 20%,
+    #f5d576 40%,
+    #fdf6e3 52%,
+    #f5d576 64%,
+    #caa43d 80%,
+    #7a5c2e 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
