@@ -217,6 +217,153 @@ function MatrixRainCardImage() {
   );
 }
 
+const STUDIO_GRID_LINE_COUNT = 9;
+const STUDIO_GRID_VANISH_Y_RATIO = 0.32;
+// Depth units per millisecond, not per tick — frame-rate independent, so
+// the drift speed stays consistent regardless of the throttle below.
+const STUDIO_GRID_SPEED_PER_MS = 0.00035;
+const STUDIO_GRID_PERSPECTIVE_POWER = 2.4;
+const STUDIO_NODE_COUNT = 7;
+const STUDIO_FRAME_INTERVAL_MS = 33;
+
+// Studio One's preview strip — a canvas-driven "4D content creator" scene:
+// an infinite perspective grid drifting toward the viewer (the classic
+// recycled-depth-line technique, same idea as a synthwave/Tron floor) with
+// floating glowing nodes drifting above it. Blue/violet/white accents
+// only — no amber/gold, per this project's standing "zero yellow" rule
+// (see feedback_zero-yellow-crisp-white memory), which explicitly named
+// this card back when it was called Pods.
+function StudioPreviewCardImage() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+
+    let width = 0;
+    let height = 0;
+    let gridLines: { depth: number }[] = [];
+    let nodes: { x: number; baseY: number; phase: number; speed: number; color: string }[] = [];
+
+    function resize() {
+      // clientWidth/clientHeight, not getBoundingClientRect — see the
+      // identical note in MatrixRainCardImage's resize() above; this card
+      // mounts inside the same ArrivalSlot scale-in animation.
+      width = canvas!.clientWidth;
+      height = canvas!.clientHeight;
+      const dpr = window.devicePixelRatio || 1;
+      canvas!.width = width * dpr;
+      canvas!.height = height * dpr;
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      gridLines = Array.from({ length: STUDIO_GRID_LINE_COUNT }, (_, i) => ({ depth: i / STUDIO_GRID_LINE_COUNT }));
+      const nodeColors = ['rgba(240, 245, 255, 0.95)', 'rgba(196, 181, 253, 0.9)', 'rgba(103, 232, 249, 0.9)'];
+      nodes = Array.from({ length: STUDIO_NODE_COUNT }, (_, i) => ({
+        x: ((i + 0.5) / STUDIO_NODE_COUNT) * width + Math.sin(i * 3.1) * width * 0.04,
+        baseY: height * (0.14 + 0.5 * Math.abs(Math.sin(i * 1.7))),
+        phase: i * 1.3,
+        speed: 0.0009 + (i % 3) * 0.0003,
+        color: nodeColors[i % nodeColors.length],
+      }));
+    }
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+
+    let rafId = 0;
+    let lastDraw = 0;
+
+    function draw(timestamp: number) {
+      rafId = requestAnimationFrame(draw);
+      if (timestamp - lastDraw < STUDIO_FRAME_INTERVAL_MS) return;
+      const dt = lastDraw ? timestamp - lastDraw : 16;
+      lastDraw = timestamp;
+
+      ctx!.shadowBlur = 0;
+      ctx!.fillStyle = '#020617';
+      ctx!.fillRect(0, 0, width, height);
+
+      const vanishX = width / 2;
+      const vanishY = height * STUDIO_GRID_VANISH_Y_RATIO;
+
+      // Converging vertical lines — a static fan from the vanishing point,
+      // the perspective "landscape" structure the horizontal lines below
+      // fly along.
+      ctx!.strokeStyle = 'rgba(96, 165, 250, 0.18)';
+      ctx!.lineWidth = 1;
+      const fanSpread = width * 0.9;
+      for (let i = 0; i <= 6; i++) {
+        const t = i / 6;
+        const bottomX = vanishX + (t - 0.5) * 2 * fanSpread;
+        ctx!.beginPath();
+        ctx!.moveTo(vanishX, vanishY);
+        ctx!.lineTo(bottomX, height);
+        ctx!.stroke();
+      }
+
+      // Horizontal depth lines — each drifts from the horizon toward the
+      // viewer and recycles back once it passes, an infinite grid that
+      // loops seamlessly since a recycled line is indistinguishable from
+      // one that was always there.
+      for (const line of gridLines) {
+        line.depth += STUDIO_GRID_SPEED_PER_MS * dt;
+        if (line.depth > 1) line.depth -= 1;
+        const y = vanishY + (height - vanishY) * Math.pow(line.depth, STUDIO_GRID_PERSPECTIVE_POWER);
+        const alpha = 0.05 + line.depth * 0.35;
+        ctx!.strokeStyle = `rgba(96, 165, 250, ${alpha})`;
+        ctx!.lineWidth = 0.5 + line.depth * 1.5;
+        ctx!.beginPath();
+        ctx!.moveTo(0, y);
+        ctx!.lineTo(width, y);
+        ctx!.stroke();
+      }
+
+      // Floating glowing nodes — "3D matrix elements" drifting above the
+      // grid, with faint connecting lines between nearby ones for a
+      // network/node-graph feel.
+      const positions = nodes.map((node) => ({
+        x: node.x,
+        y: node.baseY + Math.sin(timestamp * node.speed + node.phase) * (height * 0.06),
+      }));
+      ctx!.strokeStyle = 'rgba(196, 181, 253, 0.15)';
+      ctx!.lineWidth = 1;
+      for (let i = 0; i < positions.length; i++) {
+        for (let j = i + 1; j < positions.length; j++) {
+          const dist = Math.hypot(positions[i].x - positions[j].x, positions[i].y - positions[j].y);
+          if (dist < width * 0.28) {
+            ctx!.beginPath();
+            ctx!.moveTo(positions[i].x, positions[i].y);
+            ctx!.lineTo(positions[j].x, positions[j].y);
+            ctx!.stroke();
+          }
+        }
+      }
+      for (let i = 0; i < nodes.length; i++) {
+        ctx!.shadowColor = nodes[i].color;
+        ctx!.shadowBlur = 6;
+        ctx!.fillStyle = nodes[i].color;
+        ctx!.beginPath();
+        ctx!.arc(positions[i].x, positions[i].y, 2, 0, Math.PI * 2);
+        ctx!.fill();
+      }
+      ctx!.shadowBlur = 0;
+    }
+    rafId = requestAnimationFrame(draw);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      ro.disconnect();
+    };
+  }, []);
+
+  return (
+    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+    </div>
+  );
+}
+
 // Preview strip — a finished-looking gradient cover (see CARD_GRADIENTS)
 // plus a faint star-dot texture and an oversized icon watermark render
 // immediately, so every card shows a concrete, rich visual from the first
@@ -409,7 +556,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={1} docked={docked[1]} onDock={dock}>
           <button onClick={onOpenPods} className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.studio} gradient={CARD_GRADIENTS.studio} Icon={Mic} />
+            <StudioPreviewCardImage />
             <CardHeader Icon={Mic} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Studio One</div>
