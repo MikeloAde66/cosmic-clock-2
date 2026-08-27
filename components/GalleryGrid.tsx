@@ -491,6 +491,71 @@ function DigitalMagazineTickerCardImage() {
   );
 }
 
+// Real quantum-mechanics notation, not decorative symbol soup: the
+// time-dependent Schrodinger equation, a qubit state vector in bra-ket
+// notation, and the time-independent (eigenvalue) form. Cycled one at a
+// time, typed out, held long enough to actually read, then cleared.
+const KALI_EQUATIONS = ['iħ ∂ψ/∂t = Ĥψ', '|ψ⟩ = α|0⟩ + β|1⟩', 'Ĥ|ψ⟩ = E|ψ⟩'];
+const KALI_TYPE_CHAR_MS = 95;
+const KALI_HOLD_MS = 1800;
+const KALI_CLEAR_PAUSE_MS = 500;
+
+// Kali's preview strip — a deliberate, line-by-line typewriter reveal of
+// real quantum notation on solid black, with a soft cyan holographic glow
+// (see KaliOracleView.tsx's own note: gold/amber was considered for this
+// exact card and dropped for the project's standing zero-amber rule, so
+// this reuses that same resolved color instead of reopening it) and a
+// gentle, continuous vertical drift.
+function KaliQuantumEquationCardImage() {
+  const [equationIndex, setEquationIndex] = useState(0);
+  const [displayedLength, setDisplayedLength] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const fullText = KALI_EQUATIONS[equationIndex % KALI_EQUATIONS.length];
+
+    function typeChar(len: number) {
+      if (cancelled) return;
+      if (len <= fullText.length) {
+        setDisplayedLength(len);
+        timeoutId = setTimeout(() => typeChar(len + 1), KALI_TYPE_CHAR_MS);
+        return;
+      }
+      // Fully typed — hold so it's actually readable, not rushed, then
+      // clear and advance to the next equation.
+      timeoutId = setTimeout(() => {
+        if (cancelled) return;
+        setDisplayedLength(0);
+        timeoutId = setTimeout(() => {
+          if (cancelled) return;
+          setEquationIndex((i) => (i + 1) % KALI_EQUATIONS.length);
+        }, KALI_CLEAR_PAUSE_MS);
+      }, KALI_HOLD_MS);
+    }
+    typeChar(0);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [equationIndex]);
+
+  const fullText = KALI_EQUATIONS[equationIndex % KALI_EQUATIONS.length];
+
+  return (
+    <div className="relative flex items-center justify-center w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-black">
+      <div
+        className="px-4 font-mono text-base tracking-wide text-center kali-equation-drift text-cyan-100"
+        style={{ textShadow: '0 0 6px rgba(103,232,249,0.6), 0 0 16px rgba(34,211,238,0.3)' }}
+      >
+        {fullText.slice(0, displayedLength)}
+        <span className="kali-equation-cursor">|</span>
+      </div>
+    </div>
+  );
+}
+
 // Preview strip — a finished-looking gradient cover (see CARD_GRADIENTS)
 // plus a faint star-dot texture and an oversized icon watermark render
 // immediately, so every card shows a concrete, rich visual from the first
@@ -717,7 +782,7 @@ export default function GalleryGrid({
         <ArrivalSlot index={4} docked={docked[4]} onDock={dock}>
           <div className="relative w-full h-full">
             <button onClick={onOpenKali} className={cardClass}>
-              <CardImage src={GALLERY_IMAGES.kali} gradient={CARD_GRADIENTS.kali} Icon={Sparkles} />
+              <KaliQuantumEquationCardImage />
               <CardHeader Icon={Sparkles} />
               <div className="mt-4">
                 <div className="text-sm font-bold text-white">Kali</div>

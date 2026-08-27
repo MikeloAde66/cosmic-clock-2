@@ -446,3 +446,35 @@ body {
 .digital-magazine-ticker-track {
   animation: digital-magazine-ticker-scroll 16s linear infinite;
 }
+
+/* Kali card — typewriter quantum equation. The drift is a gentle,
+   continuous north-south sway (alternate direction), independent of the
+   typing/hold/clear cycle driven from React state in GalleryGrid.tsx —
+   coupling the two exactly would add real complexity for no visible
+   benefit, since an ambient drift reads the same regardless of what text
+   is currently on screen. */
+@keyframes kali-equation-drift {
+  0%,
+  100% {
+    transform: translateY(-6px);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+.kali-equation-drift {
+  animation: kali-equation-drift 7s ease-in-out infinite;
+}
+@keyframes kali-equation-cursor-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+.kali-equation-cursor {
+  animation: kali-equation-cursor-blink 0.8s step-end infinite;
+}
