@@ -96,7 +96,8 @@
         "Shots.$": "$.shots",
         "Action.$": "$.validation.ResponseBody.circuit_action",
         "OutputS3Bucket": "REPLACE_WITH_YOUR_BRAKET_RESULTS_BUCKET",
-        "OutputS3KeyPrefix.$": "States.Format('kali-tasks/{}', $$.Execution.Name)"
+        "OutputS3KeyPrefix.$": "States.Format('kali-tasks/{}', $$.Execution.Name)",
+        "ClientToken.$": "States.UUID()"
       },
       "End": true
     }

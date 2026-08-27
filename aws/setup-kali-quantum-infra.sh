@@ -133,16 +133,22 @@ echo "    NOTE: IAM roles can take ~10-15 seconds to propagate before Step Funct
 
 echo "==> Preparing the state machine definition (substituting the connection ARN + S3 bucket into a temp copy)..."
 SOURCE_DEFINITION="$(dirname "$0")/step-functions/kali-quantum-workflow.json"
-if grep -q "REPLACE_WITH_YOUR" "$SOURCE_DEFINITION"; then
-  echo "ERROR: ${SOURCE_DEFINITION} still has REPLACE_WITH_YOUR_* placeholders that this script doesn't fill in automatically — check the file." >&2
-  exit 1
-fi
 TMP_DEFINITION=$(mktemp)
 trap 'rm -f "$TMP_DEFINITION"' EXIT
 sed \
   -e "s|__EVENTBRIDGE_CONNECTION_ARN__|${CONNECTION_ARN}|g" \
   -e "s|REPLACE_WITH_YOUR_BRAKET_RESULTS_BUCKET|${BRAKET_RESULTS_BUCKET}|g" \
   "$SOURCE_DEFINITION" > "$TMP_DEFINITION"
+
+# Checked against the OUTPUT, not the source — the source is supposed to
+# contain these exact placeholder tokens (that's what the sed above just
+# replaced). This only catches a genuinely unhandled placeholder that
+# survived substitution, e.g. a new one added to the JSON without a
+# matching sed rule above.
+if grep -q "REPLACE_WITH_YOUR\|__EVENTBRIDGE_CONNECTION_ARN__" "$TMP_DEFINITION"; then
+  echo "ERROR: the substituted definition still has an unfilled placeholder — check the sed rules above against ${SOURCE_DEFINITION}." >&2
+  exit 1
+fi
 
 echo "==> Creating/updating state machine '${STATE_MACHINE_NAME}'..."
 EXISTING_ARN=$(aws stepfunctions list-state-machines --region "$REGION" \
