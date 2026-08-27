@@ -364,6 +364,104 @@ function StudioPreviewCardImage() {
   );
 }
 
+// Fixed positions (index-based trig, no Math.random()) — same reasoning as
+// RADIO_WAVEFORM_BARS above: a random value per render would disagree
+// between the server-rendered HTML and the client's first render and
+// throw a hydration mismatch the instant React takes over.
+const STAR_TRACKER_MINI_STARS = Array.from({ length: 10 }, (_, i) => ({
+  top: `${(Math.abs(Math.sin(i * 2.3)) * 88).toFixed(1)}%`,
+  left: `${(Math.abs(Math.cos(i * 1.7)) * 96).toFixed(1)}%`,
+  size: 1 + (i % 3),
+  delay: -((i % 5) * 0.5),
+  duration: 2 + (i % 4) * 0.5,
+}));
+const STAR_TRACKER_MINI_TICKS = Array.from({ length: 12 }, (_, i) => i * 30);
+const STAR_TRACKER_MINI_TARGETS = [
+  { x: 68, y: 40 },
+  { x: 35, y: 62 },
+  { x: 58, y: 66 },
+];
+
+// Star Tracker's preview strip — a miniature version of the real
+// sub-page's holographic radar dome (components/StarTrackerView.tsx),
+// not a generic/unrelated radar look: obsidian dome, cyan double ring,
+// tick marks, a center crosshair, a few tracked-object dots, and the same
+// rotating sweep motif. Pure SVG + CSS transform, no canvas/rAF needed —
+// see star-tracker-mini-sweep in globals.css.
+function StarTrackerRadarCardImage() {
+  const center = 50;
+  const radius = 34;
+  return (
+    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#050810]">
+      {STAR_TRACKER_MINI_STARS.map((star, i) => (
+        <div
+          key={i}
+          className="absolute rounded-full bg-white gallery-star-twinkle"
+          style={{
+            top: star.top,
+            left: star.left,
+            width: star.size,
+            height: star.size,
+            boxShadow: '0 0 4px #ffffff',
+            animationDelay: `${star.delay}s`,
+            animationDuration: `${star.duration}s`,
+          }}
+        />
+      ))}
+      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full">
+        <circle cx={center} cy={center} r={radius} fill="rgba(2,6,23,0.85)" stroke="rgba(34,211,238,0.3)" strokeWidth={1} />
+        <circle cx={center} cy={center} r={radius * 0.5} fill="none" stroke="rgba(34,211,238,0.12)" strokeWidth={1} />
+        {/* Center crosshair — the dome's "zenith" marker on the real page. */}
+        <line x1={center - 4} y1={center} x2={center + 4} y2={center} stroke="rgba(34,211,238,0.6)" strokeWidth={1} />
+        <line x1={center} y1={center - 4} x2={center} y2={center + 4} stroke="rgba(34,211,238,0.6)" strokeWidth={1} />
+        {/* Azimuth ring ticks — majors every 90°, same convention as the
+            real page's compass ring, just without labels at this scale. */}
+        {STAR_TRACKER_MINI_TICKS.map((deg) => {
+          const angle = (deg - 90) * (Math.PI / 180);
+          const isMajor = deg % 90 === 0;
+          const outer = radius + (isMajor ? 5 : 3);
+          const inner = radius + (isMajor ? 1 : 1);
+          return (
+            <line
+              key={deg}
+              x1={center + Math.cos(angle) * outer}
+              y1={center + Math.sin(angle) * outer}
+              x2={center + Math.cos(angle) * inner}
+              y2={center + Math.sin(angle) * inner}
+              stroke={isMajor ? 'rgba(103,232,249,0.8)' : 'rgba(34,211,238,0.4)'}
+              strokeWidth={isMajor ? 1.2 : 0.6}
+            />
+          );
+        })}
+        {/* Tracked-object dots — decorative telemetry targets, not real data. */}
+        {STAR_TRACKER_MINI_TARGETS.map((t, i) => (
+          <circle
+            key={i}
+            cx={t.x}
+            cy={t.y}
+            r={1.6}
+            fill="#67e8f9"
+            style={{ filter: 'drop-shadow(0 0 2px rgba(34,211,238,0.9))' }}
+          />
+        ))}
+        {/* Rotating highlight sweep — same technique as the real page's
+            azimuth ring: a short dash on a big circle, spun via CSS. */}
+        <g className="star-tracker-mini-sweep">
+          <circle
+            cx={center}
+            cy={center}
+            r={radius + 4}
+            fill="none"
+            stroke="rgba(103,232,249,0.9)"
+            strokeWidth={2}
+            strokeDasharray={`${(radius + 4) * 0.2} ${(radius + 4) * 6.08}`}
+          />
+        </g>
+      </svg>
+    </div>
+  );
+}
+
 // Preview strip — a finished-looking gradient cover (see CARD_GRADIENTS)
 // plus a faint star-dot texture and an oversized icon watermark render
 // immediately, so every card shows a concrete, rich visual from the first
@@ -567,7 +665,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={2} docked={docked[2]} onDock={dock}>
           <button onClick={onOpenStarTracker} className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.starTracker} gradient={CARD_GRADIENTS.starTracker} Icon={Telescope} />
+            <StarTrackerRadarCardImage />
             <CardHeader Icon={Telescope} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Star Tracker</div>

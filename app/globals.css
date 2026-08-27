@@ -394,3 +394,37 @@ body {
 .ptlg-face:nth-child(2) { transform: rotateY(90deg) translateZ(6px) rotateX(24deg); }
 .ptlg-face:nth-child(3) { transform: rotateY(180deg) translateZ(6px) rotateX(24deg); }
 .ptlg-face:nth-child(4) { transform: rotateY(270deg) translateZ(6px) rotateX(24deg); }
+
+/* Star Tracker card — a miniature version of the real sub-page's
+   holographic radar dome (components/StarTrackerView.tsx: obsidian dome,
+   cyan double ring, azimuth sweep). Pure CSS transform/opacity, no
+   canvas/rAF needed at all — a rotating SVG <g> and a few twinkling dots
+   are cheaper than anything JS-driven for this shape. */
+@keyframes star-tracker-mini-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.star-tracker-mini-sweep {
+  transform-origin: 50px 50px;
+  animation: star-tracker-mini-sweep 6s linear infinite;
+}
+@keyframes gallery-star-twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.2);
+  }
+}
+.gallery-star-twinkle {
+  animation-name: gallery-star-twinkle;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
