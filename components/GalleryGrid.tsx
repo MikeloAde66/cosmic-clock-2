@@ -701,6 +701,7 @@ function ArrivalSlot({ index, docked, onDock, children }: { index: number; docke
 // still the same honest, no-fabricated-content empty shell that component
 // has always been; there's no forum/community backend to point it at yet.
 export default function GalleryGrid({
+  onOpenRadio,
   onOpenPods,
   onOpenKali,
   onOpenStarTracker,
@@ -743,18 +744,14 @@ export default function GalleryGrid({
         style={{ perspective: '1200px' }}
       >
         <ArrivalSlot index={0} docked={docked[0]} onDock={dock}>
-          {/* Plain div, not a button — unclickable for now per explicit
-              instruction, since the new positioning (audiobooks from real
-              people's stories) doesn't match onOpenRadio's actual
-              destination (the live streaming radio player) yet. */}
-          <div className={cardClassRadio}>
+          <button onClick={onOpenRadio} className={cardClassRadio}>
             <RadioWaveformCardImage />
             <CardHeader Icon={RadioIcon} />
             <div className="mt-4">
-              <div className="text-sm font-bold text-white">Ai, Off Grid and DIY</div>
-              <p className="mt-1 text-xs text-slate-400">Real stories from real people, turned into audiobooks.</p>
+              <div className="text-sm font-bold text-white">Radio Central</div>
+              <p className="mt-1 text-xs text-slate-400">Live streaming stations, curated ambient/cosmic channels.</p>
             </div>
-          </div>
+          </button>
         </ArrivalSlot>
 
         <ArrivalSlot index={1} docked={docked[1]} onDock={dock}>
