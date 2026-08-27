@@ -122,23 +122,10 @@ function RadioWaveformCardImage() {
 
 const MATRIX_RAIN_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 const MATRIX_RAIN_FONT_SIZE = 14;
-// Throttles how often the canvas redraws, independent of display refresh
-// rate — without this, a 120Hz display would rain twice as fast as a 60Hz
-// one for no visual benefit, just wasted draws.
-const MATRIX_RAIN_FRAME_INTERVAL_MS = 90;
-// Rows per redraw tick — small on purpose. A column's glyph only rerolls
-// once it actually crosses into a new row (see draw() below), so this
-// alone controls the pace: at this value a column advances roughly one
-// row every ~1.3s, a slow, calm drift rather than the original's ~15
-// rows/sec cascade.
-const MATRIX_RAIN_ROW_STEP = 0.07;
-// A soft, consciously-visible glimmer of the wordmark — not a subliminal
-// flash. Genuine subliminal messaging (content shown specifically to
-// register below conscious awareness) is a manipulative pattern regardless
-// of how minor it seems here, so this fades in/out slowly enough that
-// anyone watching the card can actually notice and register it.
-const MATRIX_RAIN_GLIMMER_CYCLE_MS = 8000;
-const MATRIX_RAIN_GLIMMER_DURATION_MS = 700;
+// Throttles how often a new row of glyphs drops, independent of display
+// refresh rate — without this, a 120Hz display would rain twice as fast as
+// a 60Hz one for no visual benefit, just wasted draws.
+const MATRIX_RAIN_FRAME_INTERVAL_MS = 65;
 
 // Products card's preview strip — a canvas-driven Matrix-style digital
 // rain instead of the static gallery photo every other card fades in (see
@@ -156,12 +143,7 @@ function MatrixRainCardImage() {
     let width = 0;
     let height = 0;
     let columns = 0;
-    // Each column tracks its own fractional row position plus the glyph
-    // currently assigned to it — the glyph is only re-rolled when the
-    // column crosses into a new integer row, so a slow row-step produces a
-    // calm drift instead of the glyph flickering to a new random character
-    // every single redraw tick while barely having moved.
-    let cols: { row: number; char: string }[] = [];
+    let drops: number[] = [];
 
     function resize() {
       // clientWidth/clientHeight (the layout box), not
@@ -180,10 +162,7 @@ function MatrixRainCardImage() {
       columns = Math.max(1, Math.floor(width / MATRIX_RAIN_FONT_SIZE));
       // Staggered starting offsets (including negative ones) so columns
       // don't all begin — or later reset — in lockstep.
-      cols = Array.from({ length: columns }, () => ({
-        row: Math.random() * -30,
-        char: MATRIX_RAIN_CHARSET[Math.floor(Math.random() * MATRIX_RAIN_CHARSET.length)],
-      }));
+      drops = Array.from({ length: columns }, () => Math.random() * -30);
     }
     resize();
     const ro = new ResizeObserver(resize);
@@ -191,59 +170,36 @@ function MatrixRainCardImage() {
 
     let rafId = 0;
     let lastDraw = 0;
-    let startTime = 0;
 
     function draw(timestamp: number) {
       rafId = requestAnimationFrame(draw);
-      if (!startTime) startTime = timestamp;
       if (timestamp - lastDraw < MATRIX_RAIN_FRAME_INTERVAL_MS) return;
       lastDraw = timestamp;
 
       // A translucent wipe (rather than clearRect) is what leaves the
       // fading trail behind each falling glyph — the classic digital-rain
       // technique, entirely from compositing, no per-glyph fade tracking.
-      // A lower alpha here means older glyphs persist and fade more
-      // gradually, reading as a deeper, softer trail.
       ctx!.shadowBlur = 0;
-      ctx!.fillStyle = 'rgba(2, 6, 23, 0.08)';
+      ctx!.fillStyle = 'rgba(2, 6, 23, 0.2)';
       ctx!.fillRect(0, 0, width, height);
 
       ctx!.font = `${MATRIX_RAIN_FONT_SIZE}px monospace`;
       ctx!.textBaseline = 'top';
-      ctx!.shadowColor = 'rgba(52, 211, 153, 0.85)';
-      ctx!.shadowBlur = 8;
-      ctx!.fillStyle = 'rgba(110, 231, 183, 0.75)';
+      ctx!.shadowColor = 'rgba(52, 211, 153, 0.9)';
+      ctx!.shadowBlur = 6;
+      ctx!.fillStyle = 'rgba(110, 231, 183, 0.9)';
 
       for (let i = 0; i < columns; i++) {
-        const col = cols[i];
-        const prevRow = Math.floor(col.row);
-        col.row += MATRIX_RAIN_ROW_STEP;
-        if (Math.floor(col.row) !== prevRow) {
-          col.char = MATRIX_RAIN_CHARSET[Math.floor(Math.random() * MATRIX_RAIN_CHARSET.length)];
-        }
+        const char = MATRIX_RAIN_CHARSET[Math.floor(Math.random() * MATRIX_RAIN_CHARSET.length)];
         const x = i * MATRIX_RAIN_FONT_SIZE;
-        const y = col.row * MATRIX_RAIN_FONT_SIZE;
-        ctx!.fillText(col.char, x, y);
+        const y = drops[i] * MATRIX_RAIN_FONT_SIZE;
+        ctx!.fillText(char, x, y);
 
-        if (y > height && Math.random() > 0.985) {
-          col.row = Math.random() * -10;
+        if (y > height && Math.random() > 0.975) {
+          drops[i] = 0;
+        } else {
+          drops[i] += 1;
         }
-      }
-
-      // The glimmer — see MATRIX_RAIN_GLIMMER_* above for why this fades
-      // in/out slowly rather than flashing for a single imperceptible
-      // frame.
-      const cyclePos = (timestamp - startTime) % MATRIX_RAIN_GLIMMER_CYCLE_MS;
-      if (cyclePos < MATRIX_RAIN_GLIMMER_DURATION_MS) {
-        const t = cyclePos / MATRIX_RAIN_GLIMMER_DURATION_MS;
-        const opacity = Math.sin(t * Math.PI); // smooth 0 -> 1 -> 0 envelope
-        ctx!.font = '600 15px monospace';
-        ctx!.textAlign = 'center';
-        ctx!.shadowColor = `rgba(165, 243, 252, ${opacity * 0.9})`;
-        ctx!.shadowBlur = 10;
-        ctx!.fillStyle = `rgba(224, 250, 252, ${opacity * 0.85})`;
-        ctx!.fillText('Ai One', width / 2, height / 2 - MATRIX_RAIN_FONT_SIZE / 2);
-        ctx!.textAlign = 'left';
       }
     }
     rafId = requestAnimationFrame(draw);
