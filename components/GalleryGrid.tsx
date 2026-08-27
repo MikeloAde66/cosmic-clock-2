@@ -7,6 +7,8 @@ import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
 import WeatherForecastOverlay from './WeatherForecastOverlay';
 import { useKaliPendingApprovals } from '@/lib/useKaliPendingApprovals';
 import QuantumApprovalModal from './kali/QuantumApprovalModal';
+import { useIsSignedIn } from '@/lib/useIsSignedIn';
+import TrialGateModal from './TrialGateModal';
 
 interface GalleryGridProps {
   onOpenRadio: () => void;
@@ -708,9 +710,36 @@ export default function GalleryGrid({
   const [docked, setDocked] = useState<boolean[]>(() => Array(9).fill(false));
   const [showWeatherOverlay, setShowWeatherOverlay] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showTrialGate, setShowTrialGate] = useState(false);
   // Only ever polls anything for a signed-in admin — see the hook itself.
   const { isAdmin, approvals: pendingApprovals, refetch: refetchApprovals } = useKaliPendingApprovals();
   const dock = (i: number) => setDocked((prev) => (prev[i] ? prev : prev.map((v, idx) => (idx === i ? true : v))));
+
+  // Gates all 9 dashboard cards for a signed-out visitor on the direct
+  // subdomain — reuses the existing Stripe trial checkout (PurchaseButton
+  // + AIONE_PRO_SUBSCRIPTION_LINK, same as PricingPlans.tsx) and the
+  // existing AuthModal for login, both inside TrialGateModal; no new
+  // backend/session logic. isSignedIn stays null very briefly during the
+  // initial check — treated as "let it through" so a real signed-in
+  // user's very first click never flashes the gate before the check
+  // resolves, at the cost of a genuinely signed-out visitor's very first
+  // click (before the check settles) reaching the real handler once. This
+  // is a UI convenience gate, not a security boundary — Kali/Radio/etc.
+  // still have their own real checks server-side wherever that matters.
+  const isSignedIn = useIsSignedIn();
+  const guardCardClick = (action: () => void) => () => {
+    if (isSignedIn === false) {
+      setShowTrialGate(true);
+      return;
+    }
+    action();
+  };
+  const guardCardLinkClick = (e: React.MouseEvent) => {
+    if (isSignedIn === false) {
+      e.preventDefault();
+      setShowTrialGate(true);
+    }
+  };
 
   return (
     <div className="w-full h-full overflow-y-auto">
@@ -718,12 +747,12 @@ export default function GalleryGrid({
           align at the same edges instead of the banner bleeding wider. */}
       <div className="flex flex-col items-center justify-center max-w-5xl gap-2 px-4 pt-14 pb-10 mx-auto text-center">
         <h1
-          className="text-4xl md:text-5xl metallic-gold-text"
+          className="text-4xl text-white md:text-5xl"
           style={{
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif',
             fontWeight: 800,
             letterSpacing: '-0.025em',
-            textShadow: '0 2px 24px rgba(0,0,0,0.6), 0 0 18px rgba(212,175,55,0.45), 0 0 36px rgba(184,134,11,0.25)',
+            textShadow: '0 2px 24px rgba(0,0,0,0.6), 0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.25)',
           }}
         >
           Ai One
@@ -738,7 +767,7 @@ export default function GalleryGrid({
         style={{ perspective: '1200px' }}
       >
         <ArrivalSlot index={0} docked={docked[0]} onDock={dock}>
-          <button onClick={onOpenRadio} className={cardClassRadio}>
+          <button onClick={guardCardClick(onOpenRadio)} className={cardClassRadio}>
             <RadioWaveformCardImage />
             <CardHeader Icon={RadioIcon} />
             <div className="mt-4">
@@ -749,7 +778,7 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={1} docked={docked[1]} onDock={dock}>
-          <button onClick={onOpenPods} className={cardClass}>
+          <button onClick={guardCardClick(onOpenPods)} className={cardClass}>
             <StudioPreviewCardImage />
             <CardHeader Icon={Mic} />
             <div className="mt-4">
@@ -760,7 +789,7 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={2} docked={docked[2]} onDock={dock}>
-          <button onClick={onOpenStarTracker} className={cardClass}>
+          <button onClick={guardCardClick(onOpenStarTracker)} className={cardClass}>
             <StarTrackerRadarCardImage />
             <CardHeader Icon={Telescope} />
             <div className="mt-4">
@@ -771,7 +800,7 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={3} docked={docked[3]} onDock={dock}>
-          <button onClick={() => setShowWeatherOverlay(true)} className={cardClass}>
+          <button onClick={guardCardClick(() => setShowWeatherOverlay(true))} className={cardClass}>
             <WeatherCardImage />
             <CardHeader Icon={Umbrella} active={weatherActive} />
             <div className="mt-4">
@@ -783,7 +812,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={4} docked={docked[4]} onDock={dock}>
           <div className="relative w-full h-full">
-            <button onClick={onOpenKali} className={cardClass}>
+            <button onClick={guardCardClick(onOpenKali)} className={cardClass}>
               <KaliQuantumEquationCardImage />
               <CardHeader Icon={Sparkles} />
               <div className="mt-4">
@@ -810,7 +839,7 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={5} docked={docked[5]} onDock={dock}>
-          <Link href="/products" className={cardClass}>
+          <Link href="/products" onClick={guardCardLinkClick} className={cardClass}>
             <MatrixRainCardImage />
             <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
@@ -821,7 +850,7 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
-          <Link href="/products/aione-core" className={cardClass}>
+          <Link href="/products/aione-core" onClick={guardCardLinkClick} className={cardClass}>
             <CardImage src={GALLERY_IMAGES.aioneCore} gradient={CARD_GRADIENTS.aioneCore} Icon={LayoutGrid} />
             <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
@@ -832,7 +861,7 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={7} docked={docked[7]} onDock={dock}>
-          <Link href="/products/builder-kit" className={cardClass}>
+          <Link href="/products/builder-kit" onClick={guardCardLinkClick} className={cardClass}>
             <CardImage src={GALLERY_IMAGES.hydronodeBuilderKit} gradient={CARD_GRADIENTS.hydronodeBuilderKit} Icon={LayoutGrid} />
             <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
@@ -843,7 +872,7 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={8} docked={docked[8]} onDock={dock}>
-          <button onClick={onOpenLetsChat} className={cardClass}>
+          <button onClick={guardCardClick(onOpenLetsChat)} className={cardClass}>
             <DigitalMagazineTickerCardImage />
             <CardHeader Icon={Newspaper} />
             <div className="mt-4">
@@ -862,6 +891,12 @@ export default function GalleryGrid({
           onDecided={refetchApprovals}
         />
       )}
+      {/* isSignedIn check here (not a separate effect resetting
+          showTrialGate) — pure derived rendering avoids a redundant
+          state-sync round-trip: if a magic-link/checkout tab flips the
+          session true while this one's still open, the modal disappears
+          on the very next render with no extra state needed. */}
+      {showTrialGate && isSignedIn !== true && <TrialGateModal onClose={() => setShowTrialGate(false)} />}
     </div>
   );
 }

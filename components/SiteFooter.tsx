@@ -152,7 +152,7 @@ export default function SiteFooter({
         }
       `}</style>
 
-      <div className="flex items-center gap-4 text-slate-500">
+      <div className="flex items-center gap-4 text-white">
         {SOCIAL_LINKS.map((s) => (
           <a
             key={s.name}
@@ -160,7 +160,7 @@ export default function SiteFooter({
             target="_blank"
             rel="noopener noreferrer"
             aria-label={s.name}
-            className="hover:text-white transition-colors"
+            className="transition-all duration-200 drop-shadow-[0_0_4px_rgba(255,255,255,0.45)] hover:scale-110 hover:drop-shadow-[0_0_9px_rgba(255,255,255,0.9)]"
           >
             {s.icon ? <s.icon size={16} /> : <span className="font-bold text-sm">{s.glyph}</span>}
           </a>
