@@ -462,6 +462,35 @@ function StarTrackerRadarCardImage() {
   );
 }
 
+const DIGITAL_MAGAZINE_TICKER_TEXT = 'Welcome to the Digital Digest. Where Ancient Wisdom meets Technology';
+
+// Digital Magazine's preview strip — a continuous marquee ticker on a
+// solid black background. The content is duplicated exactly once and the
+// track is translated by exactly -50% (of its own, content-driven width,
+// via w-max — never a hardcoded pixel guess) — since the second copy is
+// identical to the first, the loop point at -50% is visually
+// indistinguishable from 0%, which is what makes it seamless rather than
+// visibly resetting.
+function DigitalMagazineTickerCardImage() {
+  return (
+    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-black">
+      <div className="absolute inset-0 flex items-center">
+        <div className="flex w-max whitespace-nowrap digital-magazine-ticker-track">
+          {[0, 1].map((i) => (
+            <span
+              key={i}
+              className="px-16 text-sm font-semibold tracking-wide text-white"
+              style={{ textShadow: '0 0 8px rgba(255,255,255,0.35)' }}
+            >
+              {DIGITAL_MAGAZINE_TICKER_TEXT}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Preview strip — a finished-looking gradient cover (see CARD_GRADIENTS)
 // plus a faint star-dot texture and an oversized icon watermark render
 // immediately, so every card shows a concrete, rich visual from the first
@@ -748,7 +777,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={8} docked={docked[8]} onDock={dock}>
           <button onClick={onOpenLetsChat} className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.communityHub} gradient={CARD_GRADIENTS.communityHub} Icon={Newspaper} />
+            <DigitalMagazineTickerCardImage />
             <CardHeader Icon={Newspaper} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Digital Magazine</div>

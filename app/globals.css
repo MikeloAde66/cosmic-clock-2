@@ -428,3 +428,21 @@ body {
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
 }
+
+/* Digital Magazine card — marquee ticker. The track holds two identical
+   copies of the phrase (see GalleryGrid.tsx); translating by exactly -50%
+   moves exactly one copy's width, so the wrap from -50% back to 0% lines
+   up perfectly with the second copy already being where the first one
+   started — no visible jump. Only transform animates, so this is
+   compositor-only regardless of card width. */
+@keyframes digital-magazine-ticker-scroll {
+  from {
+    transform: translateX(0%);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.digital-magazine-ticker-track {
+  animation: digital-magazine-ticker-scroll 16s linear infinite;
+}
