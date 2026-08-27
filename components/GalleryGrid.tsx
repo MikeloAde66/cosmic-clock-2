@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight } from 'lucide-react';
 import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
@@ -116,6 +116,103 @@ function RadioWaveformCardImage() {
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+const MATRIX_RAIN_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const MATRIX_RAIN_FONT_SIZE = 14;
+// Throttles how often a new row of glyphs drops, independent of display
+// refresh rate — without this, a 120Hz display would rain twice as fast as
+// a 60Hz one for no visual benefit, just wasted draws.
+const MATRIX_RAIN_FRAME_INTERVAL_MS = 65;
+
+// Products card's preview strip — a canvas-driven Matrix-style digital
+// rain instead of the static gallery photo every other card fades in (see
+// CardImage). Width/height are cached from ResizeObserver, not read
+// inside the draw loop itself, so the animation never forces a layout
+// read on every frame — the loop only touches canvas pixels.
+function MatrixRainCardImage() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+
+    let width = 0;
+    let height = 0;
+    let columns = 0;
+    let drops: number[] = [];
+
+    function resize() {
+      // clientWidth/clientHeight (the layout box), not
+      // getBoundingClientRect (the transformed/rendered box) — this card
+      // mounts inside ArrivalSlot's scale(0.05) -> scale(1) entrance
+      // animation, and getBoundingClientRect briefly returns that
+      // animation's tiny in-progress size if read before it settles.
+      // ResizeObserver won't catch that later either, since CSS transforms
+      // never change an element's own layout dimensions.
+      width = canvas!.clientWidth;
+      height = canvas!.clientHeight;
+      const dpr = window.devicePixelRatio || 1;
+      canvas!.width = width * dpr;
+      canvas!.height = height * dpr;
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      columns = Math.max(1, Math.floor(width / MATRIX_RAIN_FONT_SIZE));
+      // Staggered starting offsets (including negative ones) so columns
+      // don't all begin — or later reset — in lockstep.
+      drops = Array.from({ length: columns }, () => Math.random() * -30);
+    }
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+
+    let rafId = 0;
+    let lastDraw = 0;
+
+    function draw(timestamp: number) {
+      rafId = requestAnimationFrame(draw);
+      if (timestamp - lastDraw < MATRIX_RAIN_FRAME_INTERVAL_MS) return;
+      lastDraw = timestamp;
+
+      // A translucent wipe (rather than clearRect) is what leaves the
+      // fading trail behind each falling glyph — the classic digital-rain
+      // technique, entirely from compositing, no per-glyph fade tracking.
+      ctx!.shadowBlur = 0;
+      ctx!.fillStyle = 'rgba(2, 6, 23, 0.2)';
+      ctx!.fillRect(0, 0, width, height);
+
+      ctx!.font = `${MATRIX_RAIN_FONT_SIZE}px monospace`;
+      ctx!.textBaseline = 'top';
+      ctx!.shadowColor = 'rgba(52, 211, 153, 0.9)';
+      ctx!.shadowBlur = 6;
+      ctx!.fillStyle = 'rgba(110, 231, 183, 0.9)';
+
+      for (let i = 0; i < columns; i++) {
+        const char = MATRIX_RAIN_CHARSET[Math.floor(Math.random() * MATRIX_RAIN_CHARSET.length)];
+        const x = i * MATRIX_RAIN_FONT_SIZE;
+        const y = drops[i] * MATRIX_RAIN_FONT_SIZE;
+        ctx!.fillText(char, x, y);
+
+        if (y > height && Math.random() > 0.975) {
+          drops[i] = 0;
+        } else {
+          drops[i] += 1;
+        }
+      }
+    }
+    rafId = requestAnimationFrame(draw);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      ro.disconnect();
+    };
+  }, []);
+
+  return (
+    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
 }
@@ -362,7 +459,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={5} docked={docked[5]} onDock={dock}>
           <Link href="/products" className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.productsCatalog} gradient={CARD_GRADIENTS.productsCatalog} Icon={LayoutGrid} />
+            <MatrixRainCardImage />
             <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Products</div>
