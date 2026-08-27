@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Camera, Trash2 } from 'lucide-react';
 import CosmicVisualizer from './CosmicVisualizer';
 import StudioOneConsole from './StudioOneConsole';
@@ -814,7 +814,7 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
 
   // Selecting a track: routes video-backed tracks into the Broadcast Monitor,
   // and audio-backed tracks into the <audio> player, clearing the other each time.
-  const selectTrack = (track: Track) => {
+  const selectTrack = useCallback((track: Track) => {
     setActiveTrack(track);
     if (track.embedUrl) {
       setIsPlaying(false);
@@ -829,11 +829,19 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
       setLocalVideoUrl('');
       setIsPlaying(true);
     }
-  };
+  }, [localVideoUrl]);
 
-  const filteredTracks = activePlaylistId === 'all'
-    ? tracks
-    : tracks.filter(t => t.playlistId === activePlaylistId);
+  // useMemo (not a plain derived const) — filteredTracks feeds the
+  // MediaSession effect below via handleNextTrack/handlePrevTrack. A fresh
+  // array every render would give those callbacks a new identity every
+  // render too, re-running that effect (which calls setActionHandler 4x)
+  // on every one of PodsModule's frequent unrelated re-renders (100ms
+  // YouTube polling, motion detection) instead of only when the track
+  // list or active playlist actually changes.
+  const filteredTracks = useMemo(
+    () => (activePlaylistId === 'all' ? tracks : tracks.filter(t => t.playlistId === activePlaylistId)),
+    [tracks, activePlaylistId]
+  );
 
   const deleteTrack = (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation(); // don't let this also trigger the row's selectTrack click
@@ -869,17 +877,17 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
     }
   };
 
-  const handleNextTrack = () => {
+  const handleNextTrack = useCallback(() => {
     if (filteredTracks.length === 0) return;
     const currentIndex = filteredTracks.findIndex(t => t.id === activeTrack?.id);
     selectTrack(filteredTracks[(currentIndex + 1) % filteredTracks.length]);
-  };
+  }, [filteredTracks, activeTrack, selectTrack]);
 
-  const handlePrevTrack = () => {
+  const handlePrevTrack = useCallback(() => {
     if (filteredTracks.length === 0) return;
     const currentIndex = filteredTracks.findIndex(t => t.id === activeTrack?.id);
     selectTrack(filteredTracks[(currentIndex - 1 + filteredTracks.length) % filteredTracks.length]);
-  };
+  }, [filteredTracks, activeTrack, selectTrack]);
 
   // Bluetooth / lock-screen media controls (Web MediaSession API).
   // Only applies to real <audio> playback — video tracks play inside a
