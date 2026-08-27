@@ -421,13 +421,19 @@ function StarTrackerRadarCardImage() {
           const isMajor = deg % 90 === 0;
           const outer = radius + (isMajor ? 5 : 3);
           const inner = radius + (isMajor ? 1 : 1);
+          // .toFixed(4) — trig output can differ in the last bit between
+          // server and client (different CPU/engine float paths), which
+          // React's dev-mode hydration check flags as a mismatch on every
+          // hydration; rounding collapses both sides to the same string
+          // well within any real architecture-level difference. Same
+          // guard already used above for STAR_TRACKER_MINI_STARS.
           return (
             <line
               key={deg}
-              x1={center + Math.cos(angle) * outer}
-              y1={center + Math.sin(angle) * outer}
-              x2={center + Math.cos(angle) * inner}
-              y2={center + Math.sin(angle) * inner}
+              x1={(center + Math.cos(angle) * outer).toFixed(4)}
+              y1={(center + Math.sin(angle) * outer).toFixed(4)}
+              x2={(center + Math.cos(angle) * inner).toFixed(4)}
+              y2={(center + Math.sin(angle) * inner).toFixed(4)}
               stroke={isMajor ? 'rgba(103,232,249,0.8)' : 'rgba(34,211,238,0.4)'}
               strokeWidth={isMajor ? 1.2 : 0.6}
             />
