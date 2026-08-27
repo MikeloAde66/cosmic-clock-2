@@ -57,7 +57,10 @@ function CommentThread({ postId, canPost, onRequireSignIn }: { postId: string; c
   }, [postId]);
 
   useEffect(() => {
-    load();
+    async function run() {
+      await load();
+    }
+    run();
   }, [load]);
 
   const submitComment = async (e: React.FormEvent) => {
@@ -177,7 +180,10 @@ function TenForwardContent() {
   }, []);
 
   useEffect(() => {
-    loadPosts();
+    async function run() {
+      await loadPosts();
+    }
+    run();
   }, [loadPosts]);
 
   useEffect(() => {

@@ -1,25 +1,36 @@
 #!/usr/bin/env bash
-# Provisions the real AWS resources kali-quantum-workflow.json needs:
-# an SNS topic for approval notifications, an IAM execution role for the
-# state machine, and the state machine itself.
+# Provisions the real AWS resources kali-quantum-workflow.json needs: an
+# SNS topic for approval notifications, an EventBridge Connection for
+# authenticating to the Render-hosted validation service, an IAM
+# execution role for the state machine, and the state machine itself.
 #
-# This was written for account 060274391988 / region us-east-2, but
-# NOT run against it — there's no AWS CLI or credentials in the sandbox
-# this was written in (verified: `which aws` found nothing, no AWS_*
-# env vars set). Run this yourself, from a shell where
-# `aws sts get-caller-identity` already resolves to that account.
+# Requires two real values as env vars before running:
+#   QUANTUM_SERVICE_REAL_API_KEY  - the actual secret set as
+#                                   QUANTUM_SERVICE_API_KEY in the Render
+#                                   dashboard for kali-quantum-service
+#                                   (NOT the "dev-only" local value in
+#                                   .env.local - verified live that the
+#                                   deployed service rejects that one).
+#   BRAKET_RESULTS_BUCKET         - a real S3 bucket you own in this
+#                                   account/region for Braket to write
+#                                   task results to.
 #
-# Before running: open aws/step-functions/kali-quantum-workflow.json and
-# replace REPLACE_WITH_YOUR_KALI_VALIDATION_SERVICE_ENDPOINT and
-# REPLACE_WITH_YOUR_BRAKET_RESULTS_BUCKET with real values — this script
-# does not create the validation microservice or the S3 results bucket,
-# both of which need to already exist.
+#   QUANTUM_SERVICE_REAL_API_KEY=... BRAKET_RESULTS_BUCKET=... \
+#     bash aws/setup-kali-quantum-infra.sh
+#
+# The state machine definition file itself is never edited in place -
+# this script substitutes both values into a temp copy before deploying,
+# so the checked-in JSON stays generic/reusable across environments.
 
 set -euo pipefail
+
+: "${QUANTUM_SERVICE_REAL_API_KEY:?Set QUANTUM_SERVICE_REAL_API_KEY to the real Render env var value first.}"
+: "${BRAKET_RESULTS_BUCKET:?Set BRAKET_RESULTS_BUCKET to a real S3 bucket name first.}"
 
 REGION="us-east-2"
 ACCOUNT_ID="060274391988"
 TOPIC_NAME="kali-quantum-approvals"
+CONNECTION_NAME="kali-quantum-service-auth"
 ROLE_NAME="kali-quantum-workflow-role"
 STATE_MACHINE_NAME="kali-quantum-workflow"
 
@@ -35,6 +46,25 @@ TOPIC_ARN=$(aws sns create-topic --name "$TOPIC_NAME" --region "$REGION" --query
 echo "    ${TOPIC_ARN}"
 echo "    Subscribe whoever should receive approval requests, e.g.:"
 echo "    aws sns subscribe --topic-arn ${TOPIC_ARN} --protocol email --notification-endpoint you@example.com --region ${REGION}"
+
+echo "==> Creating EventBridge Connection '${CONNECTION_NAME}' (kali-quantum-service.onrender.com's X-API-Key auth)..."
+if aws events describe-connection --name "$CONNECTION_NAME" --region "$REGION" >/dev/null 2>&1; then
+  echo "    Connection already exists — updating its API key."
+  aws events update-connection \
+    --name "$CONNECTION_NAME" \
+    --authorization-type API_KEY \
+    --auth-parameters "{\"ApiKeyAuthParameters\":{\"ApiKeyName\":\"X-API-Key\",\"ApiKeyValue\":\"${QUANTUM_SERVICE_REAL_API_KEY}\"}}" \
+    --region "$REGION" >/dev/null
+else
+  aws events create-connection \
+    --name "$CONNECTION_NAME" \
+    --authorization-type API_KEY \
+    --auth-parameters "{\"ApiKeyAuthParameters\":{\"ApiKeyName\":\"X-API-Key\",\"ApiKeyValue\":\"${QUANTUM_SERVICE_REAL_API_KEY}\"}}" \
+    --region "$REGION" >/dev/null
+fi
+CONNECTION_ARN=$(aws events describe-connection --name "$CONNECTION_NAME" --region "$REGION" --query ConnectionArn --output text)
+CONNECTION_SECRET_ARN=$(aws events describe-connection --name "$CONNECTION_NAME" --region "$REGION" --query SecretArn --output text)
+echo "    ${CONNECTION_ARN}"
 
 echo "==> Creating IAM execution role '${ROLE_NAME}' for the state machine..."
 TRUST_POLICY=$(cat <<EOF
@@ -70,13 +100,23 @@ PERMISSIONS_POLICY=$(cat <<EOF
     },
     {
       "Effect": "Allow",
-      "Action": ["execute-api:Invoke"],
+      "Action": ["states:InvokeHTTPEndpoint"],
       "Resource": "*"
     },
     {
       "Effect": "Allow",
+      "Action": ["events:RetrieveConnectionCredentials"],
+      "Resource": "${CONNECTION_ARN}"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue"],
+      "Resource": "${CONNECTION_SECRET_ARN}"
+    },
+    {
+      "Effect": "Allow",
       "Action": ["s3:PutObject", "s3:GetObject"],
-      "Resource": "arn:aws:s3:::REPLACE_WITH_YOUR_BRAKET_RESULTS_BUCKET/*"
+      "Resource": "arn:aws:s3:::${BRAKET_RESULTS_BUCKET}/*"
     }
   ]
 }
@@ -91,13 +131,20 @@ ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output t
 echo "    ${ROLE_ARN}"
 echo "    NOTE: IAM roles can take ~10-15 seconds to propagate before Step Functions can assume them."
 
-echo "==> Creating/updating state machine '${STATE_MACHINE_NAME}'..."
-DEFINITION_PATH="$(dirname "$0")/step-functions/kali-quantum-workflow.json"
-if grep -q "REPLACE_WITH_YOUR" "$DEFINITION_PATH"; then
-  echo "ERROR: ${DEFINITION_PATH} still has REPLACE_WITH_YOUR_* placeholders in it — fill those in first." >&2
+echo "==> Preparing the state machine definition (substituting the connection ARN + S3 bucket into a temp copy)..."
+SOURCE_DEFINITION="$(dirname "$0")/step-functions/kali-quantum-workflow.json"
+if grep -q "REPLACE_WITH_YOUR" "$SOURCE_DEFINITION"; then
+  echo "ERROR: ${SOURCE_DEFINITION} still has REPLACE_WITH_YOUR_* placeholders that this script doesn't fill in automatically — check the file." >&2
   exit 1
 fi
+TMP_DEFINITION=$(mktemp)
+trap 'rm -f "$TMP_DEFINITION"' EXIT
+sed \
+  -e "s|__EVENTBRIDGE_CONNECTION_ARN__|${CONNECTION_ARN}|g" \
+  -e "s|REPLACE_WITH_YOUR_BRAKET_RESULTS_BUCKET|${BRAKET_RESULTS_BUCKET}|g" \
+  "$SOURCE_DEFINITION" > "$TMP_DEFINITION"
 
+echo "==> Creating/updating state machine '${STATE_MACHINE_NAME}'..."
 EXISTING_ARN=$(aws stepfunctions list-state-machines --region "$REGION" \
   --query "stateMachines[?name=='${STATE_MACHINE_NAME}'].stateMachineArn" --output text)
 
@@ -105,14 +152,14 @@ if [ -n "$EXISTING_ARN" ]; then
   echo "    State machine already exists — updating its definition."
   aws stepfunctions update-state-machine \
     --state-machine-arn "$EXISTING_ARN" \
-    --definition "file://${DEFINITION_PATH}" \
+    --definition "file://${TMP_DEFINITION}" \
     --role-arn "$ROLE_ARN" \
     --region "$REGION"
   echo "    ${EXISTING_ARN}"
 else
   STATE_MACHINE_ARN=$(aws stepfunctions create-state-machine \
     --name "$STATE_MACHINE_NAME" \
-    --definition "file://${DEFINITION_PATH}" \
+    --definition "file://${TMP_DEFINITION}" \
     --role-arn "$ROLE_ARN" \
     --type STANDARD \
     --region "$REGION" \
@@ -126,5 +173,3 @@ echo "    1. Subscribe a real recipient to ${TOPIC_ARN} (see command above)."
 echo "    2. Set AWS_REGION=${REGION}, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY in this app's"
 echo "       deployment environment, for an identity with states:SendTaskSuccess/SendTaskFailure"
 echo "       permission on the state machine — that's what app/api/kali/approve-task/route.ts uses."
-echo "    3. Deploy/verify the external circuit-validation service referenced in"
-echo "       kali-quantum-workflow.json's ValidateCircuit state."

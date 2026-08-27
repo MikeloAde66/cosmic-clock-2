@@ -46,8 +46,14 @@ export function useKaliPendingApprovals() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    refetch();
-    const interval = setInterval(refetch, POLL_INTERVAL_MS);
+    // Calling the memoized `refetch` directly here trips
+    // react-hooks/set-state-in-effect (it can't tell the callback is safe) —
+    // an inline poll function sidesteps that same as useNoaaSnapshot.ts does.
+    async function poll() {
+      await refetch();
+    }
+    poll();
+    const interval = setInterval(poll, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [isAdmin, refetch]);
 

@@ -34,6 +34,13 @@ API_KEY = os.environ.get("QUANTUM_SERVICE_API_KEY")
 
 class CircuitRequest(BaseModel):
     circuit_code: str
+    # Optional — only present when this is called from the Step Functions
+    # ValidateCircuit state (aws/step-functions/kali-quantum-workflow.json),
+    # which passes its whole input through as the request body. Kali's
+    # existing chat-tool call only ever sends circuit_code, so both stay
+    # None there and estimate_cost_usd falls back to its default.
+    target_qpu: str | None = None
+    shots: int = 1000
 
 
 @app.get("/health")
@@ -45,4 +52,4 @@ def health():
 def run_circuit(payload: CircuitRequest, x_api_key: str | None = Header(default=None)):
     if API_KEY and x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    return run_quantum_circuit_simulation(payload.circuit_code)
+    return run_quantum_circuit_simulation(payload.circuit_code, payload.target_qpu, payload.shots)
