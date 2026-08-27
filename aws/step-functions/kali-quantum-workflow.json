@@ -1,5 +1,5 @@
 {
-  "Comment": "Kali quantum task pipeline (account 060274391988, region us-east-2): validate a circuit against a local/Braket simulator, pause for an explicit human approval (SNS + waitForTaskToken), then submit to a real Braket QPU only once approved. See aws/step-functions/README.md before deploying this - several placeholders below need real values from your account, and there is no free/local equivalent for Stage 3: a real quantum device task costs real money the moment it runs.",
+  "Comment": "Kali quantum task pipeline (account 060274391988): validate a circuit against a local/Braket simulator, pause for an explicit human approval (SNS + waitForTaskToken), then submit to a real Braket QPU only once approved. Must be deployed in a Braket-supported region (us-east-1, us-west-1, us-west-2, or eu-west-2) - the aws-sdk:braket:createQuantumTask integration always calls Braket in this state machine's own execution region, and Braket isn't offered in every AWS region (us-east-2 notably isn't). See aws/setup-kali-quantum-infra.sh, which fills in the __*__ placeholders below at deploy time - there is no free/local equivalent for Stage 3: a real quantum device task costs real money the moment it runs.",
   "StartAt": "ValidateCircuit",
   "States": {
     "ValidateCircuit": {
@@ -49,13 +49,13 @@
       "Comment": "Pauses here until POST /api/kali/approve-task calls SendTaskSuccess or SendTaskFailure against $$.Task.Token - that route is the only thing that can move this forward. TimeoutSeconds below (24h) is a starting point, not a fixed requirement - tune it to how quickly you expect a human to actually respond. ResponseBody/snake_case field names below match quantum_braket.py's actual response shape and the http:invoke SDK integration's result wrapper - verify these against a real execution's history, since exact http:invoke result nesting wasn't confirmed against a live run before this was written.",
       "Resource": "arn:aws:states:::sns:publish.waitForTaskToken",
       "Parameters": {
-        "TopicArn": "arn:aws:sns:us-east-2:060274391988:kali-quantum-approvals",
+        "TopicArn": "__SNS_TOPIC_ARN__",
         "MessageStructure": "json",
         "Message": {
-          "default.$": "States.Format('Kali quantum task pending approval: {} qubits, target {}, est. ${}. Approve or reject via the dashboard.', $.validation.ResponseBody.qubit_count, $.targetQpu, $.validation.ResponseBody.estimated_cost_usd)",
+          "default.$": "States.Format('Kali quantum task pending approval: {} qubits, target {}, est. ${}. Approve or reject via the dashboard.', $.validation.ResponseBody.qubit_count, $.target_qpu, $.validation.ResponseBody.estimated_cost_usd)",
           "taskToken.$": "$$.Task.Token",
           "qubitCount.$": "$.validation.ResponseBody.qubit_count",
-          "targetQpu.$": "$.targetQpu",
+          "targetQpu.$": "$.target_qpu",
           "estimatedCostUsd.$": "$.validation.ResponseBody.estimated_cost_usd",
           "circuitSummary.$": "$.validation.ResponseBody.circuit_summary"
         }
@@ -92,7 +92,7 @@
       "Comment": "The only state in this whole machine that spends real money - everything above it exists specifically to gate this one call behind an explicit human decision. Action.$ now pulls circuit_action from the ValidateCircuit response itself (the OpenQASM IR of the SAME circuit a human just approved), not a separate top-level input field - submitting anything else here would mean the approver never actually saw what gets run. REPLACE_WITH_YOUR_BRAKET_RESULTS_BUCKET below with a real S3 bucket you own in this account/region.",
       "Resource": "arn:aws:states:::aws-sdk:braket:createQuantumTask",
       "Parameters": {
-        "DeviceArn.$": "$.targetQpu",
+        "DeviceArn.$": "$.target_qpu",
         "Shots.$": "$.shots",
         "Action.$": "$.validation.ResponseBody.circuit_action",
         "OutputS3Bucket": "REPLACE_WITH_YOUR_BRAKET_RESULTS_BUCKET",

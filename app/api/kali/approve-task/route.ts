@@ -18,7 +18,7 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 // required env vars rather than hardcoding anything). The IAM
 // identity these keys belong to needs states:SendTaskSuccess and
 // states:SendTaskFailure permission on the deployed state machine's ARN.
-const sfn = new SFNClient({ region: process.env.AWS_REGION || 'us-east-2' });
+const sfn = new SFNClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
 export async function POST(request: Request) {
   let user;

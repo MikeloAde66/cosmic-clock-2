@@ -27,7 +27,16 @@ set -euo pipefail
 : "${QUANTUM_SERVICE_REAL_API_KEY:?Set QUANTUM_SERVICE_REAL_API_KEY to the real Render env var value first.}"
 : "${BRAKET_RESULTS_BUCKET:?Set BRAKET_RESULTS_BUCKET to a real S3 bucket name first.}"
 
-REGION="us-east-2"
+# Amazon Braket is only offered in a handful of regions (us-east-1,
+# us-west-1, us-west-2, eu-west-2) - us-east-2 is NOT one of them (confirmed
+# empirically: its Braket API endpoint doesn't even resolve). Every resource
+# below must live in the same Braket-supported region, since Step
+# Functions' aws-sdk:braket:createQuantumTask integration always calls
+# Braket in the state machine's own execution region - there's no way to
+# point just that one step at a different region without a real
+# architecture change (e.g. routing through a Lambda with its own
+# cross-region client).
+REGION="us-east-1"
 ACCOUNT_ID="060274391988"
 TOPIC_NAME="kali-quantum-approvals"
 CONNECTION_NAME="kali-quantum-service-auth"
@@ -84,6 +93,18 @@ aws iam create-role \
   --description "Execution role for the Kali quantum task Step Functions workflow" \
   || echo "    (role may already exist — continuing)"
 
+# create-role only sets the trust policy at creation time - if the role
+# already existed (e.g. from a run against a different REGION, as happened
+# migrating us-east-2 -> us-east-1), it silently keeps the OLD trust
+# principal, and Step Functions fails at AssumeRole with "principal
+# states.amazonaws.com is not authorized" since it no longer matches this
+# region's service principal. Always re-assert it so the role's trust
+# policy can never drift from the region this script is actually deploying
+# into.
+aws iam update-assume-role-policy \
+  --role-name "$ROLE_NAME" \
+  --policy-document "$TRUST_POLICY"
+
 PERMISSIONS_POLICY=$(cat <<EOF
 {
   "Version": "2012-10-17",
@@ -110,7 +131,7 @@ PERMISSIONS_POLICY=$(cat <<EOF
     },
     {
       "Effect": "Allow",
-      "Action": ["secretsmanager:GetSecretValue"],
+      "Action": ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
       "Resource": "${CONNECTION_SECRET_ARN}"
     },
     {
@@ -131,12 +152,46 @@ ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output t
 echo "    ${ROLE_ARN}"
 echo "    NOTE: IAM roles can take ~10-15 seconds to propagate before Step Functions can assume them."
 
-echo "==> Preparing the state machine definition (substituting the connection ARN + S3 bucket into a temp copy)..."
+echo "==> Granting Braket's service-linked role access to ${BRAKET_RESULTS_BUCKET}..."
+# Braket writes task results into OutputS3Bucket using ITS OWN backend
+# service-linked role (AWSServiceRoleForAmazonBraket), not the workflow's
+# own execution role above - an identity-based s3:PutObject grant on that
+# role alone isn't enough, since S3 also checks the bucket's own resource
+# policy for access from a different principal. Without this, real task
+# submission fails with "Caller doesn't have access to bucket or it
+# doesn't exist" even though the bucket exists and the workflow role can
+# otherwise write to it directly.
+aws iam create-service-linked-role --aws-service-name braket.amazonaws.com 2>/dev/null \
+  || echo "    (service-linked role already exists — continuing)"
+BUCKET_POLICY=$(cat <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AmazonBraketServiceLinkedRoleAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::${ACCOUNT_ID}:role/aws-service-role/braket.amazonaws.com/AWSServiceRoleForAmazonBraket"
+      },
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:GetBucketLocation", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:::${BRAKET_RESULTS_BUCKET}",
+        "arn:aws:s3:::${BRAKET_RESULTS_BUCKET}/*"
+      ]
+    }
+  ]
+}
+EOF
+)
+aws s3api put-bucket-policy --bucket "$BRAKET_RESULTS_BUCKET" --policy "$BUCKET_POLICY"
+
+echo "==> Preparing the state machine definition (substituting the connection ARN + SNS topic ARN + S3 bucket into a temp copy)..."
 SOURCE_DEFINITION="$(dirname "$0")/step-functions/kali-quantum-workflow.json"
 TMP_DEFINITION=$(mktemp)
 trap 'rm -f "$TMP_DEFINITION"' EXIT
 sed \
   -e "s|__EVENTBRIDGE_CONNECTION_ARN__|${CONNECTION_ARN}|g" \
+  -e "s|__SNS_TOPIC_ARN__|${TOPIC_ARN}|g" \
   -e "s|REPLACE_WITH_YOUR_BRAKET_RESULTS_BUCKET|${BRAKET_RESULTS_BUCKET}|g" \
   "$SOURCE_DEFINITION" > "$TMP_DEFINITION"
 
@@ -145,7 +200,7 @@ sed \
 # replaced). This only catches a genuinely unhandled placeholder that
 # survived substitution, e.g. a new one added to the JSON without a
 # matching sed rule above.
-if grep -q "REPLACE_WITH_YOUR\|__EVENTBRIDGE_CONNECTION_ARN__" "$TMP_DEFINITION"; then
+if grep -q "REPLACE_WITH_YOUR\|__EVENTBRIDGE_CONNECTION_ARN__\|__SNS_TOPIC_ARN__" "$TMP_DEFINITION"; then
   echo "ERROR: the substituted definition still has an unfilled placeholder — check the sed rules above against ${SOURCE_DEFINITION}." >&2
   exit 1
 fi
