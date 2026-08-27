@@ -227,6 +227,16 @@ function CardImage({ src, gradient, Icon }: { src: string; gradient: string; Ico
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
+  // A cached image (very likely on repeat visits/reloads) can finish
+  // loading before React ever attaches the onLoad listener below, so the
+  // browser never fires 'load' again and the photo stays stuck at
+  // opacity-0, showing only the gradient cover underneath as if the real
+  // photo were missing. This ref-callback checks img.complete the instant
+  // the element mounts, covering the case onLoad alone misses.
+  const checkAlreadyLoaded = (img: HTMLImageElement | null) => {
+    if (img && img.complete && img.naturalWidth > 0) setLoaded(true);
+  };
+
   return (
     <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0" style={{ background: gradient }}>
       <div
@@ -240,6 +250,7 @@ function CardImage({ src, gradient, Icon }: { src: string; gradient: string; Ico
       {!failed && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
+          ref={checkAlreadyLoaded}
           src={src}
           alt=""
           className={`relative object-cover w-full h-full transition-opacity duration-500 ${
