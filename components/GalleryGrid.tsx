@@ -68,6 +68,58 @@ const ARRIVAL_STAGGER_MS = 180;
 const cardClass =
   'group relative flex flex-col justify-between w-full h-full p-5 text-left border rounded-2xl border-slate-800/80 bg-slate-900/40 backdrop-blur-md hover:border-slate-600 hover:bg-slate-900/60 transition-all min-h-[240px] overflow-hidden';
 
+// Radio Central's own border variant — cyan-tinted per the live waveform
+// inside it, instead of the neutral slate every other card uses.
+const cardClassRadio =
+  'group relative flex flex-col justify-between w-full h-full p-5 text-left border rounded-2xl border-cyan-500/20 bg-slate-900/40 backdrop-blur-md hover:border-cyan-400/40 hover:bg-slate-900/60 transition-all min-h-[240px] overflow-hidden';
+
+// Fixed per-bar profile (no Math.random()) — a random height per render
+// would disagree between the server-rendered HTML and the client's first
+// render and flash as a hydration-mismatch reflow the instant React
+// hydrates. The sine-based heights and modulo'd duration/delay still read
+// as organic rather than a flat, mechanical repeat.
+const RADIO_WAVEFORM_BARS = Array.from({ length: 32 }, (_, i) => ({
+  height: 22 + 70 * Math.abs(Math.sin(i * 0.85 + 1)),
+  duration: 0.8 + (i % 5) * 0.18,
+  // Negative delays start each bar mid-cycle rather than all 32 launching
+  // from zero in lockstep on mount, so it reads as already-in-progress
+  // playback instead of a synchronized twitch.
+  delay: -((i % 7) * 0.19),
+}));
+
+// Radio Central's preview strip — a live-looking glowing waveform instead
+// of the static gallery photo every other card fades in (see CardImage).
+// Same gradient/dot-texture/icon-watermark base as CardImage, so it still
+// reads as part of the same card family.
+function RadioWaveformCardImage() {
+  return (
+    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0" style={{ background: CARD_GRADIENTS.radio }}>
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1.5px)',
+          backgroundSize: '16px 16px',
+        }}
+      />
+      <RadioIcon className="absolute w-20 h-20 -right-3 -bottom-5 text-white/20" />
+      <div className="radio-waveform-scan" />
+      <div className="absolute inset-x-0 bottom-0 flex items-end h-16 gap-[2px] px-3 pb-1.5">
+        {RADIO_WAVEFORM_BARS.map((bar, i) => (
+          <span
+            key={i}
+            className="flex-1 min-w-[2px] rounded-t-sm radio-waveform-bar bg-cyan-200 shadow-[0_0_6px_rgba(103,232,249,0.85)]"
+            style={{
+              height: `${bar.height}%`,
+              animationDuration: `${bar.duration}s`,
+              animationDelay: `${bar.delay}s`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Preview strip — a finished-looking gradient cover (see CARD_GRADIENTS)
 // plus a faint star-dot texture and an oversized icon watermark render
 // immediately, so every card shows a concrete, rich visual from the first
@@ -237,8 +289,8 @@ export default function GalleryGrid({
         style={{ perspective: '1200px' }}
       >
         <ArrivalSlot index={0} docked={docked[0]} onDock={dock}>
-          <button onClick={onOpenRadio} className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.radio} gradient={CARD_GRADIENTS.radio} Icon={RadioIcon} />
+          <button onClick={onOpenRadio} className={cardClassRadio}>
+            <RadioWaveformCardImage />
             <CardHeader Icon={RadioIcon} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Radio Central</div>

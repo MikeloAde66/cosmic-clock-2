@@ -212,6 +212,50 @@ body {
   }
 }
 
+/* Radio Central card — glowing waveform. Each bar's duration/delay is set
+   inline per-instance (see GalleryGrid.tsx); this class only owns the
+   shared name/timing-function/iteration-count, which is why the two can
+   coexist on the same element without conflict. Only transform/opacity
+   animate, so this stays compositor-only (no layout thrash) no matter how
+   many bars are on screen. */
+@keyframes radio-waveform-pulse {
+  0%,
+  100% {
+    transform: scaleY(0.32);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+.radio-waveform-bar {
+  transform-origin: bottom;
+  animation-name: radio-waveform-pulse;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* The sweeping glint travels fully off-screen on both ends before looping,
+   so the restart is invisible — a seamless loop without needing duplicated
+   content. */
+@keyframes radio-waveform-scan {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+.radio-waveform-scan {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(165, 243, 252, 0.35), transparent);
+  animation: radio-waveform-scan 3.2s linear infinite;
+  pointer-events: none;
+}
+
 /* ------------------------------------------
    LAYER 4: foreground content — cards/controls/globe
    ------------------------------------------ */
