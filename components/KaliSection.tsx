@@ -28,7 +28,7 @@ export default function KaliSection() {
         <div className="shrink-0">
           <span className="text-[10px] font-mono tracking-widest text-cyan-400/80 uppercase">Current Epoch</span>
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-2xl font-bold tracking-wider text-white">KALI</h2>
+            <h2 className="text-2xl font-bold tracking-wider text-white">AI ONE</h2>
             <KaliSpecsButton open={specsOpen} onToggle={() => setSpecsOpen((v) => !v)} />
           </div>
           {specsOpen && <KaliSpecsContent />}

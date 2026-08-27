@@ -51,7 +51,7 @@ export default function KaliOracleView({ prefillQuery }: KaliOracleViewProps = {
             className="px-5 py-2 text-center border rounded-full"
             style={{ background: 'rgba(11,16,29,0.8)', border: '1px solid rgba(0,242,254,0.3)', boxShadow: '0 0 20px rgba(0,242,254,0.15)' }}
           >
-            <p className="text-xs font-bold tracking-[0.3em] text-white">KALI: QUANTUM ORACLE</p>
+            <p className="text-xs font-bold tracking-[0.3em] text-white">AI ONE: QUANTUM ORACLE</p>
             <p className="text-[9px] font-mono uppercase tracking-widest text-cyan-400/80">Year 5,128 / 432,000</p>
           </div>
         </div>
@@ -66,7 +66,7 @@ export default function KaliOracleView({ prefillQuery }: KaliOracleViewProps = {
             >
               <span className="text-[10px] font-mono tracking-widest text-cyan-400/80 uppercase">Current Epoch</span>
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-bold tracking-wider text-white">KALI</h2>
+                <h2 className="text-xl font-bold tracking-wider text-white">AI ONE</h2>
                 <KaliSpecsButton open={specsOpen} onToggle={() => setSpecsOpen((v) => !v)} />
               </div>
               {specsOpen && <KaliSpecsContent />}
@@ -104,7 +104,7 @@ export default function KaliOracleView({ prefillQuery }: KaliOracleViewProps = {
               />
               <Image
                 src="/images/kali-avatar.png"
-                alt="Kali"
+                alt="Ai One"
                 fill
                 sizes="(max-width: 640px) 100vw, 672px"
                 className="object-cover"

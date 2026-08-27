@@ -37,13 +37,13 @@ export type TranslationKey =
 
 const TRANSLATIONS: Record<TranslationKey, Record<LanguageCode, string>> = {
   'kali.greeting': {
-    en: "Welcome. I'm (Kali) — I keep company with ancient technology, quantum physics, and the mysteries stitched between them. Ask me what's on your mind.",
-    es: 'Bienvenido. Soy (Kali) — convivo con la tecnología antigua, la física cuántica y los misterios que las entrelazan. Pregúntame lo que tengas en mente.',
-    fr: 'Bienvenue. Je suis (Kali) — je côtoie les technologies anciennes, la physique quantique et les mystères qui les relient. Demande-moi ce qui te préoccupe.',
-    de: 'Willkommen. Ich bin (Kali) — ich beschäftige mich mit alter Technologie, Quantenphysik und den Geheimnissen, die sie miteinander verweben. Frag mich, was dich beschäftigt.',
-    pt: 'Bem-vindo. Eu sou (Kali) — convivo com tecnologia antiga, física quântica e os mistérios que os entrelaçam. Pergunte-me o que tiver em mente.',
-    ja: 'ようこそ。私は(Kali)です — 古代のテクノロジー、量子物理学、そしてそれらを結ぶ謎とともにあります。気になることを何でも聞いてください。',
-    zh: '欢迎。我是 (Kali) — 我与古代科技、量子物理以及连接它们的谜团相伴。有什么想问的，尽管问我。',
+    en: "Welcome. I'm (Ai One) — I keep company with ancient technology, quantum physics, and the mysteries stitched between them. Ask me what's on your mind.",
+    es: 'Bienvenido. Soy (Ai One) — convivo con la tecnología antigua, la física cuántica y los misterios que las entrelazan. Pregúntame lo que tengas en mente.',
+    fr: 'Bienvenue. Je suis (Ai One) — je côtoie les technologies anciennes, la physique quantique et les mystères qui les relient. Demande-moi ce qui te préoccupe.',
+    de: 'Willkommen. Ich bin (Ai One) — ich beschäftige mich mit alter Technologie, Quantenphysik und den Geheimnissen, die sie miteinander verweben. Frag mich, was dich beschäftigt.',
+    pt: 'Bem-vindo. Eu sou (Ai One) — convivo com tecnologia antiga, física quântica e os mistérios que os entrelaçam. Pergunte-me o que tiver em mente.',
+    ja: 'ようこそ。私は(Ai One)です — 古代のテクノロジー、量子物理学、そしてそれらを結ぶ謎とともにあります。気になることを何でも聞いてください。',
+    zh: '欢迎。我是 (Ai One) — 我与古代科技、量子物理以及连接它们的谜团相伴。有什么想问的，尽管问我。',
   },
   'kali.mode.cosmic.label': {
     en: 'Cosmic', es: 'Cósmico', fr: 'Cosmique', de: 'Kosmisch', pt: 'Cósmico', ja: 'コズミック', zh: '宇宙',
