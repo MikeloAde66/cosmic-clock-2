@@ -16,6 +16,9 @@ interface TopHeaderProps {
   // deep-link the protolabsglobal-main-shell static site's Log In/Sign Up
   // buttons point at, so this modal opens directly on arrival.
   authModalRequest?: { mode: 'login' | 'signup'; token: number } | null;
+  // Set by page.tsx while the Kali Oracle sub-view is open — a focused,
+  // full-screen experience where the Pricing nav button is just clutter.
+  hidePricing?: boolean;
 }
 
 // Live ISS and Star Tracker used to live here as header pills — both moved
@@ -29,6 +32,7 @@ export default function TopHeader({
   activeTab,
   onOpenPricing,
   authModalRequest,
+  hidePricing,
 }: TopHeaderProps) {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
@@ -71,12 +75,14 @@ export default function TopHeader({
         {/* Left Side: Pricing only now — pl-16 above clears LeftNav's fixed
             mobile hamburger trigger (top-3 left-3, md:hidden). */}
         <div className="flex items-center">
-          <button
-            onClick={() => onOpenPricing?.()}
-            className="px-3 py-1 font-mono text-xs uppercase tracking-wide transition-all border rounded-full cursor-pointer bg-neutral-900/80 border-neutral-700 hover:border-neutral-500 text-neutral-300 hover:text-white"
-          >
-            Pricing
-          </button>
+          {!hidePricing && (
+            <button
+              onClick={() => onOpenPricing?.()}
+              className="px-3 py-1 font-mono text-xs uppercase tracking-wide transition-all border rounded-full cursor-pointer bg-neutral-900/80 border-neutral-700 hover:border-neutral-500 text-neutral-300 hover:text-white"
+            >
+              Pricing
+            </button>
+          )}
         </div>
 
         {/* Right Side: Layout Toggle + Auth Controls (search now lives on

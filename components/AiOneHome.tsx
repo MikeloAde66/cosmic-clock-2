@@ -70,6 +70,12 @@ interface AiOneHomeProps {
   pricingRequestToken?: number;
   // See CenterHero's own kaliPrefillQuery prop — threaded straight through.
   kaliPrefillQuery?: { text: string; token: number } | null;
+  // Mirrors CosmicCanvas's own activeView all the way up to page.tsx — the
+  // value has no reader inside AiOneHome itself (the hero no longer
+  // branches on it, see setCosmicView below), but page.tsx needs to know
+  // "is Kali currently showing" to hide the persistent audio player and
+  // the Pricing nav button specifically while the Oracle is open.
+  onCosmicViewChange?: (view: 'clock' | 'weather' | 'kali') => void;
 }
 
 export default function AiOneHome({
@@ -78,12 +84,16 @@ export default function AiOneHome({
   groundZeroToken,
   pricingRequestToken,
   kaliPrefillQuery,
+  onCosmicViewChange,
 }: AiOneHomeProps) {
   const [activeSection, setActiveSection] = useState<'home' | 'pricing'>('home');
-  // Setter is still threaded down to CenterHero/CosmicCanvas so it can
-  // report its own activeView up; the value itself has no reader here now
-  // that the hero no longer branches on it.
+  // Setter is threaded down to CenterHero/CosmicCanvas so it can report
+  // its own activeView up; also forwards to page.tsx via onCosmicViewChange.
   const [, setCosmicView] = useState<'clock' | 'weather' | 'kali'>('clock');
+  const handleCosmicViewChange = (view: 'clock' | 'weather' | 'kali') => {
+    setCosmicView(view);
+    onCosmicViewChange?.(view);
+  };
 
   // Ambient "Space Dust" event — fires roughly every 30min (randomized
   // offset so it never feels mechanically on-the-dot), stays active for
@@ -190,7 +200,7 @@ export default function AiOneHome({
           homeViewRequest={homeViewRequest}
           groundZeroToken={groundZeroToken}
           visible={activeSection === 'home'}
-          onCosmicViewChange={setCosmicView}
+          onCosmicViewChange={handleCosmicViewChange}
           kaliPrefillQuery={kaliPrefillQuery}
         />
 

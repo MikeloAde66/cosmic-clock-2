@@ -52,10 +52,15 @@ function HomeInner() {
   // resets it on unmount so navigating away from '/' entirely (e.g. to
   // /products) never leaves the bar stuck hidden.
   const { setPlayerBarHidden } = useRadioPlayer();
+  // Mirrors AiOneHome/CenterHero/CosmicCanvas's own activeView — 'clock'
+  // unless the Kali Oracle sub-view is actually open, in which case the
+  // effect below also hides the persistent audio player there (a focused,
+  // full-screen experience the bar would otherwise sit on top of).
+  const [cosmicView, setCosmicView] = useState<'clock' | 'weather' | 'kali'>('clock');
   useEffect(() => {
-    setPlayerBarHidden(activeTab === 'pods');
+    setPlayerBarHidden(activeTab === 'pods' || (activeTab === 'aione' && cosmicView === 'kali'));
     return () => setPlayerBarHidden(false);
-  }, [activeTab, setPlayerBarHidden]);
+  }, [activeTab, cosmicView, setPlayerBarHidden]);
   // Set by a Home globe Vault marker's "Open Drawer" link, or a Cmd+K search
   // result, consumed once as CosmicVaultAuth's initial filter — see that
   // component's initialDrawer prop.
@@ -295,6 +300,7 @@ useContextMenuShare();
             activeTab={activeTab}
             onOpenPricing={openPricing}
             authModalRequest={authModalRequest}
+            hidePricing={activeTab === 'aione' && cosmicView === 'kali'}
           />
 
           {/* Classic Hub (default, unchanged) — the existing tab-swap
@@ -319,6 +325,7 @@ useContextMenuShare();
                   groundZeroToken={groundZeroToken}
                   pricingRequestToken={pricingRequestToken}
                   kaliPrefillQuery={kaliPrefillQuery}
+                  onCosmicViewChange={setCosmicView}
                 />
               )}
 
