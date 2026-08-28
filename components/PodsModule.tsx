@@ -544,6 +544,34 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
     }
   };
 
+  // Bare enumerateDevices() on mount — unlike refreshAudioInputDevices
+  // above, this never calls getUserMedia and can never itself trigger a
+  // permission prompt or throw for lack of permission (that's not how
+  // enumerateDevices works: it always resolves, just with blank labels
+  // pre-permission). If this site was already granted mic access on a
+  // previous visit, the browser remembers that at the origin level, so
+  // real labels (and a real Focusrite/etc. match) show up immediately
+  // with zero clicks. Deliberately does NOT call startMic() itself —
+  // auto-selecting a default in the dropdown is safe UI state; silently
+  // starting real microphone capture with no explicit click is a real,
+  // separate, more invasive behavior this doesn't take on unprompted.
+  useEffect(() => {
+    navigator.mediaDevices?.enumerateDevices?.().then((devices) => {
+      const inputs = devices.filter((d) => d.kind === 'audioinput');
+      if (inputs.length === 0) return;
+      setAudioInputDevices(inputs);
+      setMicError('');
+      setSelectedMicId((prev) => {
+        if (prev) return prev; // don't clobber a choice the user already made
+        const focusrite = inputs.find((d) => d.label.toLowerCase().includes('focusrite'));
+        return (focusrite ?? inputs[0]).deviceId;
+      });
+    }).catch(() => {
+      // Not supported in this context (e.g. insecure origin) — leave the
+      // dropdown's own "Click to list input devices…" placeholder as-is.
+    });
+  }, []);
+
   // Starts (or restarts, if switching devices) live mic capture and mixes
   // it into the exact same processing chain the track audio already runs
   // through — micGain connects straight into filtersRef.current['60'],
@@ -559,6 +587,19 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: deviceId ? { deviceId: { exact: deviceId } } : true,
       });
+
+      // Permission is now confirmed granted (the call above didn't throw),
+      // so labels are real — populate the dropdown here too, not just via
+      // the separate Refresh Devices path, so clicking Enable Mic directly
+      // (without ever touching Refresh/the dropdown first) still ends up
+      // with a populated device list, not an empty one.
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        setAudioInputDevices(devices.filter((d) => d.kind === 'audioinput'));
+      } catch {
+        // Non-fatal — the mic itself is already running at this point;
+        // only the dropdown's list would stay stale.
+      }
 
       initAudioContext();
       const ctx = audioCtxRef.current;
@@ -583,7 +624,12 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
       micStreamRef.current = stream;
       micSourceRef.current = micSource;
       micGainNodeRef.current = micGain;
-      setSelectedMicId(deviceId);
+      // The real resolved device, not just whatever was requested — an
+      // empty/no-constraint request (deviceId === '') still lands on one
+      // specific real interface, and the dropdown should reflect that
+      // actual choice rather than staying on "Default microphone".
+      const resolvedDeviceId = stream.getAudioTracks()[0]?.getSettings().deviceId ?? deviceId;
+      setSelectedMicId(resolvedDeviceId);
       setMicActive(true);
     } catch (err) {
       setMicError(err instanceof Error ? err.message : 'Could not start the microphone.');
