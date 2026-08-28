@@ -519,7 +519,24 @@ export default function AiOneChat({ prefillQuery }: AiOneChatProps = {}) {
         </div>
       )}
 
-      <form ref={formRef} onSubmit={sendMessage} className="flex gap-1.5 pt-2 mt-2 border-t border-slate-800">
+      {/* sticky bottom-0 — both real call sites (KaliOracleView,
+          KaliSection) sit inside a container that scrolls on mobile (the
+          avatar + telemetry content can be taller than the viewport), so
+          without this the prompt input required scrolling all the way
+          down to reach every time instead of staying reachable while the
+          conversation above it scrolls. position: sticky anchors to the
+          nearest scrolling ancestor automatically, no extra wiring needed.
+          Needs its own background (position: sticky content still needs
+          a backdrop) - #07090E matches KaliOracleView exactly and is
+          close enough to KaliSection's inherited ambient background to
+          read as seamless there too. safe-area-inset-bottom keeps the
+          input clear of the iOS home-indicator/gesture-bar area. */}
+      <form
+        ref={formRef}
+        onSubmit={sendMessage}
+        className="sticky bottom-0 z-10 flex gap-1.5 pt-2 mt-2 border-t border-slate-800 bg-[#07090E]"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
         <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/*" className="hidden" />
 
         <button
