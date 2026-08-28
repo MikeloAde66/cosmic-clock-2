@@ -136,22 +136,38 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(1);
 
-  // Primes BBC News (BBC World Service, the only real BBC news stream in
-  // RADIO_STATIONS) into the persistent bottom bar on load — its name and
-  // preloaded audio src are ready the instant the app opens, so the very
-  // first Play click is instant. Deliberately does NOT call .play() here:
-  // real autoplay-with-sound with no prior user gesture is blocked by
-  // every major browser, and forcing it would either silently fail or
-  // surface as a false "error" badge on a station that's actually fine —
-  // see ensureAnalyser's own comment above for the same user-gesture
-  // constraint. A real Play click (already wired in GlobalPlayerBar)
-  // starts it for real.
+  // Primes the 432Hz Cosmic Instrumental Stream (vault-432hz — the "Ai
+  // OneKast" Program Manager block) into the persistent bottom bar on
+  // load, so its name and first track are ready the instant the app
+  // opens. Deliberately does NOT call .play() here: real autoplay-with-
+  // sound with no prior user gesture is blocked by every major browser,
+  // and forcing it would either silently fail or surface as a false
+  // "error" badge on a station that's actually fine — see ensureAnalyser's
+  // own comment above for the same user-gesture constraint. A real Play
+  // click (already wired in GlobalPlayerBar) starts it for real. Unlike
+  // the previous BBC default (a 'live' station with a static streamUrl),
+  // vault-432hz is a real Cosmic Vault track queue, so priming it needs
+  // the same async fetch playStation's 'vault' branch uses — just without
+  // the final audio.play() call.
   useEffect(() => {
-    const defaultStation = RADIO_STATIONS.find((s) => s.id === 'bbc-world');
-    if (defaultStation?.kind === 'live') {
-      setStation(defaultStation);
-      setAudioSource(defaultStation.streamUrl);
-    }
+    const defaultStation = RADIO_STATIONS.find((s) => s.id === 'vault-432hz');
+    if (!defaultStation || defaultStation.kind !== 'vault') return;
+    setStation(defaultStation);
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/radio/queue?station=${defaultStation.id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const tracks: QueueTrack[] = data.tracks ?? [];
+        if (tracks.length === 0) return;
+        queueRef.current = tracks;
+        setQueue(tracks);
+        setAudioSource(tracks[0].fileUrl);
+      } catch (err) {
+        console.error('Failed to prime default station queue:', err);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
