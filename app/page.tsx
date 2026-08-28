@@ -328,7 +328,7 @@ useContextMenuShare();
                   page reload (where blob URLs are gone regardless), switching
                   tabs within this single-page app doesn't need to destroy them. */}
               <div className={activeTab === 'pods' ? 'w-full h-full' : 'hidden'}>
-                <PodsModule isActive={activeTab === 'pods'} />
+                <PodsModule isActive={activeTab === 'pods'} onGoHome={() => setActiveTab('aione')} />
               </div>
             </div>
           )}

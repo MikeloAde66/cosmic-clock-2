@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Camera, Trash2 } from 'lucide-react';
+import { Camera, Trash2, Home } from 'lucide-react';
 import CosmicVisualizer from './CosmicVisualizer';
 import StudioOneConsole from './StudioOneConsole';
 import EqOrb from './EqOrb';
@@ -97,9 +97,15 @@ interface PodsModuleProps {
   // knows to actually pause playback instead, rather than fully unmounting
   // (which would kill those blob URLs and lose in-progress uploads).
   isActive: boolean;
+  // Optional — only passed from the Hub-mode call site (app/page.tsx),
+  // not the Stack-mode one, since "go home" doesn't mean anything in a
+  // single continuous-scroll layout. Studio One had no way back to Ai
+  // One on mobile (LeftNav's own Home icon lives in a sidebar that's
+  // hidden/collapsed there) - same fix as KaliOracleView's onGoHome.
+  onGoHome?: () => void;
 }
 
-export default function PodsModule({ isActive }: PodsModuleProps) {
+export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
   // Global audio priority — see RadioPlayerContext's document-level 'play'
   // listener for native <video>/<audio> (covers this file's local-upload
   // and direct-URL video, and the Vault-track <audio> element, with no
@@ -1073,9 +1079,22 @@ export default function PodsModule({ isActive }: PodsModuleProps) {
           Monitor card's sibling z-10 stacking context, not just within
           this header's own. */}
       <div className="relative z-30 flex items-center justify-between min-h-[44px] gap-4 p-3 rounded-lg bg-[#1e2229] border border-slate-700/50">
-        <h2 className="text-lg font-mono font-extrabold tracking-widest text-white uppercase whitespace-nowrap">
-          STUDIO ONE
-        </h2>
+        <div className="flex items-center gap-3 shrink-0">
+          {onGoHome && (
+            <button
+              type="button"
+              onClick={onGoHome}
+              aria-label="Home"
+              className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+            >
+              <Home className="w-3.5 h-3.5" />
+              Home
+            </button>
+          )}
+          <h2 className="text-lg font-mono font-extrabold tracking-widest text-white uppercase whitespace-nowrap">
+            STUDIO ONE
+          </h2>
+        </div>
 
         {/* Reserved banner slot — dormant for now, activated later */}
         <div className="flex items-center justify-center flex-1 h-8 border border-dashed rounded-md border-neutral-700 bg-white/[0.03]">

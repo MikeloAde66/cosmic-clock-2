@@ -208,7 +208,7 @@ export default function CosmicCanvas({
       {/* Kali — extracted into its own component (KaliSection.tsx) so the
           Continuous Stack layout can also mount it as a standalone section;
           this is the exact same component, unchanged here. */}
-      {activeView === 'kali' && <KaliOracleView prefillQuery={kaliPrefillQuery} />}
+      {activeView === 'kali' && <KaliOracleView prefillQuery={kaliPrefillQuery} onGoHome={() => setActiveView('clock')} />}
 
       <style jsx>{`
         @keyframes cinematicDrift {

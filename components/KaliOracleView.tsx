@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import { Home } from 'lucide-react';
 import AiOneChat from './AiOneChat';
 import Starfield from './Starfield';
 import { KaliSpecsButton, KaliSpecsContent } from './KaliSpecsPanel';
@@ -34,9 +35,16 @@ interface KaliOracleViewProps {
   // and CosmicCanvas/CenterHero/AiOneHome for Hub mode, or directly for
   // Stack mode's stack-section-kali). See AiOneChat's own prefillQuery prop.
   prefillQuery?: { text: string; token: number } | null;
+  // Optional — only passed from the Hub-mode call site (CosmicCanvas.tsx),
+  // not Stack mode's, since "go home" doesn't mean anything in a single
+  // continuous-scroll layout. This view has no back button by design
+  // (LeftNav's own Home icon is the intended way out — see CosmicCanvas's
+  // groundZeroToken comment), but that sidebar is hidden/collapsed on
+  // mobile, leaving no way back at all there without this.
+  onGoHome?: () => void;
 }
 
-export default function KaliOracleView({ prefillQuery }: KaliOracleViewProps = {}) {
+export default function KaliOracleView({ prefillQuery, onGoHome }: KaliOracleViewProps = {}) {
   const [specsOpen, setSpecsOpen] = useState(false);
 
   return (
@@ -45,6 +53,18 @@ export default function KaliOracleView({ prefillQuery }: KaliOracleViewProps = {
       <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-b from-transparent via-black/40 to-black/90" />
 
       <div className="relative z-10 flex flex-col w-full h-full min-h-0 p-4">
+        {onGoHome && (
+          <button
+            type="button"
+            onClick={onGoHome}
+            aria-label="Home"
+            className="absolute z-20 flex items-center gap-1.5 h-8 px-3 top-4 left-4 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+          >
+            <Home className="w-3.5 h-3.5" />
+            Home
+          </button>
+        )}
+
         {/* Top header badge */}
         <div className="flex justify-center shrink-0">
           <div
