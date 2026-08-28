@@ -35,7 +35,15 @@ export default function HardwareProductDetail({ product }: { product: HardwarePr
   return (
     <div className="relative w-full min-h-screen overflow-hidden bg-[#0a0a0c] text-slate-100">
       <Starfield />
-      <div className="relative z-10 max-w-4xl px-6 py-16 mx-auto space-y-10">
+      {/* pb-28 (not py-16's original pb-16) — GlobalPlayerBar (app/layout.tsx)
+          is a fixed h-14 (56px) bar on every route; on a short mobile
+          viewport, 64px of bottom padding + iOS Safari's own chrome wasn't
+          enough clearance and the page's own last content (or, combined
+          with the hero image below being a flat h-80 that ate most of the
+          first viewport on mobile, the headline right after it) ended up
+          sitting under the bar. sm:pb-16 keeps the original spacing once
+          the fixed bar is a much smaller fraction of the viewport. */}
+      <div className="relative z-10 max-w-4xl px-6 pt-16 pb-28 sm:pb-16 mx-auto space-y-10">
         <Link
           href="/products"
           className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-neutral-500 hover:text-neutral-300"
@@ -46,7 +54,11 @@ export default function HardwareProductDetail({ product }: { product: HardwarePr
 
         {/* Hero: image alongside headline/price/CTA, stacked on mobile */}
         <div className="grid gap-8 md:grid-cols-2 md:items-center">
-          <div className="relative w-full h-80 overflow-hidden border rounded-xl border-slate-800 bg-[#0B0E14]">
+          {/* h-56 on mobile (was a flat h-80 at every breakpoint) — on a
+              short phone viewport a 320px-tall hero image, plus the header
+              chrome above it, could eat the entire first screen, pushing
+              the headline/CTA/demo sections fully below the fold. */}
+          <div className="relative w-full h-56 overflow-hidden border rounded-xl sm:h-80 border-slate-800 bg-[#0B0E14]">
             {product.videoSrc ? (
               videoRequested ? (
                 <video
