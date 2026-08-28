@@ -353,6 +353,26 @@ useContextMenuShare();
                   hub-mode wrapper is overflow-hidden the whole way, so that
                   excess was completely unreachable. */}
               <div className={activeTab === 'pods' ? 'w-full h-full overflow-y-auto' : 'hidden'}>
+                {/* Standalone, outer-level back button — deliberately NOT
+                    routed through PodsModule's own onGoHome prop or any
+                    nested callback chain. Calls changeLayoutMode('gallery')
+                    directly, in normal document flow above PodsModule's
+                    own header (not fixed/absolute), so it can't collide
+                    with LeftNav's fixed mobile hamburger trigger
+                    (top-3 left-3) regardless of viewport size. This is in
+                    addition to, not a replacement for, PodsModule's own
+                    Home button — both call the same real function. */}
+                {activeTab === 'pods' && (
+                  <div className="p-3 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => changeLayoutMode('gallery')}
+                      className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+                    >
+                      &laquo; Main Console
+                    </button>
+                  </div>
+                )}
                 {/* changeLayoutMode('gallery'), not setActiveTab('aione') —
                     "Home" from Studio One means the actual 9-card
                     dashboard grid (Radio Central/Studio One/Star
