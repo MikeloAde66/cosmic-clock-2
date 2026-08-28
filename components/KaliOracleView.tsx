@@ -80,7 +80,7 @@ export default function KaliOracleView({ prefillQuery, onGoHome }: KaliOracleVie
             className="px-5 py-2 text-center border rounded-full"
             style={{ background: 'rgba(11,16,29,0.8)', border: '1px solid rgba(0,242,254,0.3)', boxShadow: '0 0 20px rgba(0,242,254,0.15)' }}
           >
-            <p className="text-xs font-bold tracking-[0.3em] text-white">AI ONE: QUANTUM ORACLE</p>
+            <p className="text-xs font-bold tracking-[0.3em] text-white">KALI: QUANTUM ORACLE</p>
             <p className="text-[9px] font-mono uppercase tracking-widest text-cyan-400/80">Year 5,128 / 432,000</p>
           </div>
 
@@ -104,7 +104,7 @@ export default function KaliOracleView({ prefillQuery, onGoHome }: KaliOracleVie
             >
               <span className="text-[10px] font-mono tracking-widest text-cyan-400/80 uppercase">Current Epoch</span>
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-bold tracking-wider text-white">AI ONE</h2>
+                <h2 className="text-xl font-bold tracking-wider text-white">KALI AI</h2>
                 <KaliSpecsButton open={specsOpen} onToggle={() => setSpecsOpen((v) => !v)} />
               </div>
               {specsOpen && <KaliSpecsContent />}
@@ -112,7 +112,7 @@ export default function KaliOracleView({ prefillQuery, onGoHome }: KaliOracleVie
               <div className="h-1 w-full overflow-hidden rounded-full bg-black/40">
                 <div className="h-full w-[1.18%] bg-cyan-400" />
               </div>
-              <span className="block text-[9px] font-mono text-cyan-500/70">PROGRESS: 1.1870%</span>
+              <span className="block text-[9px] font-mono text-cyan-500/70">PROGRESS: {((5128 / 432000) * 100).toFixed(4)}%</span>
 
               <div className="pt-2 space-y-1.5 border-t border-cyan-500/10">
                 {STATUS_MARKERS.map((label) => (
@@ -142,7 +142,7 @@ export default function KaliOracleView({ prefillQuery, onGoHome }: KaliOracleVie
               />
               <Image
                 src="/images/kali-avatar.png"
-                alt="Ai One"
+                alt="Kali"
                 fill
                 sizes="(max-width: 640px) 100vw, 672px"
                 className="object-cover"

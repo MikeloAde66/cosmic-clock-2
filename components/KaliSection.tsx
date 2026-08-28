@@ -28,7 +28,7 @@ export default function KaliSection() {
         <div className="shrink-0">
           <span className="text-[10px] font-mono tracking-widest text-cyan-400/80 uppercase">Current Epoch</span>
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-2xl font-bold tracking-wider text-white">AI ONE</h2>
+            <h2 className="text-2xl font-bold tracking-wider text-white">KALI AI</h2>
             <KaliSpecsButton open={specsOpen} onToggle={() => setSpecsOpen((v) => !v)} />
           </div>
           {specsOpen && <KaliSpecsContent />}
@@ -36,7 +36,7 @@ export default function KaliSection() {
           <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/40">
             <div className="h-full w-[1.18%] bg-cyan-400" />
           </div>
-          <span className="mt-1 block text-[9px] font-mono text-cyan-500/70">PROGRESS: 1.1870%</span>
+          <span className="mt-1 block text-[9px] font-mono text-cyan-500/70">PROGRESS: {((5128 / 432000) * 100).toFixed(4)}%</span>
 
           {/* Standard orthographic projection math, restated here in
               3D spherical-to-Cartesian form as flavor text for the
