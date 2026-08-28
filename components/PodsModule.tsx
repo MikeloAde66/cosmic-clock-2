@@ -105,6 +105,62 @@ interface PodsModuleProps {
   onGoHome?: () => void;
 }
 
+// Master Studio Audio Rack — a real vertical peak-level (VU) meter driven
+// by one channel's AnalyserNode (leftAnalyserRef/rightAnalyserRef above,
+// tapped post-panner in initAudioContext). Reads real time-domain data via
+// its own requestAnimationFrame loop, same pattern as CosmicVisualizer's
+// canvas — no synthetic/fake movement when nothing's playing, the bar
+// just sits at 0.
+//
+// Takes the ref object itself, not analyserRef.current — the analyser
+// doesn't exist yet on first mount (initAudioContext only creates it once
+// the user actually presses play, a real user-gesture requirement, same
+// as CosmicVisualizer/RadioPlayerContext elsewhere in this app), and refs
+// don't trigger a re-render when they're filled in later. Reading
+// .current fresh inside the loop itself means it picks up the real
+// analyser the instant it exists, with no dependency on some other state
+// change happening to cause a re-render at the right moment.
+function VuMeter({ analyserRef, label }: { analyserRef: React.RefObject<AnalyserNode | null>; label: string }) {
+  const [level, setLevel] = useState(0);
+  const frameRef = useRef<number>(0);
+
+  useEffect(() => {
+    const data = new Uint8Array(256);
+    function tick() {
+      frameRef.current = requestAnimationFrame(tick);
+      const analyser = analyserRef.current;
+      if (!analyser) {
+        setLevel(0);
+        return;
+      }
+      analyser.getByteTimeDomainData(data);
+      // Peak absolute deviation from the silence midpoint (128), not RMS -
+      // a VU meter reads peaks, and this stays cheap enough to run every
+      // frame without its own averaging window.
+      let peak = 0;
+      for (let i = 0; i < data.length; i++) {
+        const dev = Math.abs(data[i] - 128);
+        if (dev > peak) peak = dev;
+      }
+      setLevel(Math.min(1, peak / 128));
+    }
+    tick();
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [analyserRef]);
+
+  return (
+    <div className="flex flex-col items-center gap-1 w-6 shrink-0">
+      <div className="relative w-2 h-24 overflow-hidden rounded-full bg-slate-900 border border-slate-800">
+        <div
+          className="absolute bottom-0 w-full transition-[height] duration-75 ease-out rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]"
+          style={{ height: `${(level * 100).toFixed(1)}%` }}
+        />
+      </div>
+      <span className="text-[9px] font-mono text-slate-500">{label}</span>
+    </div>
+  );
+}
+
 export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
   // Global audio priority — see RadioPlayerContext's document-level 'play'
   // listener for native <video>/<audio> (covers this file's local-upload
@@ -133,6 +189,14 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Broadcast Monitor layout — 'full' preserves the original single-frame
+  // behavior exactly (mutually-exclusive priority: local video > embed >
+  // camera). 'split' shows the real Pod Cam feed (left) and whatever real
+  // media/YouTube embed is loaded (right) side by side - not a fake
+  // "guest" stream, the same real embed 'full' mode already has, just
+  // repositioned. 'media' shows just the embed, full width, camera hidden.
+  const [monitorLayout, setMonitorLayout] = useState<'full' | 'split' | 'media'>('full');
 
   // PodCam motion detection — cheap frame-differencing (draws each frame to
   // a tiny hidden canvas, compares total pixel delta against the previous
@@ -173,6 +237,13 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const filtersRef = useRef<{ [freq: string]: BiquadFilterNode }>({});
   const analyserRef = useRef<AnalyserNode | null>(null);
+  // Real per-channel VU meters — a ChannelSplitterNode tapped off the same
+  // post-panner point as analyserRef above (a parallel fan-out, not part of
+  // the audible signal path itself; splitter isn't connected to
+  // ctx.destination), so this reads the exact same fully-processed stereo
+  // signal without altering what's heard.
+  const leftAnalyserRef = useRef<AnalyserNode | null>(null);
+  const rightAnalyserRef = useRef<AnalyserNode | null>(null);
 
   // Orb EQ control — a draggable alternative to the 5-band sliders, same
   // underlying BiquadFilterNodes. Stereo pan width is real too: a
@@ -414,6 +485,25 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
       analyserRef.current = analyser;
       panner.connect(analyser);
       analyser.connect(ctx.destination);
+
+      // Master Studio Audio Rack — real L/R VU meters. Splits the same
+      // post-panner stereo signal into two mono channels; each gets its own
+      // small analyser (fftSize 256 is plenty for a peak-level readout, no
+      // need for the frequency resolution a spectrum view would want).
+      // Deliberately NOT connected onward to ctx.destination — this splitter
+      // is a pure analysis tap, not part of what's actually heard.
+      const vuSplitter = ctx.createChannelSplitter(2);
+      panner.connect(vuSplitter);
+
+      const leftAnalyser = ctx.createAnalyser();
+      leftAnalyser.fftSize = 256;
+      vuSplitter.connect(leftAnalyser, 0);
+      leftAnalyserRef.current = leftAnalyser;
+
+      const rightAnalyser = ctx.createAnalyser();
+      rightAnalyser.fftSize = 256;
+      vuSplitter.connect(rightAnalyser, 1);
+      rightAnalyserRef.current = rightAnalyser;
     }
   };
 
@@ -1519,6 +1609,34 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
                 </div>
               </div>
 
+              {/* Monitor layout toggle — 'full' is the original single-frame
+                  behavior (default, unchanged), 'split' shows the real Pod
+                  Cam feed next to whatever real media/embed is loaded,
+                  'media' shows just the embed at full width. */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500">Layout</span>
+                <div className="flex gap-1">
+                  {([
+                    ['full', 'Full Monitor'],
+                    ['split', 'Split Screen'],
+                    ['media', 'Media Only'],
+                  ] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setMonitorLayout(mode)}
+                      className={`px-2.5 py-1 rounded text-[10px] font-mono uppercase tracking-wide border transition ${
+                        monitorLayout === mode
+                          ? 'bg-cyan-500/20 border-cyan-400/60 text-cyan-300'
+                          : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Off-screen sampling canvas for PodCam motion detection —
                   never displayed, just read back into pixel data. */}
               <canvas ref={motionCanvasRef} className="hidden" />
@@ -1561,23 +1679,44 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
                 </div>
               )}
 
-              <div className="relative flex items-center justify-center overflow-hidden border rounded-lg aspect-video bg-[#0a0b0d] border-slate-800">
-                {localVideoUrl ? (
-                  <video
-                    ref={broadcastVideoRef}
-                    src={localVideoUrl}
-                    controls
-                    className="w-full h-full object-cover"
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                    onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-                  />
-                ) : activeEmbedUrl ? (
-                  activeEmbedUrl.endsWith('.mp4') || activeEmbedUrl.endsWith('.webm') ? (
+              {/* Master Studio Audio Rack VU meters flank the monitor
+                  frame(s) — real per-channel peak levels (see VuMeter and
+                  the ChannelSplitterNode wired in initAudioContext), not
+                  decorative animation. */}
+              <div className="flex items-stretch gap-2">
+                <VuMeter analyserRef={leftAnalyserRef} label="L" />
+                {(() => {
+                  const cameraFeed = (
+                    <>
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className={`w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
+                      />
+                      {!isCameraActive && (
+                        // Plain black screen — no visualizer/particle
+                        // graphics inside the monitor box, per explicit
+                        // instruction. The dedicated full-screen Visualizer
+                        // view (header button) is untouched; this only
+                        // affects this inline fallback.
+                        <div className="p-6 space-y-2 text-center">
+                          <p className="font-mono text-xs text-slate-400">
+                            {monitorLayout === 'split' ? 'HOST CAM STANDBY' : 'BROADCAST MONITOR STANDBY'}
+                          </p>
+                          <p className="text-slate-600 text-[11px] max-w-sm mx-auto">
+                            Click &quot;Pod Cam&quot; above or paste a link to display video input.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  );
+
+                  const mediaFeed = localVideoUrl ? (
                     <video
                       ref={broadcastVideoRef}
-                      src={activeEmbedUrl}
+                      src={localVideoUrl}
                       controls
                       className="w-full h-full object-cover"
                       onPlay={() => setIsPlaying(true)}
@@ -1585,40 +1724,69 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
                       onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                       onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
                     />
+                  ) : activeEmbedUrl ? (
+                    activeEmbedUrl.endsWith('.mp4') || activeEmbedUrl.endsWith('.webm') ? (
+                      <video
+                        ref={broadcastVideoRef}
+                        src={activeEmbedUrl}
+                        controls
+                        className="w-full h-full object-cover"
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+                      />
+                    ) : (
+                      // React owns this wrapper but never renders anything
+                      // inside it via JSX — the YouTube IFrame Player API
+                      // gets an imperatively-created child div instead (see
+                      // ytContainerRef's effect), so its DOM mutations
+                      // never conflict with React's reconciliation of this
+                      // subtree. A plain <iframe src=...> has no
+                      // postMessage access to currentTime, which is what
+                      // Pods Context Sync needs.
+                      <div key="youtube-player-container" ref={ytContainerRef} className="w-full h-full" />
+                    )
                   ) : (
-                    // React owns this wrapper but never renders anything
-                    // inside it via JSX — the YouTube IFrame Player API gets
-                    // an imperatively-created child div instead (see
-                    // ytContainerRef's effect), so its DOM mutations never
-                    // conflict with React's reconciliation of this subtree.
-                    // A plain <iframe src=...> has no postMessage access to
-                    // currentTime, which is what Pods Context Sync needs.
-                    <div key="youtube-player-container" ref={ytContainerRef} className="w-full h-full" />
-                  )
-                ) : (
-                  <>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className={`w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
-                    />
-                    {!isCameraActive && (
-                      // Plain black screen — no visualizer/particle graphics
-                      // inside the monitor box, per explicit instruction.
-                      // The dedicated full-screen Visualizer view (header
-                      // button) is untouched; this only affects this
-                      // inline fallback.
-                      <div className="p-6 space-y-2 text-center">
-                        <p className="font-mono text-xs text-slate-400">BROADCAST MONITOR STANDBY</p>
-                        <p className="text-slate-600 text-[11px] max-w-sm mx-auto">
-                          Click &quot;Start Camera&quot; above or paste a link to display video input.
-                        </p>
+                    <div className="p-6 space-y-2 text-center">
+                      <p className="font-mono text-xs text-slate-400">NO MEDIA LOADED</p>
+                      <p className="text-slate-600 text-[11px] max-w-sm mx-auto">
+                        Paste a YouTube video/playlist URL or direct media link above.
+                      </p>
+                    </div>
+                  );
+
+                  if (monitorLayout === 'split') {
+                    return (
+                      <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="relative flex items-center justify-center overflow-hidden border rounded-lg aspect-video bg-[#0a0b0d] border-slate-800">
+                          {cameraFeed}
+                        </div>
+                        <div className="relative flex items-center justify-center overflow-hidden border rounded-lg aspect-video bg-[#0a0b0d] border-slate-800">
+                          {mediaFeed}
+                        </div>
                       </div>
-                    )}
-                  </>
-                )}
+                    );
+                  }
+
+                  if (monitorLayout === 'media') {
+                    return (
+                      <div className="relative flex-1 flex items-center justify-center overflow-hidden border rounded-lg aspect-video bg-[#0a0b0d] border-slate-800">
+                        {mediaFeed}
+                      </div>
+                    );
+                  }
+
+                  // 'full' — original single-frame priority (local video >
+                  // embed > camera), byte-for-byte the same behavior this
+                  // had before monitorLayout existed.
+                  return (
+                    <div className="relative flex-1 flex items-center justify-center overflow-hidden border rounded-lg aspect-video bg-[#0a0b0d] border-slate-800">
+                      {localVideoUrl || activeEmbedUrl ? mediaFeed : cameraFeed}
+                    </div>
+                  );
+                })()}
+                <VuMeter analyserRef={rightAnalyserRef} label="R" />
               </div>
             </div>
           )}
