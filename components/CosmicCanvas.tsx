@@ -83,6 +83,9 @@ interface CosmicCanvasProps {
   groundZeroToken?: number;
   // See KaliOracleView's own prefillQuery prop — threaded straight through.
   kaliPrefillQuery?: { text: string; token: number } | null;
+  // Threaded straight through to KaliOracleView's own onGoHome — reaches
+  // all the way back to page.tsx's changeLayoutMode('gallery').
+  onGoHome?: () => void;
 }
 
 export default function CosmicCanvas({
@@ -91,6 +94,7 @@ export default function CosmicCanvas({
   requestedView,
   groundZeroToken,
   kaliPrefillQuery,
+  onGoHome,
 }: CosmicCanvasProps) {
   const [activeView, setActiveView] = useState<CosmicCanvasView>('clock');
 
@@ -208,7 +212,19 @@ export default function CosmicCanvas({
       {/* Kali — extracted into its own component (KaliSection.tsx) so the
           Continuous Stack layout can also mount it as a standalone section;
           this is the exact same component, unchanged here. */}
-      {activeView === 'kali' && <KaliOracleView prefillQuery={kaliPrefillQuery} onGoHome={() => setActiveView('clock')} />}
+      {/* Resets this component's own view state (so a later return to Hub
+          mode doesn't weirdly still show Kali) AND bubbles up to
+          page.tsx's changeLayoutMode('gallery') — the actual 9-card
+          dashboard grid, not just this component's own 'clock' view. */}
+      {activeView === 'kali' && (
+        <KaliOracleView
+          prefillQuery={kaliPrefillQuery}
+          onGoHome={() => {
+            setActiveView('clock');
+            onGoHome?.();
+          }}
+        />
+      )}
 
       <style jsx>{`
         @keyframes cinematicDrift {

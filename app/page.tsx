@@ -329,6 +329,7 @@ useContextMenuShare();
                   pricingRequestToken={pricingRequestToken}
                   kaliPrefillQuery={kaliPrefillQuery}
                   onCosmicViewChange={setCosmicView}
+                  onGoHome={() => changeLayoutMode('gallery')}
                 />
               )}
 
@@ -352,7 +353,15 @@ useContextMenuShare();
                   hub-mode wrapper is overflow-hidden the whole way, so that
                   excess was completely unreachable. */}
               <div className={activeTab === 'pods' ? 'w-full h-full overflow-y-auto' : 'hidden'}>
-                <PodsModule isActive={activeTab === 'pods'} onGoHome={() => setActiveTab('aione')} />
+                {/* changeLayoutMode('gallery'), not setActiveTab('aione') —
+                    "Home" from Studio One means the actual 9-card
+                    dashboard grid (Radio Central/Studio One/Star
+                    Tracker/Products), not AiOneHome's own hero/clock
+                    view within Hub mode. setActiveTab alone left the
+                    user stuck in Hub mode looking at that hero view
+                    instead, which is what was being reported as "the
+                    blank landing view with the PRICING header." */}
+                <PodsModule isActive={activeTab === 'pods'} onGoHome={() => changeLayoutMode('gallery')} />
               </div>
             </div>
           )}

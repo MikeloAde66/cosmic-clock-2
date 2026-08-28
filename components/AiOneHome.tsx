@@ -76,6 +76,10 @@ interface AiOneHomeProps {
   // "is Kali currently showing" to hide the persistent audio player and
   // the Pricing nav button specifically while the Oracle is open.
   onCosmicViewChange?: (view: 'clock' | 'weather' | 'kali') => void;
+  // Threaded down to CosmicCanvas's Kali sub-view — "Home" from inside
+  // Kali needs to reach all the way back to page.tsx's own
+  // changeLayoutMode('gallery'), not just reset local sub-view state.
+  onGoHome?: () => void;
 }
 
 export default function AiOneHome({
@@ -85,6 +89,7 @@ export default function AiOneHome({
   pricingRequestToken,
   kaliPrefillQuery,
   onCosmicViewChange,
+  onGoHome,
 }: AiOneHomeProps) {
   const [activeSection, setActiveSection] = useState<'home' | 'pricing'>('home');
   // Setter is threaded down to CenterHero/CosmicCanvas so it can report
@@ -202,6 +207,7 @@ export default function AiOneHome({
           visible={activeSection === 'home'}
           onCosmicViewChange={handleCosmicViewChange}
           kaliPrefillQuery={kaliPrefillQuery}
+          onGoHome={onGoHome}
         />
 
         {activeSection !== 'home' && (
