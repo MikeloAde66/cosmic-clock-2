@@ -326,8 +326,16 @@ useContextMenuShare();
                   switch — it holds local file uploads as in-memory blob URLs,
                   which die the instant the component unmounts. Unlike a real
                   page reload (where blob URLs are gone regardless), switching
-                  tabs within this single-page app doesn't need to destroy them. */}
-              <div className={activeTab === 'pods' ? 'w-full h-full' : 'hidden'}>
+                  tabs within this single-page app doesn't need to destroy them.
+                  overflow-y-auto - confirmed body.scrollHeight === body.
+                  clientHeight (no scroll at all) on mobile, and PodsModule's
+                  own Studio One console has no page-level scroll of its own
+                  (only a small max-h-56 track-list sub-scroll) - its real
+                  content can be taller than this wrapper's fixed h-full
+                  allocation, and the ancestor chain up to app/page.tsx's own
+                  hub-mode wrapper is overflow-hidden the whole way, so that
+                  excess was completely unreachable. */}
+              <div className={activeTab === 'pods' ? 'w-full h-full overflow-y-auto' : 'hidden'}>
                 <PodsModule isActive={activeTab === 'pods'} onGoHome={() => setActiveTab('aione')} />
               </div>
             </div>

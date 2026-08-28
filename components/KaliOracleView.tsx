@@ -77,7 +77,14 @@ export default function KaliOracleView({ prefillQuery, onGoHome }: KaliOracleVie
         </div>
 
         {/* Main grid — side telemetry columns flank the centered avatar */}
-        <div className="grid flex-1 grid-cols-1 gap-4 mt-4 min-h-0 lg:grid-cols-[260px_1fr_260px]">
+        {/* overflow-y-auto - confirmed via real measurement that on a
+            mobile viewport (grid-cols-1 stacks all three columns
+            vertically) this grid's real content (664px) exceeds its
+            allocated height (502px), and the root's own overflow-hidden
+            (needed to contain the Starfield/gradient background) left
+            that overflow completely unreachable - the AiOneChat input at
+            the bottom was cut off with no way to scroll to it. */}
+        <div className="grid flex-1 grid-cols-1 gap-4 mt-4 min-h-0 overflow-y-auto lg:grid-cols-[260px_1fr_260px]">
           {/* Left column — the real epoch/progress/specs content from KaliSection */}
           <div className="order-2 overflow-y-auto lg:order-1">
             <div
