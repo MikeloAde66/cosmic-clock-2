@@ -53,14 +53,17 @@ function HomeInner() {
   // /products) never leaves the bar stuck hidden.
   const { setPlayerBarHidden } = useRadioPlayer();
   // Mirrors AiOneHome/CenterHero/CosmicCanvas's own activeView — 'clock'
-  // unless the Kali Oracle sub-view is actually open, in which case the
-  // effect below also hides the persistent audio player there (a focused,
-  // full-screen experience the bar would otherwise sit on top of).
+  // unless the Kali Oracle sub-view is actually open.
   const [cosmicView, setCosmicView] = useState<'clock' | 'weather' | 'kali'>('clock');
+  // Shared by the persistent audio player, the Earth Time/social footer,
+  // and the Pricing nav button — Kali and Studio One are both focused,
+  // full-screen workspaces where that chrome is just clutter eating into
+  // real vertical space, especially on mobile.
+  const hideBottomChrome = activeTab === 'pods' || (activeTab === 'aione' && cosmicView === 'kali');
   useEffect(() => {
-    setPlayerBarHidden(activeTab === 'pods' || (activeTab === 'aione' && cosmicView === 'kali'));
+    setPlayerBarHidden(hideBottomChrome);
     return () => setPlayerBarHidden(false);
-  }, [activeTab, cosmicView, setPlayerBarHidden]);
+  }, [hideBottomChrome, setPlayerBarHidden]);
   // Set by a Home globe Vault marker's "Open Drawer" link, or a Cmd+K search
   // result, consumed once as CosmicVaultAuth's initial filter — see that
   // component's initialDrawer prop.
@@ -300,7 +303,7 @@ useContextMenuShare();
             activeTab={activeTab}
             onOpenPricing={openPricing}
             authModalRequest={authModalRequest}
-            hidePricing={activeTab === 'aione' && cosmicView === 'kali'}
+            hidePricing={hideBottomChrome}
           />
 
           {/* Classic Hub (default, unchanged) — the existing tab-swap
@@ -459,14 +462,20 @@ useContextMenuShare();
             </button>
           )}
 
-          <SiteFooter
-            weatherSearchOpen={weather.searchOpen}
-            weatherLoading={weather.loading}
-            weatherError={weather.error}
-            weatherForecastText={weather.forecastText}
-            weatherCurrentTemp={weather.currentTemp}
-            onWeatherSubmit={weather.submitLocation}
-          />
+          {/* Earth Time / Kali Yuga / social links — same hideBottomChrome
+              as the audio player and Pricing button, for the same reason:
+              Kali and Studio One are focused, full-screen workspaces where
+              this is clutter eating into real vertical space on mobile. */}
+          {!hideBottomChrome && (
+            <SiteFooter
+              weatherSearchOpen={weather.searchOpen}
+              weatherLoading={weather.loading}
+              weatherError={weather.error}
+              weatherForecastText={weather.forecastText}
+              weatherCurrentTemp={weather.currentTemp}
+              onWeatherSubmit={weather.submitLocation}
+            />
+          )}
           {/* GlobalPlayerBar itself now mounts globally in app/layout.tsx
               as a fixed-to-viewport overlay (see playerBarHidden effect
               above, which hides it specifically while this tab is Pods —
@@ -478,7 +487,7 @@ useContextMenuShare();
               it instead just pushed SiteFooter down into that exact
               region, which is what was covering the footer's own social
               icons. */}
-          {activeTab !== 'pods' && <div className="h-14 shrink-0" />}
+          {!hideBottomChrome && <div className="h-14 shrink-0" />}
         </div>
         </main>
       </div>
