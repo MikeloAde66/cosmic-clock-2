@@ -78,13 +78,25 @@ const cardClassRadio =
 // render and flash as a hydration-mismatch reflow the instant React
 // hydrates. The sine-based heights and modulo'd duration/delay still read
 // as organic rather than a flat, mechanical repeat.
+//
+// .toFixed(4) on all three — confirmed via a real dev-server hydration
+// warning that the *values* here were already deterministic (same
+// Math.sin(i...) both sides), but the raw floats' string serialization
+// wasn't: the server rendered height as "74.5691%" while the client's
+// in-memory string was the full "74.56910727401733%", and delay similarly
+// came back as "-1.14s" vs "-1.1400000000000001s" - same underlying
+// number, different string once round-tripped through the browser's own
+// attribute parsing. Rounding to a fixed number of decimals up front
+// collapses both sides to the identical string. Same class of bug (and
+// same fix) as the Star Tracker card's radar-tick lines elsewhere in
+// this file.
 const RADIO_WAVEFORM_BARS = Array.from({ length: 32 }, (_, i) => ({
-  height: 22 + 70 * Math.abs(Math.sin(i * 0.85 + 1)),
-  duration: 0.8 + (i % 5) * 0.18,
+  height: Number((22 + 70 * Math.abs(Math.sin(i * 0.85 + 1))).toFixed(4)),
+  duration: Number((0.8 + (i % 5) * 0.18).toFixed(4)),
   // Negative delays start each bar mid-cycle rather than all 32 launching
   // from zero in lockstep on mount, so it reads as already-in-progress
   // playback instead of a synchronized twitch.
-  delay: -((i % 7) * 0.19),
+  delay: Number((-((i % 7) * 0.19)).toFixed(4)),
 }));
 
 // Radio Central's preview strip — a live-looking glowing waveform instead
