@@ -226,6 +226,23 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
   // so a single ref safely tracks whichever is actually mounted.
   const broadcastVideoRef = useRef<HTMLVideoElement | null>(null);
 
+  // Live Microphone Input — a real getUserMedia() capture mixed into the
+  // exact same EQ/compressor/panner/VU-meter chain the track audio already
+  // runs through (see startMic below: micGain connects straight into
+  // filtersRef.current['60'], the same first filter node.connect(source)
+  // already feeds into). Device labels from enumerateDevices() are empty
+  // strings until mic permission has actually been granted once — that's
+  // a real browser privacy behavior, not a bug in the dropdown.
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedMicId, setSelectedMicId] = useState<string>('');
+  const [micActive, setMicActive] = useState(false);
+  const [micMuted, setMicMuted] = useState(false);
+  const [micGainPct, setMicGainPct] = useState(80);
+  const [micError, setMicError] = useState('');
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const micGainNodeRef = useRef<GainNode | null>(null);
+
   // EQ Audio Nodes
   const [eqGains, setEqGains] = useState<{ [freq: string]: number }>({
     '60': 0,
@@ -506,6 +523,101 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
       rightAnalyserRef.current = rightAnalyser;
     }
   };
+
+  // Live Mic Input — enumerateDevices() only returns real device labels
+  // (e.g. "Focusrite Scarlett 2i2") once mic permission has actually been
+  // granted at least once; before that every label is an empty string, by
+  // design, for privacy (a page could otherwise fingerprint hardware
+  // without ever asking). Requesting a throwaway stream just to populate
+  // labels, then immediately stopping it, is the standard way around that
+  // — this is a real user gesture (the button that calls this), not
+  // something that runs unprompted on mount.
+  const refreshAudioInputDevices = async () => {
+    setMicError('');
+    try {
+      const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+      probe.getTracks().forEach((t) => t.stop());
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setAudioInputDevices(devices.filter((d) => d.kind === 'audioinput'));
+    } catch (err) {
+      setMicError(err instanceof Error ? err.message : 'Could not access audio input devices.');
+    }
+  };
+
+  // Starts (or restarts, if switching devices) live mic capture and mixes
+  // it into the exact same processing chain the track audio already runs
+  // through — micGain connects straight into filtersRef.current['60'],
+  // the same first EQ filter node.connect(source) already feeds into, so
+  // both signals pass through the same 5-band EQ/compressor/panner and
+  // show up on the same L/R VU meters. initAudioContext() is idempotent
+  // (checks !audioCtxRef.current before doing anything) and safe to call
+  // here even if no track has ever played — the mic shouldn't require
+  // one just to exist.
+  const startMic = async (deviceId: string) => {
+    setMicError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+      });
+
+      initAudioContext();
+      const ctx = audioCtxRef.current;
+      const firstFilter = filtersRef.current['60'];
+      if (!ctx || !firstFilter) {
+        stream.getTracks().forEach((t) => t.stop());
+        setMicError('Audio engine not ready — try again.');
+        return;
+      }
+
+      // Tear down any previous mic connection first (switching devices).
+      micSourceRef.current?.disconnect();
+      micGainNodeRef.current?.disconnect();
+      micStreamRef.current?.getTracks().forEach((t) => t.stop());
+
+      const micSource = ctx.createMediaStreamSource(stream);
+      const micGain = ctx.createGain();
+      micGain.gain.value = micMuted ? 0 : micGainPct / 100;
+      micSource.connect(micGain);
+      micGain.connect(firstFilter);
+
+      micStreamRef.current = stream;
+      micSourceRef.current = micSource;
+      micGainNodeRef.current = micGain;
+      setSelectedMicId(deviceId);
+      setMicActive(true);
+    } catch (err) {
+      setMicError(err instanceof Error ? err.message : 'Could not start the microphone.');
+    }
+  };
+
+  const stopMic = () => {
+    micSourceRef.current?.disconnect();
+    micGainNodeRef.current?.disconnect();
+    micStreamRef.current?.getTracks().forEach((t) => t.stop());
+    micStreamRef.current = null;
+    micSourceRef.current = null;
+    micGainNodeRef.current = null;
+    setMicActive(false);
+  };
+
+  // Live gain/mute — ramped with setTargetAtTime (matching setPanWidth's
+  // own approach elsewhere in this file) rather than an instant jump, so
+  // toggling mute or dragging the slider doesn't click/pop.
+  useEffect(() => {
+    if (micGainNodeRef.current && audioCtxRef.current) {
+      const target = micMuted ? 0 : micGainPct / 100;
+      micGainNodeRef.current.gain.setTargetAtTime(target, audioCtxRef.current.currentTime, 0.05);
+    }
+  }, [micGainPct, micMuted]);
+
+  // Stop the mic (real hardware, real OS-level indicator light) if this
+  // component ever unmounts while it's live — same cleanup discipline as
+  // the camera's own stream teardown elsewhere in this file.
+  useEffect(() => {
+    return () => {
+      micStreamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
 
   function applyCompressorValues(compressor: DynamicsCompressorNode, mode: 'flat' | 'broadcast') {
     const t = compressor.context.currentTime;
@@ -1635,6 +1747,100 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Live Mic Input — deliberately placed here (always visible,
+                  independent of whether a music track is selected) rather
+                  than inside the track-player's own EQ panel below, which
+                  only renders once activeTrack is set. A host needs to be
+                  able to talk over mic with no track playing at all, so
+                  gating this behind track selection would have been a real
+                  usability bug, not just a smaller scope decision. Mixes
+                  into the exact same EQ/compressor/panner/VU-meter chain
+                  the track audio runs through (see startMic: micGain
+                  connects directly into filtersRef.current['60'], the same
+                  first filter node the track's own source feeds into). */}
+              <div className="p-2 space-y-2 border rounded-lg border-cyan-500/20 bg-cyan-950/10">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400/80">
+                    Live Mic Input
+                  </span>
+                  <button
+                    type="button"
+                    onClick={refreshAudioInputDevices}
+                    className="text-[10px] font-mono text-slate-500 hover:text-cyan-300 transition-colors"
+                  >
+                    Refresh Devices
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={selectedMicId}
+                    onChange={(e) => setSelectedMicId(e.target.value)}
+                    onFocus={() => {
+                      if (audioInputDevices.length === 0) refreshAudioInputDevices();
+                    }}
+                    className="flex-1 min-w-[160px] px-2 py-1.5 text-xs bg-[#0a0b0d] border border-slate-800 rounded font-mono text-slate-300 focus:outline-none focus:border-cyan-400/50"
+                  >
+                    <option value="">
+                      {audioInputDevices.length === 0 ? 'Click to list input devices…' : 'Default microphone'}
+                    </option>
+                    {audioInputDevices.map((d, i) => (
+                      <option key={d.deviceId || i} value={d.deviceId}>
+                        {d.label || `Microphone ${i + 1}`}
+                      </option>
+                    ))}
+                  </select>
+
+                  {micActive ? (
+                    <button
+                      type="button"
+                      onClick={stopMic}
+                      className="px-3 py-1.5 rounded text-xs font-mono uppercase tracking-wide bg-red-950 text-red-300 border border-red-800 hover:bg-red-900 transition-colors"
+                    >
+                      Stop Mic
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startMic(selectedMicId)}
+                      className="px-3 py-1.5 rounded text-xs font-mono uppercase tracking-wide bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 hover:bg-cyan-500/30 transition-colors"
+                    >
+                      Enable Mic
+                    </button>
+                  )}
+                </div>
+
+                {micActive && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMicMuted((v) => !v)}
+                      aria-label={micMuted ? 'Unmute microphone' : 'Mute microphone'}
+                      className={`px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wide border transition ${
+                        micMuted
+                          ? 'bg-red-950 border-red-800 text-red-300'
+                          : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {micMuted ? 'Muted' : 'Mute'}
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={micGainPct}
+                      onChange={(e) => setMicGainPct(Number(e.target.value))}
+                      disabled={micMuted}
+                      className="flex-1 accent-cyan-400 disabled:opacity-40"
+                      aria-label="Microphone gain"
+                    />
+                    <span className="w-9 text-right text-[10px] font-mono text-slate-500">{micGainPct}%</span>
+                  </div>
+                )}
+
+                {micError && <p className="text-[10px] font-mono text-red-400">{micError}</p>}
               </div>
 
               {/* Off-screen sampling canvas for PodCam motion detection —
