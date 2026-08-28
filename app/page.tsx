@@ -262,8 +262,14 @@ useContextMenuShare();
           collapsible header pills, single-column grids) is genuinely
           responsive, rather than being shrunk into a fake phone-mockup
           bezel. */}
-      <div className="w-screen h-screen bg-black">
-        <main className="relative flex w-screen h-screen overflow-hidden bg-[#0a0a0c]">
+      {/* h-dvh (dynamic viewport height), not h-screen (100vh) - on iOS
+          Safari, 100vh includes the space behind the address bar even
+          when it's actually showing, so the real visible area is
+          shorter than h-screen claims. dvh tracks the real visible
+          height as the browser chrome shows/hides; identical to vh on
+          desktop, where there's no such chrome to account for. */}
+      <div className="w-screen h-dvh bg-black">
+        <main className="relative flex w-screen h-dvh overflow-hidden bg-[#0a0a0c]">
         <Starfield />
         <LeftNav
           activeTab={activeTab}

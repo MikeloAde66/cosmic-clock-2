@@ -11,6 +11,16 @@ body {
   color: #f8fafc;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   overflow: hidden;
+  /* overscroll-behavior-y: contain - stops a pull/bounce gesture inside
+     one of this app's internal scroll containers (the ones just fixed
+     for Kali/Studio One/the gallery footer) from chaining into a
+     rubber-band effect on the page behind it, since there's no real
+     document scroll to hand off to anyway (see overflow: hidden above).
+     -webkit-overflow-scrolling: touch - restores iOS momentum scrolling
+     on older Safari versions that don't do it by default; a no-op, not
+     a regression, on versions that already do. */
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Gallery Grid — sequential "deep-space arrival" mount. Each card travels

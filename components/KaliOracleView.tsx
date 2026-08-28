@@ -53,20 +53,29 @@ export default function KaliOracleView({ prefillQuery, onGoHome }: KaliOracleVie
       <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-b from-transparent via-black/40 to-black/90" />
 
       <div className="relative z-10 flex flex-col w-full h-full min-h-0 p-4">
-        {onGoHome && (
-          <button
-            type="button"
-            onClick={onGoHome}
-            aria-label="Home"
-            className="absolute z-20 flex items-center gap-1.5 h-8 px-3 top-4 left-4 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
-          >
-            <Home className="w-3.5 h-3.5" />
-            Home
-          </button>
-        )}
+        {/* Top header row — Home (if provided) + the centered badge as
+            real flex siblings, not an absolutely-positioned button on
+            top of it. The earlier absolute version visually collided
+            with the badge on narrow phone widths (confirmed: "AI" got
+            covered, reading as "ONE: QUANTUM ORACLE") - not just
+            unlikely to happen, actually reproduced. A matching empty
+            spacer on the right keeps the badge genuinely centered
+            rather than drifting toward the Home button's side. */}
+        <div className="flex items-center justify-between gap-2 shrink-0">
+          {onGoHome ? (
+            <button
+              type="button"
+              onClick={onGoHome}
+              aria-label="Home"
+              className="flex items-center gap-1.5 h-8 px-3 shrink-0 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
+            >
+              <Home className="w-3.5 h-3.5" />
+              Home
+            </button>
+          ) : (
+            <div className="w-8" />
+          )}
 
-        {/* Top header badge */}
-        <div className="flex justify-center shrink-0">
           <div
             className="px-5 py-2 text-center border rounded-full"
             style={{ background: 'rgba(11,16,29,0.8)', border: '1px solid rgba(0,242,254,0.3)', boxShadow: '0 0 20px rgba(0,242,254,0.15)' }}
@@ -74,6 +83,8 @@ export default function KaliOracleView({ prefillQuery, onGoHome }: KaliOracleVie
             <p className="text-xs font-bold tracking-[0.3em] text-white">AI ONE: QUANTUM ORACLE</p>
             <p className="text-[9px] font-mono uppercase tracking-widest text-cyan-400/80">Year 5,128 / 432,000</p>
           </div>
+
+          <div className="w-8 shrink-0" aria-hidden="true" />
         </div>
 
         {/* Main grid — side telemetry columns flank the centered avatar */}
