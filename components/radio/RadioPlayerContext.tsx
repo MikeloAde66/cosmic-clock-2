@@ -136,12 +136,12 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(1);
 
-  // Primes .977 Comedy (rb-977-comedy) into the persistent bottom bar on
-  // load, so its name and preloaded audio src are ready the instant the
-  // app opens — a real 'live' station with a static streamUrl (StreamThe
-  // World CDN, verified working via an actual browser canplay event, not
-  // just an HTTP check), so this is the simple direct-src priming path,
-  // not the async vault-queue fetch a 'vault'-kind default would need.
+  // Primes the 432Hz Cosmic Instrumental Stream (vault-432hz) into the
+  // persistent bottom bar on load, so it's the station shown/queued the
+  // instant the app opens. This is a 'vault'-kind station, so priming it
+  // (unlike a 'live' station's direct streamUrl) needs the same async
+  // queue fetch playStation uses to get a real signed fileUrl for the
+  // first track.
   // Deliberately does NOT call .play() here: real autoplay-with-sound
   // with no prior user gesture is blocked by every major browser, and
   // forcing it would either silently fail or surface as a false "error"
@@ -149,11 +149,31 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   // comment above for the same user-gesture constraint. A real Play
   // click (already wired in GlobalPlayerBar) starts it for real.
   useEffect(() => {
-    const defaultStation = RADIO_STATIONS.find((s) => s.id === 'rb-977-comedy');
-    if (defaultStation?.kind === 'live') {
-      setStation(defaultStation);
+    const defaultStation = RADIO_STATIONS.find((s) => s.id === 'vault-432hz');
+    if (!defaultStation) return;
+    setStation(defaultStation);
+
+    if (defaultStation.kind === 'live') {
       setAudioSource(defaultStation.streamUrl);
+      return;
     }
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/radio/queue?station=${defaultStation.id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const tracks: QueueTrack[] = data.tracks ?? [];
+        if (tracks.length === 0) return;
+        queueRef.current = tracks;
+        setQueue(tracks);
+        currentIndexRef.current = 0;
+        setCurrentIndex(0);
+        setAudioSource(tracks[0].fileUrl);
+      } catch {
+        // Priming failure is non-fatal — user can still manually select a station.
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

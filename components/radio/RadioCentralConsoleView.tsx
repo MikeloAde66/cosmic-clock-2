@@ -65,7 +65,7 @@ export default function RadioCentralConsoleView() {
     toggleProgramManager,
   } = useRadioPlayer();
 
-  const [activeCategory, setActiveCategory] = useState('ALL CHANNELS');
+  const [activeCategory, setActiveCategory] = useState('COSMIC CHILL');
   const [searchQuery, setSearchQuery] = useState('');
   const [adminStations, setAdminStations] = useState<LiveRadioStation[]>([]);
   const [showSchedule, setShowSchedule] = useState(false);
