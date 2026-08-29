@@ -1,10 +1,15 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AudioLines, Headphones, Play, Pause, Radio as RadioIcon, Search, Volume2 } from 'lucide-react';
+import { AudioLines, Headphones, Play, Pause, Plus, Radio as RadioIcon, Search, Upload, Volume2, X } from 'lucide-react';
 import { useRadioPlayer } from './RadioPlayerContext';
 import PlayerSpectrum from './PlayerSpectrum';
 import { CATEGORIES, CATEGORY_LABELS, RADIO_STATIONS, type LiveRadioStation, type RadioStation } from '@/lib/radioStations';
+
+// Station id the "Ai, Off Grid, and DIY" card (lib/radioStations.ts) is
+// registered under — used to single out that one card for its dedicated
+// Play icon below.
+const OFF_GRID_STATION_ID = 'ai-off-grid-and-diy-ep1';
 
 // Dedicated visual shell for Radio Central's cyberpunk-HUD restyle — a
 // wrapper around the real player, not a fork of it. Every hook, id, and
@@ -69,6 +74,57 @@ export default function RadioCentralConsoleView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [adminStations, setAdminStations] = useState<LiveRadioStation[]>([]);
   const [showSchedule, setShowSchedule] = useState(false);
+
+  // Upload (+) — a custom user-supplied track (file or direct link), stored
+  // in local state as the active custom source and tuned in via the same
+  // playStation the rest of Radio Central uses, so it shows up in the
+  // bottom player bar exactly like any curated station.
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadLinkInput, setUploadLinkInput] = useState('');
+  const uploadFileInputRef = useRef<HTMLInputElement | null>(null);
+  // Tracks the current custom track's blob URL so it can be revoked when
+  // replaced or when this view unmounts — object URLs otherwise leak.
+  const customBlobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (customBlobUrlRef.current) URL.revokeObjectURL(customBlobUrlRef.current);
+    };
+  }, []);
+
+  const loadCustomStation = (streamUrl: string, name: string) => {
+    const customStation: LiveRadioStation = {
+      kind: 'live',
+      id: `custom-upload-${Date.now()}`,
+      name,
+      network: 'Custom Upload',
+      tagline: 'Your uploaded track',
+      genre: 'Custom',
+      category: 'ALL CHANNELS',
+      streamUrl,
+      badge: '♪',
+      badgeColor: '#7c3aed',
+    };
+    playStation(customStation);
+    setShowUploadModal(false);
+    setUploadLinkInput('');
+  };
+
+  const handleUploadFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (customBlobUrlRef.current) URL.revokeObjectURL(customBlobUrlRef.current);
+    const url = URL.createObjectURL(file);
+    customBlobUrlRef.current = url;
+    loadCustomStation(url, file.name.replace(/\.[^/.]+$/, ''));
+  };
+
+  const handleUploadLinkSubmit = () => {
+    const url = uploadLinkInput.trim();
+    if (!url) return;
+    loadCustomStation(url, url.split('/').pop() || 'Custom Stream');
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -139,6 +195,15 @@ export default function RadioCentralConsoleView() {
               <AudioLines className="w-3.5 h-3.5" />
               432Hz
             </span>
+            <button
+              onClick={() => setShowUploadModal(true)}
+              aria-label="Upload audio"
+              title="Upload audio"
+              className="flex items-center justify-center w-11 h-11 rounded-full shrink-0 transition hover:brightness-125"
+              style={{ background: TOKENS.cyan, color: '#03121a', boxShadow: '0 0 14px rgba(0,242,254,0.5)' }}
+            >
+              <Plus className="w-6 h-6" strokeWidth={3} />
+            </button>
           </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-[0.2em] text-white">RADIO CENTRAL</h1>
@@ -311,6 +376,19 @@ export default function RadioCentralConsoleView() {
                     <p className="text-xs font-bold truncate text-white">{s.name}</p>
                     <p className="text-[10px] truncate text-slate-500">{s.tagline}</p>
                   </div>
+                  {s.id === OFF_GRID_STATION_ID && (
+                    <span
+                      aria-label={isActive && isPlaying ? 'Pause Ai, Off Grid, and DIY' : 'Play Ai, Off Grid, and DIY'}
+                      className="flex items-center justify-center w-8 h-8 rounded-full shrink-0"
+                      style={{ background: 'rgba(0,242,254,0.15)', border: `1px solid ${TOKENS.cyan}` }}
+                    >
+                      {isActive && isPlaying ? (
+                        <Pause className="w-4 h-4" style={{ color: TOKENS.cyan }} />
+                      ) : (
+                        <Play className="w-4 h-4" style={{ color: TOKENS.cyan }} />
+                      )}
+                    </span>
+                  )}
                   {isActive && isPlaying && <PlayerSpectrum analyserRef={analyserRef} isPlaying width={36} height={16} />}
                 </button>
               );
@@ -363,9 +441,9 @@ export default function RadioCentralConsoleView() {
               </div>
               {showSchedule && (
                 <div className="p-3 space-y-1 text-[10px] rounded-lg" style={subpanelStyle}>
-                  <p className="text-slate-500">2–4am History · 5–8am Comedy · 8:05–10:35am Jazz</p>
-                  <p className="text-slate-500">10:36am–12:36pm Ai OneKast · 12:37–2:37pm BBC · 2:39–4pm Comedy</p>
-                  <p className="text-slate-500">News overrides: 4pm &amp; 11pm BBC · 7pm &amp; 1am NPR (15 min each)</p>
+                  <p className="text-slate-500">8 min per station, rotating: 432Hz Cosmic → .977 Comedy → .977 Smooth Jazz → History Radio (shuffled after 432Hz)</p>
+                  <p className="text-slate-500">1-minute Commercials &amp; Ads Loop between every station change</p>
+                  <p className="text-slate-500">Starts automatically the first time you press Play · pick any station directly to override</p>
                 </div>
               )}
             </div>
@@ -416,6 +494,65 @@ export default function RadioCentralConsoleView() {
           Radio Central · Live · Always On
         </div>
       </div>
+
+      {showUploadModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(2,4,8,0.7)' }}
+          onClick={() => setShowUploadModal(false)}
+        >
+          <div className="w-full max-w-sm p-5 space-y-4 rounded-xl" style={cardStyle} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold tracking-wide text-white uppercase">Upload Audio</h2>
+              <button onClick={() => setShowUploadModal(false)} aria-label="Close" className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button
+              onClick={() => uploadFileInputRef.current?.click()}
+              className="flex items-center justify-center w-full gap-2 py-3 text-xs font-bold uppercase tracking-wide rounded-lg"
+              style={{ background: TOKENS.cyan, color: '#03121a' }}
+            >
+              <Upload className="w-4 h-4" />
+              Choose Audio File
+            </button>
+            <input
+              ref={uploadFileInputRef}
+              type="file"
+              accept=".mp3,.wav,.m4a,audio/*"
+              className="hidden"
+              onChange={handleUploadFileSelect}
+            />
+            <p className="text-[10px] text-center uppercase tracking-widest text-slate-500">MP3 · WAV · M4A</p>
+
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
+              <span className="text-[10px] uppercase tracking-widest text-slate-500">Or</span>
+              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
+            </div>
+
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={uploadLinkInput}
+                onChange={(e) => setUploadLinkInput(e.target.value)}
+                placeholder="Paste a direct audio link..."
+                className="w-full px-3 py-2 text-xs rounded-lg outline-none"
+                style={{ ...subpanelStyle, color: '#e2e8f0' }}
+              />
+              <button
+                onClick={handleUploadLinkSubmit}
+                disabled={!uploadLinkInput.trim()}
+                className="w-full py-2 text-[10px] font-bold uppercase tracking-wide rounded-lg disabled:opacity-40"
+                style={subpanelStyle}
+              >
+                Load Link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes corePulse {

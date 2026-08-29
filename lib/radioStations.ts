@@ -179,4 +179,19 @@ export const RADIO_STATIONS: RadioStation[] = [
     badge: 'AD',
     badgeColor: '#3a3a3a',
   },
+  // A real, locally-hosted narrated episode (public/assets/audio/), not a
+  // stream — 'live' kind still fits since playback is just "point the
+  // <audio> element at this URL," the same as any static file.
+  {
+    kind: 'live',
+    id: 'ai-off-grid-and-diy-ep1',
+    name: 'Ai, Off Grid, and DIY',
+    network: 'Ai One Originals',
+    tagline: 'Episode 1 — "Now What?": off-grid life narrated by Dale & Rachel',
+    genre: 'Documentary / Narration',
+    category: 'COSMIC CHILL',
+    streamUrl: '/assets/audio/ai-off-grid-and-diy-episode-1.mp3',
+    badge: 'DIY',
+    badgeColor: '#2e7d32',
+  },
 ];

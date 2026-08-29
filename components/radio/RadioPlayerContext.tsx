@@ -38,9 +38,9 @@ interface RadioPlayerContextValue {
   // directly (cross-origin YouTube iframes), so they can still cede
   // priority to the radio the same way any native <video>/<audio> does.
   pauseForExternalMedia: () => void;
-  // Program Manager — the toggle-gated 24-hour automated broadcast clock.
-  // Off by default; activeProgramLabel names the current block/override
-  // (e.g. "Ai OneKast", "BBC World Service") while enabled, null while off.
+  // Program Manager — the toggle-gated 8-minute satellite rotation.
+  // Off by default; activeProgramLabel names the current station or the
+  // "Commercials & Ads Loop" break while enabled, null while off.
   programManagerEnabled: boolean;
   activeProgramLabel: string | null;
   toggleProgramManager: () => void;
@@ -56,6 +56,28 @@ interface RadioPlayerContextValue {
 
 const RadioPlayerContext = createContext<RadioPlayerContextValue | null>(null);
 
+// Program Manager's core station pool and timing. 432Hz always leads off a
+// fresh rotation (the "Default Start"); the other three are shuffled after
+// it, and reshuffled again each time the pool wraps around.
+const ROTATION_STATION_IDS = ['vault-432hz', 'rb-977-comedy', 'rb-977-smoothjazz', 'rb-historyradio'];
+const ROTATION_AD_STATION_ID = 'vault-ads';
+const ROTATION_BLOCK_MS = 8 * 60 * 1000;
+const ROTATION_AD_MS = 60 * 1000;
+
+function shuffle<T>(items: T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function buildRotationQueue(): string[] {
+  const [first, ...rest] = ROTATION_STATION_IDS;
+  return [first, ...shuffle(rest)];
+}
+
 // Mounted once at the app-shell level (outside the tab-switched content
 // area) so the <audio> element — and playback — survives navigating between
 // Home/Vault/Pods/Radio, instead of unmounting with the Radio tab the way
@@ -66,6 +88,16 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   const hlsRef = useRef<Hls | null>(null);
   const queueRef = useRef<QueueTrack[]>([]);
   const currentIndexRef = useRef(0);
+
+  // Program Manager rotation bookkeeping.
+  const rotationQueueRef = useRef<string[]>([]);
+  const rotationIndexRef = useRef(0);
+  const rotationPhaseRef = useRef<'station' | 'ad'>('station');
+  const rotationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True once playback has started at least once this session (either via
+  // Program Manager or a manual station pick) — gates whether the global
+  // bar's Play button auto-enables Program Manager or just resumes.
+  const hasEverPlayedRef = useRef(false);
 
   // No station in the static RADIO_STATIONS list is HLS today, but
   // dynamically-fetched directory results (Radio-Browser, a future
@@ -135,6 +167,8 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(1);
+  const [programManagerEnabled, setProgramManagerEnabled] = useState(false);
+  const [activeProgramLabel, setActiveProgramLabel] = useState<string | null>(null);
 
   // Primes the 432Hz Cosmic Instrumental Stream (vault-432hz) into the
   // persistent bottom bar on load, so it's the station shown/queued the
@@ -177,6 +211,8 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const findStation = useCallback((id: string) => RADIO_STATIONS.find((s) => s.id === id) ?? null, []);
+
   const playIndex = useCallback((index: number) => {
     const track = queueRef.current[index];
     if (!track || !audioRef.current) return;
@@ -188,7 +224,10 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     audioRef.current.play().catch(() => setStatus('error'));
   }, [ensureAnalyser, setAudioSource]);
 
-  const playStation = useCallback(async (nextStation: RadioStation) => {
+  // Core fetch-and-play logic, shared by manual station selection and the
+  // Program Manager rotation below. Doesn't touch programManagerEnabled or
+  // hasEverPlayedRef itself — callers decide what a station change means.
+  const tuneStation = useCallback(async (nextStation: RadioStation) => {
     setStatus('loading');
     setStation(nextStation);
     ensureAnalyser();
@@ -233,6 +272,90 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [playIndex, ensureAnalyser, setAudioSource]);
 
+  const clearRotationTimer = useCallback(() => {
+    if (rotationTimerRef.current) {
+      clearTimeout(rotationTimerRef.current);
+      rotationTimerRef.current = null;
+    }
+  }, []);
+
+  // Alternates 8-minute station blocks with 1-minute ad breaks, looping
+  // through the shuffled pool indefinitely (reshuffling — 432Hz-first stays
+  // fixed only for the very first block of a fresh rotation) each time it
+  // wraps around.
+  const advanceRotation = useCallback(() => {
+    if (rotationPhaseRef.current === 'station') {
+      rotationPhaseRef.current = 'ad';
+      const ad = findStation(ROTATION_AD_STATION_ID);
+      if (ad) {
+        tuneStation(ad);
+        setActiveProgramLabel('Commercials & Ads Loop');
+      }
+      rotationTimerRef.current = setTimeout(() => advanceRotationRef.current(), ROTATION_AD_MS);
+    } else {
+      rotationIndexRef.current += 1;
+      if (rotationIndexRef.current >= rotationQueueRef.current.length) {
+        rotationIndexRef.current = 0;
+        rotationQueueRef.current = buildRotationQueue();
+      }
+      rotationPhaseRef.current = 'station';
+      const nextStation = findStation(rotationQueueRef.current[rotationIndexRef.current]);
+      if (nextStation) {
+        tuneStation(nextStation);
+        setActiveProgramLabel(nextStation.name);
+      }
+      rotationTimerRef.current = setTimeout(() => advanceRotationRef.current(), ROTATION_BLOCK_MS);
+    }
+  }, [findStation, tuneStation]);
+
+  // Ref mirror so the setTimeout chain above always calls the latest
+  // advanceRotation (closing over current refs/state) without needing to
+  // be recreated as its own setTimeout dependency.
+  const advanceRotationRef = useRef(advanceRotation);
+  useEffect(() => {
+    advanceRotationRef.current = advanceRotation;
+  }, [advanceRotation]);
+
+  const startProgramManager = useCallback(() => {
+    rotationQueueRef.current = buildRotationQueue();
+    rotationIndexRef.current = 0;
+    rotationPhaseRef.current = 'station';
+    setProgramManagerEnabled(true);
+    const first = findStation(rotationQueueRef.current[0]); // vault-432hz — Default Start
+    if (first) {
+      tuneStation(first);
+      setActiveProgramLabel(first.name);
+    }
+    clearRotationTimer();
+    rotationTimerRef.current = setTimeout(() => advanceRotationRef.current(), ROTATION_BLOCK_MS);
+  }, [findStation, tuneStation, clearRotationTimer]);
+
+  const stopProgramManager = useCallback(() => {
+    // Turning off just stops auto-switching — it doesn't stop whatever's
+    // already playing.
+    clearRotationTimer();
+    setProgramManagerEnabled(false);
+    setActiveProgramLabel(null);
+  }, [clearRotationTimer]);
+
+  const toggleProgramManager = useCallback(() => {
+    if (programManagerEnabled) {
+      stopProgramManager();
+    } else {
+      hasEverPlayedRef.current = true;
+      startProgramManager();
+    }
+  }, [programManagerEnabled, startProgramManager, stopProgramManager]);
+
+  // Public station-selection API — a manual override. Explicitly picking a
+  // channel (a station card, "Tune In") always wins: it cancels any running
+  // rotation and tunes directly, without Program Manager clawing it back.
+  const playStation = useCallback(async (nextStation: RadioStation) => {
+    hasEverPlayedRef.current = true;
+    if (programManagerEnabled) stopProgramManager();
+    await tuneStation(nextStation);
+  }, [programManagerEnabled, stopProgramManager, tuneStation]);
+
   const next = useCallback(() => {
     if (queueRef.current.length === 0) return;
     playIndex((currentIndexRef.current + 1) % queueRef.current.length);
@@ -243,16 +366,29 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     playIndex((currentIndexRef.current - 1 + queueRef.current.length) % queueRef.current.length);
   }, [playIndex]);
 
+  // The global bottom-bar Play/Pause button. The very first time it starts
+  // playback in a session, it auto-enables Program Manager and kicks off
+  // the 8-minute rotation (starting at 432Hz, already primed on load) —
+  // like turning on a real radio and letting the DJ take over. Any later
+  // press just pauses/resumes whatever's currently tuned — including a
+  // manually-selected station, which playStation above already excluded
+  // from the rotation.
   const togglePlayPause = useCallback(() => {
     const audio = audioRef.current;
-    if (!audio || !audio.src) return;
+    if (!audio) return;
     if (status === 'playing') {
       audio.pause();
-    } else {
-      ensureAnalyser();
-      audio.play().catch(() => setStatus('error'));
+      return;
     }
-  }, [status, ensureAnalyser]);
+    if (!hasEverPlayedRef.current) {
+      hasEverPlayedRef.current = true;
+      startProgramManager();
+      return;
+    }
+    if (!audio.src) return;
+    ensureAnalyser();
+    audio.play().catch(() => setStatus('error'));
+  }, [status, ensureAnalyser, startProgramManager]);
 
   const seek = useCallback((time: number) => {
     if (audioRef.current) audioRef.current.currentTime = time;
@@ -264,6 +400,9 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const stop = useCallback(() => {
+    clearRotationTimer();
+    setProgramManagerEnabled(false);
+    setActiveProgramLabel(null);
     audioRef.current?.pause();
     queueRef.current = [];
     currentIndexRef.current = 0;
@@ -271,139 +410,11 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     setQueue([]);
     setCurrentIndex(0);
     setStatus('idle');
-  }, []);
+  }, [clearRotationTimer]);
 
   const pauseForExternalMedia = useCallback(() => {
     audioRef.current?.pause();
   }, []);
-
-  // Program Manager — a toggle-gated 24-hour automated broadcast clock,
-  // built entirely from real stations already in RADIO_STATIONS (curated
-  // live streams + the real Vault-backed 432Hz music station, branded here
-  // as "Ai OneKast"). OFF by default; toggling it ON is itself the
-  // explicit user gesture that authorizes it to immediately tune to
-  // whatever block covers the current time — the same as turning on a
-  // real radio and getting whatever's currently airing, not unsolicited
-  // autoplay. Toggling it OFF just stops auto-switching; it doesn't stop
-  // whatever's currently playing.
-  //
-  // Two disclosed simplifications, since the literal spec isn't fully
-  // buildable: the 2:39-4pm "Comedy & Weather" block runs Comedy only —
-  // there's no text-to-speech or audio weather content anywhere in this
-  // app, only the visual NOAA widget. And 11pm/1am aren't real replays of
-  // the 4pm/7pm segments (that would require actually recording those
-  // live streams, which doesn't exist) — they're just BBC/NPR live again.
-  const PROGRAM_BLOCKS: { startMinutes: number; endMinutes: number; label: string; stationId: string }[] = [
-    { startMinutes: 2 * 60, endMinutes: 4 * 60, label: 'History Channel', stationId: 'rb-historyradio' },
-    { startMinutes: 5 * 60, endMinutes: 8 * 60, label: 'Comedy Skits Block', stationId: 'rb-977-comedy' },
-    { startMinutes: 8 * 60 + 5, endMinutes: 10 * 60 + 35, label: '.977 Jazz Stream', stationId: 'rb-977-smoothjazz' },
-    { startMinutes: 10 * 60 + 36, endMinutes: 12 * 60 + 36, label: 'Ai OneKast', stationId: 'vault-432hz' },
-    { startMinutes: 12 * 60 + 37, endMinutes: 14 * 60 + 37, label: 'BBC News & World Culture', stationId: 'bbc-world' },
-    { startMinutes: 14 * 60 + 39, endMinutes: 16 * 60, label: 'Comedy Block', stationId: 'rb-977-comedy' },
-  ];
-  // Gaps between the blocks above (and overnight, 4-5am/1:15-2am) default
-  // to Ai OneKast — a reasonable fallback rotation, not something the
-  // schedule itself specified.
-  const DEFAULT_BLOCK_STATION_ID = 'vault-432hz';
-
-  const NEWS_OVERRIDES: { startMinutes: number; stationId: 'bbc-world' | 'npr-news' }[] = [
-    { startMinutes: 16 * 60, stationId: 'bbc-world' }, // 4:00pm
-    { startMinutes: 19 * 60, stationId: 'npr-news' }, // 7:00pm
-    { startMinutes: 23 * 60, stationId: 'bbc-world' }, // 11:00pm
-    { startMinutes: 25 * 60, stationId: 'npr-news' }, // 1:00am (next day)
-  ];
-  const NEWS_OVERRIDE_MINUTES = 15;
-
-  const [programManagerEnabled, setProgramManagerEnabled] = useState(false);
-  const [activeProgramLabel, setActiveProgramLabel] = useState<string | null>(null);
-  const lastTriggeredOverrideRef = useRef<string | null>(null);
-  // Non-null while a news override's 15-minute window is running — this is
-  // the single source of truth for "are we mid-override", checked first on
-  // every tick so the base block schedule can never interrupt a news
-  // broadcast partway through (a real bug in an earlier draft: matching
-  // only the exact starting minute meant the very next 30s tick fell
-  // through to block-matching and instantly cut the news off).
-  const overrideReturnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastAppliedBlockStationIdRef = useRef<string | null>(null);
-
-  const findStation = useCallback(
-    (id: string) => RADIO_STATIONS.find((s) => s.id === id) ?? null,
-    []
-  );
-
-  const evaluateProgramManager = useCallback(() => {
-    if (overrideReturnTimerRef.current) return; // mid-override — wait for its own return timer
-
-    const now = new Date();
-    const minutesNow = now.getHours() * 60 + now.getMinutes();
-    // Also matches the +24h form so "1am" (minutesNow=60) matches the
-    // 25*60 slot the same way "11pm today" does, without needing a
-    // separate wraparound-day branch.
-    const overrideSlot = NEWS_OVERRIDES.find(
-      (o) => o.startMinutes === minutesNow || o.startMinutes === minutesNow + 24 * 60
-    );
-
-    if (overrideSlot) {
-      const overrideKey = `${now.toDateString()} ${overrideSlot.startMinutes}`;
-      if (lastTriggeredOverrideRef.current === overrideKey) return; // already ran this exact slot
-      lastTriggeredOverrideRef.current = overrideKey;
-
-      const newsStation = findStation(overrideSlot.stationId);
-      if (newsStation) {
-        playStation(newsStation);
-        setActiveProgramLabel(newsStation.name);
-      }
-      overrideReturnTimerRef.current = setTimeout(() => {
-        overrideReturnTimerRef.current = null;
-        evaluateProgramManagerRef.current?.(); // re-evaluate fresh — the base block may have changed in the meantime
-      }, NEWS_OVERRIDE_MINUTES * 60 * 1000);
-      return;
-    }
-
-    const block = PROGRAM_BLOCKS.find((b) => minutesNow >= b.startMinutes && minutesNow < b.endMinutes);
-    const targetStationId = block?.stationId ?? DEFAULT_BLOCK_STATION_ID;
-    const targetLabel = block?.label ?? 'Ai OneKast';
-
-    if (lastAppliedBlockStationIdRef.current !== targetStationId) {
-      lastAppliedBlockStationIdRef.current = targetStationId;
-      const targetStation = findStation(targetStationId);
-      if (targetStation) {
-        playStation(targetStation);
-        setActiveProgramLabel(targetLabel);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [findStation, playStation]);
-
-  // A ref mirror so the override-return setTimeout above always calls the
-  // latest evaluateProgramManager (which closes over current refs/state)
-  // without needing to be a dependency of its own setTimeout closure.
-  const evaluateProgramManagerRef = useRef(evaluateProgramManager);
-  useEffect(() => {
-    evaluateProgramManagerRef.current = evaluateProgramManager;
-  }, [evaluateProgramManager]);
-
-  const toggleProgramManager = useCallback(() => {
-    setProgramManagerEnabled((prev) => {
-      const next = !prev;
-      if (!next) {
-        // Turning off: stop auto-switching, but don't touch what's
-        // already playing.
-        if (overrideReturnTimerRef.current) clearTimeout(overrideReturnTimerRef.current);
-        overrideReturnTimerRef.current = null;
-        setActiveProgramLabel(null);
-      }
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!programManagerEnabled) return;
-    lastAppliedBlockStationIdRef.current = null; // force an immediate re-evaluation on enable
-    evaluateProgramManagerRef.current();
-    const interval = setInterval(() => evaluateProgramManagerRef.current(), 30 * 1000);
-    return () => clearInterval(interval);
-  }, [programManagerEnabled]);
 
   // Global audio priority: any other <video>/<audio> element starting
   // playback anywhere in the app takes priority over the radio. The
