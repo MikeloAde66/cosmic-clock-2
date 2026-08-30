@@ -9,7 +9,6 @@ import {
   Layers,
   LayoutGrid,
   Menu,
-  MessageCircle,
   Mic,
   Radio as RadioIcon,
   Rows3,
@@ -274,8 +273,8 @@ export default function LeftNav({
                 }}
                 className="flex items-center gap-3 h-10 px-3 rounded-lg transition-all border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
               >
-                <MessageCircle className="w-4 h-4 shrink-0" />
-                <span className="text-sm">Let&apos;s Chat</span>
+                <RadioIcon className="w-4 h-4 shrink-0" />
+                <span className="text-sm">Media Center</span>
               </button>
 
               <button
@@ -454,8 +453,8 @@ export default function LeftNav({
                       }}
                       className="flex items-center w-full gap-3 px-3 transition-all h-9 text-neutral-300 hover:text-white hover:bg-neutral-800/60"
                     >
-                      <MessageCircle className="w-4 h-4 shrink-0" />
-                      <span className="text-xs font-mono">Let&apos;s Chat</span>
+                      <RadioIcon className="w-4 h-4 shrink-0" />
+                      <span className="text-xs font-mono">Media Center</span>
                     </button>
 
                     <button

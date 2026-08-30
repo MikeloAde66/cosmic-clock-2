@@ -709,9 +709,9 @@ function ArrivalSlot({ index, docked, onDock, children }: { index: number; docke
 // Kit/Products are real routes; Weather is a direct action (no standalone
 // view at all — see lib/useWeatherLocation.ts — so its card just opens the
 // same inline footer search the umbrella icon does, without leaving
-// Gallery mode). Digital Magazine opens Let's Chat (TenForwardSection) —
-// still the same honest, no-fabricated-content empty shell that component
-// has always been; there's no forum/community backend to point it at yet.
+// Gallery mode). Digital Magazine opens the Media Flow & Audio Center
+// (TenForwardSection) — a real waveform visualizer + Webamp launcher wired
+// to RadioPlayerContext, not the community forum this slot used to hold.
 export default function GalleryGrid({
   onOpenRadio,
   onOpenPods,
@@ -866,7 +866,7 @@ export default function GalleryGrid({
             <CardHeader Icon={Newspaper} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Digital Magazine</div>
-              <p className="mt-1 text-xs text-slate-400">Community hub — stories, discussions, and Let&apos;s Chat.</p>
+              <p className="mt-1 text-xs text-slate-400">Media Flow &amp; Audio Center — waveform visualizer, Webamp, and every stream.</p>
             </div>
           </button>
         </ArrivalSlot>

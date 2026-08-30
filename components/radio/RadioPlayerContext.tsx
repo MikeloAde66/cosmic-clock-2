@@ -26,6 +26,13 @@ interface RadioPlayerContextValue {
   // Populated lazily on first playback (see ensureAnalyser below) — null
   // until then, and possibly still null after if Web Audio setup failed.
   analyserRef: React.RefObject<AnalyserNode | null>;
+  // The actual <audio> element backing every station/queue-track play call
+  // above. Exposed read-only for consumers that need to attach their own
+  // renderer to the real element (e.g. Wavesurfer's MediaElement backend)
+  // without duplicating a second parallel audio engine — callers should
+  // still drive playback through togglePlayPause/seek/etc. above, not by
+  // calling .play()/.pause() on this ref directly.
+  audioRef: React.RefObject<HTMLAudioElement | null>;
   playStation: (station: RadioStation) => Promise<void>;
   togglePlayPause: () => void;
   next: () => void;
@@ -454,6 +461,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
         duration,
         volume,
         analyserRef,
+        audioRef,
         playStation,
         togglePlayPause,
         next,
