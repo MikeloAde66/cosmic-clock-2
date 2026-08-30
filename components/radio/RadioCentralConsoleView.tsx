@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AudioLines, Headphones, Play, Pause, Plus, Radio as RadioIcon, Search, Upload, Volume2, X } from 'lucide-react';
 import { useRadioPlayer } from './RadioPlayerContext';
 import PlayerSpectrum from './PlayerSpectrum';
+import { supabase } from '@/lib/supabase';
 import { CATEGORIES, CATEGORY_LABELS, RADIO_STATIONS, type LiveRadioStation, type RadioStation } from '@/lib/radioStations';
 
 // Station id the "Ai, Off Grid, and DIY" card (lib/radioStations.ts) is
@@ -75,6 +76,50 @@ export default function RadioCentralConsoleView() {
   const [adminStations, setAdminStations] = useState<LiveRadioStation[]>([]);
   const [showSchedule, setShowSchedule] = useState(false);
 
+  // Same real Supabase-session + app_metadata.role check every other
+  // admin-only control in this app uses (see app/admin/radio-stations/
+  // page.tsx) — not a client-spoofable localStorage flag. Gates the
+  // per-channel delete "X" below; the server independently re-checks via
+  // requireAdmin() on the DELETE call itself either way.
+  const [isAdmin, setIsAdmin] = useState(false);
+  // Station ids removed this session. Admin-added stations are deleted for
+  // real via the API below; RADIO_STATIONS entries are hardcoded source
+  // data with nothing to delete server-side, so removing one of those just
+  // hides it from this browser tab until the page reloads.
+  const [hiddenStationIds, setHiddenStationIds] = useState<Set<string>>(new Set());
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setIsAdmin(data.user?.app_metadata?.role === 'admin');
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setIsAdmin(session?.user?.app_metadata?.role === 'admin');
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const handleRemoveStation = async (station: RadioStation) => {
+    const isAdminStation = adminStations.some((s) => s.id === station.id);
+    if (!isAdminStation) {
+      setHiddenStationIds((prev) => new Set(prev).add(station.id));
+      return;
+    }
+    setDeletingId(station.id);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const res = await fetch('/api/admin/radio-stations', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ id: station.id }),
+      });
+      if (res.ok) setAdminStations((prev) => prev.filter((s) => s.id !== station.id));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   // Upload (+) — a custom user-supplied track (file or direct link), stored
   // in local state as the active custom source and tuned in via the same
   // playStation the rest of Radio Central uses, so it shows up in the
@@ -142,6 +187,7 @@ export default function RadioCentralConsoleView() {
   const allStations = [...RADIO_STATIONS, ...adminStations];
   const query = searchQuery.trim().toLowerCase();
   const filteredStations = allStations.filter((s) => {
+    if (hiddenStationIds.has(s.id)) return false;
     const matchesCategory = activeCategory === 'ALL CHANNELS' ? s.category !== 'NEWS' : s.category === activeCategory;
     const matchesSearch = !query || s.name.toLowerCase().includes(query) || s.tagline.toLowerCase().includes(query);
     return matchesCategory && matchesSearch;
@@ -360,10 +406,18 @@ export default function RadioCentralConsoleView() {
             {filteredStations.map((s) => {
               const isActive = playingStation?.id === s.id;
               return (
-                <button
+                <div
                   key={s.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleTuneIn(s)}
-                  className="flex items-center w-full gap-3 p-2.5 rounded-lg text-left transition"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleTuneIn(s);
+                    }
+                  }}
+                  className="flex items-center w-full gap-3 p-2.5 rounded-lg text-left transition cursor-pointer"
                   style={isActive ? { background: 'rgba(0,242,254,0.08)', border: `1px solid rgba(0,242,254,0.4)` } : subpanelStyle}
                 >
                   <div
@@ -390,7 +444,21 @@ export default function RadioCentralConsoleView() {
                     </span>
                   )}
                   {isActive && isPlaying && <PlayerSpectrum analyserRef={analyserRef} isPlaying width={36} height={16} />}
-                </button>
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveStation(s);
+                      }}
+                      disabled={deletingId === s.id}
+                      aria-label={`Remove ${s.name}`}
+                      title="Admin: remove channel"
+                      className="flex items-center justify-center w-6 h-6 rounded-full shrink-0 text-slate-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-40 transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
