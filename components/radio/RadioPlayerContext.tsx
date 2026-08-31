@@ -345,14 +345,16 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     setActiveProgramLabel(null);
   }, [clearRotationTimer]);
 
+  // Program Manager is disabled — Radio Central is manual-selection-only.
+  // Kept as a real function (rather than removed outright) so the toggle
+  // button/badge in RadioCentralConsoleView has something safe to call;
+  // it only ever turns the rotation off, never on. startProgramManager and
+  // the rotation engine above are left in place, just unreachable, in case
+  // this needs to come back later — same as TrialGateModal/community forum
+  // elsewhere in this app.
   const toggleProgramManager = useCallback(() => {
-    if (programManagerEnabled) {
-      stopProgramManager();
-    } else {
-      hasEverPlayedRef.current = true;
-      startProgramManager();
-    }
-  }, [programManagerEnabled, startProgramManager, stopProgramManager]);
+    stopProgramManager();
+  }, [stopProgramManager]);
 
   // Public station-selection API — a manual override. Explicitly picking a
   // channel (a station card, "Tune In") always wins: it cancels any running
@@ -373,13 +375,10 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     playIndex((currentIndexRef.current - 1 + queueRef.current.length) % queueRef.current.length);
   }, [playIndex]);
 
-  // The global bottom-bar Play/Pause button. The very first time it starts
-  // playback in a session, it auto-enables Program Manager and kicks off
-  // the 8-minute rotation (starting at 432Hz, already primed on load) —
-  // like turning on a real radio and letting the DJ take over. Any later
-  // press just pauses/resumes whatever's currently tuned — including a
-  // manually-selected station, which playStation above already excluded
-  // from the rotation.
+  // The global bottom-bar Play/Pause button. Program Manager is disabled,
+  // so this is strictly manual: it just pauses/resumes whatever station is
+  // currently tuned (the default-primed 432Hz stream on a fresh load, or
+  // whatever the user last picked) — it never auto-starts a rotation.
   const togglePlayPause = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -387,15 +386,11 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
       audio.pause();
       return;
     }
-    if (!hasEverPlayedRef.current) {
-      hasEverPlayedRef.current = true;
-      startProgramManager();
-      return;
-    }
+    hasEverPlayedRef.current = true;
     if (!audio.src) return;
     ensureAnalyser();
     audio.play().catch(() => setStatus('error'));
-  }, [status, ensureAnalyser, startProgramManager]);
+  }, [status, ensureAnalyser]);
 
   const seek = useCallback((time: number) => {
     if (audioRef.current) audioRef.current.currentTime = time;

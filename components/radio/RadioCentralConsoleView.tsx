@@ -68,7 +68,6 @@ export default function RadioCentralConsoleView() {
     analyserRef,
     programManagerEnabled,
     activeProgramLabel,
-    toggleProgramManager,
   } = useRadioPlayer();
 
   const [activeCategory, setActiveCategory] = useState('COSMIC CHILL');
@@ -259,21 +258,21 @@ export default function RadioCentralConsoleView() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-widest text-slate-400">Program Manager</span>
+            {/* Disabled — Radio Central is manual-selection-only. The
+                rotation engine in RadioPlayerContext is unreachable
+                (toggleProgramManager only ever turns it off), and this
+                badge is fixed in the off position to match: no click
+                handler, no hover affordance, always "Off". */}
             <button
-              onClick={toggleProgramManager}
-              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full transition"
-              style={
-                programManagerEnabled
-                  ? { background: 'rgba(0,245,160,0.12)', border: `1px solid rgba(0,245,160,0.5)`, color: TOKENS.emerald }
-                  : { ...subpanelStyle, color: '#94a3b8' }
-              }
+              disabled
+              aria-disabled="true"
+              title="Program Manager is disabled — manual station selection only"
+              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full cursor-not-allowed"
+              style={{ ...subpanelStyle, color: '#64748b' }}
             >
               <span className="inline-flex items-center gap-1.5">
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: programManagerEnabled ? TOKENS.emerald : '#64748b' }}
-                />
-                {programManagerEnabled ? 'On Air' : 'Off'}
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#64748b' }} />
+                Program Manager &bull; Off
               </span>
             </button>
           </div>
