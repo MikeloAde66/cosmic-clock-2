@@ -1,0 +1,93 @@
+{
+  "article": {
+    "id": "autonomous_homestead_feature",
+    "title": "Off‑Grid, High‑Tech, and Unplugged",
+    "source": "Digital Digest Global",
+    "editorial_style": "Documentary, cinematic, human, accessible",
+    "next_article": {
+      "id": "star_tracker",
+      "title": "Star Tracker: Ai, Off Grid and DIY",
+      "url": "https://aione.pro.protolabsglobal.com/star-tracker"
+    },
+    "sections": [
+      {
+        "section_id": "cover_panel",
+        "title": "The Cosmic Cover",
+        "type": "illustration_panel",
+        "caption": "A nebula horizon bends over a silhouetted homestead. Solar panels glint under violet starlight. A small AI node pulses inside — the quiet intelligence guiding the autonomous homestead.",
+        "content": "HOST (V.O.): Before we step inside, we begin at the cosmic edge — a reminder that off‑grid living isn’t about going backward. It’s about building a future that fits your hands.",
+        "design_notes": "Palette: deep blues, cosmic violets, gold accents. Elements: homestead silhouette, nebula clouds, planetary curvature. Typography: thin, modern, high‑contrast."
+      },
+      {
+        "section_id": "intro",
+        "title": "Off‑Grid, High‑Tech, and Unplugged",
+        "type": "transcript",
+        "content": "HOST (V.O.): Today, we’re exploring a frontier where solar panels, batteries, sensors, and local AI merge into something entirely new... the autonomous homestead.\n\nGUEST: When you step onto a modern off-grid property, it doesn't look like a log cabin anymore. It feels more like a quiet micro-technology campus. You’ve got solar arrays overhead, LFP batteries in the workshop, satellite internet on the roof, and a tiny mini-PC running a local AI model right there on the table."
+      },
+      {
+        "section_id": "closing",
+        "title": "Closing Transcript",
+        "type": "transcript",
+        "content": "HOST: So the future isn’t just massive smart cities...\n\nGUEST: It might be a quiet piece of land, a comfortable house, a solar array, a battery bank, and a small server quietly keeping watch.\n\nHOST: Not unplugging from the future...\n\nGUEST: Building your own version of it."
+      }
+    ]
+  },
+
+  "next_article_payload": {
+    "article": {
+      "id": "star_tracker",
+      "title": "STAR TRACKER",
+      "subtitle": "Stargazers! What if you had a smart telescope in your pocket? Try Star Tracker.",
+      "edition": "Cosmic Creator Edition",
+      "source": "Proto Labs Global",
+      "url": "https://aione.pro.protolabsglobal.com/star-tracker",
+      "metadata": {
+        "earth_time": "Mon, Aug 31, 6:54 AM",
+        "kali_yuga_year": "5,128"
+      },
+      "featured_audio": {
+        "title": "Ai, Off Grid and DIY",
+        "description": "\"Living Off Grid\" by Nick Rosen – Radio Ecoshock Interview",
+        "type": "audio_feature"
+      },
+      "sections": [
+        {
+          "section_id": "star_tracker_hero",
+          "title": "Cosmic Creator Edition",
+          "type": "illustration_panel",
+          "caption": "A massive ringed planet rises over a starry horizon. The blue glow of a pocket telescope interface illuminates the foreground.",
+          "content": "HOST (V.O.): Look up. What if the universe wasn't just something you looked at, but something you could navigate from the palm of your hand?",
+          "design_notes": "Palette: deep space navy, cyan glows, starlight whites. Elements: gas giant planet, horizon glow, floating audio control HUD."
+        },
+        {
+          "section_id": "offgrid_diy_audio_transcript",
+          "title": "Ai, Off Grid and DIY",
+          "type": "transcript",
+          "content": "HOST: We transition now from managing power on the ground to looking up at the sky. In this featured interview, Nick Rosen explores the intersection of DIY resilience, self-reliance, and independent technology.\n\nGUEST (NICK ROSEN): When people hear 'off-grid,' they think of isolation. But when you pair DIY hardware with open tools, you aren't isolated at all. You're connected to the planet and the stars on your own terms."
+        },
+        {
+          "section_id": "radio_central_widget",
+          "title": "Radio Central Live Hub",
+          "type": "audio_player_widget",
+          "default_station": "BBC World Service",
+          "status": "ON AIR",
+          "secondary_stations": [
+            {
+              "name": ".977 Comedy",
+              "status": "DEMO"
+            }
+          ],
+          "content": "LIVE BROADCAST: BBC World Service streaming live on Radio Central. Toggle stations or launch AI assistance anytime."
+        },
+        {
+          "section_id": "kali_ai_integration",
+          "title": "Local Intelligence Link",
+          "type": "action_node",
+          "label": "Open Kali AI →",
+          "target": "kali_ai_interface",
+          "content": "Connect directly to the local Kali AI node to query orbital positions, power telemetry, or local system diagnostics."
+        }
+      ]
+    }
+  }
+}
