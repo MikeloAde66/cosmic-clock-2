@@ -345,16 +345,20 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     setActiveProgramLabel(null);
   }, [clearRotationTimer]);
 
-  // Program Manager is disabled — Radio Central is manual-selection-only.
-  // Kept as a real function (rather than removed outright) so the toggle
-  // button/badge in RadioCentralConsoleView has something safe to call;
-  // it only ever turns the rotation off, never on. startProgramManager and
-  // the rotation engine above are left in place, just unreachable, in case
-  // this needs to come back later — same as TrialGateModal/community forum
-  // elsewhere in this app.
+  // Program Manager: a real, deliberate on/off toggle — this is the ONLY
+  // way it can start. It was previously disabled because it used to
+  // auto-enable itself the first time someone pressed the ordinary global
+  // Play button (see togglePlayPause below), which "kept coming on"
+  // unexpectedly with no separate opt-in. That auto-start path is gone for
+  // good; togglePlayPause never touches Program Manager. This button is
+  // the single, explicit control surface for it.
   const toggleProgramManager = useCallback(() => {
-    stopProgramManager();
-  }, [stopProgramManager]);
+    if (programManagerEnabled) {
+      stopProgramManager();
+    } else {
+      startProgramManager();
+    }
+  }, [programManagerEnabled, startProgramManager, stopProgramManager]);
 
   // Public station-selection API — a manual override. Explicitly picking a
   // channel (a station card, "Tune In") always wins: it cancels any running
@@ -375,10 +379,12 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     playIndex((currentIndexRef.current - 1 + queueRef.current.length) % queueRef.current.length);
   }, [playIndex]);
 
-  // The global bottom-bar Play/Pause button. Program Manager is disabled,
-  // so this is strictly manual: it just pauses/resumes whatever station is
-  // currently tuned (the default-primed 432Hz stream on a fresh load, or
-  // whatever the user last picked) — it never auto-starts a rotation.
+  // The global bottom-bar Play/Pause button — strictly manual regardless of
+  // Program Manager's on/off state: it just pauses/resumes whatever station
+  // is currently tuned (the default-primed 432Hz stream on a fresh load, or
+  // whatever the user last picked, including an active Program Manager
+  // rotation). It never starts a rotation itself — only the dedicated
+  // toggleProgramManager button above does that.
   const togglePlayPause = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
