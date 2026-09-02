@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Music, Film, X, Pencil, Check, Loader2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Music, Film, X, Pencil, Check, Loader2, Radio } from 'lucide-react';
 import type WaveSurfer from 'wavesurfer.js';
 import type Webamp from 'webamp';
+import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
+import type { LiveRadioStation } from '@/lib/radioStations';
 
 export interface CatalogTrack {
   id: string;
@@ -79,6 +81,46 @@ async function fetchArchiveTracks(identifier: string): Promise<CatalogTrack[]> {
   }));
 }
 
+interface ParsedFeedEpisode {
+  title: string;
+  description: string;
+  pubDate: string;
+  enclosureUrl: string;
+}
+
+// Proxied server-side (app/api/podcast-feed/route.ts) — most RSS hosts
+// aren't CORS-enabled, unlike the Internet Archive metadata API above.
+async function fetchFeedTracks(feedUrl: string): Promise<CatalogTrack[]> {
+  const res = await fetch(`/api/podcast-feed?url=${encodeURIComponent(feedUrl)}`);
+  if (!res.ok) throw new Error(await res.text());
+  const data: { feedTitle: string; episodes: ParsedFeedEpisode[] } = await res.json();
+  if (data.episodes.length === 0) throw new Error('That feed has no playable audio episodes.');
+
+  return data.episodes.map((ep) => ({
+    id: `feed::${feedUrl}::${ep.enclosureUrl}`,
+    title: ep.title,
+    artist: data.feedTitle,
+    url: ep.enclosureUrl,
+    sourceIdentifier: feedUrl,
+    mediaType: 'audio',
+  }));
+}
+
+// A bare .mp3/direct-stream link skips the feed parser entirely — no
+// server round-trip needed, it's already a playable URL.
+function buildDirectAudioTrack(url: string): CatalogTrack {
+  const filename = url.split('/').pop()?.split('?')[0] ?? '';
+  const title = decodeURIComponent(filename.replace(/\.[^/.]+$/, '')) || 'Audio Track';
+  return {
+    id: `feed::${url}`,
+    title,
+    artist: 'Direct Audio Link',
+    url,
+    sourceIdentifier: url,
+    mediaType: 'audio',
+  };
+}
+
 // A standalone player over the user's own Internet-Archive-sourced
 // catalog — deliberately independent of RadioPlayerContext/RADIO_STATIONS
 // now (no hardcoded stations, no shared audio element, no assumed default
@@ -97,6 +139,15 @@ export default function MediaFlowAudioCenter() {
   const [archiveInput, setArchiveInput] = useState('');
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [archiveError, setArchiveError] = useState('');
+
+  const [feedInput, setFeedInput] = useState('');
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [feedError, setFeedError] = useState('');
+
+  // One-shot hand-off only — see sendToRadioCentral below. Media Flow reads
+  // nothing back from RadioPlayerContext and stores no radio state, so its
+  // "deliberately independent" design (see the header comment above) holds.
+  const { playStation } = useRadioPlayer();
 
   const waveformRef = useRef<HTMLDivElement | null>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
@@ -259,6 +310,64 @@ export default function MediaFlowAudioCenter() {
     }
   };
 
+  const handleFeedSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFeedError('');
+    const trimmed = feedInput.trim();
+    if (!trimmed) {
+      setFeedError('Enter a podcast RSS feed URL or a direct audio link.');
+      return;
+    }
+    setFeedLoading(true);
+    try {
+      const extracted = AUDIO_EXTENSIONS.test(trimmed)
+        ? [buildDirectAudioTrack(trimmed)]
+        : await fetchFeedTracks(trimmed);
+      const existingIds = new Set(catalog.map((t) => t.id));
+      const newTracks = extracted.filter((t) => !existingIds.has(t.id));
+      const insertAt = catalog.length;
+      const nextCatalog = [...catalog, ...newTracks];
+      persistCatalog(nextCatalog);
+
+      if (newTracks.length > 0) {
+        playCatalogIndex(insertAt, nextCatalog);
+        webampRef.current?.appendTracks(
+          newTracks.map((t) => ({ url: t.url, metaData: { artist: t.artist, title: t.title } }))
+        );
+      }
+      setFeedInput('');
+    } catch (err) {
+      setFeedError(err instanceof Error ? err.message : 'Failed to load that feed.');
+    } finally {
+      setFeedLoading(false);
+    }
+  };
+
+  // Explicit, one-shot hand-off to the global Radio Central player — not a
+  // subscription. Mirrors RadioStreams.tsx's ad-hoc-station pattern exactly
+  // (same BaseStation fields, same badge convention); app/api/radio/queue
+  // already has a fallback path for any station id not in RADIO_STATIONS,
+  // so this needs no backend changes. network: 'Media Flow' is the one
+  // deliberate value difference, so the now-playing station visibly reads
+  // as catalog-sourced rather than curated/searched.
+  const sendToRadioCentral = (track: CatalogTrack) => {
+    wavesurferRef.current?.pause();
+    videoRef.current?.pause();
+    const station: LiveRadioStation = {
+      kind: 'live',
+      id: `media-flow-${track.id}`,
+      name: track.title,
+      network: 'Media Flow',
+      tagline: track.artist || 'From your Media Flow catalog',
+      genre: track.mediaType === 'video' ? 'Video' : 'Audio',
+      category: 'ALL CHANNELS',
+      streamUrl: track.url,
+      badge: '●',
+      badgeColor: '#3a3a3a',
+    };
+    playStation(station);
+  };
+
   const removeCatalogItem = (id: string) => {
     const index = catalog.findIndex((t) => t.id === id);
     const next = catalog.filter((t) => t.id !== id);
@@ -362,6 +471,31 @@ export default function MediaFlowAudioCenter() {
           </button>
         </div>
         {archiveError && <p className="text-[11px] text-red-400">{archiveError}</p>}
+      </form>
+
+      {/* RSS / Podcast Feed Loader */}
+      <form
+        onSubmit={handleFeedSubmit}
+        className="p-5 mb-4 space-y-2 border rounded-2xl border-cyan-500/20 bg-slate-900/40 backdrop-blur-md"
+      >
+        <span className="text-xs font-mono uppercase tracking-widest text-white/70">Load from RSS / Podcast Feed</span>
+        <div className="flex gap-2">
+          <input
+            value={feedInput}
+            onChange={(e) => setFeedInput(e.target.value)}
+            placeholder="Podcast RSS feed URL or a direct .mp3 link"
+            className="flex-1 min-w-0 px-3 py-2 text-sm bg-black/40 border border-slate-800 rounded text-slate-100 placeholder-slate-600 outline-none focus:border-cyan-400/50"
+          />
+          <button
+            type="submit"
+            disabled={feedLoading || !feedInput.trim()}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold uppercase tracking-wide rounded bg-cyan-500 text-black hover:bg-cyan-400 disabled:opacity-40 transition"
+          >
+            {feedLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            {feedLoading ? 'Loading…' : 'Add to Catalog'}
+          </button>
+        </div>
+        {feedError && <p className="text-[11px] text-red-400">{feedError}</p>}
       </form>
 
       <div className="p-5 space-y-4 border rounded-2xl border-cyan-500/20 bg-slate-900/40 backdrop-blur-md">
@@ -547,6 +681,14 @@ export default function MediaFlowAudioCenter() {
                       <Pencil className="w-3 h-3" />
                     </button>
                   )}
+                  <button
+                    onClick={() => sendToRadioCentral(track)}
+                    className="flex items-center justify-center w-6 h-6 rounded shrink-0 text-slate-500 hover:text-amber-300 hover:bg-amber-500/10 transition"
+                    aria-label={`Send ${track.title} to Radio Central`}
+                    title="Send to Radio Central"
+                  >
+                    <Radio className="w-3 h-3" />
+                  </button>
                   <button
                     onClick={() => removeCatalogItem(track.id)}
                     className="flex items-center justify-center w-6 h-6 rounded shrink-0 text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition"
