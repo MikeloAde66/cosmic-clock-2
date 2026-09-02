@@ -6,6 +6,7 @@ import CosmicVisualizer from './CosmicVisualizer';
 import StudioOneConsole from './StudioOneConsole';
 import EqOrb from './EqOrb';
 import { useRadioPlayer } from './radio/RadioPlayerContext';
+import { extractIdentifier, buildArchiveEmbedUrl } from '@/lib/archiveOrg';
 // Shared with StarTrackerView's own YT.Player mount (Sky Fest's Space
 // Media tab) — see that file for why this lives in one place.
 import type { YouTubePlayer, YouTubePlayerEvent } from '@/lib/youtubeIframeApi';
@@ -103,6 +104,25 @@ interface PodsModuleProps {
   // One on mobile (LeftNav's own Home icon lives in a sidebar that's
   // hidden/collapsed there) - same fix as KaliOracleView's onGoHome.
   onGoHome?: () => void;
+  // Set by app/page.tsx when a Media Flow catalog track is sent here via
+  // "Send to Studio One" — PodsModule has no shared context of its own
+  // (unlike Radio Central's RadioPlayerContext), so this one piece of
+  // state is lifted to the nearest common ancestor instead of standing up
+  // a whole new context for a single hand-off interaction. Cleared via
+  // onPendingTrackConsumed once applied, so it can't get re-applied on an
+  // unrelated re-render.
+  pendingTrack?: StudioOneHandoffTrack | null;
+  onPendingTrackConsumed?: () => void;
+}
+
+// Payload shape for the Media Flow -> Studio One hand-off — deliberately
+// smaller than the full Track interface below (title/artist/url/mediaType
+// only), since that's all a sending component can know about its own track.
+export interface StudioOneHandoffTrack {
+  title: string;
+  artist: string;
+  url: string;
+  mediaType: 'audio' | 'video';
 }
 
 // Master Studio Audio Rack — a real vertical peak-level (VU) meter driven
@@ -161,7 +181,7 @@ function VuMeter({ analyserRef, label }: { analyserRef: React.RefObject<Analyser
   );
 }
 
-export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
+export default function PodsModule({ isActive, onGoHome, pendingTrack, onPendingTrackConsumed }: PodsModuleProps) {
   // Global audio priority — see RadioPlayerContext's document-level 'play'
   // listener for native <video>/<audio> (covers this file's local-upload
   // and direct-URL video, and the Vault-track <audio> element, with no
@@ -774,7 +794,11 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
   // instance bound to it) survives switching between YouTube tracks —
   // switching videos calls loadVideoById/loadPlaylist on the existing
   // player rather than tearing down and recreating it.
-  const isYouTubeEmbed = !!activeEmbedUrl && !activeEmbedUrl.endsWith('.mp4') && !activeEmbedUrl.endsWith('.webm');
+  const isYouTubeEmbed =
+    !!activeEmbedUrl &&
+    !activeEmbedUrl.endsWith('.mp4') &&
+    !activeEmbedUrl.endsWith('.webm') &&
+    !activeEmbedUrl.includes('archive.org/embed/');
   // React renders and owns this wrapper, but never puts any JSX children
   // inside it — YT.Player replaces whatever element it's given with its own
   // <iframe>, entirely outside React's reconciliation. Handing it an id
@@ -1043,10 +1067,24 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCameraActive]);
 
-  // Parse & load a custom YouTube video/playlist or direct media URL into the monitor
+  // Parse & load a custom YouTube video/playlist, Internet Archive item, or
+  // direct media URL into the monitor.
   const loadMedia = () => {
     const input = mediaUrl.trim();
     if (!input) return;
+
+    // Internet Archive: either a real archive.org URL, or a bare item id
+    // (no "/" or ":") — the same bare-id assumption MediaFlowAudioCenter's
+    // Internet Archive loader already makes, since this input's only other
+    // legitimate use (YouTube URLs, direct media links) always contains one.
+    const archiveId = extractIdentifier(input);
+    const looksLikeArchiveUrl = /archive\.org/i.test(input);
+    const looksLikeBareId = !/[/:]/.test(input);
+    if (archiveId && (looksLikeArchiveUrl || looksLikeBareId)) {
+      setActiveEmbedUrl(buildArchiveEmbedUrl(archiveId));
+      return;
+    }
+
     setActiveEmbedUrl(parseYouTubeUrl(input).embedUrl);
   };
 
@@ -1084,6 +1122,31 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
       setIsPlaying(true);
     }
   }, [localVideoUrl]);
+
+  // "Send to Studio One" hand-off from Media Flow — mirrors handleAddPlaylist
+  // below exactly (same Track field conventions: src holds the URL for audio,
+  // embedUrl/watchUrl hold it for video, playlistId defaults to
+  // 'main-playlist'), just sourced from a prop instead of a form submit.
+  useEffect(() => {
+    if (!pendingTrack) return;
+    const isVideo = pendingTrack.mediaType === 'video';
+    const newTrack: Track = {
+      id: `media-flow-${Date.now()}`,
+      title: pendingTrack.title,
+      frequency: isVideo ? 'Media Flow Video' : 'Media Flow Audio',
+      description: pendingTrack.artist,
+      src: isVideo ? '' : pendingTrack.url,
+      embedUrl: isVideo ? pendingTrack.url : undefined,
+      watchUrl: isVideo ? pendingTrack.url : undefined,
+      playlistId: 'main-playlist',
+      contentToRead: `### ${pendingTrack.title}\n\nSent from Media Flow.`,
+    };
+    setTracks((prev) => [newTrack, ...prev]);
+    setActivePlaylistId('main-playlist');
+    selectTrack(newTrack);
+    onPendingTrackConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingTrack]);
 
   // useMemo (not a plain derived const) — filteredTracks feeds the
   // MediaSession effect below via handleNextTrack/handlePrevTrack. A fresh
@@ -1987,6 +2050,19 @@ export default function PodsModule({ isActive, onGoHome }: PodsModuleProps) {
                         onPause={() => setIsPlaying(false)}
                         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+                      />
+                    ) : activeEmbedUrl.includes('archive.org/embed/') ? (
+                      // Internet Archive's own embed player — a real,
+                      // cross-origin iframe with no postMessage control API,
+                      // unlike the YouTube branch below. It plays back fine,
+                      // it just can't feed currentTime into Pods Context
+                      // Sync the way a bound YT.Player object can.
+                      <iframe
+                        key="archive-embed-player"
+                        src={activeEmbedUrl}
+                        className="w-full h-full border-0"
+                        allow="autoplay; fullscreen"
+                        allowFullScreen
                       />
                     ) : (
                       // React owns this wrapper but never renders anything

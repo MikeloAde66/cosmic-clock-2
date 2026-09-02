@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Music, Film, X, Pencil, Check, Loader2, Radio } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Music, Film, X, Pencil, Check, Loader2, Radio, Mic } from 'lucide-react';
 import type WaveSurfer from 'wavesurfer.js';
 import type Webamp from 'webamp';
 import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 import type { LiveRadioStation } from '@/lib/radioStations';
+import { extractIdentifier } from '@/lib/archiveOrg';
 
 export interface CatalogTrack {
   id: string;
@@ -41,14 +42,6 @@ function detectMediaType(format: string | undefined, filename: string): 'audio' 
   if (VIDEO_EXTENSIONS.test(filename)) return 'video';
   if (AUDIO_EXTENSIONS.test(filename)) return 'audio';
   return null;
-}
-
-function extractIdentifier(input: string): string | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-  if (!/[/:]/.test(trimmed)) return trimmed; // a bare item id, e.g. "rosen"
-  const match = trimmed.match(/archive\.org\/(?:details|download)\/([^/?#]+)/i);
-  return match ? match[1] : null;
 }
 
 // Real Internet Archive metadata API — no auth, CORS-enabled, documented
@@ -121,6 +114,13 @@ function buildDirectAudioTrack(url: string): CatalogTrack {
   };
 }
 
+interface MediaFlowAudioCenterProps {
+  // Optional one-shot hand-off to Studio One (components/PodsModule.tsx) —
+  // app/page.tsx owns the actual navigation/state, since Studio One has no
+  // shared context of its own to call into the way Radio Central does.
+  onSendToStudioOne?: (track: { title: string; artist: string; url: string; mediaType: 'audio' | 'video' }) => void;
+}
+
 // A standalone player over the user's own Internet-Archive-sourced
 // catalog — deliberately independent of RadioPlayerContext/RADIO_STATIONS
 // now (no hardcoded stations, no shared audio element, no assumed default
@@ -128,7 +128,7 @@ function buildDirectAudioTrack(url: string): CatalogTrack {
 // attaching to an external element, since there's no longer a shared
 // engine to attach to. Replaces the earlier version of this component,
 // which fed it from the app-wide Radio Central station list.
-export default function MediaFlowAudioCenter() {
+export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAudioCenterProps) {
   const [catalog, setCatalog] = useState<CatalogTrack[]>([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -689,6 +689,23 @@ export default function MediaFlowAudioCenter() {
                   >
                     <Radio className="w-3 h-3" />
                   </button>
+                  {onSendToStudioOne && (
+                    <button
+                      onClick={() =>
+                        onSendToStudioOne({
+                          title: track.title,
+                          artist: track.artist,
+                          url: track.url,
+                          mediaType: track.mediaType,
+                        })
+                      }
+                      className="flex items-center justify-center w-6 h-6 rounded shrink-0 text-slate-500 hover:text-violet-300 hover:bg-violet-500/10 transition"
+                      aria-label={`Send ${track.title} to Studio One`}
+                      title="Send to Studio One"
+                    >
+                      <Mic className="w-3 h-3" />
+                    </button>
+                  )}
                   <button
                     onClick={() => removeCatalogItem(track.id)}
                     className="flex items-center justify-center w-6 h-6 rounded shrink-0 text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition"

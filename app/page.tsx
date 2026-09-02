@@ -24,7 +24,7 @@ function scrollToStackSection(tab: string) {
 }
 import Starfield from '@/components/Starfield';
 import FactChecker from '@/components/FactChecker';
-import PodsModule from '@/components/PodsModule';
+import PodsModule, { type StudioOneHandoffTrack } from '@/components/PodsModule';
 import CosmicVaultAuth from '@/components/CosmicVaultAuth';
 import AiOneHome from '@/components/AiOneHome';
 import RadioCentralConsoleView from '@/components/radio/RadioCentralConsoleView';
@@ -175,6 +175,17 @@ function HomeInner() {
   const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(false);
   const [isIssOpen, setIsIssOpen] = useState(false);
   const [isLetsChatOpen, setIsLetsChatOpen] = useState(false);
+  // "Send to Studio One" hand-off from Media Flow — lifted here since
+  // PodsModule has no shared context of its own (unlike Radio Central's
+  // RadioPlayerContext) for MediaFlowAudioCenter to call into directly.
+  // Cleared by PodsModule itself via onPendingTrackConsumed once applied.
+  const [pendingStudioOneTrack, setPendingStudioOneTrack] = useState<StudioOneHandoffTrack | null>(null);
+  const handleSendToStudioOne = (track: StudioOneHandoffTrack) => {
+    setPendingStudioOneTrack(track);
+    setIsLetsChatOpen(false);
+    setActiveTab('pods');
+    changeLayoutMode('hub');
+  };
 
   const [isVaultSearchOpen, setIsVaultSearchOpen] = useState(false);
   useEffect(() => {
@@ -381,7 +392,12 @@ useContextMenuShare();
                     user stuck in Hub mode looking at that hero view
                     instead, which is what was being reported as "the
                     blank landing view with the PRICING header." */}
-                <PodsModule isActive={activeTab === 'pods'} onGoHome={() => changeLayoutMode('gallery')} />
+                <PodsModule
+                  isActive={activeTab === 'pods'}
+                  onGoHome={() => changeLayoutMode('gallery')}
+                  pendingTrack={pendingStudioOneTrack}
+                  onPendingTrackConsumed={() => setPendingStudioOneTrack(null)}
+                />
               </div>
             </div>
           )}
@@ -454,7 +470,11 @@ useContextMenuShare();
               </div>
               <div id="stack-section-pods" className="w-full min-h-full border-t border-slate-800/80">
                 <Reveal className="w-full h-full">
-                  <PodsModule isActive />
+                  <PodsModule
+                    isActive
+                    pendingTrack={pendingStudioOneTrack}
+                    onPendingTrackConsumed={() => setPendingStudioOneTrack(null)}
+                  />
                 </Reveal>
               </div>
               <div id="stack-section-products" className="w-full min-h-full border-t border-slate-800/80">
@@ -469,7 +489,7 @@ useContextMenuShare();
               </div>
               <div id="stack-section-tenforward" className="w-full min-h-full border-t border-slate-800/80">
                 <Reveal>
-                  <TenForwardSection />
+                  <TenForwardSection onSendToStudioOne={handleSendToStudioOne} />
                 </Reveal>
               </div>
 
@@ -532,7 +552,9 @@ useContextMenuShare();
           full-screen view (fixed z-50), not a stacked modal. */}
       <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
       {isStarTrackerOpen && <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} onAskKali={askKali} />}
-      {isLetsChatOpen && <TenForwardSection onBack={() => setIsLetsChatOpen(false)} />}
+      {isLetsChatOpen && (
+        <TenForwardSection onBack={() => setIsLetsChatOpen(false)} onSendToStudioOne={handleSendToStudioOne} />
+      )}
     </CartProvider>
   );
 }

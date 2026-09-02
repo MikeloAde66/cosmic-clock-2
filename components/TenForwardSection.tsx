@@ -3,6 +3,7 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import MediaFlowAudioCenter from './MediaFlowAudioCenter';
+import type { StudioOneHandoffTrack } from './PodsModule';
 
 interface TenForwardSectionProps {
   // Only set when opened as its own dedicated view (via LeftNav's icon, or
@@ -11,6 +12,11 @@ interface TenForwardSectionProps {
   // inline as a Continuous Stack section, where the page itself owns the
   // scroll.
   onBack?: () => void;
+  // Passed straight through to MediaFlowAudioCenter's "Send to Studio One"
+  // button — app/page.tsx owns the actual hand-off (it's the nearest common
+  // ancestor of MediaFlowAudioCenter and PodsModule, which has no shared
+  // context of its own to call into directly).
+  onSendToStudioOne?: (track: StudioOneHandoffTrack) => void;
 }
 
 // This workspace slot previously held "Let's Chat" (a Supabase-backed
@@ -19,7 +25,7 @@ interface TenForwardSectionProps {
 // (app/api/community/*, lib/communityCategories.ts) are left in place but
 // unreferenced here, the same way TrialGateModal was left orphaned earlier
 // rather than deleted, in case the forum comes back later.
-export default function TenForwardSection({ onBack }: TenForwardSectionProps) {
+export default function TenForwardSection({ onBack, onSendToStudioOne }: TenForwardSectionProps) {
   if (onBack) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col w-full h-full p-4 overflow-y-auto bg-[#050810] text-slate-100">
@@ -33,14 +39,14 @@ export default function TenForwardSection({ onBack }: TenForwardSectionProps) {
             Back
           </button>
         </div>
-        <MediaFlowAudioCenter />
+        <MediaFlowAudioCenter onSendToStudioOne={onSendToStudioOne} />
       </div>
     );
   }
 
   return (
     <div className="w-full px-4 py-16">
-      <MediaFlowAudioCenter />
+      <MediaFlowAudioCenter onSendToStudioOne={onSendToStudioOne} />
     </div>
   );
 }
