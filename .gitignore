@@ -54,3 +54,7 @@ __pycache__/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code local tool state (settings, chat images, agent worktrees —
+# a worktree is a full nested checkout with its own .git, never committed)
+/.claude/
