@@ -25,21 +25,11 @@ interface GalleryGridProps {
 // feed instead, see WeatherCardImage below), so it keeps the plain
 // icon-only card body.
 //
-// aioneCore/hydronodeBuilderKit point at real, already-approved hero
-// images instead of an unfilled /gallery/ path — the same
-// heroImageSrc files lib/hardwareProducts.ts already uses on those
-// products' own detail pages (public/images/aione-core.png,
-// public/images/hydronode-pro.png), confirmed to exist on disk. Reusing
-// them here, rather than a placeholder gradient, is exactly what "only use
-// approved high-res assets, never stock placeholders" calls for once a
-// real asset is confirmed to exist for that exact module.
 const GALLERY_IMAGES = {
   radio: '/gallery/radio.png',
   studio: '/gallery/studio.png',
   kali: '/gallery/kali.png',
   starTracker: '/gallery/star-tracker.png',
-  aioneCore: '/images/aione-core.png',
-  hydronodeBuilderKit: '/images/hydronode-pro.png',
   productsCatalog: '/gallery/products-catalog.png',
   communityHub: '/gallery/community.png',
 } as const;
@@ -55,8 +45,6 @@ const CARD_GRADIENTS: Record<string, string> = {
   studio: 'linear-gradient(135deg, #c084fc 0%, #7e22ce 55%, #2e1065 100%)',
   starTracker: 'linear-gradient(135deg, #7dd3fc 0%, #1d4ed8 55%, #0f172a 100%)',
   kali: 'linear-gradient(135deg, #f0abfc 0%, #9333ea 55%, #1e1b4b 100%)',
-  aioneCore: 'linear-gradient(135deg, #818cf8 0%, #4338ca 55%, #0f172a 100%)',
-  hydronodeBuilderKit: 'linear-gradient(135deg, #5eead4 0%, #0f766e 55%, #042f2e 100%)',
   productsCatalog: 'linear-gradient(135deg, #cbd5e1 0%, #475569 55%, #0f172a 100%)',
   communityHub: 'linear-gradient(135deg, #fb7185 0%, #be123c 55%, #4c0519 100%)',
 };
@@ -661,6 +649,130 @@ function WeatherCardImage() {
   );
 }
 
+// Fixed node layout for the Automation Pipeline card — a compact stand-in
+// for a real n8n-style workflow diagram (incoming call -> spam check ->
+// branch -> AI-handled response), not a literal reproduction: at 220x96
+// there's no room for readable labels, so each stage is a distinct shape
+// (circle = trigger, rounded rect = process, diamond = decision) instead.
+const AUTOMATION_NODES: { x: number; y: number; shape: 'circle' | 'rect' | 'diamond' }[] = [
+  { x: 20, y: 48, shape: 'circle' },
+  { x: 62, y: 48, shape: 'rect' },
+  { x: 104, y: 48, shape: 'diamond' },
+  { x: 150, y: 48, shape: 'rect' },
+  { x: 196, y: 48, shape: 'rect' },
+];
+const AUTOMATION_PATH = AUTOMATION_NODES.map((n, i) => `${i === 0 ? 'M' : 'L'}${n.x},${n.y}`).join(' ');
+// Node delays spaced evenly across the dot's travel duration so each one
+// lights up right as the traveling pulse passes it (see automation-node-pulse
+// in globals.css) rather than glowing on its own unrelated schedule.
+const AUTOMATION_DUR_S = 3.6;
+const AUTOMATION_NODE_DELAYS = AUTOMATION_NODES.map((_, i) =>
+  Number(((i / AUTOMATION_NODES.length) * AUTOMATION_DUR_S).toFixed(4))
+);
+
+// Automation Pipeline card's preview strip — fills the old Ai One Core
+// slot until a real n8n workflow product exists here (see GalleryGrid
+// below). A single glowing dot rides the node path on a native SVG
+// <animateMotion> loop (cheaper and simpler than canvas/rAF for one dot),
+// with each node pulsing in sequence so the whole thing reads as a workflow
+// actually running end-to-end, not a static wiring diagram.
+function AutomationFlowCardImage() {
+  return (
+    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#050810]">
+      <div
+        className="absolute inset-0 opacity-20"
+        style={{
+          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1.5px)',
+          backgroundSize: '16px 16px',
+        }}
+      />
+      <svg viewBox="0 0 220 96" className="absolute inset-0 w-full h-full">
+        {/* Main pipeline edges. */}
+        <path d={AUTOMATION_PATH} fill="none" stroke="rgba(129,140,248,0.35)" strokeWidth={1.5} />
+        {/* Decision branch stub off the diamond node — a dead-end "log it"
+            offshoot, purely to read as a real Yes/No branch like the
+            reference automation, not a literal reconnecting path. */}
+        <path
+          d={`M104,48 L104,20 L136,20`}
+          fill="none"
+          stroke="rgba(129,140,248,0.25)"
+          strokeWidth={1.2}
+          strokeDasharray="3 3"
+        />
+        <rect x={136} y={14} width={20} height={12} rx={2} fill="rgba(15,23,42,0.9)" stroke="rgba(165,180,252,0.5)" strokeWidth={1} className="automation-branch-flash" />
+
+        {AUTOMATION_NODES.map((node, i) => (
+          <g key={i} className="automation-node-pulse" style={{ animationDuration: `${AUTOMATION_DUR_S}s`, animationDelay: `${AUTOMATION_NODE_DELAYS[i]}s` }}>
+            {node.shape === 'circle' && (
+              <circle cx={node.x} cy={node.y} r={7} fill="rgba(30,27,75,0.9)" stroke="#a5b4fc" strokeWidth={1.5} />
+            )}
+            {node.shape === 'rect' && (
+              <rect x={node.x - 8} y={node.y - 7} width={16} height={14} rx={3} fill="rgba(30,27,75,0.9)" stroke="#a5b4fc" strokeWidth={1.5} />
+            )}
+            {node.shape === 'diamond' && (
+              <rect
+                x={node.x - 7}
+                y={node.y - 7}
+                width={14}
+                height={14}
+                fill="rgba(30,27,75,0.9)"
+                stroke="#a5b4fc"
+                strokeWidth={1.5}
+                transform={`rotate(45 ${node.x} ${node.y})`}
+              />
+            )}
+          </g>
+        ))}
+
+        {/* Faint trailing dot, slightly behind the lead dot — a cheap comet
+            trail with no per-frame trail tracking. */}
+        <circle r={2} fill="#67e8f9" opacity={0.4}>
+          <animateMotion path={AUTOMATION_PATH} dur={`${AUTOMATION_DUR_S}s`} begin="-0.15s" repeatCount="indefinite" />
+        </circle>
+        <circle r={3} fill="#a5f3fc" style={{ filter: 'drop-shadow(0 0 5px rgba(103,232,249,0.95))' }}>
+          <animateMotion path={AUTOMATION_PATH} dur={`${AUTOMATION_DUR_S}s`} repeatCount="indefinite" />
+        </circle>
+      </svg>
+    </div>
+  );
+}
+
+// Holographic Lab card's preview strip — fills the old HydroNode Builder
+// Kit slot until real merch exists here. A pulsing containment-field orb:
+// concentric field rings expand and fade outward (see holo-ring-pulse in
+// globals.css) around a glowing core, with a rotating dashed ring (reusing
+// star-tracker-mini-sweep's rotate keyframe — same technique, different
+// center) and a soft vertical scan sweep on top.
+function HolographicLabCardImage() {
+  const cx = 110;
+  const cy = 48;
+  return (
+    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-black">
+      <svg viewBox="0 0 220 96" className="absolute inset-0 w-full h-full">
+        {[0, 1, 2].map((i) => (
+          <ellipse
+            key={i}
+            cx={cx}
+            cy={cy}
+            rx={16 + i * 12}
+            ry={8 + i * 6}
+            fill="none"
+            stroke="rgba(94,234,212,0.7)"
+            strokeWidth={1}
+            className="holo-ring-pulse"
+            style={{ animationDuration: '2.8s', animationDelay: `${i * 0.7}s` }}
+          />
+        ))}
+        <g className="star-tracker-mini-sweep" style={{ transformOrigin: `${cx}px ${cy}px`, animationDuration: '9s' }}>
+          <circle cx={cx} cy={cy} r={30} fill="none" stroke="rgba(94,234,212,0.55)" strokeWidth={1.5} strokeDasharray="4 10" />
+        </g>
+        <circle cx={cx} cy={cy} r={9} fill="#0f766e" stroke="#5eead4" strokeWidth={1.5} className="holo-orb-glow" />
+      </svg>
+      <div className="holo-scan-sweep" />
+    </div>
+  );
+}
+
 function CardHeader({ Icon, active }: { Icon: typeof RadioIcon; active?: boolean }) {
   return (
     <div className="flex items-start justify-between">
@@ -705,13 +817,17 @@ function ArrivalSlot({ index, docked, onDock, children }: { index: number; docke
 // real sections, not fabricated placeholder content. Radio/Pods/Kali/Star
 // Tracker/Digital Magazine land you in the dedicated Classic Hub
 // view/overlay for that section (this is a launcher, not a place to cram
-// full players/chat into tiny tiles); Ai One Core/HydroNode Builder
-// Kit/Products are real routes; Weather is a direct action (no standalone
-// view at all — see lib/useWeatherLocation.ts — so its card just opens the
-// same inline footer search the umbrella icon does, without leaving
-// Gallery mode). Digital Magazine opens the Media Flow & Audio Center
-// (TenForwardSection) — a real waveform visualizer + Webamp launcher wired
-// to RadioPlayerContext, not the community forum this slot used to hold.
+// full players/chat into tiny tiles); Products is a real route; Weather is
+// a direct action (no standalone view at all — see
+// lib/useWeatherLocation.ts — so its card just opens the same inline footer
+// search the umbrella icon does, without leaving Gallery mode). Digital
+// Magazine opens the Media Flow & Audio Center (TenForwardSection) — a real
+// waveform visualizer + Webamp launcher wired to RadioPlayerContext, not
+// the community forum this slot used to hold. The former Ai One Core and
+// HydroNode Builder Kit hardware listings are gone (no real inventory
+// existed yet — see lib/hardwareProducts.ts); their two slots are
+// non-interactive animated previews (Automations, Merch) reserving the
+// grid's shape until real products land there.
 export default function GalleryGrid({
   onOpenRadio,
   onOpenPods,
@@ -839,25 +955,47 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
-          <Link href="/products/aione-core" className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.aioneCore} gradient={CARD_GRADIENTS.aioneCore} Icon={LayoutGrid} />
-            <CardHeader Icon={LayoutGrid} />
-            <div className="mt-4">
-              <div className="text-sm font-bold text-white">Ai One Core</div>
-              <p className="mt-1 text-xs text-slate-400">The agentic engine — pure-software autonomous intelligence hub.</p>
+          {/* Non-interactive — no hardware product lives at this slot
+              anymore (see lib/hardwareProducts.ts), so there's nowhere to
+              link to yet. The animated pipeline keeps the slot's shape and
+              activity on the grid until a real n8n-style workflow product
+              replaces it. */}
+          <div className={`${cardClass} cursor-default hover:border-slate-800/80 hover:bg-slate-900/40`}>
+            <AutomationFlowCardImage />
+            <div className="flex items-start justify-between">
+              <div className="flex items-center justify-center border rounded-lg w-9 h-9 border-slate-700 text-slate-300 bg-slate-950/60">
+                <LayoutGrid className="w-4 h-4" />
+              </div>
+              <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded border-slate-700 text-slate-500">
+                Coming Soon
+              </span>
             </div>
-          </Link>
+            <div className="mt-4">
+              <div className="text-sm font-bold text-white">Automations</div>
+              <p className="mt-1 text-xs text-slate-400">n8n-style workflow automations — reserved slot, live preview for now.</p>
+            </div>
+          </div>
         </ArrivalSlot>
 
         <ArrivalSlot index={7} docked={docked[7]} onDock={dock}>
-          <Link href="/products/builder-kit" className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.hydronodeBuilderKit} gradient={CARD_GRADIENTS.hydronodeBuilderKit} Icon={LayoutGrid} />
-            <CardHeader Icon={LayoutGrid} />
-            <div className="mt-4">
-              <div className="text-sm font-bold text-white">HydroNode Builder Kit</div>
-              <p className="mt-1 text-xs text-slate-400">Digital OS &amp; blueprints for self-build water intelligence.</p>
+          {/* Non-interactive for the same reason as the Automations slot
+              above — HydroNode Builder Kit's hardware listing is gone, this
+              is a reserved slot for merch. */}
+          <div className={`${cardClass} cursor-default hover:border-slate-800/80 hover:bg-slate-900/40`}>
+            <HolographicLabCardImage />
+            <div className="flex items-start justify-between">
+              <div className="flex items-center justify-center border rounded-lg w-9 h-9 border-slate-700 text-slate-300 bg-slate-950/60">
+                <LayoutGrid className="w-4 h-4" />
+              </div>
+              <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded border-slate-700 text-slate-500">
+                Coming Soon
+              </span>
             </div>
-          </Link>
+            <div className="mt-4">
+              <div className="text-sm font-bold text-white">Merch</div>
+              <p className="mt-1 text-xs text-slate-400">Reserved slot, live preview for now.</p>
+            </div>
+          </div>
         </ArrivalSlot>
 
         <ArrivalSlot index={8} docked={docked[8]} onDock={dock}>

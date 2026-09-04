@@ -503,6 +503,100 @@ body {
   animation: kali-equation-cursor-blink 0.8s step-end infinite;
 }
 
+/* Automation Pipeline card (fills the old Ai One Core slot until a real
+   n8n-style workflow product exists) — a traveling pulse rides the SVG path
+   in GalleryGrid.tsx via native <animateMotion> (no rAF/canvas needed for a
+   single dot), while each node glows on its own delay so the diagram reads
+   as "running start to finish" rather than a static wiring diagram. */
+@keyframes automation-node-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    filter: drop-shadow(0 0 0px rgba(129, 140, 248, 0));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(165, 180, 252, 0.9));
+  }
+}
+.automation-node-pulse {
+  animation-name: automation-node-pulse;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+/* The decision branch's stub line/tag has no traveling dot of its own — it
+   just flashes once per loop, timed to when the main pulse reaches the
+   diamond node it forks from. */
+@keyframes automation-branch-flash {
+  0%,
+  42%,
+  60%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.automation-branch-flash {
+  animation: automation-branch-flash 3.6s ease-in-out infinite;
+}
+
+/* Holographic Lab card (fills the old HydroNode Builder Kit slot) — a
+   pulsing containment-field orb: concentric field rings expand and fade
+   outward (sonar-ping technique, transform-box: fill-box so each ellipse
+   scales from its own center rather than the SVG viewport's origin) while
+   a rotating dashed ring and a soft vertical scan sweep keep it reading as
+   an active holographic projection rather than a static graphic. */
+@keyframes holo-ring-pulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+.holo-ring-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: holo-ring-pulse;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+}
+@keyframes holo-orb-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px rgba(94, 234, 212, 0.6));
+  }
+  50% {
+    filter: drop-shadow(0 0 13px rgba(94, 234, 212, 0.95));
+  }
+}
+.holo-orb-glow {
+  animation: holo-orb-glow 2.4s ease-in-out infinite;
+}
+@keyframes holo-scan-sweep {
+  0% {
+    transform: translateY(-120%);
+  }
+  100% {
+    transform: translateY(120%);
+  }
+}
+.holo-scan-sweep {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 40%;
+  background: linear-gradient(180deg, transparent, rgba(94, 234, 212, 0.25), transparent);
+  animation: holo-scan-sweep 3.6s linear infinite;
+  pointer-events: none;
+}
+
 /* Shared "metallic gold" text fill — used by the Kali equation and the
    main "Ai One" hero logo (see GalleryGrid.tsx). A deliberate, confirmed
    exception to this project's zero-amber rule (see
