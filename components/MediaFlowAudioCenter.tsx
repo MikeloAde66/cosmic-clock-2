@@ -1,11 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Music, Film, X, Pencil, Check, Loader2, Radio, Mic } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Music, Film, X, Pencil, Check, Loader2, Mic } from 'lucide-react';
 import type WaveSurfer from 'wavesurfer.js';
 import type Webamp from 'webamp';
-import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
-import type { LiveRadioStation } from '@/lib/radioStations';
 import { extractIdentifier } from '@/lib/archiveOrg';
 
 export interface CatalogTrack {
@@ -160,11 +158,6 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
   const [feedInput, setFeedInput] = useState('');
   const [feedLoading, setFeedLoading] = useState(false);
   const [feedError, setFeedError] = useState('');
-
-  // One-shot hand-off only — see sendToRadioCentral below. Media Flow reads
-  // nothing back from RadioPlayerContext and stores no radio state, so its
-  // "deliberately independent" design (see the header comment above) holds.
-  const { playStation } = useRadioPlayer();
 
   const waveformRef = useRef<HTMLDivElement | null>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
@@ -409,31 +402,6 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
     } finally {
       setFeedLoading(false);
     }
-  };
-
-  // Explicit, one-shot hand-off to the global Radio Central player — not a
-  // subscription. Mirrors RadioStreams.tsx's ad-hoc-station pattern exactly
-  // (same BaseStation fields, same badge convention); app/api/radio/queue
-  // already has a fallback path for any station id not in RADIO_STATIONS,
-  // so this needs no backend changes. network: 'Media Flow' is the one
-  // deliberate value difference, so the now-playing station visibly reads
-  // as catalog-sourced rather than curated/searched.
-  const sendToRadioCentral = (track: CatalogTrack) => {
-    wavesurferRef.current?.pause();
-    videoRef.current?.pause();
-    const station: LiveRadioStation = {
-      kind: 'live',
-      id: `media-flow-${track.id}`,
-      name: track.title,
-      network: 'Media Flow',
-      tagline: track.artist || 'From your Media Flow catalog',
-      genre: track.mediaType === 'video' ? 'Video' : 'Audio',
-      category: 'ALL CHANNELS',
-      streamUrl: track.url,
-      badge: '●',
-      badgeColor: '#3a3a3a',
-    };
-    playStation(station);
   };
 
   const removeCatalogItem = (id: string) => {
@@ -749,19 +717,11 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
                       <Pencil className="w-3 h-3" />
                     </button>
                   )}
-                  {/* Audio -> Radio Central, video -> Studio One — not both
-                      on every row. Dispatch target is gated on the track's
-                      own mediaType, not the icon/handler, which are unchanged. */}
-                  {track.mediaType === 'audio' && (
-                    <button
-                      onClick={() => sendToRadioCentral(track)}
-                      className="flex items-center justify-center w-6 h-6 rounded shrink-0 text-slate-500 hover:text-amber-300 hover:bg-amber-500/10 transition"
-                      aria-label={`Send ${track.title} to Radio Central`}
-                      title="Send to Radio Central"
-                    >
-                      <Radio className="w-3 h-3" />
-                    </button>
-                  )}
+                  {/* Media Flow no longer sends audio to Radio Central — it's
+                      strictly a backend ingestion tool/catalog player now,
+                      kept isolated from the shared global audio engine.
+                      Video still hands off to Studio One's own, separate
+                      video-playlist engine. */}
                   {track.mediaType === 'video' && onSendToStudioOne && (
                     <button
                       onClick={() =>

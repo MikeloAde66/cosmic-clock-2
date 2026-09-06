@@ -299,6 +299,10 @@ export default function RadioCentralConsoleView() {
   // control, not just a suggestion, so it can override a manual toggle on
   // the next poll. Only reconciles Daily Queue when dailyQueueItems is
   // actually available, so a "turn on" command can't start an empty queue.
+  // autoplay: false — this fires with no user gesture behind it, so it
+  // arms/loads the queue (the toggle shows On, a track is ready) without
+  // attempting real playback; the user's own Play press is what actually
+  // starts audio, same contract as a fresh page load.
   useEffect(() => {
     let cancelled = false;
     const reconcile = async () => {
@@ -308,7 +312,7 @@ export default function RadioCentralConsoleView() {
         const remote: { daily_queue?: boolean; program_manager?: boolean } = await res.json();
 
         if (remote.daily_queue && !dailyQueueEnabled && dailyQueueItems) {
-          startDailyQueue(dailyQueueItems);
+          startDailyQueue(dailyQueueItems, { autoplay: false });
         } else if (remote.daily_queue === false && dailyQueueEnabled) {
           stopDailyQueue();
         }

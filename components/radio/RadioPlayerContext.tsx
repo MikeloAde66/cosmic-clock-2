@@ -63,7 +63,7 @@ interface RadioPlayerContextValue {
   // static RADIO_STATIONS list it already imports.
   dailyQueueEnabled: boolean;
   activeDailyQueueLabel: string | null;
-  startDailyQueue: (items: DailyQueueItem[]) => void;
+  startDailyQueue: (items: DailyQueueItem[], options?: { autoplay?: boolean }) => void;
   stopDailyQueue: () => void;
   // Set by the home page (the only route with a Pods/Studio One tab) to
   // hide GlobalPlayerBar while that video-only workspace is active — now
@@ -266,7 +266,14 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   // Core fetch-and-play logic, shared by manual station selection and the
   // Program Manager rotation below. Doesn't touch programManagerEnabled or
   // hasEverPlayedRef itself — callers decide what a station change means.
-  const tuneStation = useCallback(async (nextStation: RadioStation) => {
+  // autoplay defaults to true (every existing caller is a real user
+  // gesture or an already-playing session's own advance); pass false to
+  // load/prime a station without attempting audio.play() — for callers
+  // that aren't a user gesture, e.g. the Daily Queue's remote/schedule-
+  // state activation, so it doesn't silently reject against browser
+  // autoplay policy (or worse, actually play unannounced for a returning
+  // visitor with high media-engagement history on this domain).
+  const tuneStation = useCallback(async (nextStation: RadioStation, autoplay: boolean = true) => {
     setStatus('loading');
     setStation(nextStation);
     ensureAnalyser();
@@ -292,7 +299,11 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
         setCurrentIndex(0);
         if (audioRef.current) {
           setAudioSource(data.streamUrl);
-          await audioRef.current.play();
+          if (autoplay) {
+            await audioRef.current.play();
+          } else {
+            setStatus('idle');
+          }
         }
         return;
       }
@@ -436,7 +447,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     advanceDailyQueueRef.current = advanceDailyQueue;
   }, [advanceDailyQueue]);
 
-  const startDailyQueue = useCallback((items: DailyQueueItem[]) => {
+  const startDailyQueue = useCallback((items: DailyQueueItem[], options?: { autoplay?: boolean }) => {
     if (items.length === 0) return;
     if (programManagerEnabled) stopProgramManager();
     hasEverPlayedRef.current = true;
@@ -444,7 +455,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     dailyQueueIndexRef.current = 0;
     setDailyQueueEnabled(true);
     const first = items[0];
-    tuneStation(first.station);
+    tuneStation(first.station, options?.autoplay ?? true);
     setActiveDailyQueueLabel(first.station.name);
     clearDailyQueueTimer();
     if (first.durationMs) {
