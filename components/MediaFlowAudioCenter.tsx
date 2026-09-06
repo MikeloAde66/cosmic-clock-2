@@ -133,8 +133,27 @@ function dispatchToMediaMatrix(track: CatalogTrack, channel: string) {
       url: track.url,
       channel,
       metadata: { artist: track.artist, sourceIdentifier: track.sourceIdentifier, mediaType: track.mediaType },
+      // Matches the local catalog's own OFF-by-default convention (see
+      // CatalogTrack.active) — the row only becomes 'active' (and thus
+      // visible to Radio Central's Daily Queue) once the user explicitly
+      // presses On below, via setCatalogItemStatus.
+      status: 'archived',
     }),
   }).catch((err) => console.error('Media Matrix dispatch failed:', err));
+}
+
+// Best-effort sync from a local On/Off toggle to the Supabase row's real
+// status column — this is the actual link between Media Flow's active
+// flag and what Radio Central's Daily Queue (which only reads status =
+// 'active' rows) sees. Matched by url, not id: /ingest's response never
+// returns the generated Supabase row id, and local catalog items are
+// keyed by a client-generated id, not Supabase's.
+function setCatalogItemStatus(url: string, active: boolean) {
+  fetch('/api/v1/media/catalog/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, status: active ? 'active' : 'archived' }),
+  }).catch((err) => console.error('Catalog status sync failed:', err));
 }
 
 interface MediaFlowAudioCenterProps {
@@ -412,13 +431,18 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
     }
   };
 
-  // Static ON/OFF toggle — capped at MAX_ACTIVE_ITEMS simultaneously
-  // active, so turning one more ON past the cap is a no-op rather than
-  // silently deactivating something else the user didn't ask to change.
+  // ON/OFF toggle — capped at MAX_ACTIVE_ITEMS simultaneously active, so
+  // turning one more ON past the cap is a no-op rather than silently
+  // deactivating something else the user didn't ask to change. Syncs to
+  // the real Supabase catalog row's status (setCatalogItemStatus) so
+  // Radio Central's Daily Queue actually reflects the change, not just
+  // this browser's local/localStorage view of the catalog.
   const activeCount = catalog.filter((t) => t.active).length;
   const toggleActive = (id: string, next: boolean) => {
     if (next && activeCount >= MAX_ACTIVE_ITEMS) return;
+    const track = catalog.find((t) => t.id === id);
     persistCatalog(catalog.map((t) => (t.id === id ? { ...t, active: next } : t)));
+    if (track) setCatalogItemStatus(track.url, next);
   };
 
   const removeCatalogItem = (id: string) => {
