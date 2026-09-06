@@ -2,9 +2,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import hashlib
-import os
-
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -34,25 +31,6 @@ app.include_router(media_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
-
-# Temporary diagnostic for the SUPABASE_KEY/N8N_MEDIA_WEBHOOK_URL Render
-# env var mismatch — reports presence/length only, never the actual
-# secret value, so it's safe to hit from outside while debugging. Remove
-# once the Render env vars are confirmed working end-to-end.
-@app.get("/debug/env")
-def debug_env():
-    supabase_key = os.getenv("SUPABASE_KEY") or ""
-    n8n_url = os.getenv("N8N_MEDIA_WEBHOOK_URL") or ""
-    return {
-        "supabase_key_set": bool(supabase_key),
-        "supabase_key_length": len(supabase_key),
-        # A truncated hash prefix — enough to compare against a known-good
-        # value without exposing anything reconstructable from it.
-        "supabase_key_sha256_prefix": hashlib.sha256(supabase_key.encode()).hexdigest()[:12] if supabase_key else None,
-        "n8n_webhook_set": bool(n8n_url),
-        "n8n_webhook_length": len(n8n_url),
-    }
 
 
 IA_SEARCH_URL = "https://archive.org/advancedsearch.php"
