@@ -310,6 +310,43 @@ export default function RadioCentralConsoleView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dailyQueueItems]);
 
+  // Polls the backend's externally-controllable broadcast state
+  // (routers/radio.py — an n8n workflow or any other automation can flip
+  // it via POST /api/v1/radio/toggle) and applies it locally through the
+  // exact same startDailyQueue/toggleProgramManager the manual buttons
+  // use. Remote state is treated as authoritative — it's a real remote
+  // control, not just a suggestion, so it can override a manual toggle on
+  // the next poll. Only reconciles Daily Queue when dailyQueueItems is
+  // actually available, so a "turn on" command can't start an empty queue.
+  useEffect(() => {
+    let cancelled = false;
+    const reconcile = async () => {
+      try {
+        const res = await fetch('/api/v1/radio/state');
+        if (!res.ok || cancelled) return;
+        const remote: { daily_queue?: boolean; program_manager?: boolean } = await res.json();
+
+        if (remote.daily_queue && !dailyQueueEnabled && dailyQueueItems) {
+          startDailyQueue(dailyQueueItems);
+        } else if (remote.daily_queue === false && dailyQueueEnabled) {
+          stopDailyQueue();
+        }
+
+        if (typeof remote.program_manager === 'boolean' && remote.program_manager !== programManagerEnabled) {
+          toggleProgramManager();
+        }
+      } catch {
+        // Remote state unreachable — leave local state as-is.
+      }
+    };
+    reconcile();
+    const interval = setInterval(reconcile, 20_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [dailyQueueEnabled, programManagerEnabled, dailyQueueItems, startDailyQueue, stopDailyQueue, toggleProgramManager]);
+
   const handleTuneIn = (station: RadioStation) => {
     if (playingStation?.id === station.id) {
       togglePlayPause();

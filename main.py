@@ -9,6 +9,7 @@ from typing import List, Optional
 import requests
 
 from routers.media import router as media_router
+from routers.radio import router as radio_router
 
 app = FastAPI(
     title="Internet Archive Media & Podcast Ingestion Service",
@@ -26,6 +27,7 @@ app.add_middleware(
 )
 
 app.include_router(media_router)
+app.include_router(radio_router)
 
 
 @app.get("/health")
