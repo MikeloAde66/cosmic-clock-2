@@ -798,6 +798,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     !!activeEmbedUrl &&
     !activeEmbedUrl.endsWith('.mp4') &&
     !activeEmbedUrl.endsWith('.webm') &&
+    !activeEmbedUrl.startsWith('blob:') &&
     !activeEmbedUrl.includes('archive.org/embed/');
   // React renders and owns this wrapper, but never puts any JSX children
   // inside it — YT.Player replaces whatever element it's given with its own
@@ -1068,7 +1069,10 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
   }, [isCameraActive]);
 
   // Parse & load a custom YouTube video/playlist, Internet Archive item, or
-  // direct media URL into the monitor.
+  // direct media URL — as a real playlist entry (same Track shape the
+  // pendingTrack hand-off and processAudioFiles use below), so repeated
+  // loads build up a real custom playlist instead of just replacing
+  // whatever was previously in the monitor.
   const loadMedia = () => {
     const input = mediaUrl.trim();
     if (!input) return;
@@ -1080,12 +1084,24 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     const archiveId = extractIdentifier(input);
     const looksLikeArchiveUrl = /archive\.org/i.test(input);
     const looksLikeBareId = !/[/:]/.test(input);
-    if (archiveId && (looksLikeArchiveUrl || looksLikeBareId)) {
-      setActiveEmbedUrl(buildArchiveEmbedUrl(archiveId));
-      return;
-    }
+    const embedUrl =
+      archiveId && (looksLikeArchiveUrl || looksLikeBareId) ? buildArchiveEmbedUrl(archiveId) : parseYouTubeUrl(input).embedUrl;
 
-    setActiveEmbedUrl(parseYouTubeUrl(input).embedUrl);
+    const targetPlaylist = activePlaylistId === 'all' ? 'main-playlist' : activePlaylistId;
+    const newTrack: Track = {
+      id: `link-${Date.now()}`,
+      title: archiveId || input,
+      frequency: 'User Stream',
+      description: input,
+      src: '',
+      embedUrl,
+      watchUrl: input,
+      playlistId: targetPlaylist,
+      contentToRead: `### Loaded Link\n\n${input}`,
+    };
+    setTracks((prev) => [newTrack, ...prev]);
+    selectTrack(newTrack);
+    setMediaUrl('');
   };
 
   const clearMedia = () => {
@@ -1095,12 +1111,32 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     setMediaUrl('');
   };
 
+  // Mirrors processAudioFiles above (same Track-building convention, same
+  // multi-file support) instead of the old single-file localVideoUrl path
+  // — each selected file becomes a real playlist entry (embedUrl/watchUrl
+  // set, src empty) so users can build an actual custom video playlist
+  // rather than only ever replacing one ephemeral monitor video.
   const handleLocalVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (localVideoUrl) URL.revokeObjectURL(localVideoUrl);
-    setActiveEmbedUrl('');
-    setLocalVideoUrl(URL.createObjectURL(file));
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const targetPlaylist = activePlaylistId === 'all' ? 'main-playlist' : activePlaylistId;
+    const newTracks: Track[] = Array.from(files).map((file, idx) => {
+      const blobUrl = URL.createObjectURL(file);
+      return {
+        id: `local-video-${Date.now()}-${idx}`,
+        title: file.name.replace(/\.[^/.]+$/, ''),
+        frequency: 'User Stream',
+        description: `Local Video • ${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+        src: '',
+        embedUrl: blobUrl,
+        watchUrl: blobUrl,
+        playlistId: targetPlaylist,
+        isLocal: true,
+        contentToRead: `### Loaded File: ${file.name}\n\n* **Type:** ${file.type || 'Video Media'}\n* **Size:** ${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+      };
+    });
+    setTracks((prev) => [...newTracks, ...prev]);
+    selectTrack(newTracks[0]);
     e.target.value = '';
   };
 
@@ -1961,6 +1997,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                 ref={mediaFileInputRef}
                 onChange={handleLocalVideoSelect}
                 accept="video/*"
+                multiple
                 className="hidden"
               />
 
@@ -2040,7 +2077,11 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                       onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
                     />
                   ) : activeEmbedUrl ? (
-                    activeEmbedUrl.endsWith('.mp4') || activeEmbedUrl.endsWith('.webm') ? (
+                    // blob: covers locally-uploaded video tracks (see
+                    // handleLocalVideoSelect) — a browser object URL has no
+                    // file extension to match on, so it needs its own check
+                    // alongside the .mp4/.webm direct-media-link case.
+                    activeEmbedUrl.endsWith('.mp4') || activeEmbedUrl.endsWith('.webm') || activeEmbedUrl.startsWith('blob:') ? (
                       <video
                         ref={broadcastVideoRef}
                         src={activeEmbedUrl}

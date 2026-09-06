@@ -19,17 +19,17 @@ import {
 // Play icon below.
 const OFF_GRID_STATION_ID = 'ai-off-grid-and-diy-ep1';
 
-// The Daily Queue's fixed lineup: two static RADIO_STATIONS anchors by id,
-// plus the one dynamic catalog item matched by name prefix (its id is a
-// Supabase row id, generated at ingest time, so it can't be hardcoded the
-// way the two static ids can). 8-minute blocks for the continuous streams
-// reuses ROTATION_BLOCK_MS's own precedent from Program Manager; the
-// archived episode in the middle has no durationMs at all — it plays to
-// its own real 'ended' event instead of being cut off by a timer.
-const DAILY_QUEUE_BLOCK_MS = 8 * 60 * 1000;
-const DAILY_HISTORY_STATION_ID = 'rb-historyradio';
+// The Daily Queue's lineup: every currently available Supabase catalog
+// audio item (catalogStations — video items never reach this list, see
+// mapCatalogItemToStation's own video exclusion), each followed by a
+// fixed BBC News block. Built dynamically rather than matching a specific
+// title, so it stays correct as more audio items get ingested later
+// rather than staying pinned to whichever one existed when this was
+// written. Each audio item has no durationMs — it plays to its own real
+// 'ended' event rather than being cut off by a timer; only the BBC block
+// (a continuous stream with no natural end) uses one.
+const DAILY_QUEUE_BBC_BLOCK_MS = 35 * 60 * 1000;
 const DAILY_BBC_STATION_ID = 'bbc-world';
-const DAILY_DRAMA_NAME_PREFIX = 'X Minus One';
 
 interface MediaCatalogItem {
   id?: string;
@@ -268,21 +268,19 @@ export default function RadioCentralConsoleView() {
     return matchesCategory && matchesSearch && matchesGenre;
   });
 
-  // Resolves the Daily Queue's fixed lineup from whatever's currently
-  // loaded — null until all three are available (the two static
-  // RADIO_STATIONS anchors plus the one dynamic catalog item), so the
-  // toggle button below can disable itself rather than start a broken,
-  // partial queue.
+  // Resolves the Daily Queue from whatever's currently loaded — null
+  // until there's at least one audio catalog item and BBC is available,
+  // so the toggle button below can disable itself rather than start a
+  // broken, empty queue. Interleaves a 35-minute BBC News block after
+  // every audio item, cycling indefinitely (advanceDailyQueue in
+  // RadioPlayerContext.tsx loops the whole array, not just this pass).
   const dailyQueueItems = (() => {
-    const history = allStations.find((s) => s.id === DAILY_HISTORY_STATION_ID);
-    const drama = allStations.find((s) => s.name.startsWith(DAILY_DRAMA_NAME_PREFIX));
     const bbc = allStations.find((s) => s.id === DAILY_BBC_STATION_ID);
-    if (!history || !drama || !bbc) return null;
-    return [
-      { station: history, durationMs: DAILY_QUEUE_BLOCK_MS },
-      { station: drama }, // plays to its own real end, no timer
-      { station: bbc, durationMs: DAILY_QUEUE_BLOCK_MS },
-    ];
+    if (!bbc || catalogStations.length === 0) return null;
+    return catalogStations.flatMap((audioItem) => [
+      { station: audioItem }, // plays to its own real end, no timer
+      { station: bbc, durationMs: DAILY_QUEUE_BBC_BLOCK_MS },
+    ]);
   })();
 
   const handleToggleDailyQueue = () => {
@@ -390,10 +388,9 @@ export default function RadioCentralConsoleView() {
             {/* Same "explicit toggle, never auto-starts" contract as
                 Program Manager above — mutually exclusive with it (see
                 startDailyQueue/startProgramManager in
-                RadioPlayerContext.tsx). Disabled until all three lineup
-                items (History Radio, the archived drama, BBC World
-                Service) are actually available, so it can't kick off a
-                broken partial sequence. */}
+                RadioPlayerContext.tsx). Disabled until at least one audio
+                catalog item and BBC World Service are available, so it
+                can't kick off an empty sequence. */}
             <button
               onClick={handleToggleDailyQueue}
               disabled={!dailyQueueEnabled && !dailyQueueItems}
@@ -401,8 +398,8 @@ export default function RadioCentralConsoleView() {
                 dailyQueueEnabled
                   ? 'Turn off the Daily Queue'
                   : dailyQueueItems
-                    ? 'Turn on the Daily Queue (History Radio → X Minus One → BBC World Service)'
-                    : 'Daily Queue unavailable — waiting on the archived drama in the catalog'
+                    ? 'Turn on the Daily Queue (catalog audio → 35min BBC News → next catalog audio → …)'
+                    : 'Daily Queue unavailable — waiting on an audio item in the catalog'
               }
               className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full transition disabled:opacity-40"
               style={
