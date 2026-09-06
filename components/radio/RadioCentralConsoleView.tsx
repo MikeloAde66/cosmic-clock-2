@@ -5,12 +5,62 @@ import { AudioLines, Headphones, Play, Pause, Plus, Radio as RadioIcon, Search, 
 import { useRadioPlayer } from './RadioPlayerContext';
 import PlayerSpectrum from './PlayerSpectrum';
 import { supabase } from '@/lib/supabase';
-import { CATEGORIES, CATEGORY_LABELS, RADIO_STATIONS, type LiveRadioStation, type RadioStation } from '@/lib/radioStations';
+import {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  MEDIA_GENRE_FILTERS,
+  RADIO_STATIONS,
+  type LiveRadioStation,
+  type RadioStation,
+} from '@/lib/radioStations';
 
 // Station id the "Ai, Off Grid, and DIY" card (lib/radioStations.ts) is
 // registered under — used to single out that one card for its dedicated
 // Play icon below.
 const OFF_GRID_STATION_ID = 'ai-off-grid-and-diy-ep1';
+
+// The Daily Queue's fixed lineup: two static RADIO_STATIONS anchors by id,
+// plus the one dynamic catalog item matched by name prefix (its id is a
+// Supabase row id, generated at ingest time, so it can't be hardcoded the
+// way the two static ids can). 8-minute blocks for the continuous streams
+// reuses ROTATION_BLOCK_MS's own precedent from Program Manager; the
+// archived episode in the middle has no durationMs at all — it plays to
+// its own real 'ended' event instead of being cut off by a timer.
+const DAILY_QUEUE_BLOCK_MS = 8 * 60 * 1000;
+const DAILY_HISTORY_STATION_ID = 'rb-historyradio';
+const DAILY_BBC_STATION_ID = 'bbc-world';
+const DAILY_DRAMA_NAME_PREFIX = 'X Minus One';
+
+interface MediaCatalogItem {
+  id?: string;
+  rawTitle: string;
+  url: string;
+  channel?: string;
+  mediaType?: 'audio' | 'video';
+  metadata?: { category?: string; genre?: string; [key: string]: unknown };
+}
+
+// Maps a persisted Supabase media_catalog row (GET /api/v1/media/catalog)
+// into a real RadioStation. Video items are excluded — Radio Central is an
+// audio-only dial, the same gate MediaFlowAudioCenter's sendToRadioCentral
+// already applies (mediaType === 'audio' only; video goes to Studio One
+// instead), so this doesn't invent a new rule.
+function mapCatalogItemToStation(item: MediaCatalogItem): LiveRadioStation | null {
+  if (item.mediaType === 'video') return null;
+  const { category, genre } = item.metadata ?? {};
+  return {
+    kind: 'live',
+    id: `media-catalog-${item.id}`,
+    name: item.rawTitle,
+    network: item.channel === 'INTERNET_ARCHIVE' ? 'Internet Archive' : item.channel || 'Media Matrix',
+    tagline: [genre, category].filter(Boolean).join(' • ') || 'From the Media Matrix catalog',
+    genre: genre || category || 'Media Catalog',
+    category: category || 'Media Catalog',
+    streamUrl: item.url,
+    badge: 'MTX',
+    badgeColor: '#8b5cf6',
+  };
+}
 
 // Dedicated visual shell for Radio Central's cyberpunk-HUD restyle — a
 // wrapper around the real player, not a fork of it. Every hook, id, and
@@ -69,11 +119,17 @@ export default function RadioCentralConsoleView() {
     programManagerEnabled,
     activeProgramLabel,
     toggleProgramManager,
+    dailyQueueEnabled,
+    activeDailyQueueLabel,
+    startDailyQueue,
+    stopDailyQueue,
   } = useRadioPlayer();
 
   const [activeCategory, setActiveCategory] = useState('COSMIC CHILL');
+  const [activeGenreFilter, setActiveGenreFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [adminStations, setAdminStations] = useState<LiveRadioStation[]>([]);
+  const [catalogStations, setCatalogStations] = useState<LiveRadioStation[]>([]);
   const [showSchedule, setShowSchedule] = useState(false);
 
   // Same real Supabase-session + app_metadata.role check every other
@@ -184,14 +240,58 @@ export default function RadioCentralConsoleView() {
     };
   }, []);
 
-  const allStations = [...RADIO_STATIONS, ...adminStations];
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/media/catalog')
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || !Array.isArray(data.items)) return;
+        const mapped = (data.items as MediaCatalogItem[])
+          .map(mapCatalogItemToStation)
+          .filter((s): s is LiveRadioStation => s !== null);
+        setCatalogStations(mapped);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const allStations = [...RADIO_STATIONS, ...adminStations, ...catalogStations];
   const query = searchQuery.trim().toLowerCase();
+  const activeGenreKeywords = MEDIA_GENRE_FILTERS.find((g) => g.label === activeGenreFilter)?.keywords ?? null;
   const filteredStations = allStations.filter((s) => {
     if (hiddenStationIds.has(s.id)) return false;
     const matchesCategory = activeCategory === 'ALL CHANNELS' ? s.category !== 'NEWS' : s.category === activeCategory;
     const matchesSearch = !query || s.name.toLowerCase().includes(query) || s.tagline.toLowerCase().includes(query);
-    return matchesCategory && matchesSearch;
+    const matchesGenre = !activeGenreKeywords || activeGenreKeywords.some((k) => s.genre.toLowerCase().includes(k));
+    return matchesCategory && matchesSearch && matchesGenre;
   });
+
+  // Resolves the Daily Queue's fixed lineup from whatever's currently
+  // loaded — null until all three are available (the two static
+  // RADIO_STATIONS anchors plus the one dynamic catalog item), so the
+  // toggle button below can disable itself rather than start a broken,
+  // partial queue.
+  const dailyQueueItems = (() => {
+    const history = allStations.find((s) => s.id === DAILY_HISTORY_STATION_ID);
+    const drama = allStations.find((s) => s.name.startsWith(DAILY_DRAMA_NAME_PREFIX));
+    const bbc = allStations.find((s) => s.id === DAILY_BBC_STATION_ID);
+    if (!history || !drama || !bbc) return null;
+    return [
+      { station: history, durationMs: DAILY_QUEUE_BLOCK_MS },
+      { station: drama }, // plays to its own real end, no timer
+      { station: bbc, durationMs: DAILY_QUEUE_BLOCK_MS },
+    ];
+  })();
+
+  const handleToggleDailyQueue = () => {
+    if (dailyQueueEnabled) {
+      stopDailyQueue();
+      return;
+    }
+    if (dailyQueueItems) startDailyQueue(dailyQueueItems);
+  };
 
   const handleTuneIn = (station: RadioStation) => {
     if (playingStation?.id === station.id) {
@@ -218,6 +318,11 @@ export default function RadioCentralConsoleView() {
     const time = new Date().toLocaleTimeString([], { hour12: false });
     setLog((prev) => [{ time, tag: 'PROGRAM', text: `Block active: ${activeProgramLabel}` }, ...prev].slice(0, 12));
   }, [activeProgramLabel]);
+  useEffect(() => {
+    if (!activeDailyQueueLabel) return;
+    const time = new Date().toLocaleTimeString([], { hour12: false });
+    setLog((prev) => [{ time, tag: 'DAILY QUEUE', text: `Now playing: ${activeDailyQueueLabel}` }, ...prev].slice(0, 12));
+  }, [activeDailyQueueLabel]);
 
   const isPlaying = status === 'playing';
   const isLoading = status === 'loading';
@@ -281,6 +386,39 @@ export default function RadioCentralConsoleView() {
                 Program Manager &bull; {programManagerEnabled ? 'On' : 'Off'}
               </span>
             </button>
+            <span className="text-[10px] uppercase tracking-widest text-slate-400">Daily Queue</span>
+            {/* Same "explicit toggle, never auto-starts" contract as
+                Program Manager above — mutually exclusive with it (see
+                startDailyQueue/startProgramManager in
+                RadioPlayerContext.tsx). Disabled until all three lineup
+                items (History Radio, the archived drama, BBC World
+                Service) are actually available, so it can't kick off a
+                broken partial sequence. */}
+            <button
+              onClick={handleToggleDailyQueue}
+              disabled={!dailyQueueEnabled && !dailyQueueItems}
+              title={
+                dailyQueueEnabled
+                  ? 'Turn off the Daily Queue'
+                  : dailyQueueItems
+                    ? 'Turn on the Daily Queue (History Radio → X Minus One → BBC World Service)'
+                    : 'Daily Queue unavailable — waiting on the archived drama in the catalog'
+              }
+              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full transition disabled:opacity-40"
+              style={
+                dailyQueueEnabled
+                  ? { background: 'rgba(0,245,160,0.12)', border: `1px solid rgba(0,245,160,0.5)`, color: TOKENS.emerald }
+                  : { ...subpanelStyle, color: '#64748b' }
+              }
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: dailyQueueEnabled ? TOKENS.emerald : '#64748b' }}
+                />
+                Daily Queue &bull; {dailyQueueEnabled ? 'On' : 'Off'}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -311,6 +449,29 @@ export default function RadioCentralConsoleView() {
               style={{ ...subpanelStyle, color: '#e2e8f0' }}
             />
           </div>
+        </div>
+
+        {/* Mini-category sub-nav — a finer genre facet layered on top of
+            the CATEGORIES tabs above (see MEDIA_GENRE_FILTERS in
+            lib/radioStations.ts), aimed at narrative/archival catalog
+            content. Applied as an additional AND filter, not a
+            replacement for the active category tab. */}
+        <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl" style={cardStyle}>
+          <span className="text-[10px] uppercase tracking-widest text-slate-500 shrink-0">Genre</span>
+          {MEDIA_GENRE_FILTERS.map((genreFilter) => (
+            <button
+              key={genreFilter.label}
+              onClick={() => setActiveGenreFilter((current) => (current === genreFilter.label ? null : genreFilter.label))}
+              className="px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wide transition"
+              style={
+                activeGenreFilter === genreFilter.label
+                  ? { background: 'rgba(139,92,246,0.15)', border: '1px solid #8b5cf6', color: '#c4b5fd' }
+                  : { ...subpanelStyle, color: '#94a3b8' }
+              }
+            >
+              {genreFilter.label}
+            </button>
+          ))}
         </div>
 
         {/* Upper grid */}

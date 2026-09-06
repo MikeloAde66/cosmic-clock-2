@@ -114,6 +114,23 @@ function buildDirectAudioTrack(url: string): CatalogTrack {
   };
 }
 
+// Best-effort forward to the n8n Media Matrix Orchestrator via the FastAPI
+// backend's /api/v1/media/ingest — mirrors the lead-capture pattern in
+// app/api/leads/route.ts. Never blocks or surfaces errors in the local
+// catalog UX; failures are logged only.
+function dispatchToMediaMatrix(track: CatalogTrack, channel: string) {
+  fetch('/api/v1/media/ingest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rawTitle: track.title,
+      url: track.url,
+      channel,
+      metadata: { artist: track.artist, sourceIdentifier: track.sourceIdentifier, mediaType: track.mediaType },
+    }),
+  }).catch((err) => console.error('Media Matrix dispatch failed:', err));
+}
+
 interface MediaFlowAudioCenterProps {
   // Optional one-shot hand-off to Studio One (components/PodsModule.tsx) —
   // app/page.tsx owns the actual navigation/state, since Studio One has no
@@ -171,6 +188,55 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
     } catch {
       // Corrupt or blocked storage — start empty rather than crash.
     }
+  }, []);
+
+  // Pull any items the n8n Media Matrix workflow has queued (its Active
+  // Sheets rows) into the catalog on load — additive only via a functional
+  // update, so it merges safely regardless of whether the localStorage
+  // load above has already applied, and never wipes out direct imports.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/v1/media/catalog');
+        if (!res.ok) return;
+        const data: {
+          items: Array<{
+            id?: string;
+            rawTitle: string;
+            url: string;
+            channel?: string;
+            artist?: string;
+            mediaType?: 'audio' | 'video';
+          }>;
+        } = await res.json();
+        if (!data.items?.length) return;
+
+        setCatalog((current) => {
+          const existingIds = new Set(current.map((t) => t.id));
+          const incoming: CatalogTrack[] = data.items
+            .map((item) => ({
+              id: item.id || `matrix::${item.url}`,
+              title: item.rawTitle,
+              artist: item.artist || item.channel || 'Media Matrix',
+              url: item.url,
+              sourceIdentifier: item.channel || 'media-matrix',
+              mediaType: item.mediaType === 'video' ? ('video' as const) : ('audio' as const),
+            }))
+            .filter((t) => !existingIds.has(t.id));
+          if (incoming.length === 0) return current;
+
+          const next = [...current, ...incoming];
+          try {
+            localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(next));
+          } catch {
+            // Storage full/blocked — in-memory still reflects the merge.
+          }
+          return next;
+        });
+      } catch (err) {
+        console.error('Media Matrix catalog fetch failed:', err);
+      }
+    })();
   }, []);
 
   const persistCatalog = (next: CatalogTrack[]) => {
@@ -301,6 +367,7 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
             newAudioTracks.map((t) => ({ url: t.url, metaData: { artist: t.artist, title: t.title } }))
           );
         }
+        newTracks.forEach((t) => dispatchToMediaMatrix(t, 'internet-archive'));
       }
       setArchiveInput('');
     } catch (err) {
@@ -334,6 +401,7 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
         webampRef.current?.appendTracks(
           newTracks.map((t) => ({ url: t.url, metaData: { artist: t.artist, title: t.title } }))
         );
+        newTracks.forEach((t) => dispatchToMediaMatrix(t, 'rss-feed'));
       }
       setFeedInput('');
     } catch (err) {

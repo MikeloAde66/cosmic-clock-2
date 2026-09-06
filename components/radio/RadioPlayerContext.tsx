@@ -51,6 +51,20 @@ interface RadioPlayerContextValue {
   programManagerEnabled: boolean;
   activeProgramLabel: string | null;
   toggleProgramManager: () => void;
+  // Daily Queue — a fixed-order lineup (unlike Program Manager's shuffled
+  // pool), for a specific curated sequence of stations to auto-advance
+  // through cleanly. Each item advances either on a real 'ended' event
+  // (finite files, e.g. a single archived episode — omit durationMs so it
+  // plays to its actual end) or after durationMs (continuous streams,
+  // which never fire 'ended'). Loops back to the first item once the last
+  // one finishes/times out. The caller resolves the actual RadioStation
+  // objects (including any dynamically-fetched ones) and passes them in —
+  // this context has no knowledge of where stations come from beyond the
+  // static RADIO_STATIONS list it already imports.
+  dailyQueueEnabled: boolean;
+  activeDailyQueueLabel: string | null;
+  startDailyQueue: (items: DailyQueueItem[]) => void;
+  stopDailyQueue: () => void;
   // Set by the home page (the only route with a Pods/Studio One tab) to
   // hide GlobalPlayerBar while that video-only workspace is active — now
   // that the bar itself is mounted globally in app/layout.tsx rather than
@@ -59,6 +73,14 @@ interface RadioPlayerContextValue {
   // other route just shows the bar with no wiring needed.
   playerBarHidden: boolean;
   setPlayerBarHidden: (hidden: boolean) => void;
+}
+
+export interface DailyQueueItem {
+  station: RadioStation;
+  // Omit for a finite file that should play to its real 'ended' event
+  // (e.g. a single archived episode); set for a continuous stream, which
+  // never fires 'ended' on its own.
+  durationMs?: number;
 }
 
 const RadioPlayerContext = createContext<RadioPlayerContextValue | null>(null);
@@ -101,6 +123,14 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   const rotationIndexRef = useRef(0);
   const rotationPhaseRef = useRef<'station' | 'ad'>('station');
   const rotationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Daily Queue bookkeeping — a fixed-order sibling to Program Manager's
+  // shuffled rotation above. dailyQueueRef doubles as the "is it active"
+  // signal (empty = off), the same convention queueRef already uses for
+  // vault-track queues, rather than tracking a separate enabled ref.
+  const dailyQueueRef = useRef<DailyQueueItem[]>([]);
+  const dailyQueueIndexRef = useRef(0);
+  const dailyQueueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // True once playback has started at least once this session (either via
   // Program Manager or a manual station pick) — gates whether the global
   // bar's Play button auto-enables Program Manager or just resumes.
@@ -176,6 +206,8 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   const [volume, setVolumeState] = useState(1);
   const [programManagerEnabled, setProgramManagerEnabled] = useState(false);
   const [activeProgramLabel, setActiveProgramLabel] = useState<string | null>(null);
+  const [dailyQueueEnabled, setDailyQueueEnabled] = useState(false);
+  const [activeDailyQueueLabel, setActiveDailyQueueLabel] = useState<string | null>(null);
 
   // Primes the 432Hz Cosmic Instrumental Stream (vault-432hz) into the
   // persistent bottom bar on load, so it's the station shown/queued the
@@ -286,6 +318,22 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
+  const clearDailyQueueTimer = useCallback(() => {
+    if (dailyQueueTimerRef.current) {
+      clearTimeout(dailyQueueTimerRef.current);
+      dailyQueueTimerRef.current = null;
+    }
+  }, []);
+
+  const stopDailyQueue = useCallback(() => {
+    // Same "turning off just stops auto-switching" contract as
+    // stopProgramManager — doesn't touch whatever's already playing.
+    clearDailyQueueTimer();
+    dailyQueueRef.current = [];
+    setDailyQueueEnabled(false);
+    setActiveDailyQueueLabel(null);
+  }, [clearDailyQueueTimer]);
+
   // Alternates 8-minute station blocks with 1-minute ad breaks, looping
   // through the shuffled pool indefinitely (reshuffling — 432Hz-first stays
   // fixed only for the very first block of a fresh rotation) each time it
@@ -324,6 +372,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   }, [advanceRotation]);
 
   const startProgramManager = useCallback(() => {
+    if (dailyQueueRef.current.length > 0) stopDailyQueue();
     rotationQueueRef.current = buildRotationQueue();
     rotationIndexRef.current = 0;
     rotationPhaseRef.current = 'station';
@@ -335,7 +384,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     }
     clearRotationTimer();
     rotationTimerRef.current = setTimeout(() => advanceRotationRef.current(), ROTATION_BLOCK_MS);
-  }, [findStation, tuneStation, clearRotationTimer]);
+  }, [findStation, tuneStation, clearRotationTimer, stopDailyQueue]);
 
   const stopProgramManager = useCallback(() => {
     // Turning off just stops auto-switching — it doesn't stop whatever's
@@ -360,14 +409,57 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [programManagerEnabled, startProgramManager, stopProgramManager]);
 
+  // Fixed-order advance: always moves to the next index (looping back to
+  // 0 past the end), tunes it, and — only for a continuous-stream entry
+  // (durationMs set) — schedules the next advance on a timer. A finite
+  // entry (durationMs omitted) sets no timer at all; handleEnded below is
+  // what advances it, once its real 'ended' event fires.
+  const advanceDailyQueue = useCallback(() => {
+    const queue = dailyQueueRef.current;
+    if (queue.length === 0) return;
+    dailyQueueIndexRef.current = (dailyQueueIndexRef.current + 1) % queue.length;
+    const item = queue[dailyQueueIndexRef.current];
+    tuneStation(item.station);
+    setActiveDailyQueueLabel(item.station.name);
+    clearDailyQueueTimer();
+    if (item.durationMs) {
+      dailyQueueTimerRef.current = setTimeout(() => advanceDailyQueueRef.current(), item.durationMs);
+    }
+  }, [tuneStation, clearDailyQueueTimer]);
+
+  // Same ref-mirror trick advanceRotationRef uses, for the same reason:
+  // the setTimeout chain and handleEnded both need to call the *latest*
+  // advanceDailyQueue without becoming a dependency that recreates them.
+  const advanceDailyQueueRef = useRef(advanceDailyQueue);
+  useEffect(() => {
+    advanceDailyQueueRef.current = advanceDailyQueue;
+  }, [advanceDailyQueue]);
+
+  const startDailyQueue = useCallback((items: DailyQueueItem[]) => {
+    if (items.length === 0) return;
+    if (programManagerEnabled) stopProgramManager();
+    hasEverPlayedRef.current = true;
+    dailyQueueRef.current = items;
+    dailyQueueIndexRef.current = 0;
+    setDailyQueueEnabled(true);
+    const first = items[0];
+    tuneStation(first.station);
+    setActiveDailyQueueLabel(first.station.name);
+    clearDailyQueueTimer();
+    if (first.durationMs) {
+      dailyQueueTimerRef.current = setTimeout(() => advanceDailyQueueRef.current(), first.durationMs);
+    }
+  }, [programManagerEnabled, stopProgramManager, tuneStation, clearDailyQueueTimer]);
+
   // Public station-selection API — a manual override. Explicitly picking a
   // channel (a station card, "Tune In") always wins: it cancels any running
   // rotation and tunes directly, without Program Manager clawing it back.
   const playStation = useCallback(async (nextStation: RadioStation) => {
     hasEverPlayedRef.current = true;
     if (programManagerEnabled) stopProgramManager();
+    if (dailyQueueRef.current.length > 0) stopDailyQueue();
     await tuneStation(nextStation);
-  }, [programManagerEnabled, stopProgramManager, tuneStation]);
+  }, [programManagerEnabled, stopProgramManager, stopDailyQueue, tuneStation]);
 
   const next = useCallback(() => {
     if (queueRef.current.length === 0) return;
@@ -411,6 +503,10 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     clearRotationTimer();
     setProgramManagerEnabled(false);
     setActiveProgramLabel(null);
+    clearDailyQueueTimer();
+    dailyQueueRef.current = [];
+    setDailyQueueEnabled(false);
+    setActiveDailyQueueLabel(null);
     audioRef.current?.pause();
     queueRef.current = [];
     currentIndexRef.current = 0;
@@ -418,7 +514,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     setQueue([]);
     setCurrentIndex(0);
     setStatus('idle');
-  }, [clearRotationTimer]);
+  }, [clearRotationTimer, clearDailyQueueTimer]);
 
   const pauseForExternalMedia = useCallback(() => {
     audioRef.current?.pause();
@@ -445,10 +541,20 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     return () => document.removeEventListener('play', handleGlobalPlay, true);
   }, []);
 
-  // Auto-advance when a queued track finishes — a no-op for live streams,
-  // which have no queue to advance through.
+  // Auto-advance when a queued track finishes. Also drives the Daily
+  // Queue's finite entries (durationMs omitted) — a continuous stream
+  // entry never fires 'ended' on its own, so this is a no-op for those;
+  // they're already advanced by advanceDailyQueue's own timer instead.
   const handleEnded = useCallback(() => {
-    if (queueRef.current.length > 0) next();
+    if (queueRef.current.length > 0) {
+      next();
+      return;
+    }
+    const dailyQueue = dailyQueueRef.current;
+    const currentDailyItem = dailyQueue[dailyQueueIndexRef.current];
+    if (dailyQueue.length > 0 && currentDailyItem && !currentDailyItem.durationMs) {
+      advanceDailyQueueRef.current();
+    }
   }, [next]);
 
   return (
@@ -474,6 +580,10 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
         programManagerEnabled,
         activeProgramLabel,
         toggleProgramManager,
+        dailyQueueEnabled,
+        activeDailyQueueLabel,
+        startDailyQueue,
+        stopDailyQueue,
         playerBarHidden,
         setPlayerBarHidden,
       }}

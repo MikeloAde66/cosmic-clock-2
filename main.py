@@ -1,8 +1,14 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import requests
+
+from routers.media import router as media_router
 
 app = FastAPI(
     title="Internet Archive Media & Podcast Ingestion Service",
@@ -18,6 +24,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(media_router)
 
 IA_SEARCH_URL = "https://archive.org/advancedsearch.php"
 IA_METADATA_URL = "https://archive.org/metadata/"

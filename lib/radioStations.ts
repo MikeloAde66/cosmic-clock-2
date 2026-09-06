@@ -46,6 +46,30 @@ export const CATEGORIES = ['ALL CHANNELS', 'NEWS', 'LAUGHTER & FUN', 'ANCIENT WI
 // underlying matching logic. Categories not listed here render as-is.
 export const CATEGORY_LABELS: Record<string, string> = {};
 
+// "Mini-categories" — a finer-grained genre facet layered on top of the
+// broad CATEGORIES tabs above, aimed at narrative/archival catalog content
+// (old-time radio drama, esoteric lore, documentaries) rather than the
+// curated live-stream channels CATEGORIES was built for. Applied as an
+// additional filter on top of the active CATEGORIES tab, matched against a
+// station's own `genre` field by keyword (substring, case-insensitive) —
+// deliberately keyword-based rather than exact-string, so genuinely
+// matching content (e.g. an existing station's "Documentary / Narration"
+// genre) is included without needing its genre string rewritten to match
+// this list verbatim. A mini-category with no matching content today just
+// renders empty — that's expected, not a bug; nothing here fabricates a
+// match that isn't real.
+export interface MediaGenreFilter {
+  label: string;
+  keywords: string[];
+}
+
+export const MEDIA_GENRE_FILTERS: MediaGenreFilter[] = [
+  { label: 'Sci-Fi', keywords: ['sci-fi', 'science fiction'] },
+  { label: 'Esoteric', keywords: ['esoteric', 'occult', 'hermetic', 'gnostic'] },
+  { label: 'Mystery', keywords: ['mystery', 'noir', 'detective'] },
+  { label: 'Documentaries', keywords: ['documentary', 'documentaries'] },
+];
+
 export interface OutkastLink {
   label: string;
   // Placeholder destinations — swap for the real URLs once they exist, same
