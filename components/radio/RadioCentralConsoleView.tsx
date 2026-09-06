@@ -118,7 +118,6 @@ export default function RadioCentralConsoleView() {
     analyserRef,
     programManagerEnabled,
     activeProgramLabel,
-    toggleProgramManager,
     dailyQueueEnabled,
     activeDailyQueueLabel,
     startDailyQueue,
@@ -294,31 +293,31 @@ export default function RadioCentralConsoleView() {
   // Polls the backend's externally-controllable broadcast state
   // (routers/radio.py — an n8n workflow or any other automation can flip
   // it via POST /api/v1/radio/toggle) and applies it locally through the
-  // exact same startDailyQueue/toggleProgramManager the manual buttons
-  // use. Remote state is treated as authoritative — it's a real remote
-  // control, not just a suggestion, so it can override a manual toggle on
-  // the next poll. Only reconciles Daily Queue when dailyQueueItems is
-  // actually available, so a "turn on" command can't start an empty queue.
+  // exact same startDailyQueue the manual Daily Queue button uses. Remote
+  // state is treated as authoritative — it's a real remote control, not
+  // just a suggestion, so it can override a manual toggle on the next
+  // poll. Only reconciles Daily Queue when dailyQueueItems is actually
+  // available, so a "turn on" command can't start an empty queue.
   // autoplay: false — this fires with no user gesture behind it, so it
   // arms/loads the queue (the toggle shows On, a track is ready) without
   // attempting real playback; the user's own Play press is what actually
   // starts audio, same contract as a fresh page load.
+  //
+  // remote.program_manager is deliberately ignored here — Program Manager
+  // is a static, disabled indicator for now (see its button above), so no
+  // remote command can turn it on either.
   useEffect(() => {
     let cancelled = false;
     const reconcile = async () => {
       try {
         const res = await fetch('/api/v1/radio/state');
         if (!res.ok || cancelled) return;
-        const remote: { daily_queue?: boolean; program_manager?: boolean } = await res.json();
+        const remote: { daily_queue?: boolean } = await res.json();
 
         if (remote.daily_queue && !dailyQueueEnabled && dailyQueueItems) {
           startDailyQueue(dailyQueueItems, { autoplay: false });
         } else if (remote.daily_queue === false && dailyQueueEnabled) {
           stopDailyQueue();
-        }
-
-        if (typeof remote.program_manager === 'boolean' && remote.program_manager !== programManagerEnabled) {
-          toggleProgramManager();
         }
       } catch {
         // Remote state unreachable — leave local state as-is.
@@ -330,7 +329,7 @@ export default function RadioCentralConsoleView() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [dailyQueueEnabled, programManagerEnabled, dailyQueueItems, startDailyQueue, stopDailyQueue, toggleProgramManager]);
+  }, [dailyQueueEnabled, dailyQueueItems, startDailyQueue, stopDailyQueue]);
 
   const handleTuneIn = (station: RadioStation) => {
     if (playingStation?.id === station.id) {
@@ -403,26 +402,21 @@ export default function RadioCentralConsoleView() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-widest text-slate-400">Program Manager</span>
-            {/* A real, deliberate toggle — this is the only way Program
-                Manager can start. It never auto-enables itself (see the
-                comment on toggleProgramManager in RadioPlayerContext.tsx
-                for why that matters). */}
+            {/* Static indicator for now, not a working toggle — Program
+                Manager is paused pending the Media Flow Hub integration;
+                always shows Off regardless of programManagerEnabled's
+                actual value (the radio_state reconciliation effect below
+                no longer acts on remote program_manager commands either,
+                so that value can no longer become true from anywhere). */}
             <button
-              onClick={toggleProgramManager}
-              title={programManagerEnabled ? 'Turn off Program Manager rotation' : 'Turn on Program Manager rotation'}
-              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full transition"
-              style={
-                programManagerEnabled
-                  ? { background: 'rgba(0,245,160,0.12)', border: `1px solid rgba(0,245,160,0.5)`, color: TOKENS.emerald }
-                  : { ...subpanelStyle, color: '#64748b' }
-              }
+              disabled
+              title="Program Manager (static — currently paused)"
+              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full transition cursor-default"
+              style={{ ...subpanelStyle, color: '#64748b' }}
             >
               <span className="inline-flex items-center gap-1.5">
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: programManagerEnabled ? TOKENS.emerald : '#64748b' }}
-                />
-                Program Manager &bull; {programManagerEnabled ? 'On' : 'Off'}
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#64748b' }} />
+                Program Manager &bull; Off
               </span>
             </button>
             <span className="text-[10px] uppercase tracking-widest text-slate-400">Daily Queue</span>

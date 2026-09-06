@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Music, Film, X, Pencil, Check, Loader2, Mic } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Music, Film, X, Pencil, Check, Loader2, Mic, ExternalLink } from 'lucide-react';
 import type WaveSurfer from 'wavesurfer.js';
 import type Webamp from 'webamp';
 import { extractIdentifier } from '@/lib/archiveOrg';
@@ -13,9 +13,17 @@ export interface CatalogTrack {
   url: string;
   sourceIdentifier: string;
   mediaType: 'audio' | 'video';
+  // Static (client-only, not backend-wired yet) ON/OFF flag — capped at
+  // MAX_ACTIVE_ITEMS simultaneously active. Undefined/omitted (older
+  // persisted items, or freshly-ingested ones) counts as OFF.
+  active?: boolean;
 }
 
 const CATALOG_STORAGE_KEY = 'aione-media-center-catalog';
+
+// Caps how many catalog items can be toggled ON at once — the exposed/
+// "live" subset of an otherwise-unbounded catalog.
+const MAX_ACTIVE_ITEMS = 4;
 
 // Internet Archive's own format labels for playable audio/video files
 // (from a real /metadata/<id> response's files[].format field) — anything
@@ -404,6 +412,15 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
     }
   };
 
+  // Static ON/OFF toggle — capped at MAX_ACTIVE_ITEMS simultaneously
+  // active, so turning one more ON past the cap is a no-op rather than
+  // silently deactivating something else the user didn't ask to change.
+  const activeCount = catalog.filter((t) => t.active).length;
+  const toggleActive = (id: string, next: boolean) => {
+    if (next && activeCount >= MAX_ACTIVE_ITEMS) return;
+    persistCatalog(catalog.map((t) => (t.id === id ? { ...t, active: next } : t)));
+  };
+
   const removeCatalogItem = (id: string) => {
     const index = catalog.findIndex((t) => t.id === id);
     const next = catalog.filter((t) => t.id !== id);
@@ -489,7 +506,19 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
         onSubmit={handleArchiveSubmit}
         className="p-5 mb-4 space-y-2 border rounded-2xl border-cyan-500/20 bg-slate-900/40 backdrop-blur-md"
       >
-        <span className="text-xs font-mono uppercase tracking-widest text-white/70">Load from Internet Archive</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-mono uppercase tracking-widest text-white/70">Load from Internet Archive</span>
+          <a
+            href="https://archive.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open Internet Archive"
+            aria-label="Open Internet Archive in a new tab"
+            className="text-slate-500 hover:text-cyan-300 transition"
+          >
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
         <div className="flex gap-2">
           <input
             value={archiveInput}
@@ -649,7 +678,12 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
 
       {/* Custom Media Catalog */}
       <div className="p-5 mt-4 border rounded-2xl border-cyan-500/20 bg-slate-900/40 backdrop-blur-md">
-        <span className="text-xs font-mono uppercase tracking-widest text-white/70">Your Catalog</span>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-mono uppercase tracking-widest text-white/70">Your Catalog</span>
+          <span className="text-[10px] font-mono text-slate-500">
+            {activeCount}/{MAX_ACTIVE_ITEMS} active
+          </span>
+        </div>
         {catalog.length === 0 ? (
           <p className="mt-3 text-xs text-slate-500">
             Nothing imported yet — load an Internet Archive item above to start building your library.
@@ -717,6 +751,43 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
                       <Pencil className="w-3 h-3" />
                     </button>
                   )}
+                  {/* Static (client-only) ON/OFF/EDIT PROGRAM controls —
+                      capped at MAX_ACTIVE_ITEMS simultaneously active (see
+                      toggleActive). EDIT PROGRAM reuses the rename flow
+                      above rather than a second, separate editor. */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => toggleActive(track.id, true)}
+                      disabled={!!track.active || activeCount >= MAX_ACTIVE_ITEMS}
+                      title={activeCount >= MAX_ACTIVE_ITEMS && !track.active ? `Max ${MAX_ACTIVE_ITEMS} active items` : 'Turn on'}
+                      className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide rounded border transition disabled:opacity-40 ${
+                        track.active
+                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                          : 'border-slate-700 text-slate-500 hover:text-emerald-300 hover:border-emerald-500/40'
+                      }`}
+                    >
+                      On
+                    </button>
+                    <button
+                      onClick={() => toggleActive(track.id, false)}
+                      disabled={!track.active}
+                      title="Turn off"
+                      className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide rounded border transition disabled:opacity-40 ${
+                        !track.active
+                          ? 'bg-red-500/15 text-red-300 border-red-500/40'
+                          : 'border-slate-700 text-slate-500 hover:text-red-300 hover:border-red-500/40'
+                      }`}
+                    >
+                      Off
+                    </button>
+                    <button
+                      onClick={() => startRename(track)}
+                      title="Edit program"
+                      className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide rounded border border-slate-700 text-slate-500 hover:text-cyan-300 hover:border-cyan-500/40 transition"
+                    >
+                      Edit Program
+                    </button>
+                  </div>
                   {/* Media Flow no longer sends audio to Radio Central — it's
                       strictly a backend ingestion tool/catalog player now,
                       kept isolated from the shared global audio engine.
