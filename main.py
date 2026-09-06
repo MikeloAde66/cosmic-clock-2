@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import hashlib
 import os
 
 from fastapi import FastAPI, HTTPException, Query
@@ -46,6 +47,9 @@ def debug_env():
     return {
         "supabase_key_set": bool(supabase_key),
         "supabase_key_length": len(supabase_key),
+        # A truncated hash prefix — enough to compare against a known-good
+        # value without exposing anything reconstructable from it.
+        "supabase_key_sha256_prefix": hashlib.sha256(supabase_key.encode()).hexdigest()[:12] if supabase_key else None,
         "n8n_webhook_set": bool(n8n_url),
         "n8n_webhook_length": len(n8n_url),
     }
