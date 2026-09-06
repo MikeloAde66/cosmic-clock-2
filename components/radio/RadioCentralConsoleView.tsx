@@ -291,6 +291,25 @@ export default function RadioCentralConsoleView() {
     if (dailyQueueItems) startDailyQueue(dailyQueueItems);
   };
 
+  // Sets the Daily Queue as the actual default on-load state (track 0 =
+  // the catalog drama, e.g. "No Contact") instead of requiring a manual
+  // click on the toggle above — fires exactly once, via the exact same
+  // startDailyQueue this component already calls from the button; no new
+  // queue mechanism. Deliberately overrides RadioPlayerContext's own
+  // vault-432hz mount-priming default (it always wins the race, being
+  // synchronous, while this waits on the async catalog fetch) — only
+  // Program Manager or an already-running Daily Queue are treated as a
+  // real, deliberate state worth not clobbering.
+  const autoStartedDailyQueueRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedDailyQueueRef.current) return;
+    if (!dailyQueueItems) return;
+    if (dailyQueueEnabled || programManagerEnabled) return;
+    autoStartedDailyQueueRef.current = true;
+    startDailyQueue(dailyQueueItems);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dailyQueueItems]);
+
   const handleTuneIn = (station: RadioStation) => {
     if (playingStation?.id === station.id) {
       togglePlayPause();
