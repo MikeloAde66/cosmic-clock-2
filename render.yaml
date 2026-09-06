@@ -13,3 +13,25 @@ services:
       # in Vercel's project env vars, so the two sides agree.
       - key: QUANTUM_SERVICE_API_KEY
         sync: false
+  # Backs Media Flow & Audio Center's ingest button and Radio Central's
+  # catalog fetch (see routers/media.py) — persists to the Supabase
+  # media_catalog table (supabase/migrations/0006, 0007) and forwards to
+  # the n8n Media Matrix webhook. rootDir is the repo root (unlike
+  # quantum-service above), since main.py/requirements.txt live there.
+  - type: web
+    name: media-catalog-service
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # Both set manually in the Render dashboard, not here — same
+      # keeps-secrets-out-of-git convention as QUANTUM_SERVICE_API_KEY
+      # above. Once this service has a real URL, MEDIA_INGEST_SERVICE_URL
+      # and MEDIA_CATALOG_SERVICE_URL in Vercel's project env vars need to
+      # point at it (see app/api/v1/media/*/route.ts).
+      - key: N8N_MEDIA_WEBHOOK_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false

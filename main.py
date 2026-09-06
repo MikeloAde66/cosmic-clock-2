@@ -27,6 +27,12 @@ app.add_middleware(
 
 app.include_router(media_router)
 
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 IA_SEARCH_URL = "https://archive.org/advancedsearch.php"
 IA_METADATA_URL = "https://archive.org/metadata/"
 IA_DOWNLOAD_BASE = "https://archive.org/download/"
