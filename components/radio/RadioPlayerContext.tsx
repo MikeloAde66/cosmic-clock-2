@@ -409,30 +409,24 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [programManagerEnabled, startProgramManager, stopProgramManager]);
 
-  // Fixed-order advance: moves to the next index and tunes it, scheduling
-  // the next advance on a timer only for a continuous-stream entry
-  // (durationMs set) — a finite entry (durationMs omitted) sets no timer
-  // at all; handleEnded below is what advances it, once its real 'ended'
-  // event fires. Once a full pass through the queue completes, it stops
-  // and clears itself (stopDailyQueue) rather than looping back to the
-  // start indefinitely — a Daily Queue run has a real, deliberate end.
+  // Fixed-order advance: always moves to the next index (wrapping back to
+  // 0 past the end, for continuous 24/7 broadcasting rather than stopping
+  // after one pass), tunes it, and — only for a continuous-stream entry
+  // (durationMs set) — schedules the next advance on a timer. A finite
+  // entry (durationMs omitted) sets no timer at all; handleEnded below is
+  // what advances it, once its real 'ended' event fires.
   const advanceDailyQueue = useCallback(() => {
     const queue = dailyQueueRef.current;
     if (queue.length === 0) return;
-    const nextIndex = dailyQueueIndexRef.current + 1;
-    if (nextIndex >= queue.length) {
-      stopDailyQueue();
-      return;
-    }
-    dailyQueueIndexRef.current = nextIndex;
-    const item = queue[nextIndex];
+    dailyQueueIndexRef.current = (dailyQueueIndexRef.current + 1) % queue.length;
+    const item = queue[dailyQueueIndexRef.current];
     tuneStation(item.station);
     setActiveDailyQueueLabel(item.station.name);
     clearDailyQueueTimer();
     if (item.durationMs) {
       dailyQueueTimerRef.current = setTimeout(() => advanceDailyQueueRef.current(), item.durationMs);
     }
-  }, [tuneStation, clearDailyQueueTimer, stopDailyQueue]);
+  }, [tuneStation, clearDailyQueueTimer]);
 
   // Same ref-mirror trick advanceRotationRef uses, for the same reason:
   // the setTimeout chain and handleEnded both need to call the *latest*
