@@ -18,7 +18,7 @@ export default function StandaloneStarTrackerPage() {
         // previously pointed at the aione subdomain itself, trapping the
         // visitor in this app. In development that shell runs locally on
         // port 5500; production points at the real domain.
-        window.location.href = process.env.NODE_ENV === 'production' ? 'https://protolabsglobal.com' : 'http://localhost:5500';
+        window.location.href = process.env.NODE_ENV === 'production' ? 'https://www.protolabsglobal.com' : 'http://localhost:5500';
       }}
     />
   );
