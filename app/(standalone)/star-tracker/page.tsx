@@ -12,9 +12,13 @@ export default function StandaloneStarTrackerPage() {
     <StarTrackerView
       onBack={() => {
         // Not "back" to anything within this page — this domain has
-        // nothing else to navigate to. Sends the visitor to the real main
-        // hub instead of a dead/no-op button.
-        window.location.href = 'https://aione.pro.protolabsglobal.com';
+        // nothing else to navigate to. Sends the visitor to the real
+        // Proto Labs Global root site (protolabsglobal-main-shell, a
+        // separate repo/deployment) instead of a dead/no-op button —
+        // previously pointed at the aione subdomain itself, trapping the
+        // visitor in this app. In development that shell runs locally on
+        // port 5500; production points at the real domain.
+        window.location.href = process.env.NODE_ENV === 'production' ? 'https://protolabsglobal.com' : 'http://localhost:5500';
       }}
     />
   );
