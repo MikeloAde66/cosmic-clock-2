@@ -33,6 +33,20 @@ const MODE_ADDENDA = {
 
 type DiscoveryMode = keyof typeof MODE_ADDENDA;
 
+// Opt-in, not a replacement of the base prompt above — the main Ai One chat
+// widget (AiOneChat.tsx) relies on that base prompt's Markdown tables,
+// Mermaid/SVG diagrams, and "give real depth room when it's warranted"
+// instruction; those are real, deliberate features of that text-rendered
+// experience and must keep working exactly as before. This addendum only
+// applies when a caller explicitly sets voiceMode: true in the request body
+// — currently just StarTrackerView's inline narrative, which is streamed
+// straight into window.speechSynthesis rather than rendered as text, so
+// Markdown syntax and long structured answers would be read aloud as
+// literal noise ("pipe, Program, pipe, Operator, pipe...").
+const VOICE_MODE_ADDENDUM = `
+
+Voice Mode: this response is spoken aloud by text-to-speech, not displayed as rendered text — a listener hears it as dialogue, not a document. Never use Markdown tables, code blocks, bullet or numbered lists, headers, or any dense technical formatting; write only in plain, natural spoken sentences. Keep it short — 2 to 4 sentences. Sound like a warm, knowledgeable space guide talking with someone standing next to you, not a database readout. Lead with the most engaging high-level fact, story, or distance, in plain language; leave the technical deep-dive for if they ask a follow-up, rather than cramming it all into one answer.`;
+
 function isDiscoveryMode(value: unknown): value is DiscoveryMode {
   return typeof value === 'string' && value in MODE_ADDENDA;
 }
@@ -153,10 +167,11 @@ export async function POST(request: Request) {
     return new Response('Ai One is not connected yet — no API key configured.', { status: 500 });
   }
 
-  const { messages, mode, language } = (await request.json()) as {
+  const { messages, mode, language, voiceMode } = (await request.json()) as {
     messages: ChatMessage[];
     mode?: unknown;
     language?: unknown;
+    voiceMode?: unknown;
   };
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -168,6 +183,7 @@ export async function POST(request: Request) {
   const systemPrompt =
     BASE_SYSTEM_PROMPT +
     MODE_ADDENDA[resolvedMode] +
+    (voiceMode === true ? VOICE_MODE_ADDENDUM : '') +
     (retrievedContext
       ? `\n\nRelevant excerpts from ingested primary sources — draw on these where genuinely relevant, cite the source naturally, and ignore any that aren't a good fit for this question:\n\n${retrievedContext}`
       : '') +

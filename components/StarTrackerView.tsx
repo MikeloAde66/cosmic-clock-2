@@ -725,7 +725,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
       const res = await fetch('/api/ai-one-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [{ role: 'user', content: query }], mode: 'synthesis', language: 'en' }),
+        body: JSON.stringify({ messages: [{ role: 'user', content: query }], mode: 'synthesis', language: 'en', voiceMode: true }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error('Kali did not respond.');
