@@ -1,10 +1,10 @@
 import { AlpacaAdapter } from '../hardware/alpaca.adapter.js';
-import { lookupMessierTarget } from '../db/messierRepo.js';
+import { lookupCatalogTarget } from '../db/catalogRepo.js';
 
 const mount = new AlpacaAdapter();
 
 export async function handleUserTargetIntent(targetQuery) {
-  const target = await lookupMessierTarget(targetQuery);
+  const target = await lookupCatalogTarget(targetQuery);
   if (!target) {
     return { status: 'NOT_FOUND', message: `I couldn't locate ${targetQuery} in the local offline database.` };
   }

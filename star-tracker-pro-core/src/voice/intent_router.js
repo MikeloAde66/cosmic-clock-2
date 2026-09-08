@@ -1,5 +1,5 @@
 import { AlpacaAdapter } from '../hardware/alpaca.adapter.js';
-import { lookupMessierTarget } from '../db/messierRepo.js';
+import { lookupCatalogTarget } from '../db/catalogRepo.js';
 
 const mount = new AlpacaAdapter(
   process.env.ALPACA_HOST || '127.0.0.1',
@@ -81,10 +81,62 @@ async function handleStatus() {
   }
 }
 
+// ---------- Target storytelling ----------
+// Rule-based/templated, not an LLM call — same reasoning as the client-side
+// TTS decision: no model provider is wired into this service, so narration
+// is generated locally from the catalog row itself (type, constellation,
+// description, magnitude), with a few phrasing variants per object type so
+// repeat visits to the same target don't always read out identically.
+
+function targetCategory(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('galaxy')) return 'galaxy';
+  if (t.includes('nebula')) return 'nebula';
+  if (t.includes('cluster')) return 'cluster';
+  return 'object';
+}
+
+const OPENING_LINES = {
+  galaxy: [
+    (name, constellation) => `Setting course for ${name}, a galaxy out in ${constellation}.`,
+    (name, constellation) => `Now locking onto ${name} — a galaxy drifting through ${constellation}.`,
+  ],
+  nebula: [
+    (name, constellation) => `Steering toward ${name}, a nebula glowing in ${constellation}.`,
+    (name, constellation) => `Target acquired: ${name}, a cloud of gas and dust in ${constellation}.`,
+  ],
+  cluster: [
+    (name, constellation) => `Heading for ${name}, a cluster of stars in ${constellation}.`,
+    (name, constellation) => `Now tracking ${name} — a stellar gathering in ${constellation}.`,
+  ],
+  object: [(name, constellation) => `Slewing toward ${name} in ${constellation}.`],
+};
+
+const MAGNITUDE_ASIDES = [
+  (mag) => `It shines at magnitude ${mag}.`,
+  (mag) => `You'll find it around magnitude ${mag}.`,
+];
+
+function pickOne(options) {
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+export function buildTargetNarrative(target) {
+  const category = targetCategory(target.type);
+  const opening = pickOne(OPENING_LINES[category])(target.common_name, target.constellation || 'the sky');
+
+  const parts = [opening];
+  if (target.description) parts.push(target.description);
+  if (typeof target.magnitude === 'number') {
+    parts.push(pickOne(MAGNITUDE_ASIDES)(target.magnitude));
+  }
+  return parts.join(' ');
+}
+
 async function handleGoto(targetQuery) {
   await publishVoiceEvent({ stage: 'searching', message: `Looking up ${targetQuery} in the local catalog...` });
 
-  const target = await lookupMessierTarget(targetQuery);
+  const target = await lookupCatalogTarget(targetQuery);
   if (!target) {
     const message = `I couldn't find "${targetQuery}" in the local offline catalog.`;
     await publishVoiceEvent({ stage: 'not_found', message });
@@ -93,8 +145,9 @@ async function handleGoto(targetQuery) {
 
   await publishVoiceEvent({
     stage: 'target_found',
-    message: `Found ${target.common_name}. Slewing now.`,
+    message: buildTargetNarrative(target),
     target: target.common_name,
+    catalog: target.catalog,
     ra: target.ra_decimal,
     dec: target.dec_decimal,
   });
