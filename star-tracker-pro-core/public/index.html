@@ -2,32 +2,115 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Star Tracker Pro Core — Voice Demo</title>
+<title>Star Tracker Pro Core — Observation HUD</title>
 <style>
-  body { font-family: -apple-system, sans-serif; background: #0b0f19; color: #e2e8f0; max-width: 720px; margin: 40px auto; padding: 0 16px; }
-  h1 { font-size: 18px; font-weight: 600; }
-  #status { font-size: 12px; color: #94a3b8; margin-bottom: 16px; }
-  #status.connected { color: #34d399; }
+  :root {
+    --bg: #0b0f19;
+    --panel: #161b2c;
+    --border: #2d3548;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #60a5fa;
+    --accent-btn: #2563eb;
+    --accent-btn-hover: #1d4ed8;
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --error: #f87171;
+  }
+  html[data-mode="night"] {
+    --bg: #0a0000;
+    --panel: #1a0000;
+    --border: #4d0000;
+    --text: #ff3b3b;
+    --text-dim: #a83232;
+    --accent: #ff3b3b;
+    --accent-btn: #7a0000;
+    --accent-btn-hover: #990000;
+    --ok: #ff3b3b;
+    --warn: #ff3b3b;
+    --error: #ff3b3b;
+  }
+
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); max-width: 780px; margin: 40px auto; padding: 0 16px; transition: background 0.2s, color 0.2s; }
+  h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  #status { font-size: 12px; color: var(--text-dim); }
+  #status.connected { color: var(--ok); }
+  #nightToggle { background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+
+  /* ---------- HUD ---------- */
+  .hud { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .hud-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .hud-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 6px; }
+  .coords { font-family: 'SF Mono', Menlo, monospace; font-size: 20px; letter-spacing: 0.02em; }
+  .coords .dec { margin-top: 2px; }
+
+  .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; letter-spacing: 0.03em; background: #2d3548; color: var(--text-dim); }
+  .status-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .status-badge.IDLE { color: var(--text-dim); }
+  .status-badge.SLEWING { color: var(--warn); animation: pulse 1s infinite; }
+  .status-badge.TRACKING { color: var(--ok); }
+  .status-badge.ERROR { color: var(--error); }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .target-name { font-size: 15px; font-weight: 600; }
+  .target-meta { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+  .tts-indicator { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); }
+  .tts-indicator .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+  .tts-indicator.speaking { color: var(--accent); }
+  .tts-indicator.speaking .dot { background: var(--accent); animation: pulse 0.6s infinite; }
+
+  /* ---------- controls ---------- */
   form { display: flex; gap: 8px; margin-bottom: 16px; }
-  input[type=text] { flex: 1; padding: 8px 10px; background: #161b2c; border: 1px solid #2d3548; border-radius: 6px; color: #e2e8f0; }
-  button { padding: 8px 14px; background: #2563eb; border: none; border-radius: 6px; color: white; cursor: pointer; }
-  button:hover { background: #1d4ed8; }
-  label { font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
-  #log { list-style: none; padding: 0; font-size: 13px; }
-  #log li { padding: 8px 10px; border-bottom: 1px solid #1e2536; }
-  #log li .stage { color: #60a5fa; font-weight: 600; margin-right: 6px; }
-  #log li.error .stage { color: #f87171; }
+  input[type=text] { flex: 1; padding: 8px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; color: var(--text); }
+  button { padding: 8px 14px; background: var(--accent-btn); border: none; border-radius: 6px; color: white; cursor: pointer; }
+  button:hover { background: var(--accent-btn-hover); }
+  label.check { font-size: 12px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+
+  #log { list-style: none; padding: 0; font-size: 13px; max-height: 260px; overflow-y: auto; }
+  #log li { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  #log li .stage { color: var(--accent); font-weight: 600; margin-right: 6px; }
+  #log li.error .stage { color: var(--error); }
 </style>
 </head>
 <body>
-<h1>Star Tracker Pro Core — Voice Demo</h1>
-<div id="status">connecting…</div>
+<div class="topbar">
+  <div>
+    <h1>Star Tracker Pro Core — Observation HUD</h1>
+    <div id="status">connecting…</div>
+  </div>
+  <button id="nightToggle" type="button">🌙 Night Vision</button>
+</div>
+
+<div class="hud">
+  <div class="hud-card">
+    <div class="label">Current RA / Dec (live telemetry)</div>
+    <div class="coords"><span id="raValue">--h --m --s</span></div>
+    <div class="coords dec"><span id="decValue">--° --' --"</span></div>
+  </div>
+  <div class="hud-card">
+    <div class="label">Mount Status</div>
+    <div class="status-badge IDLE" id="statusBadge"><span class="dot"></span><span id="statusBadgeText">IDLE</span></div>
+    <div style="margin-top: 12px;">
+      <div class="label">Kali Voice</div>
+      <div class="tts-indicator" id="ttsIndicator"><span class="dot"></span><span id="ttsIndicatorText">silent</span></div>
+    </div>
+  </div>
+  <div class="hud-card" style="grid-column: 1 / -1;">
+    <div class="label">Current Target</div>
+    <div class="target-name" id="targetName">—</div>
+    <div class="target-meta" id="targetMeta"></div>
+  </div>
+</div>
 
 <form id="queryForm">
   <input id="queryInput" type="text" placeholder='e.g. "go to the Orion Nebula" or "stop"' autocomplete="off" />
   <button type="submit">Send</button>
 </form>
-<label><input id="speakToggle" type="checkbox" checked /> Speak responses aloud (window.speechSynthesis)</label>
+<label class="check"><input id="speakToggle" type="checkbox" checked /> Speak responses aloud (window.speechSynthesis)</label>
 
 <ul id="log"></ul>
 
@@ -37,19 +120,88 @@
   const form = document.getElementById('queryForm');
   const input = document.getElementById('queryInput');
   const speakToggle = document.getElementById('speakToggle');
+  const nightToggle = document.getElementById('nightToggle');
+  const raValue = document.getElementById('raValue');
+  const decValue = document.getElementById('decValue');
+  const statusBadge = document.getElementById('statusBadge');
+  const statusBadgeText = document.getElementById('statusBadgeText');
+  const targetName = document.getElementById('targetName');
+  const targetMeta = document.getElementById('targetMeta');
+  const ttsIndicator = document.getElementById('ttsIndicator');
+  const ttsIndicatorText = document.getElementById('ttsIndicatorText');
+
+  // ---------- night-vision mode ----------
+  // Astronomy convention: red-on-black preserves dark-adapted night vision.
+  // Persisted so it survives a reload mid-session.
+  function applyMode(mode) {
+    document.documentElement.dataset.mode = mode;
+    nightToggle.textContent = mode === 'night' ? '☀️ Normal View' : '🌙 Night Vision';
+  }
+  applyMode(localStorage.getItem('hudMode') || 'normal');
+  nightToggle.addEventListener('click', () => {
+    const next = document.documentElement.dataset.mode === 'night' ? 'normal' : 'night';
+    localStorage.setItem('hudMode', next);
+    applyMode(next);
+  });
+
+  // ---------- coordinate formatting ----------
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function formatRA(hours) {
+    if (typeof hours !== 'number') return '--h --m --s';
+    const h = Math.floor(hours);
+    const mFull = (hours - h) * 60;
+    const m = Math.floor(mFull);
+    const s = Math.round((mFull - m) * 60);
+    return `${pad(h)}h ${pad(m)}m ${pad(s)}s`;
+  }
+  function formatDec(deg) {
+    if (typeof deg !== 'number') return '--° --\' --"';
+    const sign = deg < 0 ? '-' : '+';
+    const abs = Math.abs(deg);
+    const d = Math.floor(abs);
+    const mFull = (abs - d) * 60;
+    const m = Math.floor(mFull);
+    const s = Math.round((mFull - m) * 60);
+    return `${sign}${pad(d)}° ${pad(m)}' ${pad(s)}"`;
+  }
+
+  // ---------- mount status badge ----------
+  function setMountStatus(status) {
+    if (!status) return;
+    statusBadge.className = 'status-badge ' + status;
+    statusBadgeText.textContent = status;
+  }
+
+  // voice_status stages don't map 1:1 to hardware state, but give a
+  // reasonable badge update when no live INDI stream is running to report
+  // the real thing.
+  const STAGE_TO_STATUS = {
+    complete: 'SLEWING',
+    stopped: 'IDLE',
+    error: 'ERROR',
+  };
+
+  // ---------- TTS ----------
+  function speak(text) {
+    if (!speakToggle.checked || typeof window.speechSynthesis === 'undefined') return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onstart = () => {
+      ttsIndicator.classList.add('speaking');
+      ttsIndicatorText.textContent = 'speaking…';
+    };
+    utterance.onend = utterance.onerror = () => {
+      ttsIndicator.classList.remove('speaking');
+      ttsIndicatorText.textContent = 'silent';
+    };
+    window.speechSynthesis.speak(utterance);
+  }
 
   function log(stage, message, isError) {
     const li = document.createElement('li');
     if (isError) li.className = 'error';
     li.innerHTML = '<span class="stage">' + stage + '</span>' + message;
     logEl.prepend(li);
-  }
-
-  function speak(text) {
-    if (!speakToggle.checked || typeof window.speechSynthesis === 'undefined') return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    window.speechSynthesis.speak(utterance);
   }
 
   const ws = new WebSocket('ws://' + location.host + '/ws/indi');
@@ -81,11 +233,30 @@
       const isError = data.stage === 'error' || data.stage === 'not_found';
       log(data.stage, data.message, isError);
       if (data.message) speak(data.message);
+
+      if (data.stage === 'target_found' || data.stage === 'complete') {
+        if (data.target) targetName.textContent = data.target;
+        if (typeof data.ra === 'number' || typeof data.dec === 'number') {
+          targetMeta.textContent =
+            (data.catalog ? data.catalog + ' — ' : '') + formatRA(data.ra) + '  ' + formatDec(data.dec);
+        }
+      }
+      if (data.stage === 'status' && typeof data.tracking === 'boolean') {
+        setMountStatus(data.tracking ? 'TRACKING' : 'IDLE');
+      } else if (STAGE_TO_STATUS[data.stage]) {
+        setMountStatus(STAGE_TO_STATUS[data.stage]);
+      }
       return;
     }
 
     if (data.type === 'indi_telemetry') {
       log('indi:' + (data.property || data.device || ''), data.status || JSON.stringify(data.values || {}));
+      // This is real hardware telemetry — the authoritative source for the
+      // live RA/Dec readout and status badge, taking priority over the
+      // voice-flow's best-effort guesses above.
+      if (typeof data.ra === 'number') raValue.textContent = formatRA(data.ra);
+      if (typeof data.dec === 'number') decValue.textContent = formatDec(data.dec);
+      if (data.status) setMountStatus(data.status);
     }
   });
 
