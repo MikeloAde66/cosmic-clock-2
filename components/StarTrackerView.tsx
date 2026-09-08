@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, CalendarClock, Mic, Satellite, Sparkles, Sun as SunIcon, Volume2, X } from 'lucide-react';
+import { ArrowLeft, CalendarClock, HelpCircle, Mic, Satellite, Sparkles, Sun as SunIcon, Volume2, X } from 'lucide-react';
 import { Body as AstroBody, Equator, Horizon, Illumination, Observer, SearchRiseSet, SiderealTime } from 'astronomy-engine';
 import { calculateCosmicTime } from '@/lib/cosmicMath';
 import { useIssTracker } from '@/lib/useIssTracker';
@@ -312,6 +312,14 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const domeRef = useRef<SVGSVGElement | null>(null);
+
+  // Quick Start tour — see the tourSteps/tour-overlay block further down.
+  const [tourActive, setTourActive] = useState(false);
+  const [tourStepIndex, setTourStepIndex] = useState(0);
+  const [tourRect, setTourRect] = useState<DOMRect | null>(null);
+  const askKaliBarRef = useRef<HTMLDivElement | null>(null);
+  const messierToggleRef = useRef<HTMLDivElement | null>(null);
+  const telescopeConnectRef = useRef<HTMLDivElement | null>(null);
   // Set whenever an auto-zoom-to-target animation is in flight, so a manual
   // drag/wheel can cancel it (see the animateViewTo/interrupt effect below)
   // instead of fighting it frame by frame.
@@ -829,6 +837,57 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
     };
   }, []);
 
+  // ---------- Quick Start tour ----------
+  // Lightweight and dependency-free: a CSS spotlight (a box-shadow large
+  // enough to darken the whole viewport except a cutout matching the
+  // target's real DOMRect) plus a callout with an arrow, rather than
+  // pulling in a tour library for three steps.
+  const tourSteps = [
+    {
+      ref: askKaliBarRef,
+      message: "Type or tap the mic here to ask me anything about the sky — I'll speak the answer back to you.",
+    },
+    {
+      ref: messierToggleRef,
+      message: 'Switch Sky Maps to Messier Deep-Sky to reveal galaxies, nebulae, and clusters — click one to zoom in and hear its story.',
+    },
+    {
+      ref: telescopeConnectRef,
+      message: 'Got a real telescope? Connect it here and I can show its live position, or even slew it to a target.',
+    },
+  ];
+
+  const endTour = () => {
+    setTourActive(false);
+    setTourRect(null);
+  };
+
+  // Tracks the current step's target element continuously (not a one-time
+  // measurement) so the spotlight stays correctly placed through the
+  // smooth-scroll-into-view below, a window resize, or any other layout
+  // shift — a plain rAF loop is simpler and more robust here than wiring up
+  // separate scroll/resize listeners.
+  useEffect(() => {
+    if (!tourActive) return;
+    const step = tourSteps[tourStepIndex];
+    const el = step?.ref.current;
+    if (!el) {
+      endTour();
+      return;
+    }
+
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    let frame: number;
+    const track = () => {
+      setTourRect(el.getBoundingClientRect());
+      frame = requestAnimationFrame(track);
+    };
+    frame = requestAnimationFrame(track);
+    return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tourActive, tourStepIndex]);
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col w-full h-full p-4 overflow-y-auto bg-[#050810] text-slate-100">
       {/* Ambient starfield backdrop — fixed to the viewport, not the scroll
@@ -863,6 +922,17 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Back
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setTourStepIndex(0);
+            setTourActive(true);
+          }}
+          className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-cyan-500/40 text-cyan-300 hover:border-cyan-400 hover:bg-cyan-500/10"
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+          Quick Start
         </button>
       </div>
 
@@ -930,7 +1000,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
             <SunIcon className="w-3 h-3" />
             Space Weather
           </button>
-          <div className="relative flex items-center">
+          <div ref={messierToggleRef} className="relative flex items-center">
             <Sparkles className="absolute w-3 h-3 pointer-events-none left-2.5 text-cyan-300" />
             <select
               value={skyFocusMode}
@@ -978,7 +1048,9 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
           </div>
         </div>
 
-        <TelescopeConnectPanel connection={telescope} />
+        <div ref={telescopeConnectRef}>
+          <TelescopeConnectPanel connection={telescope} />
+        </div>
 
         {skyFestOpen && (
           <div className="overflow-hidden border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
@@ -1315,7 +1387,10 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               the automatic per-target narrative triggered by selection
               above. Anchored over the bottom edge of the lens, per the
               "directly on top of the canvas" placement. */}
-          <div className="absolute z-10 flex items-center gap-1.5 px-2 py-1.5 -translate-x-1/2 border rounded-lg bottom-2 left-1/2 border-cyan-500/30 bg-black/60 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_20px_-6px_rgba(0,0,0,0.6)] w-[92%]">
+          <div
+            ref={askKaliBarRef}
+            className="absolute z-10 flex items-center gap-1.5 px-2 py-1.5 -translate-x-1/2 border rounded-lg bottom-2 left-1/2 border-cyan-500/30 bg-black/60 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_20px_-6px_rgba(0,0,0,0.6)] w-[92%]"
+          >
             {hasMicSupport && (
               <button
                 type="button"
@@ -1931,6 +2006,84 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         )}
       </div>
 
+      {/* Quick Start tour overlay — a spotlight cutout over the real target
+          element's DOMRect (tourRect), a callout box with Kali's 1-sentence
+          prompt, and an arrow connecting the two. Renders above everything
+          else on the page and captures all clicks itself, so the rest of
+          the UI can't be accidentally triggered mid-tour; Skip/Next/Finish
+          are the only interactive elements. */}
+      {tourActive && tourRect && (
+        <div className="fixed inset-0 z-[100]">
+          <div
+            className="absolute transition-all duration-300 border-2 rounded-lg pointer-events-none border-cyan-300 animate-tour-glow"
+            style={{
+              left: tourRect.left - 8,
+              top: tourRect.top - 8,
+              width: tourRect.width + 16,
+              height: tourRect.height + 16,
+              boxShadow: '0 0 0 9999px rgba(2,6,16,0.8)',
+            }}
+          />
+          {(() => {
+            const viewportH = typeof window !== 'undefined' ? window.innerHeight : 800;
+            const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1200;
+            const calloutW = 280;
+            const gap = 16;
+            const spaceBelow = viewportH - tourRect.bottom;
+            const placeAbove = spaceBelow < 160 && tourRect.top > 160;
+            const top = placeAbove ? tourRect.top - gap : tourRect.bottom + gap;
+            const idealLeft = tourRect.left + tourRect.width / 2 - calloutW / 2;
+            const left = Math.min(Math.max(idealLeft, 12), viewportW - calloutW - 12);
+            const arrowLeft = Math.min(Math.max(tourRect.left + tourRect.width / 2 - left - 6, 12), calloutW - 24);
+            const isLastStep = tourStepIndex === tourSteps.length - 1;
+
+            return (
+              <div
+                className="absolute p-4 border rounded-lg shadow-2xl border-cyan-400/60 bg-slate-950/95 backdrop-blur-md"
+                style={{
+                  top: placeAbove ? undefined : top,
+                  bottom: placeAbove ? viewportH - top : undefined,
+                  left,
+                  width: calloutW,
+                }}
+              >
+                <div
+                  className="absolute w-3 h-3 border-cyan-400/60 bg-slate-950/95"
+                  style={
+                    placeAbove
+                      ? { left: arrowLeft, bottom: -6, borderRight: '1px solid', borderBottom: '1px solid', transform: 'rotate(45deg)' }
+                      : { left: arrowLeft, top: -6, borderLeft: '1px solid', borderTop: '1px solid', transform: 'rotate(45deg)' }
+                  }
+                />
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+                  <span className="text-[9px] font-mono uppercase tracking-widest text-purple-300/80">
+                    Kali · Quick Start {tourStepIndex + 1}/{tourSteps.length}
+                  </span>
+                </div>
+                <p className="text-sm leading-relaxed text-slate-100">{tourSteps[tourStepIndex].message}</p>
+                <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={endTour}
+                    className="text-[10px] font-mono uppercase tracking-wide text-slate-500 hover:text-slate-300"
+                  >
+                    Skip Tour
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => (isLastStep ? endTour() : setTourStepIndex((i) => i + 1))}
+                    className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wide rounded bg-cyan-400 text-cyan-950 hover:bg-cyan-300"
+                  >
+                    {isLastStep ? 'Finish' : 'Next →'}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       <style jsx>{`
         @keyframes star-twinkle {
           0%, 100% { opacity: 0.15; transform: scale(0.8); }
@@ -1984,6 +2137,13 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         }
         .animate-glass-fade-in {
           animation: glass-fade-in 0.35s ease-out;
+        }
+        @keyframes tour-glow {
+          0%, 100% { box-shadow: 0 0 0 9999px rgba(2,6,16,0.8), 0 0 10px 2px rgba(103,232,249,0.5); }
+          50% { box-shadow: 0 0 0 9999px rgba(2,6,16,0.8), 0 0 22px 6px rgba(103,232,249,0.9); }
+        }
+        .animate-tour-glow {
+          animation: tour-glow 1.8s ease-in-out infinite;
         }
       `}</style>
     </div>
