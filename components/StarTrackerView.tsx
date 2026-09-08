@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, CalendarClock, Satellite, Sparkles, Sun as SunIcon, X } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Mic, Satellite, Sparkles, Sun as SunIcon, Volume2, X } from 'lucide-react';
 import { Body as AstroBody, Equator, Horizon, Illumination, Observer, SearchRiseSet, SiderealTime } from 'astronomy-engine';
 import { calculateCosmicTime } from '@/lib/cosmicMath';
 import { useIssTracker } from '@/lib/useIssTracker';
@@ -18,11 +18,12 @@ import {
 import { daysUntil, getUpcomingEclipses, getUpcomingMeteorShowers, type UpcomingEclipse, type UpcomingMeteorShower } from '@/lib/skyEvents';
 import { listPlaylist, parseYouTubeId, removePlaylistItem, savePlaylistItem, type PlaylistItem } from '@/lib/spaceMediaPlaylist';
 import type { YouTubePlayer } from '@/lib/youtubeIframeApi';
-import { MESSIER_OBJECTS } from '@/lib/messierCatalog';
+import { MESSIER_OBJECTS, type MessierObject } from '@/lib/messierCatalog';
 import ObservatoryPicker, { OBSERVATORIES, type Observatory } from './ObservatoryPicker';
 import { useTelescopeConnection } from '@/lib/useTelescopeConnection';
 import TelescopeConnectPanel from './telescope/TelescopeConnectPanel';
 import InfoTooltip from './InfoTooltip';
+import { useSpeechToText } from './useSpeechToText';
 
 // The same real NASA ISS live feed already used by ISSFeedModal (the
 // header's "LIVE ISS" button) — reused here so the video is inline inside
@@ -159,7 +160,24 @@ function azAltToXY(azimuth: number, altitude: number, center: number, radius: nu
 // far less precise than real GPS, and the UI says so rather than silently
 // presenting it as an exact position.
 type LocationStatus = 'requesting' | 'granted' | 'ip-fallback' | 'denied' | 'unavailable';
-type SelectedItem = { kind: 'body'; body: SkyBody } | { kind: 'iss' } | { kind: 'constellation'; id: string } | null;
+type SelectedItem =
+  | { kind: 'body'; body: SkyBody }
+  | { kind: 'iss' }
+  | { kind: 'constellation'; id: string }
+  | { kind: 'messier'; object: MessierObject }
+  | null;
+
+// Stable identity for a selection, independent of object reference — bodies
+// are recomputed (new object identity) on every `now` tick, so effects that
+// should only re-fire on a genuine change of *what's* selected (not just a
+// clock tick) key off this instead of `selected` itself.
+function selectionKey(item: SelectedItem): string | null {
+  if (!item) return null;
+  if (item.kind === 'body') return `body:${item.body.name}`;
+  if (item.kind === 'messier') return `messier:${item.object.id}`;
+  if (item.kind === 'constellation') return `constellation:${item.id}`;
+  return 'iss';
+}
 
 // Fixed background stars/constellations have real RA/Dec already (unlike
 // the tracked solar-system bodies, which need Equator() first to derive
@@ -294,6 +312,20 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const domeRef = useRef<SVGSVGElement | null>(null);
+  // Set whenever an auto-zoom-to-target animation is in flight, so a manual
+  // drag/wheel can cancel it (see the animateViewTo/interrupt effect below)
+  // instead of fighting it frame by frame.
+  const viewAnimationRef = useRef<number | null>(null);
+
+  // Inline Kali narrative — real /api/ai-one-chat calls, spoken via
+  // window.speechSynthesis (same voice config as AiOneChat's toggleSpeak),
+  // triggered automatically on target selection and from the voice bar.
+  const [narrativeText, setNarrativeText] = useState('');
+  const [isNarrating, setIsNarrating] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [narrativeError, setNarrativeError] = useState('');
+  const [voiceQuery, setVoiceQuery] = useState('');
+  const narrativeAbortRef = useRef<AbortController | null>(null);
 
   const [issLayerOn, setIssLayerOn] = useState(false);
 
@@ -574,11 +606,22 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   // performance), which silently no-ops preventDefault on a JSX onWheel —
   // the page would scroll behind the dome while zooming it. A native
   // listener with passive:false is the only way to actually stop that.
+  // Cancels any in-flight auto-zoom-to-target animation (see animateViewTo
+  // below) so manual interaction always wins rather than fighting it frame
+  // by frame.
+  const interruptAutoZoom = () => {
+    if (viewAnimationRef.current !== null) {
+      cancelAnimationFrame(viewAnimationRef.current);
+      viewAnimationRef.current = null;
+    }
+  };
+
   useEffect(() => {
     const el = domeRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
       e.preventDefault();
+      interruptAutoZoom();
       setView((v) => ({ ...v, scale: Math.min(5, Math.max(1, v.scale - e.deltaY * 0.001)) }));
     };
     el.addEventListener('wheel', handler, { passive: false });
@@ -586,6 +629,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   }, []);
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    interruptAutoZoom();
     dragRef.current = { x: e.clientX - view.tx, y: e.clientY - view.ty };
   };
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -595,10 +639,189 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const endDrag = () => {
     dragRef.current = null;
   };
-  const resetView = () => setView({ scale: 1, tx: 0, ty: 0 });
+  const resetView = () => {
+    interruptAutoZoom();
+    setView({ scale: 1, tx: 0, ty: 0 });
+  };
+
+  // Animates the lens to center + zoom into a target point (in the same
+  // untransformed 0-500 viewBox space azAltToXY/equatorialToXY already
+  // return), given transform="translate(tx ty) scale(s)" with
+  // transform-origin at the dome's own center: the tx/ty that lands point P
+  // exactly at center is tx = -s*(P.x-center), ty = -s*(P.y-center).
+  const animateViewTo = (point: { x: number; y: number }, targetScale = 3, duration = 550) => {
+    interruptAutoZoom();
+    const from = view;
+    const to = {
+      scale: targetScale,
+      tx: -targetScale * (point.x - center),
+      ty: -targetScale * (point.y - center),
+    };
+    const start = performance.now();
+    const step = (t: number) => {
+      const progress = Math.min(1, (t - start) / duration);
+      // ease-out cubic — decelerates into the target rather than a linear pan
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setView({
+        scale: from.scale + (to.scale - from.scale) * eased,
+        tx: from.tx + (to.tx - from.tx) * eased,
+        ty: from.ty + (to.ty - from.ty) * eased,
+      });
+      if (progress < 1) {
+        viewAnimationRef.current = requestAnimationFrame(step);
+      } else {
+        viewAnimationRef.current = null;
+      }
+    };
+    viewAnimationRef.current = requestAnimationFrame(step);
+  };
 
   const eclipses = useMemo<UpcomingEclipse[]>(() => getUpcomingEclipses(now, 2), [now]);
   const meteorShowers = useMemo<UpcomingMeteorShower[]>(() => getUpcomingMeteorShowers(now, 4), [now]);
+
+  // ---------- Inline Kali narrative (real /api/ai-one-chat + TTS) ----------
+
+  const stopSpeaking = () => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+  };
+
+  // Same voice config as AiOneChat's toggleSpeak — a consistent Kali "voice"
+  // across the app rather than the browser's default TTS voice.
+  const speakNarrative = (text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis || !text.trim()) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.pitch = 0.85;
+    utterance.rate = 0.9;
+    const voices = window.speechSynthesis.getVoices();
+    utterance.voice = voices.find((v) => v.name.includes('Google UK English Female') || v.name.includes('Samantha')) ?? voices[0];
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Fires a real query at Kali, streams the response into narrativeText,
+  // then speaks the complete text once streaming finishes (waiting for the
+  // full answer reads far better aloud than speaking partial sentences as
+  // tokens arrive). A fresh call aborts whatever the previous one was doing
+  // — selecting a new target, or sending a new voice query, should
+  // interrupt rather than queue behind a stale request.
+  const askKaliInline = async (query: string) => {
+    narrativeAbortRef.current?.abort();
+    const controller = new AbortController();
+    narrativeAbortRef.current = controller;
+
+    stopSpeaking();
+    setNarrativeError('');
+    setNarrativeText('');
+    setIsNarrating(true);
+
+    try {
+      const res = await fetch('/api/ai-one-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: query }], mode: 'synthesis', language: 'en' }),
+        signal: controller.signal,
+      });
+      if (!res.ok || !res.body) throw new Error('Kali did not respond.');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let full = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        full += decoder.decode(value, { stream: true });
+        setNarrativeText(full);
+      }
+      setIsNarrating(false);
+      speakNarrative(full);
+    } catch (err) {
+      if (controller.signal.aborted) return; // superseded by a newer request, not a real failure
+      setIsNarrating(false);
+      setNarrativeError(err instanceof Error ? err.message : 'Kali could not be reached.');
+    }
+  };
+
+  // Builds the same kind of rich, grounded query the existing "Ask Kali →"
+  // button already constructs (object name + position + magnitude/distance)
+  // — reused here so the automatic on-canvas narrative and the button
+  // elsewhere ask Kali equally well-grounded questions.
+  const describeSelectedForKali = (item: SelectedItem): string | null => {
+    if (!item) return null;
+    if (item.kind === 'body') {
+      return (
+        `Tell me the story of ${item.body.name} — it's ${compassDirection(item.body.azimuth)} at ` +
+        `${item.body.altitude.toFixed(1)}° altitude` +
+        `${item.body.magnitude !== null ? `, magnitude ${item.body.magnitude.toFixed(2)}` : ''}, ` +
+        `${formatDistance(item.body.distanceAu)} away. In two or three sentences, what is it and why does it matter?`
+      );
+    }
+    if (item.kind === 'messier') {
+      return (
+        `Tell me the story of ${item.object.name} (${item.object.id}), a ${item.object.type} roughly ` +
+        `${formatLightYears(item.object.distanceLy)} away. In two or three sentences, what is it and why does it matter?`
+      );
+    }
+    if (item.kind === 'iss' && issTracker.telemetry) {
+      return (
+        `Tell me about the International Space Station — it's currently ${Math.round(issTracker.telemetry.rangeKm).toLocaleString()} km away, ` +
+        `orbiting at ${Math.round(issTracker.telemetry.altitudeKm)} km altitude at ${issTracker.telemetry.velocityKmS.toFixed(2)} km/s. ` +
+        `In two or three sentences, what's notable about it right now?`
+      );
+    }
+    return null;
+  };
+
+  // Auto-zoom + auto-narrate whenever the *selected object itself* changes
+  // (not just a clock tick recomputing the same body's position — see
+  // selectionKey). Only point-like selections (body/iss/messier) get a
+  // target to zoom to; a constellation is a line strip, not a single point.
+  const selKey = selectionKey(selected);
+  useEffect(() => {
+    if (!selected) return;
+
+    let point: { x: number; y: number } | null = null;
+    if (selected.kind === 'body') {
+      point = azAltToXY(selected.body.azimuth, selected.body.altitude, center, radius);
+    } else if (selected.kind === 'iss' && issTracker.telemetry) {
+      point = azAltToXY(issTracker.telemetry.azimuth, issTracker.telemetry.elevation, center, radius);
+    } else if (selected.kind === 'messier') {
+      point = equatorialToXY(selected.object.raHours, selected.object.decDeg, observer, now, center, radius);
+    }
+    if (point) animateViewTo(point);
+
+    const query = describeSelectedForKali(selected);
+    if (query) askKaliInline(query);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selKey]);
+
+  // Voice bar: mic (real speech-to-text, same hook AiOneChat's input uses)
+  // appends to the text field rather than auto-submitting, so a transcript
+  // can be reviewed/edited before it's sent — free-form questions here are
+  // independent of canvas selection, so they don't drive the lens/zoom.
+  const { isListening, toggleListening, hasSupport: hasMicSupport } = useSpeechToText((transcript) => {
+    setVoiceQuery((prev) => (prev ? `${prev} ${transcript}` : transcript));
+  });
+  const submitVoiceQuery = () => {
+    const q = voiceQuery.trim();
+    if (!q) return;
+    askKaliInline(q);
+    setVoiceQuery('');
+  };
+
+  // Speech never outlives this component — cancel on unmount, and abort any
+  // in-flight Kali request so a late stream doesn't setState after unmount.
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
+      narrativeAbortRef.current?.abort();
+      interruptAutoZoom();
+    };
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col w-full h-full p-4 overflow-y-auto bg-[#050810] text-slate-100">
@@ -1038,6 +1261,92 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
           <span className="absolute px-1.5 py-0.5 text-[8px] font-mono uppercase tracking-widest rounded top-1 right-1 text-cyan-300/70 bg-black/40">
             {view.scale.toFixed(1)}× · FOV {(180 / view.scale).toFixed(0)}°
           </span>
+
+          {/* On-canvas telemetry overlay — the selected target's key stats,
+              directly over the lens rather than only in the panel below it.
+              Only point-like selections have anything to show here. */}
+          {selected && selected.kind !== 'constellation' && (
+            <div className="absolute z-10 max-w-[55%] px-2 py-1.5 space-y-0.5 border rounded top-1 left-1 border-cyan-500/30 bg-black/60 backdrop-blur-sm pointer-events-none">
+              {selected.kind === 'body' && (
+                <>
+                  <div className="text-[9px] font-bold text-white font-mono">{selected.body.name}</div>
+                  <div className="text-[8px] text-cyan-300/80 font-mono">
+                    {compassDirection(selected.body.azimuth)} {selected.body.altitude.toFixed(1)}° · {formatDistance(selected.body.distanceAu)}
+                  </div>
+                </>
+              )}
+              {selected.kind === 'messier' && (
+                <>
+                  <div className="text-[9px] font-bold text-white font-mono">
+                    {selected.object.id} · {selected.object.name}
+                  </div>
+                  <div className="text-[8px] text-cyan-300/80 font-mono">
+                    {selected.object.type} · {formatLightYears(selected.object.distanceLy)}
+                  </div>
+                </>
+              )}
+              {selected.kind === 'iss' && issTracker.telemetry && (
+                <>
+                  <div className="text-[9px] font-bold text-white font-mono">International Space Station</div>
+                  <div className="text-[8px] text-cyan-300/80 font-mono">
+                    {Math.round(issTracker.telemetry.rangeKm).toLocaleString()} km · {issTracker.telemetry.velocityKmS.toFixed(2)} km/s
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Kali voice bar — real speech-to-text (mic) or typed text, real
+              /api/ai-one-chat, spoken aloud. Free-form questions here are
+              independent of canvas selection (no target to zoom to), unlike
+              the automatic per-target narrative triggered by selection
+              above. Anchored over the bottom edge of the lens, per the
+              "directly on top of the canvas" placement. */}
+          <div className="absolute z-10 flex items-center gap-1.5 px-2 py-1.5 -translate-x-1/2 border rounded-lg bottom-2 left-1/2 border-cyan-500/30 bg-black/70 backdrop-blur-sm w-[92%]">
+            {hasMicSupport && (
+              <button
+                type="button"
+                onClick={toggleListening}
+                title={isListening ? 'Stop listening' : 'Ask Kali by voice'}
+                className={`shrink-0 flex items-center justify-center w-6 h-6 rounded-full border ${
+                  isListening
+                    ? 'border-red-400 text-red-400 animate-pulse bg-red-500/10'
+                    : 'border-cyan-500/40 text-cyan-300 hover:border-cyan-400'
+                }`}
+              >
+                <Mic className="w-3 h-3" />
+              </button>
+            )}
+            <input
+              type="text"
+              value={voiceQuery}
+              onChange={(e) => setVoiceQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitVoiceQuery();
+              }}
+              placeholder={isListening ? 'Listening…' : 'Ask Kali about the sky…'}
+              className="flex-1 min-w-0 text-[10px] font-mono text-white placeholder-slate-500 bg-transparent outline-none"
+            />
+            {isSpeaking && (
+              <button
+                type="button"
+                onClick={stopSpeaking}
+                title="Stop speaking"
+                className="flex items-center justify-center w-6 h-6 text-cyan-300 shrink-0 animate-pulse"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={submitVoiceQuery}
+              disabled={!voiceQuery.trim() || isNarrating}
+              className="shrink-0 px-2 py-1 text-[9px] font-mono uppercase tracking-wide rounded text-cyan-950 bg-cyan-400 hover:bg-cyan-300 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isNarrating ? '…' : 'Ask'}
+            </button>
+          </div>
+
           <div className="p-4 border rounded-lg border-cyan-500/20 bg-black/30">
           <svg
             ref={domeRef}
@@ -1200,7 +1509,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                     <g
                       key={m.id}
                       className="cursor-pointer"
-                      onClick={() => window.open(messierArchiveUrl(m.id), '_blank', 'noopener,noreferrer')}
+                      onClick={() => setSelected({ kind: 'messier', object: m })}
                       onMouseEnter={() => setHoveredMessierId(m.id)}
                       onMouseLeave={() => setHoveredMessierId((prev) => (prev === m.id ? null : prev))}
                     >
@@ -1242,9 +1551,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                       {isHovered && (
                         <foreignObject x={boxX} y={boxY} width={boxW} height={boxH} className="pointer-events-none">
                           <div className="p-2 space-y-0.5 text-[7px] font-mono leading-tight text-purple-100 border rounded shadow-lg border-purple-500/40 bg-slate-950/95">
-                            <div className="text-[8px] font-bold text-white">
-                              🌌 {m.id} • Click to launch deep space archive
-                            </div>
+                            <div className="text-[8px] font-bold text-white">🌌 {m.id} • Click to select and hear its story</div>
                             <div className="pt-0.5">{m.name} — {m.type}</div>
                             <div>Distance: {formatLightYears(m.distanceLy)}</div>
                           </div>
@@ -1485,6 +1792,25 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                   <p className="font-mono text-xs text-cyan-100">Velocity {issTracker.telemetry.velocityKmS.toFixed(2)} km/s</p>
                 </div>
               )
+            ) : selected.kind === 'messier' ? (
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-white">
+                  {selected.object.id} · {selected.object.name}
+                </h3>
+                <p className="font-mono text-xs text-cyan-100">{selected.object.type}</p>
+                <p className="font-mono text-xs text-cyan-100">Distance {formatLightYears(selected.object.distanceLy)}</p>
+                {selected.object.magnitude !== null && (
+                  <p className="font-mono text-xs text-cyan-100">Magnitude {selected.object.magnitude.toFixed(2)}</p>
+                )}
+                <a
+                  href={messierArchiveUrl(selected.object.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block pt-1 text-[10px] text-purple-300 font-mono hover:underline hover:text-purple-200"
+                >
+                  View in Hubble Messier archive →
+                </a>
+              </div>
             ) : (
               constellationNames?.[selected.id] && (
                 <div className="space-y-1">
@@ -1494,6 +1820,37 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                   <p className="font-mono text-xs text-slate-400">Brightness rank: {constellationNames[selected.id].rank}</p>
                 </div>
               )
+            )}
+
+            {/* Kali's inline spoken narrative — real /api/ai-one-chat,
+                triggered automatically by the selection effect above for
+                any point-like target (constellations excluded, same as the
+                lens auto-zoom). Streamed text shown here as it arrives;
+                speaking starts once the full answer is in. */}
+            {selected.kind !== 'constellation' && (
+              <div className="pt-2 mt-2 border-t border-slate-800">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Sparkles className="w-3 h-3 text-purple-300" />
+                  <span className="text-[9px] font-mono uppercase tracking-widest text-purple-300/80">Kali</span>
+                  {isSpeaking && (
+                    <button
+                      type="button"
+                      onClick={stopSpeaking}
+                      title="Stop speaking"
+                      className="flex items-center gap-1 text-[9px] font-mono text-cyan-300 hover:text-cyan-200"
+                    >
+                      <Volume2 className="w-3 h-3 animate-pulse" /> speaking…
+                    </button>
+                  )}
+                </div>
+                {narrativeError ? (
+                  <p className="text-xs text-red-400">{narrativeError}</p>
+                ) : narrativeText ? (
+                  <p className="text-xs leading-relaxed text-slate-200">{narrativeText}</p>
+                ) : isNarrating ? (
+                  <p className="text-xs text-slate-500">Kali is thinking…</p>
+                ) : null}
+              </div>
             )}
           </div>
         )}
