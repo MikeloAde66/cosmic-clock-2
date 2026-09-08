@@ -1,10 +1,13 @@
 import 'dotenv/config';
 import http from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { AlpacaAdapter } from './hardware/alpaca.adapter.js';
 import { routeIntent } from './voice/intent_router.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 4000;
 
 const mount = new AlpacaAdapter(
@@ -15,6 +18,10 @@ const mount = new AlpacaAdapter(
 
 const app = express();
 app.use(express.json());
+// Demo client (public/index.html) — speaks voice_status messages via the
+// browser's own window.speechSynthesis, same pattern AiOneChat.tsx already
+// uses in the main app. No server-side audio generation, no API key.
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
@@ -105,4 +112,5 @@ server.listen(PORT, () => {
   console.log(`[star-tracker-pro-core] REST + WS server listening on port ${PORT}`);
   console.log(`  REST:      http://localhost:${PORT}/api/mount/...`);
   console.log(`  WebSocket: ws://localhost:${PORT}/ws/indi`);
+  console.log(`  Demo UI:   http://localhost:${PORT}/`);
 });
