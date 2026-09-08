@@ -35,3 +35,25 @@ services:
         sync: false
       - key: SUPABASE_KEY
         sync: false
+  # star-tracker-pro-core: the Alpaca/INDI hardware bridge + voice HUD
+  # living in the star-tracker-pro-core/ subdirectory of this repo. Only
+  # ever exposes the UI/voice/catalog demo experience once deployed here —
+  # the Alpaca (127.0.0.1:11111) and INDI (127.0.0.1:7624) calls inside it
+  # target localhost *on whichever machine runs this service*, which on
+  # Render has no telescope attached. Real hardware control only works
+  # when this runs on the same machine as the mount.
+  - type: web
+    name: star-tracker-pro-core
+    runtime: node
+    plan: free
+    rootDir: star-tracker-pro-core
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: ALPACA_HOST
+        value: 127.0.0.1
+      - key: ALPACA_PORT
+        value: 11111
+      - key: ALPACA_DEVICE_NUMBER
+        value: 0

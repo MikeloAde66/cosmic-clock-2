@@ -7,7 +7,12 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test tests/hardware_loop_test.js"
+    "test": "node --test tests/hardware_loop_test.js",
+    "init-db": "node scripts/init-db.js",
+    "build": "npm run init-db"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "keywords": [],
   "author": "",

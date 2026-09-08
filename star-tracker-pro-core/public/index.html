@@ -204,7 +204,11 @@
     logEl.prepend(li);
   }
 
-  const ws = new WebSocket('ws://' + location.host + '/ws/indi');
+  // wss:// when the page itself is loaded over https:// (e.g. once deployed)
+  // — a browser blocks an insecure ws:// connection from a secure page, the
+  // same mixed-content rule that applies to iframes/scripts.
+  const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(wsProtocol + '//' + location.host + '/ws/indi');
 
   ws.addEventListener('open', () => {
     statusEl.textContent = 'connected';
