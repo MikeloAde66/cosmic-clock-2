@@ -1,5 +1,16 @@
 import { AlpacaAdapter } from '../hardware/alpaca.adapter.js';
 import { lookupCatalogTarget } from '../db/catalogRepo.js';
+import { loadPacks, getPackTarget, getPackLore } from '../packs/pack_loader.js';
+
+// Loaded once at import time. This is the only place pack_loader.js touches
+// intent_router.js's control flow — everything else it does is purely
+// additive data lookups inside handleGoto/buildTargetNarrative below, so
+// routeIntent's dispatch logic never needs to change to support new packs.
+const packSummary = await loadPacks();
+console.log(
+  `[intent_router] Loaded ${packSummary.packs.length} pack(s): ${packSummary.packs.join(', ') || '(none)'} ` +
+    `— ${packSummary.targetCount} extra target(s), lore for ${packSummary.loreTargetCount} target(s).`
+);
 
 const mount = new AlpacaAdapter(
   process.env.ALPACA_HOST || '127.0.0.1',
@@ -130,13 +141,20 @@ export function buildTargetNarrative(target) {
   if (typeof target.magnitude === 'number') {
     parts.push(pickOne(MAGNITUDE_ASIDES)(target.magnitude));
   }
+
+  const packLore = getPackLore(target.id);
+  if (packLore.length) parts.push(pickOne(packLore));
+
   return parts.join(' ');
 }
 
 async function handleGoto(targetQuery) {
   await publishVoiceEvent({ stage: 'searching', message: `Looking up ${targetQuery} in the local catalog...` });
 
-  const target = await lookupCatalogTarget(targetQuery);
+  // Base SQLite catalog first, falling back to anything an expansion pack
+  // added — same exact-id-or-fuzzy-name matching either way, so pack
+  // targets are reachable identically to built-in ones.
+  const target = (await lookupCatalogTarget(targetQuery)) || getPackTarget(targetQuery);
   if (!target) {
     const message = `I couldn't find "${targetQuery}" in the local offline catalog.`;
     await publishVoiceEvent({ stage: 'not_found', message });
