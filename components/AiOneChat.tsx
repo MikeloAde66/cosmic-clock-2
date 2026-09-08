@@ -12,6 +12,7 @@ import {
   Minimize2,
   Plus,
   Printer,
+  Speaker,
   SquarePen,
   Volume2,
   VolumeX,
@@ -98,6 +99,15 @@ export default function AiOneChat({ prefillQuery }: AiOneChatProps = {}) {
   // Index of the message currently being read aloud via window.speechSynthesis
   // — null when nothing is speaking. Only one message speaks at a time.
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  // Off by default — the default chat experience (Markdown tables, diagrams,
+  // full-depth answers) is unchanged. Toggling this on opts into the same
+  // voiceMode contract StarTrackerView uses: replies come back short and
+  // conversational (see /api/ai-one-chat's VOICE_MODE_ADDENDUM) and speak
+  // themselves automatically once each one finishes streaming. The existing
+  // per-message Volume2/VolumeX read-aloud button works independently of
+  // this, in either mode.
+  const [voiceMode, setVoiceMode] = useState(false);
+  const lastAutoSpokenIdxRef = useRef<number | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const lastPrefillToken = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -150,16 +160,10 @@ export default function AiOneChat({ prefillQuery }: AiOneChatProps = {}) {
     };
   }, []);
 
-  // Toggle: clicking the speaker on the message already speaking stops it;
-  // clicking a different one cancels that and starts the new one instead.
-  const toggleSpeak = (idx: number, text: string) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-
-    if (speakingIdx === idx) {
-      window.speechSynthesis.cancel();
-      setSpeakingIdx(null);
-      return;
-    }
+  // Same voice config as StarTrackerView's speakNarrative — one consistent
+  // Kali "voice" across the app.
+  const startSpeaking = (idx: number, text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis || !text.trim()) return;
 
     window.speechSynthesis.cancel();
 
@@ -180,6 +184,36 @@ export default function AiOneChat({ prefillQuery }: AiOneChatProps = {}) {
     window.speechSynthesis.speak(utterance);
     setSpeakingIdx(idx);
   };
+
+  // Toggle: clicking the speaker on the message already speaking stops it;
+  // clicking a different one cancels that and starts the new one instead.
+  // Works the same regardless of voiceMode — this is the manual path.
+  const toggleSpeak = (idx: number, text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    if (speakingIdx === idx) {
+      window.speechSynthesis.cancel();
+      setSpeakingIdx(null);
+      return;
+    }
+
+    startSpeaking(idx, text);
+  };
+
+  // Automatic path: only while voiceMode is on, speak each assistant message
+  // exactly once, the moment it finishes streaming (isStreaming -> false) —
+  // guarded by lastAutoSpokenIdxRef so this doesn't re-fire on every render
+  // or re-speak a message that already got its turn.
+  useEffect(() => {
+    if (!voiceMode || isStreaming) return;
+    const idx = messages.length - 1;
+    const last = messages[idx];
+    if (!last || last.role !== 'assistant') return;
+    const text = typeof last.content === 'string' ? last.content : '';
+    if (!text.trim() || lastAutoSpokenIdxRef.current === idx) return;
+    lastAutoSpokenIdxRef.current = idx;
+    startSpeaking(idx, text);
+  }, [isStreaming, messages, voiceMode]);
 
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
@@ -314,7 +348,7 @@ export default function AiOneChat({ prefillQuery }: AiOneChatProps = {}) {
       const res = await fetch('/api/ai-one-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages, mode, language }),
+        body: JSON.stringify({ messages: apiMessages, mode, language, voiceMode }),
       });
 
       if (!res.ok || !res.body) {
@@ -404,6 +438,20 @@ export default function AiOneChat({ prefillQuery }: AiOneChatProps = {}) {
         </div>
 
         <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setVoiceMode((v) => !v)}
+            title={
+              voiceMode
+                ? 'Voice Mode: On — replies are short, spoken-style, and read aloud automatically'
+                : 'Voice Mode: Off — click to have Kali speak her replies automatically'
+            }
+            className={`flex items-center justify-center w-6 h-6 transition rounded ${
+              voiceMode ? 'text-cyan-300 bg-cyan-500/10' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Speaker className="w-3.5 h-3.5" />
+          </button>
           <button
             type="button"
             onClick={startNewChat}
