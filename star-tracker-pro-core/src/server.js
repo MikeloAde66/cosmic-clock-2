@@ -3,6 +3,7 @@ import http from 'http';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { AlpacaAdapter } from './hardware/alpaca.adapter.js';
+import { routeIntent } from './voice/intent_router.js';
 
 const PORT = process.env.PORT || 4000;
 
@@ -52,23 +53,43 @@ app.post('/api/mount/abort', async (_req, res) => {
   }
 });
 
-// ---------- INDI telemetry ingestion + broadcast ----------
-// indi_listener.py doesn't parse real telemetry out of the INDI XML stream
-// yet (still a TODO there) — once it does, it should POST each parsed
-// event here, and this fans it out to every connected WebSocket client.
-// Kept as a plain HTTP hop (rather than a direct process pipe/socket) so
-// the Python and Node sides stay independently runnable/testable.
+// ---------- Voice intent endpoint ----------
+
+app.post('/api/voice/intent', async (req, res) => {
+  const { query } = req.body ?? {};
+  if (typeof query !== 'string' || !query.trim()) {
+    return res.status(400).json({ error: 'Body must include a non-empty string "query".' });
+  }
+  try {
+    const result = await routeIntent(query);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Telemetry ingestion + broadcast ----------
+// indi_listener.py POSTs each parsed INDI XML event here as it streams in,
+// and intent_router.js POSTs stage-by-stage voice/status events as it
+// drives the Alpaca adapter — both fan out to every connected WebSocket
+// client. Kept as a plain HTTP hop (rather than a direct process pipe/
+// socket) so the Python and Node sides stay independently runnable/
+// testable.
 app.post('/api/telemetry/indi', (req, res) => {
-  const event = req.body ?? {};
-  broadcastIndiTelemetry(event);
+  broadcast('indi_telemetry', req.body ?? {});
+  res.status(202).json({ received: true });
+});
+
+app.post('/api/telemetry/voice', (req, res) => {
+  broadcast('voice_status', req.body ?? {});
   res.status(202).json({ received: true });
 });
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws/indi' });
 
-function broadcastIndiTelemetry(event) {
-  const payload = JSON.stringify({ type: 'indi_telemetry', ...event, ts: Date.now() });
+function broadcast(type, event) {
+  const payload = JSON.stringify({ type, ...event, ts: Date.now() });
   for (const client of wss.clients) {
     if (client.readyState === client.OPEN) {
       client.send(payload);
@@ -77,7 +98,7 @@ function broadcastIndiTelemetry(event) {
 }
 
 wss.on('connection', (ws) => {
-  ws.send(JSON.stringify({ type: 'connected', message: 'Subscribed to INDI telemetry.' }));
+  ws.send(JSON.stringify({ type: 'connected', message: 'Subscribed to INDI + voice telemetry.' }));
 });
 
 server.listen(PORT, () => {
