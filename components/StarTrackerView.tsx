@@ -702,13 +702,16 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
     window.speechSynthesis.speak(utterance);
   };
 
-  // Fires a real query at Kali, streams the response into narrativeText,
-  // then speaks the complete text once streaming finishes (waiting for the
-  // full answer reads far better aloud than speaking partial sentences as
-  // tokens arrive). A fresh call aborts whatever the previous one was doing
-  // — selecting a new target, or sending a new voice query, should
-  // interrupt rather than queue behind a stale request.
-  const askKaliInline = async (query: string) => {
+  // Fires a real query at Kali and streams the response into narrativeText.
+  // autoSpeak controls whether the complete answer is spoken once streaming
+  // finishes — false for target selection (no autoplay on page load or on
+  // clicking a marker; the text still appears, with an explicit Speak
+  // button to hear it), true for an explicit voice/text query submitted in
+  // the Ask Kali bar, which is itself already a deliberate user action. A
+  // fresh call aborts whatever the previous one was doing — selecting a new
+  // target, or sending a new voice query, should interrupt rather than
+  // queue behind a stale request.
+  const askKaliInline = async (query: string, autoSpeak: boolean) => {
     narrativeAbortRef.current?.abort();
     const controller = new AbortController();
     narrativeAbortRef.current = controller;
@@ -737,7 +740,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         setNarrativeText(full);
       }
       setIsNarrating(false);
-      speakNarrative(full);
+      if (autoSpeak) speakNarrative(full);
     } catch (err) {
       if (controller.signal.aborted) return; // superseded by a newer request, not a real failure
       setIsNarrating(false);
@@ -779,6 +782,9 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   // (not just a clock tick recomputing the same body's position — see
   // selectionKey). Only point-like selections (body/iss/messier) get a
   // target to zoom to; a constellation is a line strip, not a single point.
+  // Narrative text still fetches/displays on selection (useful, silent) —
+  // autoSpeak is false here specifically so nothing plays on page load or
+  // on merely clicking a marker; hearing it is an explicit Speak click.
   const selKey = selectionKey(selected);
   useEffect(() => {
     if (!selected) return;
@@ -794,7 +800,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
     if (point) animateViewTo(point);
 
     const query = describeSelectedForKali(selected);
-    if (query) askKaliInline(query);
+    if (query) askKaliInline(query, false);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selKey]);
@@ -809,7 +815,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const submitVoiceQuery = () => {
     const q = voiceQuery.trim();
     if (!q) return;
-    askKaliInline(q);
+    askKaliInline(q, true); // an explicit ask — speak the answer
     setVoiceQuery('');
   };
 
@@ -828,21 +834,25 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
       {/* Ambient starfield backdrop — fixed to the viewport, not the scroll
           container, so it stays put while the content above scrolls over it */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        {BACKGROUND_STARS.map((star, idx) => (
-          <div
-            key={idx}
-            className={`absolute rounded-full bg-white shadow-[0_0_4px_#ffffff] ${star.twinkles ? 'animate-star-twinkle' : ''}`}
-            style={{
-              top: star.top,
-              left: star.left,
-              width: star.size,
-              height: star.size,
-              opacity: star.twinkles ? undefined : star.opacity,
-              animationDelay: star.twinkles ? star.delay : undefined,
-              animationDuration: star.twinkles ? star.duration : undefined,
-            }}
-          />
-        ))}
+        {/* Slightly oversized (-inset-6) so the slow whole-field drift below
+            never reveals an edge gap against the clipping container above. */}
+        <div className="absolute -inset-6 animate-starfield-drift">
+          {BACKGROUND_STARS.map((star, idx) => (
+            <div
+              key={idx}
+              className={`absolute rounded-full bg-white shadow-[0_0_4px_#ffffff] ${star.twinkles ? 'animate-star-twinkle' : ''}`}
+              style={{
+                top: star.top,
+                left: star.left,
+                width: star.size,
+                height: star.size,
+                opacity: star.twinkles ? undefined : star.opacity,
+                animationDelay: star.twinkles ? star.delay : undefined,
+                animationDuration: star.twinkles ? star.duration : undefined,
+              }}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="relative z-10 flex items-center gap-2 mb-4 shrink-0">
@@ -867,7 +877,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         </div>
 
         {/* Time Sync header */}
-        <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg border-cyan-500/20 bg-black/30">
+        <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">Local Time</div>
             <div className="font-mono text-sm text-white">{now.toLocaleTimeString()}</div>
@@ -971,7 +981,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         <TelescopeConnectPanel connection={telescope} />
 
         {skyFestOpen && (
-          <div className="overflow-hidden border rounded-lg border-cyan-500/20 bg-black/30">
+          <div className="overflow-hidden border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
             <div className="flex border-b border-cyan-500/20">
               {(['eclipses', 'meteors', 'media'] as const).map((tab) => (
                 <button
@@ -1125,7 +1135,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         )}
 
         {spaceWeatherOn && (
-          <div className="px-3 py-2 border rounded-lg border-cyan-500/20 bg-black/30">
+          <div className="px-3 py-2 border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
             {kpError ? (
               <p className="font-mono text-xs text-red-400">Space weather data unavailable right now.</p>
             ) : kp ? (
@@ -1139,7 +1149,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         )}
 
         {issLayerOn && (
-          <div className="p-2 space-y-2 border rounded-lg border-cyan-500/20 bg-black/30">
+          <div className="p-2 space-y-2 border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
             {issTracker.error ? (
               <p className="px-1 font-mono text-xs text-red-400">ISS position unavailable right now.</p>
             ) : issTracker.telemetry ? (
@@ -1168,7 +1178,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         )}
 
         {skyFocusMode !== 'OFF' && (skyMapsLoading || skyMapsError) && (
-          <div className="px-3 py-2 border rounded-lg border-cyan-500/20 bg-black/30">
+          <div className="px-3 py-2 border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
             {skyMapsError ? (
               <p className="font-mono text-xs text-red-400">Constellation data unavailable right now.</p>
             ) : (
@@ -1183,7 +1193,10 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
             outer ring's rotation is a real readout of view.scale (1x-5x,
             the same real wheel-zoom already wired to the dome below), not
             purely decorative. */}
-        <div className="relative p-3 rounded-2xl" style={{ background: 'radial-gradient(circle at 32% 28%, rgba(148,163,184,0.14), rgba(8,12,18,0.5) 65%)' }}>
+        <div
+          className="relative p-3 border rounded-2xl border-white/10 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_20px_60px_-20px_rgba(0,0,0,0.7)]"
+          style={{ background: 'radial-gradient(circle at 32% 28%, rgba(148,163,184,0.14), rgba(8,12,18,0.5) 65%)' }}
+        >
           {/* Green-coated-optics edge glare — fades in from the bezel rim,
               transparent at center so it doesn't wash out the reticle. */}
           <div
@@ -1266,7 +1279,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               directly over the lens rather than only in the panel below it.
               Only point-like selections have anything to show here. */}
           {selected && selected.kind !== 'constellation' && (
-            <div className="absolute z-10 max-w-[55%] px-2 py-1.5 space-y-0.5 border rounded top-1 left-1 border-cyan-500/30 bg-black/60 backdrop-blur-sm pointer-events-none">
+            <div className="absolute z-10 max-w-[55%] px-2 py-1.5 space-y-0.5 border rounded top-1 left-1 border-cyan-500/30 bg-black/50 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] pointer-events-none animate-glass-fade-in">
               {selected.kind === 'body' && (
                 <>
                   <div className="text-[9px] font-bold text-white font-mono">{selected.body.name}</div>
@@ -1302,7 +1315,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               the automatic per-target narrative triggered by selection
               above. Anchored over the bottom edge of the lens, per the
               "directly on top of the canvas" placement. */}
-          <div className="absolute z-10 flex items-center gap-1.5 px-2 py-1.5 -translate-x-1/2 border rounded-lg bottom-2 left-1/2 border-cyan-500/30 bg-black/70 backdrop-blur-sm w-[92%]">
+          <div className="absolute z-10 flex items-center gap-1.5 px-2 py-1.5 -translate-x-1/2 border rounded-lg bottom-2 left-1/2 border-cyan-500/30 bg-black/60 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_20px_-6px_rgba(0,0,0,0.6)] w-[92%]">
             {hasMicSupport && (
               <button
                 type="button"
@@ -1347,7 +1360,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
             </button>
           </div>
 
-          <div className="p-4 border rounded-lg border-cyan-500/20 bg-black/30">
+          <div className="p-4 border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
           <svg
             ref={domeRef}
             viewBox={`0 0 ${size} ${size}`}
@@ -1721,7 +1734,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
 
         {/* Detail panel for the selected body/satellite — inline, not a modal */}
         {selected && (
-          <div className="relative p-4 border rounded-lg border-cyan-500/40 bg-cyan-950/20">
+          <div className="relative p-4 border rounded-lg border-cyan-500/40 bg-cyan-950/20 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_32px_-12px_rgba(0,0,0,0.6)] animate-glass-fade-in">
             <button
               type="button"
               onClick={() => setSelected(null)}
@@ -1822,17 +1835,20 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               )
             )}
 
-            {/* Kali's inline spoken narrative — real /api/ai-one-chat,
-                triggered automatically by the selection effect above for
-                any point-like target (constellations excluded, same as the
-                lens auto-zoom). Streamed text shown here as it arrives;
-                speaking starts once the full answer is in. */}
+            {/* Kali's inline narrative — real /api/ai-one-chat, fetched
+                automatically by the selection effect above for any
+                point-like target (constellations excluded, same as the
+                lens auto-zoom) and shown here as it streams. It does NOT
+                speak itself — no autoplay on page load or on merely
+                clicking a marker. Hearing it aloud is always an explicit
+                action: the Speak button below, or a query submitted
+                through the Ask Kali bar. */}
             {selected.kind !== 'constellation' && (
               <div className="pt-2 mt-2 border-t border-slate-800">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Sparkles className="w-3 h-3 text-purple-300" />
                   <span className="text-[9px] font-mono uppercase tracking-widest text-purple-300/80">Kali</span>
-                  {isSpeaking && (
+                  {isSpeaking ? (
                     <button
                       type="button"
                       onClick={stopSpeaking}
@@ -1841,6 +1857,18 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                     >
                       <Volume2 className="w-3 h-3 animate-pulse" /> speaking…
                     </button>
+                  ) : (
+                    narrativeText &&
+                    !isNarrating && (
+                      <button
+                        type="button"
+                        onClick={() => speakNarrative(narrativeText)}
+                        title="Speak this narrative aloud"
+                        className="flex items-center gap-1 text-[9px] font-mono text-purple-300 hover:text-purple-200"
+                      >
+                        <Volume2 className="w-3 h-3" /> Speak
+                      </button>
+                    )
                   )}
                 </div>
                 {narrativeError ? (
@@ -1933,6 +1961,29 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         }
         .animate-azimuth-sweep {
           animation: azimuth-sweep 8s linear infinite;
+        }
+        /* Whole-field drift, not per-star — one animation instead of
+           hundreds is dramatically cheaper and reads as a slower, more
+           cinematic parallax than jittering individual stars would.
+           Deliberately large duration/small distance: this should register
+           as "the sky is alive" at a glance, never as something to
+           consciously watch. */
+        @keyframes starfield-drift {
+          0% { transform: translate(0, 0); }
+          25% { transform: translate(-8px, 5px); }
+          50% { transform: translate(3px, -6px); }
+          75% { transform: translate(6px, 4px); }
+          100% { transform: translate(0, 0); }
+        }
+        .animate-starfield-drift {
+          animation: starfield-drift 120s ease-in-out infinite;
+        }
+        @keyframes glass-fade-in {
+          from { opacity: 0; transform: translateY(6px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-glass-fade-in {
+          animation: glass-fade-in 0.35s ease-out;
         }
       `}</style>
     </div>
