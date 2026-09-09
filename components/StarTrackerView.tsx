@@ -15,7 +15,6 @@ import {
   type ConstellationNames,
   type StarTuple,
 } from '@/lib/skyChart';
-import { daysUntil, getUpcomingEclipses, getUpcomingMeteorShowers, type UpcomingEclipse, type UpcomingMeteorShower } from '@/lib/skyEvents';
 import { listPlaylist, parseYouTubeId, removePlaylistItem, savePlaylistItem, type PlaylistItem } from '@/lib/spaceMediaPlaylist';
 import type { YouTubePlayer } from '@/lib/youtubeIframeApi';
 import { MESSIER_OBJECTS, type MessierObject } from '@/lib/messierCatalog';
@@ -29,6 +28,8 @@ import { TelemetryGauges } from './hud/TelemetryGauges';
 import { SystemMetricsGauges } from './hud/SystemMetricsGauges';
 import { TargetAlignmentDiagnostics } from './hud/TargetAlignmentDiagnostics';
 import { HudControlPanel } from './hud/HudControlPanel';
+import DsnTelemetryPanel from './hud/DsnTelemetryPanel';
+import DeepSkySpectrumPanel from './hud/DeepSkySpectrumPanel';
 import { useProCoreConnection } from '@/lib/useProCoreConnection';
 
 // The same real NASA ISS live feed already used by ISSFeedModal (the
@@ -360,7 +361,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
 
   const [skyFestOpen, setSkyFestOpen] = useState(false);
   const telescope = useTelescopeConnection();
-  const [skyFestTab, setSkyFestTab] = useState<'eclipses' | 'meteors' | 'media'>('eclipses');
+  const [skyFestTab, setSkyFestTab] = useState<'dsn' | 'deepsky' | 'media'>('dsn');
   // Real local UI preference (Phase 4 HUD controls) — directly sets this
   // panel's own backdrop opacity below, nothing fabricated or hardware-linked.
   const [hudOpacity, setHudOpacity] = useState(1);
@@ -650,6 +651,13 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const size = 500;
   const center = size / 2;
   const radius = size / 2 - 24;
+  // Holographic azimuth ring's own radius — inset a few px inside where the
+  // outer bezel ring used to sit (radius + 8) so the N/E/S/W labels' glyph
+  // width/height and drop-shadow halo (see the label loop below) land fully
+  // inside the SVG viewBox instead of clipping against it at the cardinal
+  // points, where they previously had almost no margin to spare.
+  const azimuthRingR = radius + 6;
+  const azimuthLabelR = radius + 16;
 
   // Resolves overlapping body labels (e.g. Mercury sitting almost exactly
   // on the Sun from Earth's sky) into a staggered column with leader
@@ -693,9 +701,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const resetView = () => {
     setView({ scale: 1, tx: 0, ty: 0 });
   };
-
-  const eclipses = useMemo<UpcomingEclipse[]>(() => getUpcomingEclipses(now, 2), [now]);
-  const meteorShowers = useMemo<UpcomingMeteorShower[]>(() => getUpcomingMeteorShowers(now, 4), [now]);
 
   // ---------- Inline Kali narrative (real /api/ai-one-chat + TTS) ----------
 
@@ -810,6 +815,22 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
     }
     return null;
   };
+
+  // Feeds the Deep Sky Spectrum tab (real multi-wavelength imagery for
+  // whichever Messier object is actually selected on the map) — null for
+  // every other selection kind/no selection, rather than falling back to an
+  // arbitrary default target the user didn't actually pick.
+  const deepSkyTarget =
+    selected?.kind === 'messier'
+      ? {
+          id: selected.object.id,
+          name: selected.object.name,
+          raHours: selected.object.raHours,
+          decDeg: selected.object.decDeg,
+          type: selected.object.type,
+          distanceLy: selected.object.distanceLy,
+        }
+      : null;
 
   // Auto-narrate whenever the *selected object itself* changes (not just a
   // clock tick recomputing the same body's position — see selectionKey).
@@ -1125,7 +1146,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
             </div>
 
             <div className="flex border-b border-cyan-500/20">
-              {(['eclipses', 'meteors', 'media'] as const).map((tab) => (
+              {(['dsn', 'deepsky', 'media'] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -1134,47 +1155,15 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                     skyFestTab === tab ? 'bg-cyan-500/10 text-cyan-300' : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
-                  {tab === 'eclipses' ? '🌘 Eclipses' : tab === 'meteors' ? '☄️ Meteors' : '🛰️ Space Media'}
+                  {tab === 'dsn' ? '📡 DSN Telemetry' : tab === 'deepsky' ? '🌌 Deep Sky Spectrum' : '🛰️ Space Media'}
                 </button>
               ))}
             </div>
 
             <div className="p-3 space-y-2">
-              {skyFestTab === 'eclipses' &&
-                eclipses.map((e, i) => (
-                  <div key={i} className="p-2 border rounded border-slate-800 bg-slate-900/40">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-white capitalize">
-                        {e.type} eclipse — {e.kind}
-                      </span>
-                      <span className="font-mono text-[10px] text-cyan-300">{daysUntil(now, e.peak)}d</span>
-                    </div>
-                    <p className="font-mono text-[11px] text-slate-400">
-                      {e.peak.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
-                    </p>
-                    {e.obscuration !== null && (
-                      <p className="font-mono text-[11px] text-slate-400">Obscuration {(e.obscuration * 100).toFixed(0)}%</p>
-                    )}
-                    {e.latitude !== null && e.longitude !== null && (
-                      <p className="font-mono text-[11px] text-slate-400">
-                        Peak visibility near {e.latitude.toFixed(1)}°, {e.longitude.toFixed(1)}°
-                      </p>
-                    )}
-                  </div>
-                ))}
+              {skyFestTab === 'dsn' && <DsnTelemetryPanel active={skyFestTab === 'dsn'} />}
 
-              {skyFestTab === 'meteors' &&
-                meteorShowers.map((m) => (
-                  <div key={m.name} className="p-2 border rounded border-slate-800 bg-slate-900/40">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-white">{m.name}</span>
-                      <span className="font-mono text-[10px] text-cyan-300">{daysUntil(now, m.nextPeak)}d</span>
-                    </div>
-                    <p className="font-mono text-[11px] text-slate-400">
-                      Peaks {m.nextPeak.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })} · parent body: {m.parentBody}
-                    </p>
-                  </div>
-                ))}
+              {skyFestTab === 'deepsky' && <DeepSkySpectrumPanel target={deepSkyTarget} />}
 
               {skyFestTab === 'media' && (
                 <div className="space-y-3">
@@ -1568,14 +1557,14 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                   "holographic" feel. Real azimuth convention (0=N,
                   90=E clockwise), same as the rest of this view. */}
               <g className="pointer-events-none">
-                <circle cx={center} cy={center} r={radius + 8} fill="none" stroke={LIGHTWORK_GREEN} strokeOpacity={0.15} strokeWidth={4} />
-                <circle cx={center} cy={center} r={radius + 8} fill="none" stroke={LIGHTWORK_GREEN} strokeOpacity={0.5} strokeWidth={1} />
+                <circle cx={center} cy={center} r={azimuthRingR} fill="none" stroke={LIGHTWORK_GREEN} strokeOpacity={0.15} strokeWidth={4} />
+                <circle cx={center} cy={center} r={azimuthRingR} fill="none" stroke={LIGHTWORK_GREEN} strokeOpacity={0.5} strokeWidth={1} />
                 {Array.from({ length: 24 }).map((_, i) => {
                   const deg = i * 15;
                   const angle = (deg - 90) * (Math.PI / 180);
                   const isMajor = deg % 45 === 0;
-                  const outer = radius + 8 + (isMajor ? 5 : 3);
-                  const inner = radius + 8 - (isMajor ? 5 : 3);
+                  const outer = azimuthRingR + (isMajor ? 5 : 3);
+                  const inner = azimuthRingR - (isMajor ? 5 : 3);
                   return (
                     <line
                       key={deg}
@@ -1600,8 +1589,8 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                   { deg: 315, label: 'NW' },
                 ].map(({ deg, label }) => {
                   const angle = (deg - 90) * (Math.PI / 180);
-                  const x = center + Math.cos(angle) * (radius + 20);
-                  const y = center + Math.sin(angle) * (radius + 20);
+                  const x = center + Math.cos(angle) * azimuthLabelR;
+                  const y = center + Math.sin(angle) * azimuthLabelR;
                   return (
                     <text
                       key={label}
@@ -1626,11 +1615,11 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                   <circle
                     cx={center}
                     cy={center}
-                    r={radius + 8}
+                    r={azimuthRingR}
                     fill="none"
                     stroke="rgba(103,232,249,0.9)"
                     strokeWidth={2}
-                    strokeDasharray={`${(radius + 8) * 0.15} ${(radius + 8) * 6.13}`}
+                    strokeDasharray={`${azimuthRingR * 0.15} ${azimuthRingR * 6.13}`}
                   />
                 </g>
               </g>
