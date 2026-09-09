@@ -2,8 +2,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, CalendarClock, HelpCircle, Mic, Satellite, Sparkles, Sun as SunIcon, Volume2, X } from 'lucide-react';
-import { Body as AstroBody, Equator, Horizon, Illumination, Observer, SearchRiseSet, SiderealTime } from 'astronomy-engine';
+import { Body as AstroBody, Equator, Horizon, Illumination, Observer, SearchRiseSet } from 'astronomy-engine';
 import { calculateCosmicTime } from '@/lib/cosmicMath';
+import { localSiderealTime } from '@/lib/siderealTime';
 import { useIssTracker } from '@/lib/useIssTracker';
 import { describeKp, fetchLatestKp, type KpReading } from '@/lib/spaceWeather';
 import {
@@ -149,18 +150,6 @@ function computeSky(observer: Observer, now: Date): SkyBody[] {
       nextSet: nextSet ? nextSet.date : null,
     };
   }).sort((a, b) => b.altitude - a.altitude);
-}
-
-// Local Sidereal Time = Greenwich Apparent Sidereal Time (astronomy-engine's
-// SiderealTime, in sidereal hours) shifted by the observer's longitude —
-// each 15° of longitude is 1 sidereal hour.
-function localSiderealTime(now: Date, longitude: number): string {
-  const gast = SiderealTime(now);
-  const lst = (((gast + longitude / 15) % 24) + 24) % 24;
-  const hours = Math.floor(lst);
-  const minutes = Math.floor((lst - hours) * 60);
-  const seconds = Math.floor((((lst - hours) * 60 - minutes) * 60));
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 function azAltToXY(azimuth: number, altitude: number, center: number, radius: number) {

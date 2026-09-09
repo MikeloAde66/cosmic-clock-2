@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Check, Download } from 'lucide-react';
 import Starfield from '@/components/Starfield';
+import StarTrackerHero from '@/components/StarTrackerHero';
 import PurchaseButton from '@/components/PurchaseButton';
 import { STANDALONE_PRODUCTS } from '@/lib/standaloneProducts';
 import { STAR_TRACKER_LINK, AIONE_PRO_SUBSCRIPTION_LINK } from '@/lib/paymentLinks';
@@ -29,8 +30,7 @@ export default function StarTrackerProductPage() {
 
   return (
     <div className="relative w-full min-h-screen overflow-hidden bg-[#0a0a0c] text-slate-100">
-      <Starfield />
-      <div className="relative z-10 max-w-2xl px-6 py-16 mx-auto space-y-8">
+      <div className="relative z-10 px-6 pt-6">
         <Link
           href="/products"
           className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-neutral-500 hover:text-neutral-300"
@@ -38,16 +38,12 @@ export default function StarTrackerProductPage() {
           <ArrowLeft className="w-3.5 h-3.5" />
           Back to Products
         </Link>
+      </div>
 
-        <div className="space-y-3">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-cyan-400/80">Standalone</p>
-          <h1 className="text-4xl font-bold text-white">Star Tracker PRO</h1>
-          <p className="text-sm text-neutral-400">
-            Deep-space telemetry, real-time SGP4 orbital propagation, and observatory-grade horizon
-            tracking — built on client-side astronomical algorithms, not stock imagery or static almanacs.
-          </p>
-        </div>
+      <StarTrackerHero />
 
+      <Starfield />
+      <div className="relative z-10 max-w-2xl px-6 py-16 mx-auto space-y-8">
         <ul className="space-y-2.5">
           {CAPABILITIES.map((cap) => (
             <li key={cap} className="flex items-start gap-2 text-sm text-slate-300">
