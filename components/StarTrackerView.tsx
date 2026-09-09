@@ -50,6 +50,11 @@ const HOUSING_SHADOW_SM =
   'inset 0 1px 1px rgba(255,241,199,0.45), inset 0 -2px 4px rgba(0,0,0,0.6), 0 6px 16px -6px rgba(0,0,0,0.75)';
 const LIGHTWORK_GREEN = '#33CCCC';
 
+// Literal first-contact line — both the input's placeholder and the greeting
+// spoken aloud once on mount (see the mount effect near speakNarrative
+// below), kept as one constant so the two can't drift apart.
+const KALI_GREETING = "Welcome. I'm Kali, What's on your mind?";
+
 const TRACKED_BODIES: AstroBody[] = [
   AstroBody.Sun,
   AstroBody.Moon,
@@ -329,10 +334,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const askKaliBarRef = useRef<HTMLDivElement | null>(null);
   const messierToggleRef = useRef<HTMLDivElement | null>(null);
   const telescopeConnectRef = useRef<HTMLDivElement | null>(null);
-  // Set whenever an auto-zoom-to-target animation is in flight, so a manual
-  // drag/wheel can cancel it (see the animateViewTo/interrupt effect below)
-  // instead of fighting it frame by frame.
-  const viewAnimationRef = useRef<number | null>(null);
 
   // Inline Kali narrative — real /api/ai-one-chat calls, spoken via
   // window.speechSynthesis (same voice config as AiOneChat's toggleSpeak),
@@ -668,22 +669,11 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   // performance), which silently no-ops preventDefault on a JSX onWheel —
   // the page would scroll behind the dome while zooming it. A native
   // listener with passive:false is the only way to actually stop that.
-  // Cancels any in-flight auto-zoom-to-target animation (see animateViewTo
-  // below) so manual interaction always wins rather than fighting it frame
-  // by frame.
-  const interruptAutoZoom = () => {
-    if (viewAnimationRef.current !== null) {
-      cancelAnimationFrame(viewAnimationRef.current);
-      viewAnimationRef.current = null;
-    }
-  };
-
   useEffect(() => {
     const el = domeRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
       e.preventDefault();
-      interruptAutoZoom();
       setView((v) => ({ ...v, scale: Math.min(5, Math.max(1, v.scale - e.deltaY * 0.001)) }));
     };
     el.addEventListener('wheel', handler, { passive: false });
@@ -691,7 +681,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   }, []);
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-    interruptAutoZoom();
     dragRef.current = { x: e.clientX - view.tx, y: e.clientY - view.ty };
   };
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -702,40 +691,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
     dragRef.current = null;
   };
   const resetView = () => {
-    interruptAutoZoom();
     setView({ scale: 1, tx: 0, ty: 0 });
-  };
-
-  // Animates the lens to center + zoom into a target point (in the same
-  // untransformed 0-500 viewBox space azAltToXY/equatorialToXY already
-  // return), given transform="translate(tx ty) scale(s)" with
-  // transform-origin at the dome's own center: the tx/ty that lands point P
-  // exactly at center is tx = -s*(P.x-center), ty = -s*(P.y-center).
-  const animateViewTo = (point: { x: number; y: number }, targetScale = 3, duration = 550) => {
-    interruptAutoZoom();
-    const from = view;
-    const to = {
-      scale: targetScale,
-      tx: -targetScale * (point.x - center),
-      ty: -targetScale * (point.y - center),
-    };
-    const start = performance.now();
-    const step = (t: number) => {
-      const progress = Math.min(1, (t - start) / duration);
-      // ease-out cubic — decelerates into the target rather than a linear pan
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setView({
-        scale: from.scale + (to.scale - from.scale) * eased,
-        tx: from.tx + (to.tx - from.tx) * eased,
-        ty: from.ty + (to.ty - from.ty) * eased,
-      });
-      if (progress < 1) {
-        viewAnimationRef.current = requestAnimationFrame(step);
-      } else {
-        viewAnimationRef.current = null;
-      }
-    };
-    viewAnimationRef.current = requestAnimationFrame(step);
   };
 
   const eclipses = useMemo<UpcomingEclipse[]>(() => getUpcomingEclipses(now, 2), [now]);
@@ -763,6 +719,21 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
     utterance.onerror = () => setIsSpeaking(false);
     window.speechSynthesis.speak(utterance);
   };
+
+  // First-contact greeting: speaks KALI_GREETING aloud once, the first time
+  // this view mounts — not a real Kali/API response (there's no query, no
+  // fetch), just the literal placeholder text read aloud so voice output
+  // isn't silent before the user's first message. Ref-guarded (not state)
+  // so it can't re-fire on a re-render, and isSpeaking/onend above already
+  // give this the same "on while speaking, off once done" lifecycle as any
+  // other spoken response.
+  const hasGreetedRef = useRef(false);
+  useEffect(() => {
+    if (hasGreetedRef.current) return;
+    hasGreetedRef.current = true;
+    speakNarrative(KALI_GREETING);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fires a real query at Kali and streams the response into narrativeText.
   // autoSpeak controls whether the complete answer is spoken once streaming
@@ -840,26 +811,20 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
     return null;
   };
 
-  // Auto-zoom + auto-narrate whenever the *selected object itself* changes
-  // (not just a clock tick recomputing the same body's position — see
-  // selectionKey). Only point-like selections (body/iss/messier) get a
-  // target to zoom to; a constellation is a line strip, not a single point.
-  // Narrative text still fetches/displays on selection (useful, silent) —
-  // autoSpeak is false here specifically so nothing plays on page load or
-  // on merely clicking a marker; hearing it is an explicit Speak click.
+  // Auto-narrate whenever the *selected object itself* changes (not just a
+  // clock tick recomputing the same body's position — see selectionKey).
+  // Deliberately does NOT auto-zoom the lens anymore — selecting a marker
+  // highlights it in place (see the detail panel + selected-state styling
+  // on the markers themselves below) while keeping the wide 180° FOV, so
+  // the user keeps full contextual awareness of the sky instead of losing
+  // it to a tight zoomed-in crop. Manual zoom (wheel/drag) is still
+  // available and unaffected. Narrative text still fetches/displays
+  // on selection (useful, silent) — autoSpeak is false here specifically so
+  // nothing plays on page load or on merely clicking a marker; hearing it
+  // is an explicit Speak click.
   const selKey = selectionKey(selected);
   useEffect(() => {
     if (!selected) return;
-
-    let point: { x: number; y: number } | null = null;
-    if (selected.kind === 'body') {
-      point = azAltToXY(selected.body.azimuth, selected.body.altitude, center, radius);
-    } else if (selected.kind === 'iss' && issTracker.telemetry) {
-      point = azAltToXY(issTracker.telemetry.azimuth, issTracker.telemetry.elevation, center, radius);
-    } else if (selected.kind === 'messier') {
-      point = equatorialToXY(selected.object.raHours, selected.object.decDeg, observer, now, center, radius);
-    }
-    if (point) animateViewTo(point);
 
     const query = describeSelectedForKali(selected);
     if (query) askKaliInline(query, false);
@@ -887,7 +852,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
     return () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
       narrativeAbortRef.current?.abort();
-      interruptAutoZoom();
     };
   }, []);
 
@@ -1534,7 +1498,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               onKeyDown={(e) => {
                 if (e.key === 'Enter') submitVoiceQuery();
               }}
-              placeholder={isListening ? 'Listening…' : 'Ask Kali about the sky…'}
+              placeholder={isListening ? 'Listening…' : KALI_GREETING}
               className="flex-1 min-w-0 text-[10px] font-mono placeholder-slate-500 bg-transparent outline-none"
               style={{ color: LIGHTWORK_GREEN }}
             />
@@ -1914,7 +1878,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         </div>
 
         {/* Map key — only covers what's actually drawn above, nothing invented */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[10px] font-mono text-slate-500">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-sm font-medium font-mono text-slate-200">
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-[#67e8f9]" /> Sun / Moon
           </span>
