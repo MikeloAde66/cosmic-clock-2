@@ -24,39 +24,26 @@ import { useTelescopeConnection } from '@/lib/useTelescopeConnection';
 import TelescopeConnectPanel from './telescope/TelescopeConnectPanel';
 import InfoTooltip from './InfoTooltip';
 import { useSpeechToText } from './useSpeechToText';
+import Starfield from './Starfield';
 
 // The same real NASA ISS live feed already used by ISSFeedModal (the
 // header's "LIVE ISS" button) — reused here so the video is inline inside
 // Star Tracker's ISS layer instead of a separate popup elsewhere in the app.
 const ISS_STREAM_URL = 'https://www.youtube.com/embed/awQzjn72bI0';
 
-// Same deterministic PRNG + twinkle approach as CosmicCanvas's own
-// starfield, kept local here rather than shared — it's an 8-line pure
-// function, and this view has no other dependency on that component.
-function mulberry32(seed: number) {
-  return function () {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const STAR_COUNT = 380;
-const randomStar = mulberry32(20260814);
-const BACKGROUND_STARS = Array.from({ length: STAR_COUNT }, () => {
-  const twinkles = randomStar() < 0.2;
-  return {
-    top: `${(randomStar() * 100).toFixed(2)}%`,
-    left: `${(randomStar() * 100).toFixed(2)}%`,
-    size: `${(1 + randomStar() * 1.5).toFixed(2)}px`,
-    opacity: 0.15 + randomStar() * 0.7,
-    twinkles,
-    delay: `${(randomStar() * 4).toFixed(2)}s`,
-    duration: `${(2.5 + randomStar() * 2.5).toFixed(2)}s`,
-  };
-});
+// Bronze/gold "Tactile Bronze/Gold and Green Lightwork" theme — the metal
+// housing gradient/shadow applied to every physical-instrument surface
+// (bezel, dome frame, Ask Kali bar frame), and the single green used for
+// every data-driven readout (cardinal points, tick marks, ZENITH, Venus/
+// Saturn labels, voice-bar input text) so the whole instrument reads as one
+// consistent metal-and-light object rather than a patchwork of accents.
+const HOUSING_GRADIENT =
+  'linear-gradient(135deg, #6b4f16 0%, #BF9B30 22%, #F0D68A 45%, #BF9B30 68%, #8a6a20 88%, #5c4412 100%)';
+const HOUSING_SHADOW =
+  'inset 0 1px 1px rgba(255,241,199,0.5), inset 0 -3px 6px rgba(0,0,0,0.65), 0 10px 24px -8px rgba(0,0,0,0.8)';
+const HOUSING_SHADOW_SM =
+  'inset 0 1px 1px rgba(255,241,199,0.45), inset 0 -2px 4px rgba(0,0,0,0.6), 0 6px 16px -6px rgba(0,0,0,0.75)';
+const LIGHTWORK_GREEN = '#33CCCC';
 
 const TRACKED_BODIES: AstroBody[] = [
   AstroBody.Sun,
@@ -890,29 +877,14 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col w-full h-full p-4 overflow-y-auto bg-[#050810] text-slate-100">
-      {/* Ambient starfield backdrop — fixed to the viewport, not the scroll
-          container, so it stays put while the content above scrolls over it */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        {/* Slightly oversized (-inset-6) so the slow whole-field drift below
-            never reveals an edge gap against the clipping container above. */}
-        <div className="absolute -inset-6 animate-starfield-drift">
-          {BACKGROUND_STARS.map((star, idx) => (
-            <div
-              key={idx}
-              className={`absolute rounded-full bg-white shadow-[0_0_4px_#ffffff] ${star.twinkles ? 'animate-star-twinkle' : ''}`}
-              style={{
-                top: star.top,
-                left: star.left,
-                width: star.size,
-                height: star.size,
-                opacity: star.twinkles ? undefined : star.opacity,
-                animationDelay: star.twinkles ? star.delay : undefined,
-                animationDuration: star.twinkles ? star.duration : undefined,
-              }}
-            />
-          ))}
-        </div>
-      </div>
+      {/* Same shared animated starfield as the home page (fixed to the
+          viewport, z-0, resolution-independent %-based positions so it
+          resizes cleanly with no listener needed) — replaces this view's
+          own previously-duplicated star implementation, so the background
+          is now literally the same moving field as everywhere else in the
+          app, visible around and through the lens below via the glass
+          treatment on its housing. */}
+      <Starfield />
 
       <div className="relative z-10 flex items-center gap-2 mb-4 shrink-0">
         <button
@@ -1266,8 +1238,8 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
             the same real wheel-zoom already wired to the dome below), not
             purely decorative. */}
         <div
-          className="relative p-3 border rounded-2xl border-white/10 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_20px_60px_-20px_rgba(0,0,0,0.7)]"
-          style={{ background: 'radial-gradient(circle at 32% 28%, rgba(148,163,184,0.14), rgba(8,12,18,0.5) 65%)' }}
+          className="relative p-3 border rounded-2xl border-[#4a3610]"
+          style={{ background: HOUSING_GRADIENT, boxShadow: HOUSING_SHADOW }}
         >
           {/* Green-coated-optics edge glare — fades in from the bezel rim,
               transparent at center so it doesn't wash out the reticle. */}
@@ -1281,7 +1253,20 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
             style={{ transform: `rotate(${(view.scale - 1) * 60}deg)` }}
             aria-hidden="true"
           >
-            <circle cx={50} cy={50} r={48.5} fill="none" stroke="rgba(34,211,238,0.3)" strokeWidth={0.6} />
+            {/* SVG stroke can't use a CSS gradient directly — a real
+                <linearGradient> def is the only way to get the brushed
+                gold look onto the bezel ring itself, not just its
+                container's background. */}
+            <defs>
+              <linearGradient id="bezelGoldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#6b4f16" />
+                <stop offset="25%" stopColor="#F0D68A" />
+                <stop offset="50%" stopColor="#BF9B30" />
+                <stop offset="75%" stopColor="#F0D68A" />
+                <stop offset="100%" stopColor="#5c4412" />
+              </linearGradient>
+            </defs>
+            <circle cx={50} cy={50} r={48.5} fill="none" stroke="url(#bezelGoldGradient)" strokeWidth={2.5} />
             {/* Cardinal labels — letters only, no degree numbers (matches
                 the inner holographic azimuth ring's own N/E/S/W/NE/etc
                 convention, professional-instrument style rather than a
@@ -1307,12 +1292,12 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                   y={y}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fill="rgba(103,232,249,0.7)"
+                  fill={LIGHTWORK_GREEN}
                   fontSize={4}
                   fontFamily="monospace"
                   fontWeight="bold"
                   style={{
-                    filter: 'drop-shadow(0 0 1.5px rgba(6,182,212,0.9))',
+                    filter: `drop-shadow(0 0 1.5px ${LIGHTWORK_GREEN})`,
                     transform: `rotate(${counterRotateDeg}deg)`,
                     transformOrigin: `${x}px ${y}px`,
                   }}
@@ -1334,7 +1319,8 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                   y1={y1}
                   x2={x2}
                   y2={y2}
-                  stroke="rgba(34,211,238,0.35)"
+                  stroke={LIGHTWORK_GREEN}
+                  strokeOpacity={i % 4 === 0 ? 0.9 : 0.5}
                   strokeWidth={i % 4 === 0 ? 0.8 : 0.4}
                 />
               );
@@ -1389,8 +1375,10 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               "directly on top of the canvas" placement. */}
           <div
             ref={askKaliBarRef}
-            className="absolute z-10 flex items-center gap-1.5 px-2 py-1.5 -translate-x-1/2 border rounded-lg bottom-2 left-1/2 border-cyan-500/30 bg-black/60 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_20px_-6px_rgba(0,0,0,0.6)] w-[92%]"
+            className="absolute z-10 -translate-x-1/2 bottom-2 left-1/2 w-[92%] rounded-lg p-[3px]"
+            style={{ background: HOUSING_GRADIENT, boxShadow: HOUSING_SHADOW_SM }}
           >
+          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-[7px] bg-black/90 backdrop-blur-md">
             {hasMicSupport && (
               <button
                 type="button"
@@ -1413,7 +1401,8 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                 if (e.key === 'Enter') submitVoiceQuery();
               }}
               placeholder={isListening ? 'Listening…' : 'Ask Kali about the sky…'}
-              className="flex-1 min-w-0 text-[10px] font-mono text-white placeholder-slate-500 bg-transparent outline-none"
+              className="flex-1 min-w-0 text-[10px] font-mono placeholder-slate-500 bg-transparent outline-none"
+              style={{ color: LIGHTWORK_GREEN }}
             />
             {isSpeaking && (
               <button
@@ -1434,12 +1423,25 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               {isNarrating ? '…' : 'Ask'}
             </button>
           </div>
+          </div>
 
-          <div className="p-4 border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
+          <div
+            className="p-[3px] rounded-lg"
+            style={{ background: HOUSING_GRADIENT, boxShadow: HOUSING_SHADOW }}
+          >
+          <div className="relative p-4 overflow-hidden rounded-[9px] bg-[#050810] backdrop-blur-md transition-[backdrop-filter] duration-300">
+          {/* Localized starfield specifically for the lens's own field of
+              view — the housing above is deliberately solid/opaque metal
+              (real brushed metal isn't see-through), so this is what
+              actually satisfies "stars visible through the lens": the
+              dome's circle fill is semi-transparent and sits directly on
+              top of this, not on top of the opaque housing several layers
+              back. */}
+          <Starfield contained starCount={140} />
           <svg
             ref={domeRef}
             viewBox={`0 0 ${size} ${size}`}
-            className="w-full aspect-square touch-none cursor-grab active:cursor-grabbing"
+            className="relative z-10 w-full aspect-square touch-none cursor-grab active:cursor-grabbing"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
@@ -1447,18 +1449,17 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
             onDoubleClick={resetView}
           >
             <g transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`} style={{ transformOrigin: `${center}px ${center}px` }}>
-              {/* Deep obsidian core — darker than before so the real
-                  page-wide starfield behind it (BACKGROUND_STARS) reads
-                  with more contrast through the dome, closer to real
-                  deep-sky astrophotography than the previous lighter teal. */}
-              <circle cx={center} cy={center} r={radius} fill="rgba(2,6,23,0.85)" stroke="rgba(34,211,238,0.3)" strokeWidth={1} />
-              <circle cx={center} cy={center} r={radius * 0.5} fill="none" stroke="rgba(34,211,238,0.12)" strokeWidth={1} />
+              {/* Lens glass — deliberately more transparent than before so
+                  the shared home-page starfield behind this whole view
+                  reads through the dome itself, not just around it. */}
+              <circle cx={center} cy={center} r={radius} fill="rgba(2,6,23,0.3)" stroke={LIGHTWORK_GREEN} strokeOpacity={0.3} strokeWidth={1} />
+              <circle cx={center} cy={center} r={radius * 0.5} fill="none" stroke={LIGHTWORK_GREEN} strokeOpacity={0.12} strokeWidth={1} />
               {/* Zenith marker — straight overhead, the center of this
                   projection by construction (altitude 90° maps to r=0). */}
               <g className="pointer-events-none">
-                <line x1={center - 6} y1={center} x2={center + 6} y2={center} stroke="rgba(34,211,238,0.5)" strokeWidth={1} />
-                <line x1={center} y1={center - 6} x2={center} y2={center + 6} stroke="rgba(34,211,238,0.5)" strokeWidth={1} />
-                <text x={center} y={center + 16} textAnchor="middle" className="fill-cyan-500/50" fontSize={8} fontFamily="monospace">
+                <line x1={center - 6} y1={center} x2={center + 6} y2={center} stroke={LIGHTWORK_GREEN} strokeOpacity={0.7} strokeWidth={1} />
+                <line x1={center} y1={center - 6} x2={center} y2={center + 6} stroke={LIGHTWORK_GREEN} strokeOpacity={0.7} strokeWidth={1} />
+                <text x={center} y={center + 16} textAnchor="middle" fill={LIGHTWORK_GREEN} fillOpacity={0.7} fontSize={8} fontFamily="monospace">
                   ZENITH
                 </text>
               </g>
@@ -1469,8 +1470,8 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                   "holographic" feel. Real azimuth convention (0=N,
                   90=E clockwise), same as the rest of this view. */}
               <g className="pointer-events-none">
-                <circle cx={center} cy={center} r={radius + 8} fill="none" stroke="rgba(34,211,238,0.15)" strokeWidth={4} />
-                <circle cx={center} cy={center} r={radius + 8} fill="none" stroke="rgba(34,211,238,0.5)" strokeWidth={1} />
+                <circle cx={center} cy={center} r={radius + 8} fill="none" stroke={LIGHTWORK_GREEN} strokeOpacity={0.15} strokeWidth={4} />
+                <circle cx={center} cy={center} r={radius + 8} fill="none" stroke={LIGHTWORK_GREEN} strokeOpacity={0.5} strokeWidth={1} />
                 {Array.from({ length: 24 }).map((_, i) => {
                   const deg = i * 15;
                   const angle = (deg - 90) * (Math.PI / 180);
@@ -1484,7 +1485,8 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                       y1={center + Math.sin(angle) * outer}
                       x2={center + Math.cos(angle) * inner}
                       y2={center + Math.sin(angle) * inner}
-                      stroke={isMajor ? 'rgba(103,232,249,0.8)' : 'rgba(34,211,238,0.4)'}
+                      stroke={LIGHTWORK_GREEN}
+                      strokeOpacity={isMajor ? 0.8 : 0.4}
                       strokeWidth={isMajor ? 1.2 : 0.6}
                     />
                   );
@@ -1509,11 +1511,12 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                       y={y}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fill={label.length === 1 ? '#67e8f9' : 'rgba(103,232,249,0.6)'}
+                      fill={LIGHTWORK_GREEN}
+                      fillOpacity={label.length === 1 ? 1 : 0.7}
                       fontSize={label.length === 1 ? 10 : 7}
                       fontFamily="monospace"
                       fontWeight={label.length === 1 ? 'bold' : 'normal'}
-                      style={{ filter: 'drop-shadow(0 0 2px rgba(34,211,238,0.7))' }}
+                      style={{ filter: `drop-shadow(0 0 2px ${LIGHTWORK_GREEN})` }}
                     >
                       {label}
                     </text>
@@ -1651,6 +1654,10 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               {visible.map((b) => {
                 const { x, y } = azAltToXY(b.azimuth, b.altitude, center, radius);
                 const isLuminary = b.name === 'Sun' || b.name === 'Moon';
+                // Venus and Saturn keep pure bright-white dots (their real
+                // brightness), but get the lightwork green treatment on
+                // their text labels specifically, per the theme spec.
+                const isLightworkLabeled = b.name === 'Venus' || b.name === 'Saturn';
                 const label = resolvedLabels.get(b.name);
                 const labelY = label?.renderedY ?? y - 9;
                 const isSelected = selected?.kind === 'body' && selected.body.name === b.name;
@@ -1671,10 +1678,14 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                       cx={x}
                       cy={y}
                       r={isLuminary ? 6 : 4.5}
-                      fill={isLuminary ? '#67e8f9' : '#e2e8f0'}
+                      fill={isLuminary ? '#67e8f9' : isLightworkLabeled ? '#FFFFFF' : '#e2e8f0'}
                       stroke="transparent"
                       strokeWidth={8}
-                      style={{ filter: `drop-shadow(0 0 3px ${isLuminary ? 'rgba(103,232,249,0.7)' : 'rgba(226,232,240,0.6)'})` }}
+                      style={{
+                        filter: `drop-shadow(0 0 3px ${
+                          isLuminary ? 'rgba(103,232,249,0.7)' : isLightworkLabeled ? 'rgba(255,255,255,0.85)' : 'rgba(226,232,240,0.6)'
+                        })`,
+                      }}
                     />
                     {label?.needsLeaderLine && (
                       <line
@@ -1691,7 +1702,8 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                       x={label?.needsLeaderLine ? x + 14 : x}
                       y={labelY}
                       textAnchor={label?.needsLeaderLine ? 'start' : 'middle'}
-                      className="pointer-events-none fill-slate-300"
+                      className={isLightworkLabeled ? 'pointer-events-none' : 'pointer-events-none fill-slate-300'}
+                      fill={isLightworkLabeled ? LIGHTWORK_GREEN : undefined}
                       fontSize={9}
                       fontFamily="monospace"
                     >
@@ -1758,6 +1770,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                 })()}
             </g>
           </svg>
+          </div>
           </div>
           {!selected && (
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1.5 text-[10px] font-mono text-center rounded-full pointer-events-none bg-black/50 text-cyan-200/70 backdrop-blur-sm">
@@ -2085,15 +2098,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
       )}
 
       <style jsx>{`
-        @keyframes star-twinkle {
-          0%, 100% { opacity: 0.15; transform: scale(0.8); }
-          50% { opacity: 0.85; transform: scale(1.2); }
-        }
-        .animate-star-twinkle {
-          animation-name: star-twinkle;
-          animation-timing-function: linear;
-          animation-iteration-count: infinite;
-        }
         @keyframes messier-pulse {
           0% { r: 5; stroke-opacity: 0.9; }
           100% { r: 11; stroke-opacity: 0; }
@@ -2114,22 +2118,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         }
         .animate-azimuth-sweep {
           animation: azimuth-sweep 8s linear infinite;
-        }
-        /* Whole-field drift, not per-star — one animation instead of
-           hundreds is dramatically cheaper and reads as a slower, more
-           cinematic parallax than jittering individual stars would.
-           Deliberately large duration/small distance: this should register
-           as "the sky is alive" at a glance, never as something to
-           consciously watch. */
-        @keyframes starfield-drift {
-          0% { transform: translate(0, 0); }
-          25% { transform: translate(-8px, 5px); }
-          50% { transform: translate(3px, -6px); }
-          75% { transform: translate(6px, 4px); }
-          100% { transform: translate(0, 0); }
-        }
-        .animate-starfield-drift {
-          animation: starfield-drift 120s ease-in-out infinite;
         }
         @keyframes glass-fade-in {
           from { opacity: 0; transform: translateY(6px) scale(0.98); }
