@@ -18,13 +18,12 @@ function formatTime(seconds: number) {
 // beside it there — survives every route, not just tab switches within the
 // single-page app. Fixed to the viewport bottom rather than a normal flex
 // child, since every route has its own independent page layout/scroll
-// model; playerBarHidden (see RadioPlayerContext) is the one escape hatch
-// a specific route/tab still has to opt out of showing it (Pods/Studio One
-// on the home page, a video-only workspace the audio strip doesn't belong
-// in). With no station picked yet it shows an idle/paused strip rather
-// than nothing, so the bar itself is always visible otherwise; actual
-// playback still only ever starts from an explicit Play press
-// (playStation/togglePlayPause), never automatically.
+// model; playerBarHidden (see RadioPlayerContext) defaults to true, so
+// this only actually renders while Radio Central or Media Flow — the only
+// two views that opt in — are the active view. With no station picked yet
+// it shows an idle/paused strip rather than nothing, so it's always
+// visible there once shown; actual playback still only ever starts from an
+// explicit Play press (playStation/togglePlayPause), never automatically.
 export default function GlobalPlayerBar() {
   const {
     station,

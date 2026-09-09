@@ -1,8 +1,10 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { Home } from 'lucide-react';
 import RadioCentralConsoleView from '@/components/radio/RadioCentralConsoleView';
+import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 
 // Reached at /radio on any domain pointing at this deployment, and ready
 // for the same transparent rewrite-from-'/' treatment proxy.ts already
@@ -13,6 +15,17 @@ import RadioCentralConsoleView from '@/components/radio/RadioCentralConsoleView'
 // RadioPlayerProvider/GlobalPlayerBar live in the root layout, so playback
 // started here survives navigating anywhere else in the app.
 export default function StandaloneRadioPage() {
+  // GlobalPlayerBar defaults to hidden app-wide (see RadioPlayerContext) —
+  // this is Radio Central itself, one of the two views allowed to show it,
+  // and this page mounts entirely outside app/page.tsx's own opt-in effect,
+  // so it needs its own. Restores the hidden default on unmount so it
+  // doesn't leak the bar into whatever route the user navigates to next.
+  const { setPlayerBarHidden } = useRadioPlayer();
+  useEffect(() => {
+    setPlayerBarHidden(false);
+    return () => setPlayerBarHidden(true);
+  }, [setPlayerBarHidden]);
+
   return (
     <div className="relative flex flex-col w-full h-screen overflow-hidden bg-[#0a0a0c] text-slate-100">
       {/* A slim bar above the console, not an absolute overlay on top of

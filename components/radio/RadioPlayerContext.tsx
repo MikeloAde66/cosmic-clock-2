@@ -65,12 +65,14 @@ interface RadioPlayerContextValue {
   activeDailyQueueLabel: string | null;
   startDailyQueue: (items: DailyQueueItem[], options?: { autoplay?: boolean }) => void;
   stopDailyQueue: () => void;
-  // Set by the home page (the only route with a Pods/Studio One tab) to
-  // hide GlobalPlayerBar while that video-only workspace is active — now
-  // that the bar itself is mounted globally in app/layout.tsx rather than
-  // locally on the home page, this is the only way a specific route/tab
-  // can still opt out of showing it. Defaults to false (visible) so every
-  // other route just shows the bar with no wiring needed.
+  // Defaults to true (hidden) — the bar is scoped to Radio Central and
+  // Media Flow specifically, not shown app-wide, so every other route/view
+  // (Star Tracker PRO, Pods/Studio One, Kali, Products, etc.) just stays
+  // hidden with no wiring needed. Radio Central (the standalone /radio
+  // route) and Media Flow (its isLetsChatOpen overlay, or its "stack"
+  // layout section while actually scrolled into view) are the only
+  // callers that opt IN by setting this false while they're the active
+  // view, and must restore it to true on unmount/close.
   playerBarHidden: boolean;
   setPlayerBarHidden: (hidden: boolean) => void;
 }
@@ -112,7 +114,7 @@ function buildRotationQueue(): string[] {
 // Home/Vault/Pods/Radio, instead of unmounting with the Radio tab the way
 // everything except Pods currently does.
 export function RadioPlayerProvider({ children }: { children: React.ReactNode }) {
-  const [playerBarHidden, setPlayerBarHidden] = useState(false);
+  const [playerBarHidden, setPlayerBarHidden] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const queueRef = useRef<QueueTrack[]>([]);

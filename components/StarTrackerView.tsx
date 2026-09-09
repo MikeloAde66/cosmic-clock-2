@@ -943,7 +943,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         <div className="space-y-3">
           <div>
             <span className="text-[10px] font-mono tracking-widest uppercase text-cyan-400/80">Sky Above You</span>
-            <h2 className="text-2xl font-bold tracking-wider text-white">Star Tracker</h2>
+            <h2 className="text-2xl font-bold tracking-wider text-white">Star Tracker PRO</h2>
             <p className="mt-1 font-mono text-xs text-cyan-100/80">{statusLine}</p>
           </div>
           <ObservatoryPicker selectedId={selectedObservatoryId} onSelectObservatory={(obs: Observatory) => setSelectedObservatoryId(obs.id)} />

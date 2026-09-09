@@ -263,7 +263,7 @@ export default function LeftNav({
                     }`}
                   />
                 </span>
-                <span className="text-sm">Star Tracker</span>
+                <span className="text-sm">Star Tracker PRO</span>
               </button>
 
               <button
@@ -443,7 +443,7 @@ export default function LeftNav({
                           }`}
                         />
                       </span>
-                      <span className="text-xs font-mono">Star Tracker</span>
+                      <span className="text-xs font-mono">Star Tracker PRO</span>
                     </button>
 
                     <button

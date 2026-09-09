@@ -55,15 +55,15 @@ function HomeInner() {
   // Mirrors AiOneHome/CenterHero/CosmicCanvas's own activeView — 'clock'
   // unless the Kali Oracle sub-view is actually open.
   const [cosmicView, setCosmicView] = useState<'clock' | 'weather' | 'kali'>('clock');
-  // Shared by the persistent audio player, the Earth Time/social footer,
-  // and the Pricing nav button — Kali and Studio One are both focused,
-  // full-screen workspaces where that chrome is just clutter eating into
-  // real vertical space, especially on mobile.
+  // Shared by TopHeader's Pricing button and SiteFooter (Earth Time/Kali
+  // Yuga/social links) — Kali and Studio One are both focused, full-screen
+  // workspaces where that chrome is just clutter eating into real vertical
+  // space, especially on mobile. Independent of showBottomChrome below,
+  // which is specifically about GlobalPlayerBar (see RadioPlayerContext) —
+  // the two used to be the same boolean, but the player bar's visibility
+  // rule is now scoped to Radio Central/Media Flow only, not "every view
+  // except Pods/Kali".
   const hideBottomChrome = activeTab === 'pods' || (activeTab === 'aione' && cosmicView === 'kali');
-  useEffect(() => {
-    setPlayerBarHidden(hideBottomChrome);
-    return () => setPlayerBarHidden(false);
-  }, [hideBottomChrome, setPlayerBarHidden]);
   // Set by a Home globe Vault marker's "Open Drawer" link, or a Cmd+K search
   // result, consumed once as CosmicVaultAuth's initial filter — see that
   // component's initialDrawer prop.
@@ -168,6 +168,40 @@ function HomeInner() {
     setShowBackToTop((stackScrollRef.current?.scrollTop ?? 0) > 400);
   };
 
+  // GlobalPlayerBar is scoped to Radio Central and Media Flow only (see
+  // RadioPlayerContext's playerBarHidden default). In Stack mode both live
+  // as inline sections alongside Home/Pods/Products/Kali on one continuous
+  // scroll, so "is Media Flow/Radio Central the active view" has to mean
+  // "is that section actually scrolled into view" — tracked here via a real
+  // IntersectionObserver against Stack's own scroll container, not window
+  // scroll (see stackScrollRef above).
+  const radioSectionRef = useRef<HTMLDivElement>(null);
+  const tenForwardSectionRef = useRef<HTMLDivElement>(null);
+  const [stackAudioSectionVisible, setStackAudioSectionVisible] = useState(false);
+  useEffect(() => {
+    if (layoutMode !== 'stack') {
+      setStackAudioSectionVisible(false);
+      return;
+    }
+    const targets = [radioSectionRef.current, tenForwardSectionRef.current].filter(
+      (el): el is HTMLDivElement => el !== null
+    );
+    if (targets.length === 0) return;
+    const visible = new Set<Element>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) visible.add(entry.target);
+          else visible.delete(entry.target);
+        }
+        setStackAudioSectionVisible(visible.size > 0);
+      },
+      { root: stackScrollRef.current, threshold: 0.4 }
+    );
+    targets.forEach((t) => observer.observe(t));
+    return () => observer.disconnect();
+  }, [layoutMode]);
+
   // Star Tracker / Live ISS — moved out of TopHeader (which used to own
   // both) into LeftNav's icon rail; state lives here now since LeftNav and
   // TopHeader are siblings, and this is also where StarTrackerView/
@@ -175,6 +209,17 @@ function HomeInner() {
   const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(false);
   const [isIssOpen, setIsIssOpen] = useState(false);
   const [isLetsChatOpen, setIsLetsChatOpen] = useState(false);
+  // The only two things allowed to show GlobalPlayerBar within this SPA
+  // route: the Media Flow overlay (isLetsChatOpen), or Stack mode's Radio
+  // Central/Media Flow sections while actually scrolled into view (see
+  // stackAudioSectionVisible above). Radio Central's other home, the
+  // standalone /radio route, opts in independently since it never mounts
+  // this component at all.
+  const showBottomChrome = isLetsChatOpen || stackAudioSectionVisible;
+  useEffect(() => {
+    setPlayerBarHidden(!showBottomChrome);
+    return () => setPlayerBarHidden(true);
+  }, [showBottomChrome, setPlayerBarHidden]);
   // "Send to Studio One" hand-off from Media Flow — lifted here since
   // PodsModule has no shared context of its own (unlike Radio Central's
   // RadioPlayerContext) for MediaFlowAudioCenter to call into directly.
@@ -463,7 +508,7 @@ useContextMenuShare();
                   />
                 </Reveal>
               </div>
-              <div id="stack-section-radio" className="w-full min-h-full border-t border-slate-800/80">
+              <div id="stack-section-radio" ref={radioSectionRef} className="w-full min-h-full border-t border-slate-800/80">
                 <Reveal className="w-full h-full">
                   <RadioCentralConsoleView />
                 </Reveal>
@@ -487,7 +532,7 @@ useContextMenuShare();
                   <KaliOracleView prefillQuery={kaliPrefillQuery} />
                 </Reveal>
               </div>
-              <div id="stack-section-tenforward" className="w-full min-h-full border-t border-slate-800/80">
+              <div id="stack-section-tenforward" ref={tenForwardSectionRef} className="w-full min-h-full border-t border-slate-800/80">
                 <Reveal>
                   <TenForwardSection onSendToStudioOne={handleSendToStudioOne} />
                 </Reveal>
@@ -526,17 +571,17 @@ useContextMenuShare();
             />
           )}
           {/* GlobalPlayerBar itself now mounts globally in app/layout.tsx
-              as a fixed-to-viewport overlay (see playerBarHidden effect
-              above, which hides it specifically while this tab is Pods —
-              that's a video-only workspace the audio strip doesn't belong
-              in). This spacer reserves the same h-14 of room at the very
-              bottom of the flex column so SiteFooter isn't covered by it -
-              it has to come AFTER SiteFooter (not before) to actually push
-              the footer up above where the fixed bar sits; placed before
-              it instead just pushed SiteFooter down into that exact
-              region, which is what was covering the footer's own social
-              icons. */}
-          {!hideBottomChrome && <div className="h-14 shrink-0" />}
+              as a fixed-to-viewport overlay, shown only while showBottomChrome
+              is true (Media Flow open, or Stack mode scrolled to its Radio
+              Central/Media Flow section — see the effect above). This spacer
+              reserves the same h-14 of room at the very bottom of the flex
+              column so SiteFooter isn't covered by it whenever it's actually
+              rendering — it has to come AFTER SiteFooter (not before) to
+              actually push the footer up above where the fixed bar sits;
+              placed before it instead just pushed SiteFooter down into that
+              exact region, which is what was covering the footer's own
+              social icons. */}
+          {showBottomChrome && <div className="h-14 shrink-0" />}
         </div>
         </main>
       </div>

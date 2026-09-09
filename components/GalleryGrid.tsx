@@ -898,7 +898,7 @@ export default function GalleryGrid({
             <StarTrackerRadarCardImage />
             <CardHeader Icon={Telescope} />
             <div className="mt-4">
-              <div className="text-sm font-bold text-white">Star Tracker</div>
+              <div className="text-sm font-bold text-white">Star Tracker PRO</div>
               <p className="mt-1 text-xs text-slate-400">Live orbital tracking and pass predictions.</p>
             </div>
           </button>
