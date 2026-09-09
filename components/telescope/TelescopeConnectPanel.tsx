@@ -141,7 +141,7 @@ export default function TelescopeConnectPanel({ connection }: { connection: Tele
                   <button
                     key={t.label}
                     type="button"
-                    onClick={() => slewTo(t)}
+                    onClick={() => slewTo(t, t.label)}
                     disabled={slewing}
                     className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wide rounded border border-slate-700 text-slate-300 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-50"
                   >

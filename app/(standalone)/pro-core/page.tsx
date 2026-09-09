@@ -4,15 +4,21 @@
 // changes made there show up here for free, with no risk of two copies
 // drifting apart.
 //
-// star-tracker-pro-core has no public deployment yet — it's a separate
-// local Node service. NEXT_PUBLIC_PRO_CORE_URL lets this be pointed
-// somewhere else once/if it's deployed; defaults to localhost:4000, which
-// browsers treat as reachable even from an HTTPS page (localhost is
-// exempted from mixed-content blocking). Until then, visiting this route
-// without the service running locally will show a failed-to-load iframe —
-// that's an honest reflection of the current setup, not a broken link
-// pointing somewhere that doesn't exist.
-const PRO_CORE_URL = process.env.NEXT_PUBLIC_PRO_CORE_URL || 'http://localhost:4000';
+// Now deployed on Render (chosen over Vercel/cPanel: it needs a
+// persistent WebSocket server, which serverless doesn't support — see
+// render.yaml). In dev this still defaults to localhost:4000 so a
+// developer running both services locally sees their own local instance,
+// not the shared deployed one. NEXT_PUBLIC_PRO_CORE_URL overrides either
+// default, same pattern as the StarTracker/TopHeader back-button URLs
+// elsewhere in this app.
+//
+// Either way, remember this only ever exposes the UI/voice/catalog demo
+// experience — the Alpaca/INDI calls inside it target localhost on
+// whichever machine actually runs the service (Render's server, which has
+// no telescope attached), not the visitor's own machine.
+const PRO_CORE_URL =
+  process.env.NEXT_PUBLIC_PRO_CORE_URL ||
+  (process.env.NODE_ENV === 'production' ? 'https://star-tracker-pro-core.onrender.com' : 'http://localhost:4000');
 
 export default function ProCorePage() {
   return (
@@ -21,7 +27,8 @@ export default function ProCorePage() {
         <div>
           <div className="text-sm font-bold text-white">Star Tracker Pro Core</div>
           <div className="text-xs text-neutral-400">
-            Live hardware bridge &amp; voice HUD — requires the pro-core service running locally on port 4000.
+            Live hardware bridge &amp; voice HUD — a UI/voice/catalog demo; no real telescope is attached to this
+            deployment.
           </div>
         </div>
         <a

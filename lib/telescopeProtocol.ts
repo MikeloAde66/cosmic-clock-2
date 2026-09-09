@@ -8,6 +8,8 @@
 
 export type TelescopeProtocolId = 'lx200' | 'nexstar';
 
+export type TrackingRate = 'sidereal' | 'solar' | 'lunar' | 'stopped';
+
 export interface TelescopePosition {
   raHours: number; // 0-24
   decDeg: number; // -90..90
@@ -22,6 +24,12 @@ export interface TelescopeProtocolAdapter {
   parsePositionResponse: (raw: string) => TelescopePosition | null;
   gotoCommand: (pos: TelescopePosition) => string;
   stopCommand: string;
+  // Real command string for the given rate, or null if this adapter has no
+  // genuinely documented way to select that particular rate — callers must
+  // disable that option rather than guess at a command. Omitted entirely
+  // (undefined) on an adapter with no rate-selection support at all, so
+  // "unsupported rate" and "unsupported feature" stay distinguishable.
+  trackingRateCommand?: (rate: TrackingRate) => string | null;
 }
 
 function clamp(v: number, min: number, max: number) {
@@ -84,6 +92,26 @@ export const LX200_ADAPTER: TelescopeProtocolAdapter = {
   },
   gotoCommand: (pos) => `:Sr${lx200FormatRa(pos.raHours)}#:Sd${lx200FormatDec(pos.decDeg)}#:MS#`,
   stopCommand: ':Q#',
+  // :TQ#/:TS#/:TL# (select sidereal/solar/lunar rate) are part of the
+  // original Meade LX200 command set. :Td# ("tracking disable") is NOT —
+  // the original spec has no bare tracking-off command, since a real LX200
+  // mount is generally always tracking once aligned. :Td#/:Te# come from the
+  // LX200-compatible "extended" command set later adopted by Meade Autostar,
+  // OnStep, and most third-party LX200-emulating firmwares — included here
+  // as the best-effort mapping for a "STOPPED" preset, same unverified-
+  // against-real-hardware caveat as the rest of this file.
+  trackingRateCommand: (rate) => {
+    switch (rate) {
+      case 'sidereal':
+        return ':TQ#';
+      case 'solar':
+        return ':TS#';
+      case 'lunar':
+        return ':TL#';
+      case 'stopped':
+        return ':Td#';
+    }
+  },
 };
 
 // --- NexStar (Celestron) -------------------------------------------------
@@ -126,6 +154,11 @@ export const NEXSTAR_ADAPTER: TelescopeProtocolAdapter = {
     return `r${raHex},${decHex}`; // high-precision GOTO-RA-DEC
   },
   stopCommand: 'M',
+  // Deliberately no trackingRateCommand: the documented NexStar AUX
+  // passthrough command ('T' + mode byte) selects tracking *mode*
+  // (off/Alt-Az/EQ-North/EQ-South), not a sidereal/solar/lunar *rate* —
+  // there's no genuinely documented passthrough command for the latter on
+  // this protocol, so this stays unimplemented rather than guessed at.
 };
 
 export const TELESCOPE_PROTOCOLS: Record<TelescopeProtocolId, TelescopeProtocolAdapter> = {

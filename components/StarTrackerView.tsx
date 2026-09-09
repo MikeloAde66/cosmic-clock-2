@@ -25,6 +25,11 @@ import TelescopeConnectPanel from './telescope/TelescopeConnectPanel';
 import InfoTooltip from './InfoTooltip';
 import { useSpeechToText } from './useSpeechToText';
 import Starfield from './Starfield';
+import { TelemetryGauges } from './hud/TelemetryGauges';
+import { SystemMetricsGauges } from './hud/SystemMetricsGauges';
+import { TargetAlignmentDiagnostics } from './hud/TargetAlignmentDiagnostics';
+import { HudControlPanel } from './hud/HudControlPanel';
+import { useProCoreConnection } from '@/lib/useProCoreConnection';
 
 // The same real NASA ISS live feed already used by ISSFeedModal (the
 // header's "LIVE ISS" button) — reused here so the video is inline inside
@@ -92,6 +97,23 @@ function formatDistance(au: number): string {
 function formatLightYears(ly: number): string {
   if (ly >= 1_000_000) return `${(ly / 1_000_000).toFixed(1)} million ly`;
   return `${ly.toLocaleString()} ly`;
+}
+
+// Same format TelescopeConnectPanel already uses for the mount's live
+// position — reused here for TargetAlignmentDiagnostics' commanded-target
+// readout so the two RA/Dec displays in this view read consistently.
+function formatTargetRa(hours: number): string {
+  const h = Math.floor(hours);
+  const m = Math.floor((hours - h) * 60);
+  const s = Math.round(((hours - h) * 60 - m) * 60);
+  return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+}
+function formatTargetDec(deg: number): string {
+  const sign = deg < 0 ? '-' : '+';
+  const abs = Math.abs(deg);
+  const d = Math.floor(abs);
+  const m = Math.round((abs - d) * 60);
+  return `${sign}${String(d).padStart(2, '0')}° ${String(m).padStart(2, '0')}'`;
 }
 
 // NASA's Hubble Messier Catalog pages key off the bare catalog number, not
@@ -338,6 +360,51 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const [skyFestOpen, setSkyFestOpen] = useState(false);
   const telescope = useTelescopeConnection();
   const [skyFestTab, setSkyFestTab] = useState<'eclipses' | 'meteors' | 'media'>('eclipses');
+  // Real local UI preference (Phase 4 HUD controls) — directly sets this
+  // panel's own backdrop opacity below, nothing fabricated or hardware-linked.
+  const [hudOpacity, setHudOpacity] = useState(1);
+
+  // SystemMetricsGauges data. Both the quantum-service ping and the
+  // pro-core WS connection below only run while the Sky Fest panel is open
+  // (skyFestOpen gates both) — no background network activity for visitors
+  // who never open the panel that displays them.
+  const [quantumLatencyMs, setQuantumLatencyMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (!skyFestOpen) {
+      setQuantumLatencyMs(null);
+      return;
+    }
+    let cancelled = false;
+    const ping = () => {
+      fetch('/api/quantum-service/health')
+        .then((res) => res.json())
+        .then((data) => {
+          if (!cancelled) setQuantumLatencyMs(typeof data.latencyMs === 'number' ? data.latencyMs : null);
+        })
+        .catch(() => {
+          if (!cancelled) setQuantumLatencyMs(null);
+        });
+    };
+    ping();
+    const interval = setInterval(ping, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [skyFestOpen]);
+
+  const { wsConnected: proCoreConnected, connectedSince: proCoreConnectedSince } = useProCoreConnection(skyFestOpen);
+  const [sessionDurationSec, setSessionDurationSec] = useState<number | null>(null);
+  useEffect(() => {
+    if (!proCoreConnected || proCoreConnectedSince === null) {
+      setSessionDurationSec(null);
+      return;
+    }
+    const update = () => setSessionDurationSec(Math.floor((Date.now() - proCoreConnectedSince) / 1000));
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [proCoreConnected, proCoreConnectedSince]);
 
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [nowPlayingVideoId, setNowPlayingVideoId] = useState<string | null>(null);
@@ -1025,7 +1092,74 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         </div>
 
         {skyFestOpen && (
-          <div className="overflow-hidden border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
+          <div
+            style={{ opacity: hudOpacity }}
+            className="overflow-hidden border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow,opacity] duration-300"
+          >
+            {/* Live telemetry HUD — real data from useTelescopeConnection
+                (see its own comments for exactly which fields are honestly
+                derivable vs. genuinely unknown for real hardware), only
+                shown once a telescope is actually connected. Sits above the
+                event tabs below, which are unrelated and unchanged. */}
+            <div className="p-3 border-b border-cyan-500/20">
+              {telescope.mode === 'connected' || telescope.mode === 'simulator' ? (
+                (() => {
+                  const hor = telescope.position ? Horizon(now, observer, telescope.position.raHours, telescope.position.decDeg, 'normal') : null;
+                  // Real conversion of the already-real targetDeltaDeg
+                  // (Phase 1) to arcseconds — not a separate measurement.
+                  const offAxisErrorArcsec = telescope.targetDeltaDeg !== null ? telescope.targetDeltaDeg * 3600 : null;
+                  // Locked once the mount has actually stopped moving and
+                  // landed inside a tight tolerance — matches the same 10"
+                  // threshold the diagnostics readout below colors green at.
+                  const isAligned = !telescope.slewing && offAxisErrorArcsec !== null && offAxisErrorArcsec < 10;
+                  return (
+                    <>
+                      <TelemetryGauges
+                        alt={hor ? hor.altitude : null}
+                        az={hor ? hor.azimuth : null}
+                        driftRate={telescope.driftRateArcsecPerSec}
+                        isSlewing={telescope.slewing}
+                        slewProgress={telescope.slewProgressPercent}
+                        targetDelta={telescope.targetDeltaDeg}
+                        etaSeconds={telescope.etaSeconds}
+                      />
+                      <TargetAlignmentDiagnostics
+                        targetName={telescope.lastTargetName}
+                        targetRa={telescope.lastTarget ? formatTargetRa(telescope.lastTarget.raHours) : null}
+                        targetDec={telescope.lastTarget ? formatTargetDec(telescope.lastTarget.decDeg) : null}
+                        offAxisErrorArcsec={offAxisErrorArcsec}
+                        isAligned={isAligned}
+                      />
+                    </>
+                  );
+                })()
+              ) : (
+                <p className="text-xs text-center text-slate-500 font-mono py-2">
+                  Connect a telescope above to see live position, drift, and slew telemetry here.
+                </p>
+              )}
+
+              {/* Phase 2 — system/service health, independent of whether a
+                  local telescope is connected above. */}
+              <SystemMetricsGauges
+                latencyMs={quantumLatencyMs}
+                wsConnected={proCoreConnected}
+                sessionDurationSec={sessionDurationSec}
+              />
+
+              {/* Phase 4 — HUD opacity is a real local preference; tracking
+                  rate sends a real command (or sets real simulator state);
+                  sensor gain stays permanently disabled (see component). */}
+              <HudControlPanel
+                hudOpacity={hudOpacity}
+                onHudOpacityChange={setHudOpacity}
+                trackingRate={telescope.trackingRate}
+                supportedTrackingRates={telescope.supportedTrackingRates}
+                onTrackingRateChange={telescope.setTrackingRate}
+                isTelescopeConnected={telescope.mode === 'connected' || telescope.mode === 'simulator'}
+              />
+            </div>
+
             <div className="flex border-b border-cyan-500/20">
               {(['eclipses', 'meteors', 'media'] as const).map((tab) => (
                 <button
