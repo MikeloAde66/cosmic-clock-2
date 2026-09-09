@@ -19,7 +19,7 @@ function ThankYouContent() {
         </div>
         <h1 className="text-2xl font-bold text-white">Purchase complete</h1>
         <p className="max-w-md mt-3 text-sm text-neutral-400">
-          Star Tracker is unlocked on your account. There's no separate app to install — open it from
+          Star Tracker PRO is unlocked on your account. There&apos;s no separate app to install — open it from
           the top bar in the main app any time.
         </p>
         {sessionId && (

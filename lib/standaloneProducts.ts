@@ -12,7 +12,7 @@ export interface StandaloneProduct {
 export const STANDALONE_PRODUCTS: StandaloneProduct[] = [
   {
     id: 'star-tracker',
-    name: 'Star Tracker — Standalone',
+    name: 'Star Tracker PRO — Standalone',
     priceId: 'price_1U58FN6YqqBfIrutZGB5d5zD',
     amountCents: 6900,
   },

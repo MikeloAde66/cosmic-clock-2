@@ -4,29 +4,22 @@ import React from 'react';
 import Link from 'next/link';
 import { Home } from 'lucide-react';
 import Starfield from '@/components/Starfield';
-import ProductHeroCard from '@/components/ProductHeroCard';
+import StarTrackerHeroCard from '@/components/StarTrackerHeroCard';
 import HardwareProductSlide from '@/components/HardwareProductSlide';
 import ProductFlipbook, { type FlipbookPage } from '@/components/ProductFlipbook';
 import { HARDWARE_PRODUCTS } from '@/lib/hardwareProducts';
 
 export default function ProductsPage() {
-  // All three cards are hero-image + CTA, not live component previews —
-  // Star Tracker's real interactive app still lives at its own
-  // /products/star-tracker page, just one tap away via this card's CTA.
+  // Star Tracker PRO gets its own live glassmorphic/typewriter card
+  // (StarTrackerHeroCard) instead of the static hero-image + baked-in-CTA
+  // convention the hardware slides below still use — its real interactive
+  // app lives at /products/star-tracker, just one tap away via this card.
+  // Delisted hardware (see hardwareProducts.ts) is filtered out here so
+  // it stops appearing in this browsing carousel while its own detail/
+  // checkout/thank-you routes stay live for anyone with a direct link.
   const pages: FlipbookPage[] = [
-    {
-      key: 'star-tracker',
-      title: 'Star Tracker',
-      render: () => (
-        <ProductHeroCard
-          heroImageSrc="/images/star-tracker.png"
-          heroTagline="See Beyond the Horizon."
-          ctaLabel="Explore Specs →"
-          ctaHref="/products/star-tracker"
-        />
-      ),
-    },
-    ...HARDWARE_PRODUCTS.map((product) => ({
+    { key: 'star-tracker', title: 'Star Tracker PRO', render: () => <StarTrackerHeroCard /> },
+    ...HARDWARE_PRODUCTS.filter((product) => !product.delisted).map((product) => ({
       key: product.id,
       title: product.name,
       render: () => <HardwareProductSlide product={product} />,

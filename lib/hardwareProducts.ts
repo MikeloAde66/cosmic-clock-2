@@ -34,12 +34,20 @@ export interface HardwareProduct {
   preOrderCta: string;
   featured?: boolean;
   manualFulfillment?: boolean;
+  // Hidden from browsing surfaces (the /products flipbook, ProductsSection's
+  // teaser grid) per an explicit catalog-streamlining decision — HydroNode
+  // Pro is a hardware/off-grid concept that diverges from the core AiOne
+  // software/media positioning. Its own detail page, checkout, and
+  // thank-you route are all still live and unchanged for anyone who
+  // already has a direct link — this only removes it from discovery.
+  delisted?: boolean;
 }
 
 export const HARDWARE_PRODUCTS: HardwareProduct[] = [
   {
     id: 'hydronode-pro',
     categoryBadge: 'TURNKEY NODE',
+    delisted: true,
     name: 'HydroNode Pro',
     brandedTitle: 'Ai One HydroNode™ Pro',
     heroImageSrc: '/images/hydronode-pro.png',

@@ -15,8 +15,10 @@ import { HARDWARE_PRODUCTS } from '@/lib/hardwareProducts';
 // This is a real teaser grid instead, linking out to each product's real
 // detail page (and to /products itself for the full browsing experience).
 const TEASER_PRODUCTS = [
-  { id: 'star-tracker', name: 'Star Tracker', tagline: 'See Beyond the Horizon.', heroImageSrc: '/images/star-tracker.png' },
-  ...HARDWARE_PRODUCTS.map((p) => ({ id: p.id, name: p.name, tagline: p.heroTagline, heroImageSrc: p.heroImageSrc })),
+  { id: 'star-tracker', name: 'Star Tracker PRO', tagline: 'See Beyond the Horizon.', heroImageSrc: '/images/star-tracker.png' },
+  // delisted (see hardwareProducts.ts) hides HydroNode Pro from this teaser
+  // grid without touching its real detail/checkout/thank-you routes.
+  ...HARDWARE_PRODUCTS.filter((p) => !p.delisted).map((p) => ({ id: p.id, name: p.name, tagline: p.heroTagline, heroImageSrc: p.heroImageSrc })),
 ];
 
 export default function ProductsSection() {
