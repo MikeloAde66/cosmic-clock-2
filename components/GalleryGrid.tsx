@@ -895,7 +895,7 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={2} docked={docked[2]} onDock={dock}>
           <button onClick={onOpenStarTracker} className={cardClass}>
-            <CardImage src={GALLERY_IMAGES.starTracker} gradient={CARD_GRADIENTS.starTracker} Icon={Telescope} />
+            <StarTrackerRadarCardImage />
             <CardHeader Icon={Telescope} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Star Tracker PRO</div>
