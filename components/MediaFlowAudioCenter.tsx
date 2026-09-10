@@ -5,6 +5,7 @@ import { Play, Pause, SkipBack, SkipForward, Volume2, Music, Film, X, Pencil, Ch
 import type WaveSurfer from 'wavesurfer.js';
 import type Webamp from 'webamp';
 import { extractIdentifier } from '@/lib/archiveOrg';
+import RadioControlPanelPreview from './radio/RadioControlPanelPreview';
 
 export interface CatalogTrack {
   id: string;
@@ -517,6 +518,7 @@ export default function MediaFlowAudioCenter({ onSendToStudioOne }: MediaFlowAud
 
   return (
     <div className="max-w-5xl mx-auto">
+      <RadioControlPanelPreview />
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-white">Media Flow &amp; Audio Center</h2>
         <p className="mt-1 text-sm text-slate-400">
