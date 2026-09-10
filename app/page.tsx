@@ -168,22 +168,23 @@ function HomeInner() {
     setShowBackToTop((stackScrollRef.current?.scrollTop ?? 0) > 400);
   };
 
-  // GlobalPlayerBar is scoped to Radio Central and Media Flow only (see
-  // RadioPlayerContext's playerBarHidden default). In Stack mode both live
-  // as inline sections alongside Home/Pods/Products/Kali on one continuous
-  // scroll, so "is Media Flow/Radio Central the active view" has to mean
-  // "is that section actually scrolled into view" — tracked here via a real
+  // GlobalPlayerBar is scoped to Home, Radio Central, and Media Flow (see
+  // RadioPlayerContext's playerBarHidden default). In Stack mode all three
+  // live as inline sections alongside Pods/Products/Kali on one continuous
+  // scroll, so "is one of those the active view" has to mean "is that
+  // section actually scrolled into view" — tracked here via a real
   // IntersectionObserver against Stack's own scroll container, not window
   // scroll (see stackScrollRef above).
+  const aioneSectionRef = useRef<HTMLDivElement>(null);
   const radioSectionRef = useRef<HTMLDivElement>(null);
   const tenForwardSectionRef = useRef<HTMLDivElement>(null);
-  const [stackAudioSectionVisible, setStackAudioSectionVisible] = useState(false);
+  const [stackChromeSectionVisible, setStackChromeSectionVisible] = useState(false);
   useEffect(() => {
     if (layoutMode !== 'stack') {
-      setStackAudioSectionVisible(false);
+      setStackChromeSectionVisible(false);
       return;
     }
-    const targets = [radioSectionRef.current, tenForwardSectionRef.current].filter(
+    const targets = [aioneSectionRef.current, radioSectionRef.current, tenForwardSectionRef.current].filter(
       (el): el is HTMLDivElement => el !== null
     );
     if (targets.length === 0) return;
@@ -194,7 +195,7 @@ function HomeInner() {
           if (entry.isIntersecting) visible.add(entry.target);
           else visible.delete(entry.target);
         }
-        setStackAudioSectionVisible(visible.size > 0);
+        setStackChromeSectionVisible(visible.size > 0);
       },
       { root: stackScrollRef.current, threshold: 0.4 }
     );
@@ -209,13 +210,16 @@ function HomeInner() {
   const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(false);
   const [isIssOpen, setIsIssOpen] = useState(false);
   const [isLetsChatOpen, setIsLetsChatOpen] = useState(false);
-  // The only two things allowed to show GlobalPlayerBar within this SPA
-  // route: the Media Flow overlay (isLetsChatOpen), or Stack mode's Radio
-  // Central/Media Flow sections while actually scrolled into view (see
-  // stackAudioSectionVisible above). Radio Central's other home, the
+  // The things allowed to show GlobalPlayerBar within this SPA route: the
+  // Media Flow overlay (isLetsChatOpen), the Ai One Home view itself
+  // (Gallery mode's grid, or Hub mode's 'aione' tab) as long as Star
+  // Tracker isn't open on top of it, or Stack mode's Home/Radio Central/
+  // Media Flow sections while actually scrolled into view (see
+  // stackChromeSectionVisible above). Radio Central's other home, the
   // standalone /radio route, opts in independently since it never mounts
   // this component at all.
-  const showBottomChrome = isLetsChatOpen || stackAudioSectionVisible;
+  const isHomeVisible = !isStarTrackerOpen && (layoutMode === 'gallery' || (layoutMode === 'hub' && activeTab === 'aione'));
+  const showBottomChrome = isLetsChatOpen || isHomeVisible || stackChromeSectionVisible;
   useEffect(() => {
     setPlayerBarHidden(!showBottomChrome);
     return () => setPlayerBarHidden(true);
@@ -497,7 +501,7 @@ useContextMenuShare();
               mode's nested Kali sub-view can share the same component). */}
           {layoutMode === 'stack' && (
             <div ref={stackScrollRef} onScroll={handleStackScroll} className="relative flex-1 overflow-y-auto">
-              <div id="stack-section-aione" className="w-full min-h-full">
+              <div id="stack-section-aione" ref={aioneSectionRef} className="w-full min-h-full">
                 <Reveal className="w-full h-full">
                   <AiOneHome
                     onNavigateToVaultDrawer={navigateToVaultDrawer}

@@ -95,6 +95,13 @@ const ROTATION_AD_STATION_ID = 'vault-ads';
 const ROTATION_BLOCK_MS = 8 * 60 * 1000;
 const ROTATION_AD_MS = 60 * 1000;
 
+// -3dB expressed as a linear amplitude gain factor: 10^(-3/20) ≈ 0.708.
+// Applied via a real GainNode (see ensureAnalyser's audio graph) whenever
+// the currently playing track's isAd flag (set server-side in
+// app/api/radio/queue) is true — ads/commercials sit a real, measured
+// -3dB under normal programming rather than an approximated volume tweak.
+const AD_GAIN_FACTOR = 0.708;
+
 function shuffle<T>(items: T[]): T[] {
   const arr = [...items];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -164,8 +171,13 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  // Real ad/commercial gain stage — see AD_GAIN_FACTOR above and
+  // applyAdGain below, which is the only thing that ever sets this node's
+  // gain value.
+  const adGainRef = useRef<GainNode | null>(null);
 
-  // Wires an AnalyserNode into the <audio> element's output graph for the
+  // Wires an AnalyserNode (and a GainNode ahead of it, for ad/commercial
+  // volume staging) into the <audio> element's output graph for the
   // player-bar spectrum visualizer. Deliberately lazy — created on first
   // actual play() call (always a user gesture: a play button, a station
   // marker, etc.) rather than on mount. AudioContext starts 'suspended'
@@ -180,13 +192,19 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
           window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
         const audioCtx = new AudioContextCtor();
         const source = audioCtx.createMediaElementSource(audioRef.current);
+        const gain = audioCtx.createGain();
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 64; // 32 frequency bins — enough for a compact player-bar bar graph
         analyser.smoothingTimeConstant = 0.8;
-        source.connect(analyser);
+        // Gain sits ahead of the analyser (not after) so the player-bar
+        // visualizer's bars actually reflect an ad's real, quieter output
+        // rather than the pre-attenuation signal.
+        source.connect(gain);
+        gain.connect(analyser);
         analyser.connect(audioCtx.destination);
         audioCtxRef.current = audioCtx;
         mediaSourceRef.current = source;
+        adGainRef.current = gain;
         analyserRef.current = analyser;
       } catch (err) {
         // Most likely createMediaElementSource being called a second time on
@@ -197,6 +215,18 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
       }
     }
     audioCtxRef.current?.resume().catch(() => {});
+  }, []);
+
+  // The only place adGainRef's value is ever set — called whenever
+  // playback moves to a new track/station with a known isAd state.
+  // setTargetAtTime (not a hard assignment) avoids an audible click on the
+  // rare case this runs while the previous track is still audibly
+  // finishing out.
+  const applyAdGain = useCallback((isAd: boolean) => {
+    const gain = adGainRef.current;
+    const ctx = audioCtxRef.current;
+    if (!gain || !ctx) return;
+    gain.gain.setTargetAtTime(isAd ? AD_GAIN_FACTOR : 1, ctx.currentTime, 0.05);
   }, []);
 
   const [station, setStation] = useState<RadioStation | null>(null);
@@ -261,9 +291,10 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
     setCurrentIndex(index);
     setStatus('loading');
     ensureAnalyser();
+    applyAdGain(track.isAd ?? false);
     setAudioSource(track.fileUrl);
     audioRef.current.play().catch(() => setStatus('error'));
-  }, [ensureAnalyser, setAudioSource]);
+  }, [ensureAnalyser, applyAdGain, setAudioSource]);
 
   // Core fetch-and-play logic, shared by manual station selection and the
   // Program Manager rotation below. Doesn't touch programManagerEnabled or
@@ -299,6 +330,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
         queueRef.current = [];
         setQueue([]);
         setCurrentIndex(0);
+        applyAdGain(false); // no live (non-Vault) station is ever ad content
         if (audioRef.current) {
           setAudioSource(data.streamUrl);
           if (autoplay) {
@@ -322,7 +354,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
       console.error('Failed to play station:', err);
       setStatus('error');
     }
-  }, [playIndex, ensureAnalyser, setAudioSource]);
+  }, [playIndex, ensureAnalyser, applyAdGain, setAudioSource]);
 
   const clearRotationTimer = useCallback(() => {
     if (rotationTimerRef.current) {

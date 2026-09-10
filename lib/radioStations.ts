@@ -203,19 +203,4 @@ export const RADIO_STATIONS: RadioStation[] = [
     badge: 'AD',
     badgeColor: '#3a3a3a',
   },
-  // A real, locally-hosted narrated episode (public/assets/audio/), not a
-  // stream — 'live' kind still fits since playback is just "point the
-  // <audio> element at this URL," the same as any static file.
-  {
-    kind: 'live',
-    id: 'ai-off-grid-and-diy-ep1',
-    name: 'Ai, Off Grid, and DIY',
-    network: 'Ai One Originals',
-    tagline: '"Living Off Grid" by Nick Rosen — Radio Ecoshock Interview',
-    genre: 'Documentary / Narration',
-    category: 'COSMIC CHILL',
-    streamUrl: 'https://archive.org/download/rosen/ES_Rosen_LivingOffGrid.mp3',
-    badge: 'DIY',
-    badgeColor: '#2e7d32',
-  },
 ];

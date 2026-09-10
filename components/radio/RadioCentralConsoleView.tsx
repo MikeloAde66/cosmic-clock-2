@@ -13,11 +13,7 @@ import {
   type LiveRadioStation,
   type RadioStation,
 } from '@/lib/radioStations';
-
-// Station id the "Ai, Off Grid, and DIY" card (lib/radioStations.ts) is
-// registered under — used to single out that one card for its dedicated
-// Play icon below.
-const OFF_GRID_STATION_ID = 'ai-off-grid-and-diy-ep1';
+import { isBannedTrackTitle } from '@/lib/bannedTracks';
 
 // The Daily Queue's lineup: every currently available Supabase catalog
 // audio item (catalogStations — video items never reach this list, see
@@ -232,7 +228,11 @@ export default function RadioCentralConsoleView() {
     fetch('/api/admin/radio-stations')
       .then((res) => res.json())
       .then((data) => {
-        if (!cancelled && Array.isArray(data.stations)) setAdminStations(data.stations);
+        if (cancelled || !Array.isArray(data.stations)) return;
+        // Defensive denylist (see lib/bannedTracks) — filtered at the
+        // source so both allStations below AND the Daily Queue (which
+        // reads catalogStations directly, not allStations) benefit.
+        setAdminStations(data.stations.filter((s: RadioStation) => !isBannedTrackTitle(s.name) && !isBannedTrackTitle(s.tagline)));
       })
       .catch(() => {});
     return () => {
@@ -248,7 +248,7 @@ export default function RadioCentralConsoleView() {
         if (cancelled || !Array.isArray(data.items)) return;
         const mapped = (data.items as MediaCatalogItem[])
           .map(mapCatalogItemToStation)
-          .filter((s): s is LiveRadioStation => s !== null);
+          .filter((s): s is LiveRadioStation => s !== null && !isBannedTrackTitle(s.name));
         setCatalogStations(mapped);
       })
       .catch(() => {});
@@ -634,19 +634,6 @@ export default function RadioCentralConsoleView() {
                     <p className="text-xs font-bold truncate text-white">{s.name}</p>
                     <p className="text-[10px] truncate text-slate-500">{s.tagline}</p>
                   </div>
-                  {s.id === OFF_GRID_STATION_ID && (
-                    <span
-                      aria-label={isActive && isPlaying ? 'Pause Ai, Off Grid, and DIY' : 'Play Ai, Off Grid, and DIY'}
-                      className="flex items-center justify-center w-8 h-8 rounded-full shrink-0"
-                      style={{ background: 'rgba(0,242,254,0.15)', border: `1px solid ${TOKENS.cyan}` }}
-                    >
-                      {isActive && isPlaying ? (
-                        <Pause className="w-4 h-4" style={{ color: TOKENS.cyan }} />
-                      ) : (
-                        <Play className="w-4 h-4" style={{ color: TOKENS.cyan }} />
-                      )}
-                    </span>
-                  )}
                   {isActive && isPlaying && <PlayerSpectrum analyserRef={analyserRef} isPlaying width={36} height={16} />}
                   {isAdmin && (
                     <button

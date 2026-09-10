@@ -3,6 +3,7 @@ import VaultProduct, { type VaultTrackSub } from '@/lib/models/VaultProduct';
 import AdminRadioStation from '@/lib/models/AdminRadioStation';
 import { getSupabaseAdmin, VAULT_BUCKET } from '@/lib/supabaseAdmin';
 import { RADIO_STATIONS } from '@/lib/radioStations';
+import { isBannedTrackTitle } from '@/lib/bannedTracks';
 
 export const runtime = 'nodejs';
 
@@ -118,17 +119,24 @@ export async function GET(request: Request) {
   try {
     await dbConnect();
     const doc = await VaultProduct.findOne({ sku: station.sku, drawer: station.drawer }).lean();
-    if (!doc || doc.tracks.length === 0) {
+    // Defensive denylist (see lib/bannedTracks) — filtered here regardless
+    // of whether the underlying Mongo document has actually been cleaned
+    // up, since this repo has no credentials to verify/edit that directly.
+    const bannedFilteredTracks = doc?.tracks.filter((t: VaultTrackSub) => !isBannedTrackTitle(t.filename)) ?? [];
+    if (!doc || bannedFilteredTracks.length === 0) {
       return Response.json({ station, kind: 'vault', tracks: [] });
     }
 
-    const count = countParam ? Math.max(1, Math.min(500, parseInt(countParam, 10))) : doc.tracks.length;
-    const musicOrdered = buildQueue(doc.tracks, count, (t: VaultTrackSub) => t.weight ?? 1);
+    const count = countParam ? Math.max(1, Math.min(500, parseInt(countParam, 10))) : bannedFilteredTracks.length;
+    const musicOrdered = buildQueue(bannedFilteredTracks, count, (t: VaultTrackSub) => t.weight ?? 1);
 
-    // Interleave ad/station-ID breaks for music stations only — the ads
-    // station itself shouldn't get ads spliced into its own ad rotation,
-    // and this quietly no-ops if the ad pack is missing or empty.
-    let sequence: { track: VaultTrackSub; isAd: boolean }[] = musicOrdered.map((t) => ({ track: t, isAd: false }));
+    // isAd is true either when this station IS the ad-break pack itself
+    // (tuned directly, e.g. Program Manager's ad phase), or per-track when
+    // interleaved into a MUSIC station's queue below — the client's -3dB
+    // ad/commercial gain staging (RadioPlayerContext) keys off this flag,
+    // so both paths need it set correctly, not just the interleaved case.
+    const isAdStation = station.sku === AD_BREAK_SKU && station.drawer === AD_BREAK_DRAWER;
+    let sequence: { track: VaultTrackSub; isAd: boolean }[] = musicOrdered.map((t) => ({ track: t, isAd: isAdStation }));
     if (station.drawer === 'MUSIC') {
       const adDoc = await VaultProduct.findOne({ sku: AD_BREAK_SKU, drawer: AD_BREAK_DRAWER }).lean();
       if (adDoc && adDoc.tracks.length > 0) {
