@@ -14,6 +14,7 @@ export interface YouTubePlayer {
   // YouTube iframe's audio at all.
   setVolume: (volume: number) => void;
   mute: () => void;
+  unMute: () => void;
   destroy: () => void;
 }
 

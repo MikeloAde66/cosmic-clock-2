@@ -421,6 +421,11 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   useEffect(() => {
     if (skyFestTab !== 'media' || !nowPlayingVideoId) return;
     let cancelled = false;
+    // Guards the one-time auto-unmute below so it fires exactly once per
+    // player instance — onStateChange fires PLAYING again on every manual
+    // pause/resume, and re-unmuting/re-lowering the volume each time would
+    // fight whatever level the visitor has since set themselves.
+    let hasAutoUnmuted = false;
 
     const bindPlayer = () => {
       if (cancelled || !ytContainerRef.current) return;
@@ -431,20 +436,28 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
       ytContainerRef.current.appendChild(playerHost);
       ytPlayerRef.current = new window.YT!.Player(playerHost, {
         videoId: nowPlayingVideoId,
-        // mute: 1 is what actually makes autoplay work — every major
-        // browser blocks unmuted autoplay outright, muted or not is the
-        // real gate here, not autoplay alone (the YT IFrame Player API's
-        // equivalent of a plain <video>'s autoPlay+muted+playsInline,
-        // which don't apply to an <iframe>-based embed like this one).
+        // mute: 1 is what actually makes autoplay work at all — every
+        // major browser blocks unmuted autoplay outright (this isn't a
+        // preference to tune, it's a hard platform policy), so starting
+        // muted is unavoidable if the video is to play automatically
+        // rather than sit paused. The onStateChange handler below is what
+        // actually gets real sound out: it unmutes the instant playback
+        // genuinely begins, at a real -3dB-equivalent volume (10^(-3/20)
+        // ≈ 0.708, i.e. ~71/100) rather than full blast — the same
+        // technique (and the same real dB math already used for
+        // RadioPlayerContext's ad gain staging) most autoplay-with-sound
+        // embeds across the web rely on.
         playerVars: { autoplay: 1, mute: 1, playsinline: 1 },
         events: {
-          // Starts muted (browser-required for autoplay) at a lower
-          // default volume rather than full blast, so unmuting via the
-          // native controls doesn't blast full volume — controls stay
-          // fully visible/enabled for manual adjustment either way.
           onReady: (event) => {
             event.target.mute();
-            event.target.setVolume(70);
+            event.target.setVolume(71);
+          },
+          onStateChange: (event) => {
+            if (hasAutoUnmuted || event.data !== window.YT!.PlayerState.PLAYING) return;
+            hasAutoUnmuted = true;
+            event.target.unMute();
+            event.target.setVolume(71);
           },
         },
       });
