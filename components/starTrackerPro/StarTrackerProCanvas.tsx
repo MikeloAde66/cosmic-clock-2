@@ -1,26 +1,39 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
 import { ArrowLeft } from 'lucide-react';
+import { Body } from 'astronomy-engine';
 import { useGeolocation } from '@/lib/useGeolocation';
-import { buildStarInstanceBuffers, loadRawStarCatalog, type RawStarEntry, type StarInstanceBuffers } from '@/lib/starTrackerPro/starCatalogBuffers';
-import type { GeodeticLocation } from '@/lib/starTrackerPro/coordinates';
-import CelestialSphere, { DOME_RADIUS } from './CelestialSphere';
+import {
+  loadConstellationLines,
+  loadConstellationNames,
+  type ConstellationLineSegment,
+  type RawConstellationNames,
+} from '@/lib/starTrackerPro/constellationLines';
+import { bodyToHorizon, type GeodeticLocation, type HorizonPosition } from '@/lib/starTrackerPro/coordinates';
+import type { IdentifiedStar } from '@/lib/starTrackerPro/starCatalogBuffers';
+import type { HoveredStarInfo } from './CelestialSphere';
+import StarTrackerProScene, { POSITION_TICK_MS } from './StarTrackerProScene';
+import ObjectTooltip from './ObjectTooltip';
+import OverlayToolbar from './OverlayToolbar';
 import DeviceHub from './DeviceHub';
-
-// Real position tick — sidereal drift is continuous but slow (~15°/hour);
-// recomputing once a second is genuinely fine visually while keeping the
-// Alt/Az math (and the instance-matrix rebuild it triggers) off the
-// per-frame render path. See CelestialSphere's own comment for why that
-// separation matters for real 60fps rendering.
-const POSITION_TICK_MS = 1000;
 
 // Equatorial default (0°, 0°) — used only while real GPS is pending/denied,
 // and labeled as such in the UI rather than silently presented as the
 // user's real location.
 const FALLBACK_LOCATION: GeodeticLocation = { latitudeDeg: 0, longitudeDeg: 0, elevationMeters: 0 };
+
+const SEARCHABLE_BODIES: Record<string, Body> = {
+  Sun: Body.Sun,
+  Moon: Body.Moon,
+  Mercury: Body.Mercury,
+  Venus: Body.Venus,
+  Mars: Body.Mars,
+  Jupiter: Body.Jupiter,
+  Saturn: Body.Saturn,
+  Uranus: Body.Uranus,
+  Neptune: Body.Neptune,
+};
 
 export default function StarTrackerProCanvas({ onBack }: { onBack: () => void }) {
   const { status: geoStatus, coords } = useGeolocation();
@@ -28,17 +41,25 @@ export default function StarTrackerProCanvas({ onBack }: { onBack: () => void })
     ? { latitudeDeg: coords.lat, longitudeDeg: coords.lon, elevationMeters: 0 }
     : FALLBACK_LOCATION;
 
-  const [catalog, setCatalog] = useState<RawStarEntry[] | null>(null);
+  const [constellationSegments, setConstellationSegments] = useState<ConstellationLineSegment[] | null>(null);
+  const [constellationNames, setConstellationNames] = useState<RawConstellationNames | null>(null);
   const [now, setNow] = useState(() => new Date());
-  const [buffers, setBuffers] = useState<StarInstanceBuffers | null>(null);
+
+  const [showConstellations, setShowConstellations] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
+  const [hoveredStar, setHoveredStar] = useState<HoveredStarInfo | null>(null);
+  const [selectedBody, setSelectedBody] = useState<{ name: string; horizon: HorizonPosition } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    loadRawStarCatalog()
-      .then((data) => {
-        if (!cancelled) setCatalog(data);
+    Promise.all([loadConstellationLines(), loadConstellationNames()])
+      .then(([segments, names]) => {
+        if (!cancelled) {
+          setConstellationSegments(segments);
+          setConstellationNames(names);
+        }
       })
-      .catch((err) => console.error('Star catalog load failed:', err));
+      .catch((err) => console.error('Constellation data load failed:', err));
     return () => {
       cancelled = true;
     };
@@ -49,20 +70,23 @@ export default function StarTrackerProCanvas({ onBack }: { onBack: () => void })
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!catalog) return;
-    setBuffers(buildStarInstanceBuffers(catalog, location, now, DOME_RADIUS));
-    // location is a fresh object every render (GeoCoords isn't memoized
-    // upstream) — real lat/lon values are what matter for recomputation,
-    // not the wrapper object's identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog, now, location.latitudeDeg, location.longitudeDeg]);
-
   const geoLabel = useMemo(() => {
     if (coords) return `${coords.lat.toFixed(2)}°, ${coords.lon.toFixed(2)}°`;
     if (geoStatus === 'pending') return 'Locating…';
     return '0.00°, 0.00° (fallback — location unavailable)';
   }, [coords, geoStatus]);
+
+  const handleSelectStar = (star: IdentifiedStar) => {
+    setSelectedBody(null);
+    setHoveredStar({ star, clientX: window.innerWidth / 2, clientY: window.innerHeight - 160 });
+  };
+
+  const handleSearchSelect = (name: string) => {
+    const body = SEARCHABLE_BODIES[name];
+    if (body === undefined) return;
+    setHoveredStar(null);
+    setSelectedBody({ name, horizon: bodyToHorizon(body, location, now) });
+  };
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black">
@@ -79,16 +103,32 @@ export default function StarTrackerProCanvas({ onBack }: { onBack: () => void })
         {geoLabel}
       </div>
 
-      <Canvas camera={{ position: [0, 0, 0.1], fov: 75, near: 0.1, far: DOME_RADIUS * 2 }}>
-        <color attach="background" args={['#000000']} />
-        <ambientLight intensity={0.2} />
-        <CelestialSphere buffers={buffers} />
-        {/* enableZoom/enablePan off — this is a look-around-from-inside-a-
-            fixed-radius-dome control, not a free-fly camera; zooming or
-            panning away from the observer's real position would break the
-            Alt/Az projection's whole premise. */}
-        <OrbitControls enableZoom={false} enablePan={false} rotateSpeed={-0.4} target={[0, 0, -1]} />
-      </Canvas>
+      <OverlayToolbar
+        showConstellations={showConstellations}
+        onToggleConstellations={() => setShowConstellations((v) => !v)}
+        showGrid={showGrid}
+        onToggleGrid={() => setShowGrid((v) => !v)}
+        onSearchSelect={handleSearchSelect}
+      />
+
+      {selectedBody && (
+        <div className="fixed z-20 px-3 py-2 font-mono text-xs border rounded-lg shadow-lg bottom-6 left-1/2 -translate-x-1/2 border-cyan-500/30 bg-slate-950/90 backdrop-blur-md text-slate-200">
+          <span className="font-bold text-cyan-300">{selectedBody.name}</span> — Alt {selectedBody.horizon.altitudeDeg.toFixed(1)}°, Az{' '}
+          {selectedBody.horizon.azimuthDeg.toFixed(1)}°
+        </div>
+      )}
+
+      <StarTrackerProScene
+        location={location}
+        now={now}
+        constellationSegments={constellationSegments}
+        showConstellations={showConstellations}
+        showGrid={showGrid}
+        onHoverStar={setHoveredStar}
+        onSelectStar={handleSelectStar}
+      />
+
+      <ObjectTooltip info={hoveredStar} constellationSegments={constellationSegments} constellationNames={constellationNames} />
 
       <DeviceHub />
     </div>

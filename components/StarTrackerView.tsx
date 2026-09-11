@@ -968,17 +968,17 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   }, [tourActive, tourStepIndex]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col w-full h-full p-4 overflow-y-auto bg-[#050810] text-slate-100">
-      {/* Same shared animated starfield as the home page (fixed to the
-          viewport, z-0, resolution-independent %-based positions so it
-          resizes cleanly with no listener needed) — replaces this view's
-          own previously-duplicated star implementation, so the background
-          is now literally the same moving field as everywhere else in the
-          app, visible around and through the lens below via the glass
-          treatment on its housing. */}
-      <Starfield />
+    <div className="fixed inset-0 z-50 flex flex-col w-full h-full p-4 overflow-y-auto bg-transparent text-slate-100 pointer-events-none">
+      {/* No own background/Starfield here — this view is now mounted as a
+          transparent HUD layer over StarTrackerProCanvas's WebGL starfield
+          (see app/(standalone)/star-tracker/page.tsx), which replaces what
+          Starfield used to provide behind this same dashboard. The root
+          itself is pointer-events-none so empty space between/around the
+          panels below falls through as real clicks to that WebGL canvas;
+          each actual content wrapper below re-enables pointer-events-auto
+          for its own buttons/panels. */}
 
-      <div className="relative z-10 flex items-center gap-2 mb-4 shrink-0">
+      <div className="relative z-10 flex items-center gap-2 mb-4 shrink-0 pointer-events-auto">
         <button
           type="button"
           onClick={onBack}
@@ -1000,7 +1000,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         </button>
       </div>
 
-      <div className="relative z-10 w-full max-w-3xl mx-auto space-y-6">
+      <div className="relative z-10 w-full max-w-3xl mx-auto space-y-6 pointer-events-auto">
         <div className="space-y-3">
           <div>
             <span className="text-[10px] font-mono tracking-widest uppercase text-cyan-400/80">Sky Above You</span>
@@ -2153,7 +2153,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
           the UI can't be accidentally triggered mid-tour; Skip/Next/Finish
           are the only interactive elements. */}
       {tourActive && tourRect && (
-        <div className="fixed inset-0 z-[100]">
+        <div className="fixed inset-0 z-[100] pointer-events-auto">
           <div
             className="absolute transition-all duration-300 border-2 rounded-lg pointer-events-none border-cyan-300 animate-tour-glow"
             style={{
