@@ -83,14 +83,34 @@ export default function DeviceHub() {
         <SatelliteIcon className="w-5 h-5" />
       </button>
 
-      {open && (
-        <div className="fixed inset-y-0 right-0 z-30 flex flex-col w-full max-w-sm p-5 space-y-4 overflow-y-auto border-l shadow-2xl border-slate-800 bg-slate-950/95 backdrop-blur-md">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold tracking-wide text-white uppercase">Device Hub</h2>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="text-slate-400 hover:text-white">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+      {/* Backdrop fades in/out with the drawer and closes it on click-away;
+          kept mounted (not conditionally rendered) so both it and the
+          drawer below actually transition instead of snapping. */}
+      <div
+        onClick={() => setOpen(false)}
+        aria-hidden="true"
+        className={`fixed inset-0 z-20 bg-black/40 transition-opacity duration-300 ${
+          open ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+      />
+
+      <div
+        // Stays mounted while closed (translated off-screen) so the open
+        // transition actually animates — inert while closed keeps its
+        // buttons/inputs from stealing keyboard focus or showing up to
+        // screen readers when it isn't visibly on screen.
+        inert={!open ? true : undefined}
+        aria-hidden={!open}
+        className={`fixed inset-y-0 right-0 z-30 flex flex-col w-full max-w-sm p-5 space-y-4 overflow-y-auto border-l shadow-2xl border-slate-800 bg-slate-950/95 backdrop-blur-md transition-transform duration-300 ease-out ${
+          open ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold tracking-wide text-white uppercase">Device Hub</h2>
+          <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="text-slate-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
           <button
             type="button"
@@ -167,7 +187,6 @@ export default function DeviceHub() {
             </div>
           )}
         </div>
-      )}
     </>
   );
 }
