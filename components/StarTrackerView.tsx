@@ -161,12 +161,26 @@ function computeSky(observer: Observer, now: Date): SkyBody[] {
   }).sort((a, b) => b.altitude - a.altitude);
 }
 
+// Math.sin/cos aren't required by spec to be bit-identical across engines
+// (Node's V8 build on the server vs. the browser's V8 build on the
+// client can legitimately differ in the last bit), and real real-time
+// values like `now` also genuinely differ by however long hydration took
+// — either way the raw float can render as a slightly different decimal
+// string server- vs. client-side, which is a real (if invisible)
+// hydration mismatch for any SVG coordinate built from trig. Rounding to
+// 3 decimal places (thousandths of an SVG unit — far below one screen
+// pixel at any realistic dome size) absorbs both without any visible
+// effect, and guarantees identical serialization both sides.
+function roundCoord(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
+
 function azAltToXY(azimuth: number, altitude: number, center: number, radius: number) {
   // North at top (azimuth 0 -> -90° in SVG angle space), clockwise; zenith
   // (altitude 90°) at the center, horizon (altitude 0°) at the rim.
   const angle = (azimuth - 90) * (Math.PI / 180);
   const r = radius * (1 - Math.max(altitude, 0) / 90);
-  return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle) };
+  return { x: roundCoord(center + r * Math.cos(angle)), y: roundCoord(center + r * Math.sin(angle)) };
 }
 
 // 'ip-fallback' is distinct from 'granted' — city-level IP geolocation is
@@ -307,6 +321,15 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   // coords/status above; anything else is a fixed real-world site.
   const [selectedObservatoryId, setSelectedObservatoryId] = useState('local');
   const [now, setNow] = useState(() => new Date());
+  // `now` is real wall-clock time, so its initial value is genuinely
+  // different between the server's render pass and the client's hydration
+  // pass (different instant, often a different locale/timezone entirely)
+  // — anything that stringifies it directly (toLocaleTimeString, etc.)
+  // would otherwise trip a real hydration mismatch. Gating those specific
+  // renders on this flag (false during SSR and the first client render,
+  // true only after mount) keeps the very first paint identical on both
+  // sides; the real time appears a tick later once hydration is done.
+  const [mounted, setMounted] = useState(false);
   const [selected, setSelected] = useState<SelectedItem>(null);
   // Casual/Expert only change how much of the already-real data is shown
   // (plain description vs full RA/Dec/magnitude/rise-set readout) — no
@@ -566,6 +589,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   }, []);
 
   useEffect(() => {
+    setMounted(true);
     const interval = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(interval);
   }, []);
@@ -726,7 +750,13 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
     };
     el.addEventListener('wheel', handler, { passive: false });
     return () => el.removeEventListener('wheel', handler);
-  }, []);
+    // The real <svg ref={domeRef}> only exists once `mounted` is true (see
+    // the hydration fix around the dome below) — without `mounted` here,
+    // this effect's one-time (empty-deps) run would find domeRef.current
+    // still null (the placeholder, not the svg, is what's rendered on
+    // that first pass) and never get a second chance to attach the
+    // listener.
+  }, [mounted]);
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     dragRef.current = { x: e.clientX - view.tx, y: e.clientY - view.ty };
@@ -1014,7 +1044,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">Local Time</div>
-            <div className="font-mono text-sm text-white">{now.toLocaleTimeString()}</div>
+            <div className="font-mono text-sm text-white">{mounted ? now.toLocaleTimeString() : '--:--:--'}</div>
           </div>
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">
@@ -1025,7 +1055,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                 onAskKali={onAskKali}
               />
             </div>
-            <div className="font-mono text-sm text-cyan-300">{localSiderealTime(now, effectiveCoords.lon)}</div>
+            <div className="font-mono text-sm text-cyan-300">{mounted ? localSiderealTime(now, effectiveCoords.lon) : '--:--:--'}</div>
           </div>
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">
@@ -1406,8 +1436,8 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               { deg: 270, label: 'W' },
             ].map(({ deg, label }) => {
               const angle = (deg - 90) * (Math.PI / 180);
-              const x = 50 + Math.cos(angle) * 38;
-              const y = 50 + Math.sin(angle) * 38;
+              const x = roundCoord(50 + Math.cos(angle) * 38);
+              const y = roundCoord(50 + Math.sin(angle) * 38);
               // Counter-rotates against the outer ring's own rotation so
               // the label stays upright/readable at any zoom level,
               // instead of tipping over as the bezel spins.
@@ -1435,10 +1465,10 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
             })}
             {Array.from({ length: 32 }).map((_, i) => {
               const angle = (i / 32) * Math.PI * 2;
-              const x1 = 50 + Math.cos(angle) * 46;
-              const y1 = 50 + Math.sin(angle) * 46;
-              const x2 = 50 + Math.cos(angle) * (i % 4 === 0 ? 42 : 44);
-              const y2 = 50 + Math.sin(angle) * (i % 4 === 0 ? 42 : 44);
+              const x1 = roundCoord(50 + Math.cos(angle) * 46);
+              const y1 = roundCoord(50 + Math.sin(angle) * 46);
+              const x2 = roundCoord(50 + Math.cos(angle) * (i % 4 === 0 ? 42 : 44));
+              const y2 = roundCoord(50 + Math.sin(angle) * (i % 4 === 0 ? 42 : 44));
               return (
                 <line
                   key={i}
@@ -1565,6 +1595,25 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               top of this, not on top of the opaque housing several layers
               back. */}
           <Starfield contained starCount={140} />
+          {/* Every real object placed in this dome (stars, planets,
+              Messier objects, ISS/satellites) is positioned from `now` —
+              real wall-clock time, continuously drifting with real
+              sidereal motion. Unlike the fixed decorative rings elsewhere
+              in this file, rounding can't paper over this one: the actual
+              gap between the server's render instant and the client's
+              hydration instant is unbounded (network/parse time), so the
+              resulting coordinates can differ by more than a rounding
+              error can hide. Gating the whole dome behind `mounted` (same
+              flag as the Local Time/Sidereal Time fix above) keeps the
+              first client render's DOM identical to the server's —
+              nothing here needs to exist before hydration finishes
+              anyway, same as the WebGL starfield behind this whole page.
+              The placeholder reserves the same aspect-square footprint so
+              nothing shifts layout once the real dome mounts a tick
+              later. */}
+          {!mounted ? (
+            <div className="relative z-10 w-full aspect-square" />
+          ) : (
           <svg
             ref={domeRef}
             viewBox={`0 0 ${size} ${size}`}
@@ -1608,10 +1657,10 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                   return (
                     <line
                       key={deg}
-                      x1={center + Math.cos(angle) * outer}
-                      y1={center + Math.sin(angle) * outer}
-                      x2={center + Math.cos(angle) * inner}
-                      y2={center + Math.sin(angle) * inner}
+                      x1={roundCoord(center + Math.cos(angle) * outer)}
+                      y1={roundCoord(center + Math.sin(angle) * outer)}
+                      x2={roundCoord(center + Math.cos(angle) * inner)}
+                      y2={roundCoord(center + Math.sin(angle) * inner)}
                       stroke={LIGHTWORK_GREEN}
                       strokeOpacity={isMajor ? 0.8 : 0.4}
                       strokeWidth={isMajor ? 1.2 : 0.6}
@@ -1629,8 +1678,8 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                   { deg: 315, label: 'NW' },
                 ].map(({ deg, label }) => {
                   const angle = (deg - 90) * (Math.PI / 180);
-                  const x = center + Math.cos(angle) * azimuthLabelR;
-                  const y = center + Math.sin(angle) * azimuthLabelR;
+                  const x = roundCoord(center + Math.cos(angle) * azimuthLabelR);
+                  const y = roundCoord(center + Math.sin(angle) * azimuthLabelR);
                   return (
                     <text
                       key={label}
@@ -1897,6 +1946,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                 })()}
             </g>
           </svg>
+          )}
           </div>
           </div>
           {!selected && (
