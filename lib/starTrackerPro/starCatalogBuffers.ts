@@ -8,6 +8,7 @@
 // this repo, and fabricating one would mean inventing star positions.
 // Swapping in a real Tycho-2/Gaia subset later just means pointing this at
 // a bigger real file; nothing else here needs to change.
+import { lonToRaHours } from '@/lib/skyChart';
 import { equatorialToHorizon, horizonToSceneDirection, type GeodeticLocation } from './coordinates';
 
 export interface RawStarEntry {
@@ -23,8 +24,26 @@ export async function loadRawStarCatalog(): Promise<RawStarEntry[]> {
   const res = await fetch('/data/stars.json');
   if (!res.ok) throw new Error(`Failed to load star catalog: ${res.status}`);
   const raw = (await res.json()) as [number, number, number][];
-  cachedRawCatalog = raw.map(([raHours, decDeg, magnitude]) => ({ raHours, decDeg, magnitude }));
+  // The file's first field is signed -180..180 RA *degrees* (d3-celestial's
+  // convention — see lib/skyChart.ts's own header comment and its
+  // lonToRaHours, which the legacy 2D StarTrackerView already applies to
+  // this exact file), not hours despite the tuple's [ra, dec, mag] shape
+  // making that easy to assume. Converting here, once, keeps every
+  // consumer of RawStarEntry.raHours honestly in 0-24h.
+  cachedRawCatalog = raw.map(([raDeg, decDeg, magnitude]) => ({ raHours: lonToRaHours(raDeg), decDeg, magnitude }));
   return cachedRawCatalog;
+}
+
+// A star as actually identifiable from real data — no name field, because
+// the real catalog (public/data/stars.json) doesn't carry one; fabricating
+// "Sirius"/"Betelgeuse" labels for arbitrary entries would be inventing
+// data this app doesn't have. catalogIndex is real and stable (position in
+// the full, unfiltered catalog array), used as the tooltip's actual
+// identifier instead.
+export interface IdentifiedStar extends RawStarEntry {
+  catalogIndex: number;
+  altitudeDeg: number;
+  azimuthDeg: number;
 }
 
 export interface StarInstanceBuffers {
@@ -38,6 +57,11 @@ export interface StarInstanceBuffers {
   // Real per-star catalog magnitude, kept alongside the buffer so a
   // renderer can also drive color/opacity from it without a second pass.
   magnitudes: Float32Array;
+  // Same order/length as the buffers above — stars[i] is the real catalog
+  // entry (plus its live Alt/Az) instanceId i's matrix was built from, for
+  // raycasting hit-testing to resolve back to real data instead of a bare
+  // index.
+  stars: IdentifiedStar[];
 }
 
 // Magnitude -> point size, brighter (lower/negative magnitude) is larger.
@@ -57,9 +81,12 @@ export function buildStarInstanceBuffers(
   domeRadius: number,
   minAltitudeDeg = -5 // a few degrees below the true horizon, matching the legacy dome's own horizon-buffer convention
 ): StarInstanceBuffers {
-  const visible = catalog.filter((star) => {
+  const visible: IdentifiedStar[] = [];
+  catalog.forEach((star, catalogIndex) => {
     const horizon = equatorialToHorizon({ raHours: star.raHours, decDeg: star.decDeg }, location, now);
-    return horizon.altitudeDeg >= minAltitudeDeg;
+    if (horizon.altitudeDeg >= minAltitudeDeg) {
+      visible.push({ ...star, catalogIndex, altitudeDeg: horizon.altitudeDeg, azimuthDeg: horizon.azimuthDeg });
+    }
   });
 
   const positions = new Float32Array(visible.length * 3);
@@ -67,8 +94,7 @@ export function buildStarInstanceBuffers(
   const magnitudes = new Float32Array(visible.length);
 
   visible.forEach((star, i) => {
-    const horizon = equatorialToHorizon({ raHours: star.raHours, decDeg: star.decDeg }, location, now);
-    const [x, y, z] = horizonToSceneDirection(horizon, domeRadius);
+    const [x, y, z] = horizonToSceneDirection({ altitudeDeg: star.altitudeDeg, azimuthDeg: star.azimuthDeg }, domeRadius);
     positions[i * 3] = x;
     positions[i * 3 + 1] = y;
     positions[i * 3 + 2] = z;
@@ -76,5 +102,5 @@ export function buildStarInstanceBuffers(
     magnitudes[i] = star.magnitude;
   });
 
-  return { count: visible.length, positions, sizes, magnitudes };
+  return { count: visible.length, positions, sizes, magnitudes, stars: visible };
 }
