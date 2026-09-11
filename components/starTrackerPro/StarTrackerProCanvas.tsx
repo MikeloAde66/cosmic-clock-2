@@ -89,7 +89,16 @@ export default function StarTrackerProCanvas({ onBack }: { onBack: () => void })
   };
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black">
+    // fixed inset-0 z-50 — the same "dedicated full-screen view, not a
+    // stacked modal" pattern every sibling overlay in app/page.tsx uses
+    // (TenForwardSection, ISSFeedModal). This was `relative w-full
+    // h-screen` instead, which only ever looked right on the standalone
+    // /star-tracker route (where this is the only thing on the page, so
+    // normal document flow happens to fill the viewport); mounted here
+    // alongside the hub's own GalleryGrid content, it rendered as an
+    // inert block appended below the grid instead of covering it —
+    // clicking the "Star Tracker PRO" card looked like nothing happened.
+    <div className="fixed inset-0 z-50 w-full h-full overflow-hidden bg-black">
       <button
         type="button"
         onClick={onBack}

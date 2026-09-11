@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, CalendarClock, HelpCircle, Mic, Satellite, Sparkles, Sun as SunIcon, Volume2, X } from 'lucide-react';
 import { Body as AstroBody, Equator, Horizon, Illumination, Observer, SearchRiseSet } from 'astronomy-engine';
-import { calculateCosmicTime } from '@/lib/cosmicMath';
 import { localSiderealTime } from '@/lib/siderealTime';
 import { useIssTracker } from '@/lib/useIssTracker';
 import { describeKp, fetchLatestKp, type KpReading } from '@/lib/spaceWeather';
@@ -380,7 +379,11 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const [constellationNames, setConstellationNames] = useState<ConstellationNames | null>(null);
   const [stars, setStars] = useState<StarTuple[] | null>(null);
 
-  const [skyFestOpen, setSkyFestOpen] = useState(true);
+  // Defaults closed — no auto-engagement on load (no DSN/Deep Sky/Space
+  // Media panel popping open unprompted, and no background quantum-service
+  // /pro-core network activity starting until the user actually clicks
+  // Sky Fest — see the gating effect below).
+  const [skyFestOpen, setSkyFestOpen] = useState(false);
   const telescope = useTelescopeConnection();
   const [skyFestTab, setSkyFestTab] = useState<'dsn' | 'deepsky' | 'media'>('media');
   // Real local UI preference (Phase 4 HUD controls) — directly sets this
@@ -444,11 +447,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   useEffect(() => {
     if (skyFestTab !== 'media' || !nowPlayingVideoId) return;
     let cancelled = false;
-    // Guards the one-time auto-unmute below so it fires exactly once per
-    // player instance — onStateChange fires PLAYING again on every manual
-    // pause/resume, and re-unmuting/re-lowering the volume each time would
-    // fight whatever level the visitor has since set themselves.
-    let hasAutoUnmuted = false;
 
     const bindPlayer = () => {
       if (cancelled || !ytContainerRef.current) return;
@@ -459,27 +457,17 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
       ytContainerRef.current.appendChild(playerHost);
       ytPlayerRef.current = new window.YT!.Player(playerHost, {
         videoId: nowPlayingVideoId,
-        // mute: 1 is what actually makes autoplay work at all — every
-        // major browser blocks unmuted autoplay outright (this isn't a
-        // preference to tune, it's a hard platform policy), so starting
-        // muted is unavoidable if the video is to play automatically
-        // rather than sit paused. The onStateChange handler below is what
-        // actually gets real sound out: it unmutes the instant playback
-        // genuinely begins, at a real -3dB-equivalent volume (10^(-3/20)
-        // ≈ 0.708, i.e. ~71/100) rather than full blast — the same
-        // technique (and the same real dB math already used for
-        // RadioPlayerContext's ad gain staging) most autoplay-with-sound
-        // embeds across the web rely on.
-        playerVars: { autoplay: 1, mute: 1, playsinline: 1 },
+        // autoplay: 0 — loads paused on the video's own thumbnail; nothing
+        // plays (with or without sound) until the visitor presses play
+        // themselves. mute:1 was only ever needed to satisfy the browser
+        // policy that blocks unmuted autoplay — with autoplay off there's
+        // no such policy to work around, so a manual play starts normally
+        // at a real -3dB-equivalent volume (10^(-3/20) ≈ 0.708, i.e.
+        // ~71/100) rather than full blast, same dB math already used for
+        // RadioPlayerContext's ad gain staging.
+        playerVars: { autoplay: 0, playsinline: 1 },
         events: {
           onReady: (event) => {
-            event.target.mute();
-            event.target.setVolume(71);
-          },
-          onStateChange: (event) => {
-            if (hasAutoUnmuted || event.data !== window.YT!.PlayerState.PLAYING) return;
-            hasAutoUnmuted = true;
-            event.target.unMute();
             event.target.setVolume(71);
           },
         },
@@ -691,7 +679,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
     issLayerOn
   );
 
-  const cosmic = calculateCosmicTime();
   const locationLabel = isCustomObservatory
     ? `${selectedObservatory.name} — ${effectiveCoords.lat.toFixed(2)}°, ${effectiveCoords.lon.toFixed(2)}° · Elev ${selectedObservatory.elevationMeters}m`
     : status === 'granted'
@@ -1040,8 +1027,11 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
           <ObservatoryPicker selectedId={selectedObservatoryId} onSelectObservatory={(obs: Observatory) => setSelectedObservatoryId(obs.id)} />
         </div>
 
-        {/* Time Sync header */}
-        <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
+        {/* Time Sync header — Kali Yuga Epoch intentionally removed from
+            here (this card only) to keep this panel focused purely on
+            astronomical metrics; it's still shown elsewhere in the app
+            (home hero, nav, etc.), just not on this telemetry card. */}
+        <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg border-cyan-500/20 bg-black/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-[backdrop-filter,box-shadow] duration-300">
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">Local Time</div>
             <div className="font-mono text-sm text-white">{mounted ? now.toLocaleTimeString() : '--:--:--'}</div>
@@ -1056,17 +1046,6 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
               />
             </div>
             <div className="font-mono text-sm text-cyan-300">{mounted ? localSiderealTime(now, effectiveCoords.lon) : '--:--:--'}</div>
-          </div>
-          <div>
-            <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">
-              <InfoTooltip
-                term="Kali Yuga Epoch"
-                explanation="A 432,000-year cycle from Hindu cosmology, reckoned from 3102 BCE. This shows how far the current calendar year is through that cycle — a cosmological/calendrical reference, not a scientific measurement."
-                askKaliQuery={`We're ${cosmic.kaliYugaProgressPercent}% through the current Kali Yuga cycle — tell me more about what that means.`}
-                onAskKali={onAskKali}
-              />
-            </div>
-            <div className="font-mono text-sm text-white">{cosmic.kaliYugaProgressPercent}%</div>
           </div>
         </div>
 

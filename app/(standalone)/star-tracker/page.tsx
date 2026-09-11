@@ -27,13 +27,13 @@ export default function StandaloneStarTrackerPage() {
           // Not "back" to anything within this page — this domain has
           // nothing else to navigate to. Sends the visitor to the real
           // Proto Labs Global root site (protolabsglobal-main-shell, a
-          // separate repo/deployment) instead of a dead/no-op button —
-          // previously pointed at the aione subdomain itself, trapping the
-          // visitor in this app. In development that root shell is this same
-          // repo's own "/" route, so window.location.origin (not a hardcoded
-          // port) always finds it regardless of which port `next dev` is
-          // actually bound to; production points at the real separate domain.
-          window.location.href = process.env.NODE_ENV === 'production' ? 'https://www.protolabsglobal.com' : window.location.origin;
+          // separate repo/deployment), not this app's own origin — that
+          // would just reload this same standalone page. Locally that
+          // shell runs on its own static server at :5500 (see
+          // protolabsglobal-main-shell-site's README), not whatever port
+          // `next dev` happens to be bound to; production points at the
+          // real separate domain. Mirrors TopHeader.tsx's own back button.
+          window.location.href = process.env.NODE_ENV === 'production' ? 'https://www.protolabsglobal.com' : 'http://localhost:5500';
         }}
       />
     </div>

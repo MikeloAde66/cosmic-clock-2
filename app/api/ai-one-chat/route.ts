@@ -1,7 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { Body, Illumination, MoonPhase } from 'astronomy-engine';
 import dbConnect from '@/lib/dbConnect';
 import { embedOne } from '@/lib/voyage';
 import { isLanguageCode, LANGUAGE_NAMES } from '@/lib/languages';
+import { bodyToHorizon, equatorialToHorizon, type GeodeticLocation } from '@/lib/starTrackerPro/coordinates';
+import { MESSIER_OBJECTS } from '@/lib/messierCatalog';
 
 export const runtime = 'nodejs';
 
@@ -27,7 +30,9 @@ Images: the user can attach photographs — of artwork, astronomical charts, anc
 
 When greeting the user at the start of a conversation, keep it brief — invite them in, don't summarize your entire capability list.
 
-Quantum circuit simulation: you have a run_quantum_circuit tool that actually executes a real quantum circuit (Amazon Braket, local simulator, 1000 shots) rather than just describing one theoretically — use it whenever a question calls for simulating a real circuit (entanglement demonstrations, interference, a specific gate sequence, etc.), not for purely conceptual physics questions. Before calling it, briefly state in one sentence what circuit you're about to run and why. Write the circuit_code as Python that builds a Braket Circuit and assigns it strictly to a variable named circuit — Circuit is already in scope, no import needed. If the tool returns an error status, read the message/traceback, fix the code, and retry rather than giving up or fabricating a result.`;
+Quantum circuit simulation: you have a run_quantum_circuit tool that actually executes a real quantum circuit (Amazon Braket, local simulator, 1000 shots) rather than just describing one theoretically — use it whenever a question calls for simulating a real circuit (entanglement demonstrations, interference, a specific gate sequence, etc.), not for purely conceptual physics questions. Before calling it, briefly state in one sentence what circuit you're about to run and why. Write the circuit_code as Python that builds a Braket Circuit and assigns it strictly to a variable named circuit — Circuit is already in scope, no import needed. If the tool returns an error status, read the message/traceback, fix the code, and retry rather than giving up or fabricating a result.
+
+Live sky and weather data: you have get_live_sky_coordinates and get_noaa_atmospheric_conditions tools backed by real astronomical calculation (the same engine driving this app's own Star Tracker) and live NOAA/NWS conditions, run against the actual current server clock — not a simulation and not your training-data knowledge of where something "usually" is. Call get_live_sky_coordinates whenever a question turns on where an object is right now, whether it's currently visible, or the current Moon phase — the Sun, Moon, the eight planets, and a curated set of Messier deep-sky objects (Andromeda Galaxy, Orion Nebula, Pleiades, and a few others) are covered; anything outside that returns a clear not_found result you should relay honestly rather than estimating a position from memory. Both tools default to this app's own Charleston, SC reference location when you omit latitude/longitude, so you can still give a real, live answer on the first turn — but once the user states or implies a real location, always pass that instead, and say which location an answer is actually for so it's never ambiguous. Call get_noaa_atmospheric_conditions (US/territories only, real NOAA data) when cloud cover, wind, humidity, or general conditions bear on whether tonight's viewing will actually be good. Never claim you lack real-time access to time, position, or current-sky-conditions questions — call the relevant tool instead.`;
 
 const MODE_ADDENDA = {
   cosmic: `\n\nDiscovery Mode — Cosmic/Ancient: for this conversation, lean primarily into archaeoastronomy and cyclical timekeeping — precessional math, Yuga/epoch cycles, classical metaphysics, and the historical/archaeological record. Modern physics can support a point, but the ancient/cosmological model is your primary lens.`,
@@ -166,6 +171,187 @@ async function runQuantumCircuit(circuitCode: string): Promise<string> {
   }
 }
 
+// Charleston, SC — this app's own established fallback observer location,
+// not something invented for this tool: lib/useNoaaSnapshot.ts already
+// falls back to these exact coordinates when real geolocation isn't
+// available. Reused here so a user who hasn't stated their location yet
+// still gets a real, live calculation for *somewhere real* on the first
+// turn, rather than the tool call failing or Kali stalling on a question
+// before it can ask. Kali still asks for/uses the user's real location
+// once they give one — see BASE_SYSTEM_PROMPT below.
+const DEFAULT_OBSERVER = { latitude: 32.7765, longitude: -79.9311 };
+
+// Real live Alt/Az — the exact same astronomy-engine math this app's own
+// Star Tracker already uses (lib/starTrackerPro/coordinates.ts), just
+// exposed to Kali as a tool instead of driving the WebGL dome. Live means
+// two real things, not a simulation: the server's actual current clock
+// (new Date() below, at call time) and a target resolved against this
+// app's own real, curated catalogs — never a fabricated RA/Dec for a name
+// neither catalog recognizes.
+const SKY_COORDINATES_TOOL: Anthropic.Tool = {
+  name: 'get_live_sky_coordinates',
+  description:
+    'Calculates the real, live Altitude and Azimuth of a celestial object for an observer at a given location, using the current server clock. Covers the Sun, Moon, the eight planets, and a curated set of Messier deep-sky objects (e.g. M31/Andromeda Galaxy, M42/Orion Nebula, M45/Pleiades) — returns a clear not_found result for anything outside that catalog rather than guessing. Also reports the current real Moon phase/illumination, since that affects visibility of everything else. latitude/longitude default to this app\'s own Charleston, SC reference location if the user hasn\'t given a real one yet. Always call this rather than estimating positions or phases from memory.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      target_name: {
+        type: 'string',
+        description: "Name or catalog id of the object, e.g. 'Jupiter', 'Moon', 'M42', 'Orion Nebula'.",
+      },
+      latitude: { type: 'number', description: `Observer latitude in decimal degrees (-90 to 90). Default ${DEFAULT_OBSERVER.latitude}.` },
+      longitude: { type: 'number', description: `Observer longitude in decimal degrees (-180 to 180). Default ${DEFAULT_OBSERVER.longitude}.` },
+    },
+    required: ['target_name'],
+  },
+};
+
+const BODY_NAME_ALIASES: Record<string, Body> = {
+  sun: Body.Sun,
+  moon: Body.Moon,
+  mercury: Body.Mercury,
+  venus: Body.Venus,
+  mars: Body.Mars,
+  jupiter: Body.Jupiter,
+  saturn: Body.Saturn,
+  uranus: Body.Uranus,
+  neptune: Body.Neptune,
+  pluto: Body.Pluto,
+};
+
+// 8 real 45-degree slices of MoonPhase()'s 0-360 ecliptic-longitude
+// output — the same definition every almanac uses (0=New, 90=First
+// Quarter, 180=Full, 270=Last Quarter), not an approximation.
+function describeMoonPhase(phaseAngleDeg: number): string {
+  const names = [
+    'New Moon',
+    'Waxing Crescent',
+    'First Quarter',
+    'Waxing Gibbous',
+    'Full Moon',
+    'Waning Gibbous',
+    'Last Quarter',
+    'Waning Crescent',
+  ];
+  const index = Math.round(((phaseAngleDeg % 360) + 360) % 360 / 45) % 8;
+  return names[index];
+}
+
+async function getSkyCoordinates(targetName: string, latitude?: number, longitude?: number): Promise<string> {
+  const lat = latitude ?? DEFAULT_OBSERVER.latitude;
+  const lon = longitude ?? DEFAULT_OBSERVER.longitude;
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
+    return JSON.stringify({ status: 'error', message: 'latitude/longitude out of valid range.' });
+  }
+
+  const now = new Date();
+  const location: GeodeticLocation = { latitudeDeg: lat, longitudeDeg: lon, elevationMeters: 0 };
+  const normalized = targetName.trim().toLowerCase();
+
+  let displayName: string;
+  let altitudeDeg: number;
+  let azimuthDeg: number;
+
+  const bodyMatch = BODY_NAME_ALIASES[normalized];
+  const messierMatch = MESSIER_OBJECTS.find(
+    (m) => m.id.toLowerCase() === normalized || m.name.toLowerCase() === normalized || `${m.id} ${m.name}`.toLowerCase() === normalized
+  );
+
+  if (bodyMatch !== undefined) {
+    displayName = targetName.trim();
+    const horizon = bodyToHorizon(bodyMatch, location, now);
+    altitudeDeg = horizon.altitudeDeg;
+    azimuthDeg = horizon.azimuthDeg;
+  } else if (messierMatch) {
+    displayName = `${messierMatch.id} (${messierMatch.name})`;
+    const horizon = equatorialToHorizon({ raHours: messierMatch.raHours, decDeg: messierMatch.decDeg }, location, now);
+    altitudeDeg = horizon.altitudeDeg;
+    azimuthDeg = horizon.azimuthDeg;
+  } else {
+    return JSON.stringify({
+      status: 'not_found',
+      message: `"${targetName}" isn't in this app's real catalog (Sun/Moon/planets + a curated set of Messier objects — M31, M42, M45, M13, M51, M57, M8, M27, M104, M1). Tell the user this rather than guessing a position.`,
+    });
+  }
+
+  const moonIllum = Illumination(Body.Moon, now);
+
+  return JSON.stringify({
+    status: 'ok',
+    timestamp_utc: now.toISOString(),
+    target: displayName,
+    observer: { latitude: lat, longitude: lon },
+    altitude_deg: Math.round(altitudeDeg * 100) / 100,
+    azimuth_deg: Math.round(azimuthDeg * 100) / 100,
+    visibility_status: altitudeDeg > 0 ? 'Above Horizon' : 'Below Horizon',
+    moon_phase: describeMoonPhase(MoonPhase(now)),
+    moon_illumination_pct: Math.round(moonIllum.phase_fraction * 1000) / 10,
+  });
+}
+
+// Real live conditions from the National Weather Service's free public API
+// (no key required — the same api.weather.gov points -> forecastHourly
+// pattern already used client-side by lib/useNoaaSnapshot.ts, just called
+// server-side here so Kali can reason over it). US/territories coverage
+// only, same as NWS itself; a location outside that returns a clear error
+// rather than fabricated conditions.
+const WEATHER_TOOL: Anthropic.Tool = {
+  name: 'get_noaa_atmospheric_conditions',
+  description:
+    "Fetches real, current NOAA/National Weather Service conditions (sky/precipitation outlook, temperature, wind, humidity) for a location, e.g. to assess whether clouds will interfere with tonight's viewing. US and territories only (NWS coverage). latitude/longitude default to this app's own Charleston, SC reference location if the user hasn't given a real one yet. Always call this rather than guessing conditions.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      latitude: { type: 'number', description: `Location latitude in decimal degrees (-90 to 90). Default ${DEFAULT_OBSERVER.latitude}.` },
+      longitude: { type: 'number', description: `Location longitude in decimal degrees (-180 to 180). Default ${DEFAULT_OBSERVER.longitude}.` },
+    },
+  },
+};
+
+const NWS_HEADERS = { 'User-Agent': '(AiOne-Kali, contact@cosmicclock.io)' };
+
+async function getLiveWeather(latitude?: number, longitude?: number): Promise<string> {
+  const lat = latitude ?? DEFAULT_OBSERVER.latitude;
+  const lon = longitude ?? DEFAULT_OBSERVER.longitude;
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
+    return JSON.stringify({ status: 'error', message: 'latitude/longitude out of valid range.' });
+  }
+  try {
+    const pointRes = await fetch(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`, {
+      headers: NWS_HEADERS,
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!pointRes.ok) {
+      return JSON.stringify({
+        status: 'error',
+        message: 'No NOAA/NWS coverage for this location (US and territories only).',
+      });
+    }
+    const pointData = await pointRes.json();
+    const forecastRes = await fetch(pointData.properties.forecastHourly, {
+      headers: NWS_HEADERS,
+      signal: AbortSignal.timeout(8_000),
+    });
+    const forecastData = await forecastRes.json();
+    const period = forecastData.properties.periods[0];
+    return JSON.stringify({
+      status: 'ok',
+      as_of: period.startTime,
+      temperature: period.temperature,
+      temperature_unit: period.temperatureUnit,
+      sky_cover_desc: period.shortForecast,
+      wind: `${period.windSpeed} ${period.windDirection}`,
+      precipitation_chance_pct: period.probabilityOfPrecipitation?.value ?? null,
+      humidity_pct: period.relativeHumidity?.value ?? null,
+    });
+  } catch (err) {
+    return JSON.stringify({
+      status: 'error',
+      message: err instanceof Error ? err.message : 'NOAA/NWS request failed.',
+    });
+  }
+}
+
 export async function POST(request: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return new Response('Ai One is not connected yet — no API key configured.', { status: 500 });
@@ -258,7 +444,7 @@ export async function POST(request: Request) {
             // budget go to the actual answer.
             thinking: { type: 'disabled' },
             system: systemPrompt,
-            tools: [QUANTUM_TOOL],
+            tools: [QUANTUM_TOOL, SKY_COORDINATES_TOOL, WEATHER_TOOL],
             messages: workingMessages,
           });
 
@@ -287,6 +473,20 @@ export async function POST(request: Request) {
                 type: 'tool_result',
                 tool_use_id: block.id,
                 content: await runQuantumCircuit(input.circuit_code),
+              });
+            } else if (block.name === 'get_live_sky_coordinates') {
+              const input = block.input as { target_name: string; latitude?: number; longitude?: number };
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: await getSkyCoordinates(input.target_name, input.latitude, input.longitude),
+              });
+            } else if (block.name === 'get_noaa_atmospheric_conditions') {
+              const input = block.input as { latitude?: number; longitude?: number };
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: await getLiveWeather(input.latitude, input.longitude),
               });
             } else {
               toolResults.push({

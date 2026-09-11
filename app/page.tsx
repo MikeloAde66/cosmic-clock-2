@@ -30,7 +30,8 @@ import AiOneHome from '@/components/AiOneHome';
 import RadioCentralConsoleView from '@/components/radio/RadioCentralConsoleView';
 import SiteFooter from '@/components/SiteFooter';
 import ISSFeedModal from '@/components/ISSFeedModal';
-import StarTrackerProCanvas from '@/components/starTrackerPro/StarTrackerProCanvas';
+import StarTrackerView from '@/components/StarTrackerView';
+import StarTrackerProBackground from '@/components/starTrackerPro/StarTrackerProBackground';
 import VaultSearchModal from '@/components/VaultSearchModal';
 import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 import { CartProvider } from '@/lib/cart';
@@ -204,7 +205,13 @@ function HomeInner() {
   // both) into LeftNav's icon rail; state lives here now since LeftNav and
   // TopHeader are siblings, and this is also where StarTrackerView/
   // ISSFeedModal are rendered directly rather than from inside TopHeader.
-  const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(false);
+  // Defaults to true — Star Tracker PRO (StarTrackerView) is the default
+  // landing view on top of the existing hub layout, per explicit request.
+  // Nothing about the route/layout structure changes: the hub grid
+  // (GalleryGrid, Radio Central, Studio One, Weather, Kali, etc.) is still
+  // fully intact underneath and reachable the moment the visitor presses
+  // Back — this just flips which view renders first.
+  const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(true);
   const [isIssOpen, setIsIssOpen] = useState(false);
   const [isLetsChatOpen, setIsLetsChatOpen] = useState(false);
   // The things allowed to show GlobalPlayerBar within this SPA route: the
@@ -593,14 +600,25 @@ useContextMenuShare();
 
       {/* ISS Stream Modal + Star Tracker — both moved here from TopHeader,
           now triggered from LeftNav instead. Star Tracker is a dedicated
-          full-screen view (fixed z-50), not a stacked modal.
-          Phase 1 rewrite: StarTrackerProCanvas (WebGL/R3F + SGP4 worker +
-          ASCOM Alpaca Device Hub) replaces the legacy StarTrackerView here
-          too, for consistency with the standalone /star-tracker route —
-          onAskKali has no equivalent yet in the new minimal UI, so that
-          integration is dropped for now pending a later phase. */}
+          full-screen view (fixed z-50), not a stacked modal. Reverted from
+          the Phase 1 WebGL/R3F StarTrackerProCanvas back to the legacy
+          StarTrackerView here — that's the actual dashboard (Messier dome,
+          telemetry header, Sky Fest) requested as the hub's default view.
+          StarTrackerView's own root is transparent/pointer-events-none by
+          design (see that component) — it's built to be a HUD layered
+          over StarTrackerProBackground's WebGL starfield, the same pairing
+          the standalone /star-tracker route already uses, not a
+          self-contained opaque view on its own; mounting it without that
+          background here would let the hub grid bleed through underneath.
+          onAskKali omitted, same as that standalone route — no real "hand
+          off to Kali chat" integration point exists at this call site yet. */}
       <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
-      {isStarTrackerOpen && <StarTrackerProCanvas onBack={() => setIsStarTrackerOpen(false)} />}
+      {isStarTrackerOpen && (
+        <div className="fixed inset-0 z-50 w-full h-screen overflow-hidden bg-black">
+          <StarTrackerProBackground />
+          <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} />
+        </div>
+      )}
       {isLetsChatOpen && (
         <TenForwardSection onBack={() => setIsLetsChatOpen(false)} onSendToStudioOne={handleSendToStudioOne} />
       )}

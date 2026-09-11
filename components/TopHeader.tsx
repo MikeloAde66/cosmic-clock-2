@@ -78,10 +78,15 @@ export default function TopHeader({
           {!hidePricing && (
             <button
               onClick={() => {
+                // The real Proto Labs Global shell (protolabsglobal-main-shell)
+                // is its own static site now, served separately from this
+                // Next.js app — locally that's :5500 (python3 -m http.server
+                // in that repo), not this app's own dev port, so
+                // window.location.origin would just reload this same hub.
                 window.location.href =
                   process.env.NODE_ENV === 'production'
                     ? 'https://www.protolabsglobal.com'
-                    : window.location.origin;
+                    : 'http://localhost:5500';
               }}
               className="px-3 py-1 font-mono text-xs uppercase tracking-wide transition-all border rounded-full cursor-pointer bg-neutral-900/80 border-neutral-700 hover:border-neutral-500 text-neutral-300 hover:text-white"
             >
