@@ -14,6 +14,7 @@ import {
   type RadioStation,
 } from '@/lib/radioStations';
 import { isBannedTrackTitle } from '@/lib/bannedTracks';
+import styles from './RadioCentralConsoleView.module.css';
 
 // The Daily Queue's lineup: every currently available Supabase catalog
 // audio item (catalogStations — video items never reach this list, see
@@ -85,11 +86,48 @@ const TOKENS = {
   cyan: '#00F2FE',
   crimson: '#FF2E63',
   emerald: '#00F5A0',
+  // The holographic shell's oil-slick edge gradient — distinct from the
+  // single-tone cyan glow used everywhere else in this view, deliberately
+  // reserved for the outer casing and a handful of marquee controls so it
+  // reads as a special "metal + light" treatment rather than replacing
+  // the existing cyan HUD language wholesale.
+  holoA: '#2fd9ff',
+  holoB: '#b63cff',
+  holoC: '#ff00a0',
 };
 
-const glowBorder = `1px solid rgba(0,242,254,0.2)`;
+// Holographic Glass — shared Tailwind class strings for every interactive
+// surface (buttons, filter pills, tune buttons, channel rows, metric
+// tiles): an idle state that's a translucent iridescent sheen rather than
+// a flat fill, an active/selected state with a vivid spectrum edge glow,
+// and a hover state that "ignites" further. Centralized here (not
+// hand-typed at each of the ~10 usage sites) so the look stays consistent
+// and any future tuning happens in one place. These replace the flat
+// background colors this file's inline `style` objects used to set at
+// each of those sites — Tailwind's gradient/opacity utilities aren't
+// reproducible from a plain CSS-in-JS object without re-deriving the same
+// color-mix math by hand.
+const GLASS_IDLE =
+  'bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 backdrop-blur-md border border-cyan-300/40 border-t-white/60 shadow-[inset_0_1px_2px_rgba(255,255,255,0.45)] text-slate-200 hover:from-cyan-300/40 hover:via-purple-400/35 hover:to-pink-500/40 hover:border-cyan-200/70 hover:shadow-[0_0_20px_rgba(182,60,255,0.5)] transition-all duration-300';
+const GLASS_ACTIVE =
+  'bg-gradient-to-r from-cyan-400/40 via-fuchsia-500/40 to-indigo-500/40 backdrop-blur-md border border-cyan-200/80 text-white font-medium shadow-[0_0_18px_rgba(47,217,255,0.5),inset_0_1px_3px_rgba(255,255,255,0.6)] hover:from-cyan-300/40 hover:via-purple-400/35 hover:to-pink-500/40 hover:shadow-[0_0_24px_rgba(182,60,255,0.6)] transition-all duration-300';
+// Same glass mechanics as GLASS_ACTIVE, tinted emerald instead of cyan —
+// reserved for Program Manager/Daily Queue's real "this automation is
+// currently running" state, which is a meaningfully different fact than
+// "this filter is selected" and shouldn't collapse into the same color.
+const GLASS_ACTIVE_GREEN =
+  'bg-gradient-to-r from-emerald-400/40 via-teal-400/40 to-emerald-600/40 backdrop-blur-md border border-emerald-200/80 text-white font-medium shadow-[0_0_18px_rgba(0,245,160,0.5),inset_0_1px_3px_rgba(255,255,255,0.6)] hover:shadow-[0_0_24px_rgba(0,245,160,0.65)] transition-all duration-300';
+
 const glowShadow = `0 0 15px rgba(0,242,254,0.15)`;
 const monoFont = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+
+// Glassmorphic panel base — every cardStyle/subpanelStyle consumer below
+// (there are ~15 of them) picks this up automatically, so the "holographic
+// metallic shell" upgrade reaches every panel without rewriting each call
+// site individually. backdropFilter is real CSS, not a Tailwind class,
+// but functions identically (no JS, no extra library) — inline style was
+// already this file's own convention before this pass.
+const glassBlur: React.CSSProperties = { backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' };
 
 // Purely decorative CSS-keyframe equalizer accent (log panel header) —
 // distinct from the real AnalyserNode-driven bars elsewhere in this view
@@ -366,31 +404,77 @@ export default function RadioCentralConsoleView() {
   const isPlaying = status === 'playing';
   const isLoading = status === 'loading';
 
-  const cardStyle: React.CSSProperties = { background: TOKENS.card, border: glowBorder, boxShadow: glowShadow };
-  const subpanelStyle: React.CSSProperties = { background: TOKENS.subpanel, border: glowBorder };
+  // 3D glass edge — every internal sub-panel gets a real lit top edge
+  // (inset highlight) plus a real cast shadow (drop below it), not just a
+  // flat translucent fill, so panels read as floating glass on top of the
+  // recessed screen behind them rather than being painted onto it.
+  const cardStyle: React.CSSProperties = {
+    ...glassBlur,
+    background: 'rgba(15,23,42,0.6)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.2), 0 8px 16px rgba(0,0,0,0.6)',
+  };
+  const subpanelStyle: React.CSSProperties = {
+    ...glassBlur,
+    background: 'rgba(15,23,42,0.7)',
+    border: '1px solid rgba(0,242,254,0.2)',
+    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.12), inset 0 -2px 4px rgba(0,0,0,0.5)',
+  };
 
   return (
     <div
-      className="w-full h-full overflow-y-auto"
+      className="w-full h-full overflow-y-auto p-3 sm:p-6 md:p-10"
       style={{ background: TOKENS.base, color: '#e7f6ff', fontFamily: monoFont }}
     >
-      <div className="max-w-6xl mx-auto p-6 space-y-4">
+      {/* Holographic Metallic Shell Wrap — the whole dashboard sits inside
+          one bulky armored casing: an outer iridescent "oil-slick" edge
+          (holo-shell-edge, an animated 3-stop gradient shifted via
+          background-position) with a 2px reveal around an inner metal
+          shell (dark slate/zinc gradient, industrial bezel, corner
+          brackets, rivets). Both are plain scoped CSS in the <style jsx>
+          block below — no animation library, same performance profile as
+          this file's existing corePulse/eqBar keyframes. */}
+      <div className="relative max-w-6xl mx-auto">
+        <div className={`${styles.holoShellEdge} rounded-[2rem] p-[3px]`}>
+          <div className={`${styles.metalShell} relative rounded-[calc(2rem-3px)] p-3 sm:p-6 overflow-hidden`}>
+            <span className={`${styles.cornerCut} ${styles.cornerCutTl}`} aria-hidden="true" />
+            <span className={`${styles.cornerCut} ${styles.cornerCutTr}`} aria-hidden="true" />
+            <span className={`${styles.cornerCut} ${styles.cornerCutBl}`} aria-hidden="true" />
+            <span className={`${styles.cornerCut} ${styles.cornerCutBr}`} aria-hidden="true" />
+            <span className={`${styles.cornerBracket} ${styles.cornerBracketTl}`} aria-hidden="true" />
+            <span className={`${styles.cornerBracket} ${styles.cornerBracketTr}`} aria-hidden="true" />
+            <span className={`${styles.cornerBracket} ${styles.cornerBracketBl}`} aria-hidden="true" />
+            <span className={`${styles.cornerBracket} ${styles.cornerBracketBr}`} aria-hidden="true" />
+            <span className={styles.rivet} style={{ top: 16, left: 16 }} aria-hidden="true" />
+            <span className={styles.rivet} style={{ top: 16, right: 16 }} aria-hidden="true" />
+            <span className={styles.rivet} style={{ bottom: 16, left: 16 }} aria-hidden="true" />
+            <span className={styles.rivet} style={{ bottom: 16, right: 16 }} aria-hidden="true" />
+            {/* Ventilation grilles — hardware detail along the top edge,
+                clear of the corner brackets/rivets. */}
+            <span className={styles.ventSlits} style={{ top: 14, left: '50%', transform: 'translateX(-140px)' }} aria-hidden="true" />
+            <span className={styles.ventSlits} style={{ top: 14, left: '50%', transform: 'translateX(106px)' }} aria-hidden="true" />
+
+            {/* Recessed screen pit — the real dashboard content (header
+                through footer) sits visibly set back from the metal
+                casing around it, like a real device's display glass. */}
+            <div className={`${styles.screenRecess} relative rounded-[1.25rem] p-4 sm:p-8 md:p-10 space-y-4 overflow-hidden`}>
+              {/* CRT/scanline micro-pattern — a barely-there diagonal
+                  repeating-gradient over the recessed screen so it reads
+                  as the display surface itself rather than a decal on any
+                  single panel. */}
+              <div className={styles.scanlineOverlay} aria-hidden="true" />
         {/* Header */}
         <div className="flex flex-col gap-4 p-4 rounded-xl md:flex-row md:items-center md:justify-between" style={cardStyle}>
           <div className="flex items-center gap-3">
-            <span
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full"
-              style={{ ...subpanelStyle, color: TOKENS.cyan }}
-            >
-              <AudioLines className="w-3.5 h-3.5" />
+            <span className={`${GLASS_IDLE} flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full !text-cyan-200`}>
+              <AudioLines className="w-3.5 h-3.5" style={{ filter: `drop-shadow(0 0 6px rgba(47,217,255,0.6))` }} />
               432Hz
             </span>
             <button
               onClick={() => setShowUploadModal(true)}
               aria-label="Upload audio"
               title="Upload audio"
-              className="flex items-center justify-center w-11 h-11 rounded-full shrink-0 transition hover:brightness-125"
-              style={{ background: TOKENS.cyan, color: '#03121a', boxShadow: '0 0 14px rgba(0,242,254,0.5)' }}
+              className={`${GLASS_ACTIVE} flex items-center justify-center w-11 h-11 rounded-full shrink-0`}
             >
               <Plus className="w-6 h-6" strokeWidth={3} />
             </button>
@@ -410,12 +494,7 @@ export default function RadioCentralConsoleView() {
             <button
               onClick={toggleProgramManager}
               title={programManagerEnabled ? 'Turn off Program Manager rotation' : 'Turn on Program Manager rotation'}
-              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full transition"
-              style={
-                programManagerEnabled
-                  ? { background: 'rgba(0,245,160,0.12)', border: `1px solid rgba(0,245,160,0.5)`, color: TOKENS.emerald }
-                  : { ...subpanelStyle, color: '#64748b' }
-              }
+              className={`${programManagerEnabled ? GLASS_ACTIVE_GREEN : GLASS_IDLE} px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full`}
             >
               <span className="inline-flex items-center gap-1.5">
                 <span
@@ -442,12 +521,7 @@ export default function RadioCentralConsoleView() {
                     ? 'Turn on the Daily Queue (catalog audio → 35min BBC News → next catalog audio → …)'
                     : 'Daily Queue unavailable — waiting on an audio item in the catalog'
               }
-              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full transition disabled:opacity-40"
-              style={
-                dailyQueueEnabled
-                  ? { background: 'rgba(0,245,160,0.12)', border: `1px solid rgba(0,245,160,0.5)`, color: TOKENS.emerald }
-                  : { ...subpanelStyle, color: '#64748b' }
-              }
+              className={`${dailyQueueEnabled ? GLASS_ACTIVE_GREEN : GLASS_IDLE} px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full disabled:opacity-40`}
             >
               <span className="inline-flex items-center gap-1.5">
                 <span
@@ -466,12 +540,7 @@ export default function RadioCentralConsoleView() {
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className="px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wide transition"
-              style={
-                activeCategory === cat
-                  ? { background: 'rgba(0,242,254,0.12)', border: `1px solid ${TOKENS.cyan}`, color: TOKENS.cyan }
-                  : { ...subpanelStyle, color: '#94a3b8' }
-              }
+              className={`${activeCategory === cat ? GLASS_ACTIVE : GLASS_IDLE} px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wide`}
             >
               {CATEGORY_LABELS[cat] ?? cat}
             </button>
@@ -500,12 +569,7 @@ export default function RadioCentralConsoleView() {
             <button
               key={genreFilter.label}
               onClick={() => setActiveGenreFilter((current) => (current === genreFilter.label ? null : genreFilter.label))}
-              className="px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wide transition"
-              style={
-                activeGenreFilter === genreFilter.label
-                  ? { background: 'rgba(139,92,246,0.15)', border: '1px solid #8b5cf6', color: '#c4b5fd' }
-                  : { ...subpanelStyle, color: '#94a3b8' }
-              }
+              className={`${activeGenreFilter === genreFilter.label ? GLASS_ACTIVE : GLASS_IDLE} px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wide`}
             >
               {genreFilter.label}
             </button>
@@ -520,8 +584,14 @@ export default function RadioCentralConsoleView() {
               On Air Now
             </span>
             <div
-              className="flex items-center justify-between gap-4 p-4 rounded-lg"
-              style={{ background: TOKENS.subpanel, border: `1px solid rgba(255,46,99,0.35)` }}
+              className="flex items-center justify-between gap-4 p-4 rounded-lg transition-shadow duration-700"
+              style={{
+                background: TOKENS.subpanel,
+                border: `1px solid rgba(255,46,99,0.35)`,
+                boxShadow: isPlaying
+                  ? `inset 0 0 30px rgba(47,217,255,0.12), 0 0 24px rgba(255,46,99,0.3)`
+                  : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+              }}
             >
               <div className="flex items-center min-w-0 gap-3">
                 <div
@@ -536,12 +606,16 @@ export default function RadioCentralConsoleView() {
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <PlayerSpectrum analyserRef={analyserRef} isPlaying={isPlaying} width={64} height={24} />
+                {/* Real analyser-driven waveform (see PlayerSpectrum) —
+                    the drop-shadow filter is purely a volumetric glow on
+                    top of genuine frequency data, not a fabricated visual. */}
+                <div style={{ filter: isPlaying ? `drop-shadow(0 0 8px rgba(47,217,255,0.7))` : undefined }}>
+                  <PlayerSpectrum analyserRef={analyserRef} isPlaying={isPlaying} width={64} height={24} />
+                </div>
                 <button
                   onClick={() => playingStation && handleTuneIn(playingStation)}
                   disabled={!playingStation}
-                  className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wide rounded disabled:opacity-40"
-                  style={{ background: TOKENS.cyan, color: '#03121a' }}
+                  className={`${GLASS_ACTIVE} flex items-center gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wide rounded disabled:opacity-40`}
                 >
                   {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                   {isLoading ? 'Tuning' : isPlaying ? 'Pause' : 'Tune In'}
@@ -562,7 +636,7 @@ export default function RadioCentralConsoleView() {
             <div className="flex items-center gap-4 p-3 rounded-lg" style={subpanelStyle}>
               <div className="relative flex items-center justify-center w-14 h-14 shrink-0">
                 <span
-                  className="absolute inset-0 rounded-full core-pulse"
+                  className={`absolute inset-0 rounded-full ${styles.corePulse}`}
                   style={{ background: `radial-gradient(circle, rgba(0,242,254,0.55), rgba(168,85,247,0.35) 55%, transparent 75%)` }}
                 />
                 <span
@@ -583,7 +657,7 @@ export default function RadioCentralConsoleView() {
                 {EQ_BAR_DELAYS.map((delay, i) => (
                   <span
                     key={i}
-                    className="w-1 rounded-sm eq-bar"
+                    className={`w-1 rounded-sm ${styles.eqBar}`}
                     style={{ background: TOKENS.cyan, animationDelay: `${delay}s` }}
                   />
                 ))}
@@ -621,8 +695,7 @@ export default function RadioCentralConsoleView() {
                       handleTuneIn(s);
                     }
                   }}
-                  className="flex items-center w-full gap-3 p-2.5 rounded-lg text-left transition cursor-pointer"
-                  style={isActive ? { background: 'rgba(0,242,254,0.08)', border: `1px solid rgba(0,242,254,0.4)` } : subpanelStyle}
+                  className={`${isActive ? GLASS_ACTIVE : GLASS_IDLE} ${styles.chanTile} flex items-center w-full gap-3 p-2.5 rounded-lg text-left cursor-pointer`}
                 >
                   <div
                     className="flex items-center justify-center w-9 h-9 text-[10px] font-bold rounded shrink-0"
@@ -662,10 +735,10 @@ export default function RadioCentralConsoleView() {
                 { label: 'Stream', value: status.toUpperCase(), sub: 'Status' },
                 { label: 'Volume', value: `${Math.round(volume * 100)}%`, sub: 'Output' },
               ].map((m) => (
-                <div key={m.label} className="p-3 text-center rounded-xl" style={cardStyle}>
+                <div key={m.label} className={`${styles.tile3d} p-3 text-center rounded-xl`} style={cardStyle}>
                   <p
                     className="text-xl font-bold leading-tight"
-                    style={{ color: TOKENS.cyan, textShadow: `0 0 12px rgba(0,242,254,0.6)` }}
+                    style={{ color: TOKENS.cyan, filter: `drop-shadow(0 0 12px ${TOKENS.holoA})` }}
                   >
                     {m.value}
                   </p>
@@ -679,14 +752,14 @@ export default function RadioCentralConsoleView() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setShowSchedule((v) => !v)}
-                  className="flex flex-col items-center gap-1 p-3 rounded-lg"
+                  className={`${styles.tile3d} flex flex-col items-center gap-1 p-3 rounded-lg`}
                   style={subpanelStyle}
                 >
-                  <RadioIcon className="w-4 h-4" style={{ color: TOKENS.cyan }} />
+                  <RadioIcon className="w-4 h-4" style={{ color: TOKENS.cyan, filter: `drop-shadow(0 0 6px rgba(47,217,255,0.6))` }} />
                   <span className="text-[9px] uppercase tracking-wide text-slate-400">Schedule</span>
                 </button>
-                <div className="flex flex-col items-center gap-1 p-3 rounded-lg" style={subpanelStyle}>
-                  <Volume2 className="w-4 h-4" style={{ color: TOKENS.cyan }} />
+                <div className={`${styles.tile3d} flex flex-col items-center gap-1 p-3 rounded-lg`} style={subpanelStyle}>
+                  <Volume2 className="w-4 h-4" style={{ color: TOKENS.cyan, filter: `drop-shadow(0 0 6px rgba(47,217,255,0.6))` }} />
                   <input
                     type="range"
                     min={0}
@@ -694,7 +767,8 @@ export default function RadioCentralConsoleView() {
                     step={0.05}
                     value={volume}
                     onChange={(e) => setVolume(Number(e.target.value))}
-                    className="w-full"
+                    className={`${styles.cyberSlider} w-full`}
+                    style={{ '--fill': `${Math.round(volume * 100)}%` } as React.CSSProperties}
                   />
                 </div>
               </div>
@@ -732,18 +806,19 @@ export default function RadioCentralConsoleView() {
           <button
             onClick={() => playingStation && handleTuneIn(playingStation)}
             disabled={!playingStation}
-            className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-bold uppercase tracking-wide rounded disabled:opacity-40 shrink-0"
-            style={{ background: TOKENS.cyan, color: '#03121a' }}
+            className={`${GLASS_ACTIVE} flex items-center gap-1.5 px-4 py-2 text-[10px] font-bold uppercase tracking-wide rounded disabled:opacity-40 shrink-0`}
           >
             {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
             {isPlaying ? 'Pause' : 'Tune In'}
           </button>
-          <PlayerSpectrum analyserRef={analyserRef} isPlaying={isPlaying} width={100} height={32} />
+          <div style={{ filter: isPlaying ? `drop-shadow(0 0 10px rgba(47,217,255,0.7))` : undefined }}>
+            <PlayerSpectrum analyserRef={analyserRef} isPlaying={isPlaying} width={100} height={32} />
+          </div>
         </div>
 
         {/* Full-width visualizer */}
-        <div className="p-4 rounded-xl" style={cardStyle}>
-          <div className="flex items-center justify-center h-16">
+        <div className="p-4 rounded-xl" style={{ ...cardStyle, boxShadow: `${cardStyle.boxShadow}, inset 0 4px 10px rgba(0,0,0,0.6)` }}>
+          <div className="flex items-center justify-center h-16" style={{ filter: isPlaying ? `drop-shadow(0 0 12px rgba(47,217,255,0.6))` : undefined }}>
             <FullWidthSpectrum analyserRef={analyserRef} isPlaying={isPlaying} />
           </div>
         </div>
@@ -751,6 +826,9 @@ export default function RadioCentralConsoleView() {
         {/* Footer */}
         <div className="p-3 text-center text-[10px] uppercase tracking-widest text-slate-500">
           Radio Central · Live · Always On
+        </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -770,8 +848,7 @@ export default function RadioCentralConsoleView() {
 
             <button
               onClick={() => uploadFileInputRef.current?.click()}
-              className="flex items-center justify-center w-full gap-2 py-3 text-xs font-bold uppercase tracking-wide rounded-lg"
-              style={{ background: TOKENS.cyan, color: '#03121a' }}
+              className={`${GLASS_ACTIVE} flex items-center justify-center w-full gap-2 py-3 text-xs font-bold uppercase tracking-wide rounded-lg`}
             >
               <Upload className="w-4 h-4" />
               Choose Audio File
@@ -803,8 +880,7 @@ export default function RadioCentralConsoleView() {
               <button
                 onClick={handleUploadLinkSubmit}
                 disabled={!uploadLinkInput.trim()}
-                className="w-full py-2 text-[10px] font-bold uppercase tracking-wide rounded-lg disabled:opacity-40"
-                style={subpanelStyle}
+                className={`${GLASS_IDLE} w-full py-2 text-[10px] font-bold uppercase tracking-wide rounded-lg disabled:opacity-40`}
               >
                 Load Link
               </button>
@@ -812,24 +888,6 @@ export default function RadioCentralConsoleView() {
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        @keyframes corePulse {
-          0%, 100% { transform: scale(0.92); opacity: 0.75; }
-          50% { transform: scale(1.08); opacity: 1; }
-        }
-        .core-pulse {
-          animation: corePulse 2.4s ease-in-out infinite;
-        }
-        @keyframes eqBar {
-          0%, 100% { height: 20%; }
-          50% { height: 100%; }
-        }
-        .eq-bar {
-          height: 20%;
-          animation: eqBar 0.9s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }
