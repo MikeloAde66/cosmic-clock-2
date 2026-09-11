@@ -81,7 +81,7 @@ export default function TopHeader({
                 window.location.href =
                   process.env.NODE_ENV === 'production'
                     ? 'https://www.protolabsglobal.com'
-                    : 'http://localhost:5500';
+                    : window.location.origin;
               }}
               className="px-3 py-1 font-mono text-xs uppercase tracking-wide transition-all border rounded-full cursor-pointer bg-neutral-900/80 border-neutral-700 hover:border-neutral-500 text-neutral-300 hover:text-white"
             >
