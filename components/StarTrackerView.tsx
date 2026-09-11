@@ -484,16 +484,23 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   useEffect(() => {
     queueMicrotask(() => {
       const existing = listPlaylist();
-      if (existing.length > 0) {
-        // A returning visitor's own real saved videos — never overwritten
-        // or auto-selected over. spaceMediaPlaylist.ts is deliberately
-        // "no hardcoded videos"; the one-time seed below only ever runs
-        // against a genuinely empty (first-ever-visit) playlist.
-        setPlaylist(existing);
-        return;
+      // "Space Stream #1" is this app's own reserved default-slot label —
+      // not a title a real user would independently choose. If it's
+      // missing, or present but pointing at a stale video (e.g. from
+      // localStorage predating this feature/default), fix just that slot
+      // rather than trusting whatever's already there. Any OTHER real
+      // video a visitor separately added (a different title) is left
+      // completely untouched — this only ever corrects its own slot.
+      const defaultSlot = existing.find((item) => item.title === 'Space Stream #1');
+      let nextPlaylist = existing;
+      if (!defaultSlot || defaultSlot.videoId !== DEFAULT_SPACE_MEDIA_VIDEO_ID) {
+        if (defaultSlot) nextPlaylist = removePlaylistItem(defaultSlot.id);
+        nextPlaylist = savePlaylistItem('Space Stream #1', DEFAULT_SPACE_MEDIA_VIDEO_ID);
       }
-      const seeded = savePlaylistItem('Space Stream #1', DEFAULT_SPACE_MEDIA_VIDEO_ID);
-      setPlaylist(seeded);
+      setPlaylist(nextPlaylist);
+      // The mandatory default plays on every fresh page load regardless of
+      // what else is in the playlist — a visitor can still switch to any
+      // other saved video by clicking it, same as before.
       setNowPlayingVideoId(DEFAULT_SPACE_MEDIA_VIDEO_ID);
     });
   }, []);
