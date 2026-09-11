@@ -30,7 +30,7 @@ import AiOneHome from '@/components/AiOneHome';
 import RadioCentralConsoleView from '@/components/radio/RadioCentralConsoleView';
 import SiteFooter from '@/components/SiteFooter';
 import ISSFeedModal from '@/components/ISSFeedModal';
-import StarTrackerView from '@/components/StarTrackerView';
+import StarTrackerProCanvas from '@/components/starTrackerPro/StarTrackerProCanvas';
 import VaultSearchModal from '@/components/VaultSearchModal';
 import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 import { CartProvider } from '@/lib/cart';
@@ -107,17 +107,14 @@ function HomeInner() {
   // effect that opens it inside CosmicCanvas, which stays mounted between
   // clicks.
   const [homeViewRequest, setHomeViewRequest] = useState<{ view: 'weather' | 'kali'; token: number } | null>(null);
-  // Set by StarTrackerView's "Ask Kali" tooltip action — a real query built
-  // from the live sky-body/telemetry data the user was looking at, handed
-  // to whichever AiOneChat instance is actually on screen once openHomeView
-  // below switches over to Kali. Prefills the input only; AiOneChat itself
-  // decides not to auto-send it.
-  const [kaliPrefillQuery, setKaliPrefillQuery] = useState<{ text: string; token: number } | null>(null);
-  const askKali = (query: string) => {
-    setIsStarTrackerOpen(false);
-    setKaliPrefillQuery({ text: query, token: Date.now() });
-    openHomeView('kali');
-  };
+  // AiOneHome/KaliOracleView/AiOneChat's own prefillQuery props are still
+  // real, generic, reusable infrastructure — but the one thing that ever
+  // populated it at this app/page.tsx level was the legacy StarTrackerView's
+  // "Ask Kali" tooltip (askKali()), which has no equivalent yet in the
+  // Phase 1 rewrite (see StarTrackerProCanvas). Removed the now-write-less
+  // state itself rather than keep threading a permanently-null value
+  // through three components; a future phase that reintroduces Kali
+  // integration can add a real writer back here.
   const openHomeView = (view: 'weather' | 'kali') => {
     setActiveTab('aione');
     setHomeViewRequest({ view, token: Date.now() });
@@ -387,7 +384,6 @@ useContextMenuShare();
                   homeViewRequest={homeViewRequest}
                   groundZeroToken={groundZeroToken}
                   pricingRequestToken={pricingRequestToken}
-                  kaliPrefillQuery={kaliPrefillQuery}
                   onCosmicViewChange={setCosmicView}
                   onGoHome={() => changeLayoutMode('gallery')}
                 />
@@ -508,8 +504,7 @@ useContextMenuShare();
                     homeViewRequest={homeViewRequest}
                     groundZeroToken={groundZeroToken}
                     pricingRequestToken={pricingRequestToken}
-                    kaliPrefillQuery={kaliPrefillQuery}
-                  />
+                    />
                 </Reveal>
               </div>
               <div id="stack-section-radio" ref={radioSectionRef} className="w-full min-h-full border-t border-slate-800/80">
@@ -533,7 +528,7 @@ useContextMenuShare();
               </div>
               <div id="stack-section-kali" className="w-full min-h-full border-t border-slate-800/80">
                 <Reveal className="w-full h-full">
-                  <KaliOracleView prefillQuery={kaliPrefillQuery} />
+                  <KaliOracleView />
                 </Reveal>
               </div>
               <div id="stack-section-tenforward" ref={tenForwardSectionRef} className="w-full min-h-full border-t border-slate-800/80">
@@ -598,9 +593,14 @@ useContextMenuShare();
 
       {/* ISS Stream Modal + Star Tracker — both moved here from TopHeader,
           now triggered from LeftNav instead. Star Tracker is a dedicated
-          full-screen view (fixed z-50), not a stacked modal. */}
+          full-screen view (fixed z-50), not a stacked modal.
+          Phase 1 rewrite: StarTrackerProCanvas (WebGL/R3F + SGP4 worker +
+          ASCOM Alpaca Device Hub) replaces the legacy StarTrackerView here
+          too, for consistency with the standalone /star-tracker route —
+          onAskKali has no equivalent yet in the new minimal UI, so that
+          integration is dropped for now pending a later phase. */}
       <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
-      {isStarTrackerOpen && <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} onAskKali={askKali} />}
+      {isStarTrackerOpen && <StarTrackerProCanvas onBack={() => setIsStarTrackerOpen(false)} />}
       {isLetsChatOpen && (
         <TenForwardSection onBack={() => setIsLetsChatOpen(false)} onSendToStudioOne={handleSendToStudioOne} />
       )}
