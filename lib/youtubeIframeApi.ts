@@ -13,6 +13,7 @@ export interface YouTubePlayer {
   // unreachable by) Web Audio gain nodes, which can't touch a cross-origin
   // YouTube iframe's audio at all.
   setVolume: (volume: number) => void;
+  mute: () => void;
   destroy: () => void;
 }
 

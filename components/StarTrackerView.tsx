@@ -38,6 +38,15 @@ import { useProCoreConnection } from '@/lib/useProCoreConnection';
 // Star Tracker's ISS layer instead of a separate popup elsewhere in the app.
 const ISS_STREAM_URL = 'https://www.youtube.com/embed/awQzjn72bI0';
 
+// A real ISS interior tour — "ISS Tour: Kitchen, Bedrooms & The
+// Latrine" (https://www.youtube.com/watch?v=XkM_04Ch76E), verified before
+// use. The one-time Space Media playlist seed below (first-ever-visit
+// only, see that effect's own comment) uses this specific video, not the
+// live ISS_STREAM_URL feed above — they're deliberately different: that
+// one is the real-time NASA stream for the ISS tracking layer, this is a
+// real recorded tour for Space Media's own default.
+const DEFAULT_SPACE_MEDIA_VIDEO_ID = 'XkM_04Ch76E';
+
 // Bronze/gold "Tactile Bronze/Gold and Green Lightwork" theme — the metal
 // housing gradient/shadow applied to every physical-instrument surface
 // (bezel, dome frame, Ask Kali bar frame), and the single green used for
@@ -341,16 +350,16 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const [kp, setKp] = useState<KpReading | null>(null);
   const [kpError, setKpError] = useState(false);
 
-  const [skyFocusMode, setSkyFocusMode] = useState<SkyFocusMode>('OFF');
+  const [skyFocusMode, setSkyFocusMode] = useState<SkyFocusMode>('MESSIER');
   const [skyMapsLoading, setSkyMapsLoading] = useState(false);
   const [skyMapsError, setSkyMapsError] = useState(false);
   const [constellationLines, setConstellationLines] = useState<ConstellationLine[] | null>(null);
   const [constellationNames, setConstellationNames] = useState<ConstellationNames | null>(null);
   const [stars, setStars] = useState<StarTuple[] | null>(null);
 
-  const [skyFestOpen, setSkyFestOpen] = useState(false);
+  const [skyFestOpen, setSkyFestOpen] = useState(true);
   const telescope = useTelescopeConnection();
-  const [skyFestTab, setSkyFestTab] = useState<'dsn' | 'deepsky' | 'media'>('dsn');
+  const [skyFestTab, setSkyFestTab] = useState<'dsn' | 'deepsky' | 'media'>('media');
   // Real local UI preference (Phase 4 HUD controls) — directly sets this
   // panel's own backdrop opacity below, nothing fabricated or hardware-linked.
   const [hudOpacity, setHudOpacity] = useState(1);
@@ -422,12 +431,21 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
       ytContainerRef.current.appendChild(playerHost);
       ytPlayerRef.current = new window.YT!.Player(playerHost, {
         videoId: nowPlayingVideoId,
-        playerVars: { autoplay: 1 },
+        // mute: 1 is what actually makes autoplay work — every major
+        // browser blocks unmuted autoplay outright, muted or not is the
+        // real gate here, not autoplay alone (the YT IFrame Player API's
+        // equivalent of a plain <video>'s autoPlay+muted+playsInline,
+        // which don't apply to an <iframe>-based embed like this one).
+        playerVars: { autoplay: 1, mute: 1, playsinline: 1 },
         events: {
-          // Loads at a lower default rather than full blast — native
-          // controls stay fully visible/enabled for manual adjustment
-          // from there.
-          onReady: (event) => event.target.setVolume(70),
+          // Starts muted (browser-required for autoplay) at a lower
+          // default volume rather than full blast, so unmuting via the
+          // native controls doesn't blast full volume — controls stay
+          // fully visible/enabled for manual adjustment either way.
+          onReady: (event) => {
+            event.target.mute();
+            event.target.setVolume(70);
+          },
         },
       });
     };
@@ -464,7 +482,20 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   }, [nowPlayingVideoId, skyFestTab]);
 
   useEffect(() => {
-    queueMicrotask(() => setPlaylist(listPlaylist()));
+    queueMicrotask(() => {
+      const existing = listPlaylist();
+      if (existing.length > 0) {
+        // A returning visitor's own real saved videos — never overwritten
+        // or auto-selected over. spaceMediaPlaylist.ts is deliberately
+        // "no hardcoded videos"; the one-time seed below only ever runs
+        // against a genuinely empty (first-ever-visit) playlist.
+        setPlaylist(existing);
+        return;
+      }
+      const seeded = savePlaylistItem('Space Stream #1', DEFAULT_SPACE_MEDIA_VIDEO_ID);
+      setPlaylist(seeded);
+      setNowPlayingVideoId(DEFAULT_SPACE_MEDIA_VIDEO_ID);
+    });
   }, []);
 
   useEffect(() => {
