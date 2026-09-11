@@ -21,10 +21,19 @@ export function parseYouTubeId(url: string): string | null {
     return null;
   }
 
+  // list=/si=/index=/t=/start_radio= etc. were never the actual problem —
+  // parsed.searchParams.get('v') and the pathname-based branches below
+  // already ignore any other query params by construction (confirmed
+  // directly: a /watch?v=...&list=...&si=... link already extracts just
+  // the v value). The real gap was the mobile share hostname
+  // (m.youtube.com), stripped here alongside www. — youtu.be short links
+  // (also common from mobile "Share") already worked, since ?si= there is
+  // a query param too and never touched the pathname this reads from.
   let id: string | null = null;
+  const hostname = parsed.hostname.replace(/^(www\.|m\.)/, '');
   if (parsed.hostname === 'youtu.be') {
     id = parsed.pathname.slice(1).split('/')[0] || null;
-  } else if (parsed.hostname.replace(/^www\./, '') === 'youtube.com') {
+  } else if (hostname === 'youtube.com') {
     if (parsed.pathname === '/watch') id = parsed.searchParams.get('v');
     else if (parsed.pathname.startsWith('/embed/')) id = parsed.pathname.split('/')[2] || null;
     else if (parsed.pathname.startsWith('/live/')) id = parsed.pathname.split('/')[2] || null;
