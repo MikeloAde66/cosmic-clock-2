@@ -5,6 +5,13 @@ import { embedOne } from '@/lib/voyage';
 import { isLanguageCode, LANGUAGE_NAMES } from '@/lib/languages';
 import { bodyToHorizon, equatorialToHorizon, type GeodeticLocation } from '@/lib/starTrackerPro/coordinates';
 import { MESSIER_OBJECTS } from '@/lib/messierCatalog';
+import {
+  computeHorizontalPosition,
+  sampleAltitudeSeries,
+  findAltitudeCrossingUtc,
+  type EquatorialCoords,
+  type ObserverLocation,
+} from '@/lib/astronomy/ephemeris';
 
 export const runtime = 'nodejs';
 
@@ -237,6 +244,107 @@ function describeMoonPhase(phaseAngleDeg: number): string {
   return names[index];
 }
 
+// ---------- Star Tracker Engine -> Kali: pre-computed ephemeris ground truth ----------
+// A second, deterministic path into the same conversation, alongside the
+// get_live_sky_coordinates tool above: instead of waiting for the model to
+// decide to call a tool, the server itself scans the user's own latest
+// message for a recognized deep-sky target and, if found, computes exact
+// LST/Hour-Angle/Alt/Az/45deg-crossing figures via lib/astronomy/
+// ephemeris.ts *before* the model runs, then injects them into the system
+// prompt as a labeled, non-negotiable ground-truth block (same mechanism as
+// retrievedContext below). This closes the one gap the existing tool has —
+// it returns Alt/Az but not LST, Hour Angle, or a 45deg threshold-crossing
+// time — without replacing it; the tool still covers the Sun/Moon/planets
+// and any target/location the user states explicitly.
+//
+// Charleston-only for now (a fixed reference point, not the user's stated
+// location) — this intentionally does not attempt free-text location
+// parsing; that's still the live tool's job when the user gives a real one.
+const EPHEMERIS_DEFAULT_OBSERVER: ObserverLocation = { latDeg: 32.82, lonDeg: -80.0, elevationM: 3 };
+
+// Reuses the same curated MESSIER_OBJECTS catalog the get_live_sky_coordinates
+// tool already trusts, rather than a second, possibly-inconsistent list of
+// target coordinates.
+function findMentionedMessierObject(text: string) {
+  const lower = text.toLowerCase();
+  return MESSIER_OBJECTS.find((m) => {
+    const idPattern = new RegExp(`\\b${m.id.toLowerCase()}\\b`);
+    const firstNameWord = m.name.toLowerCase().split(' ')[0];
+    const namePattern = new RegExp(`\\b${firstNameWord}\\b`);
+    return idPattern.test(lower) || lower.includes(m.name.toLowerCase()) || namePattern.test(lower);
+  });
+}
+
+// Scans forward from `fromUtc` in coarse steps to bracket the first sign
+// change in (altitude - targetAltitudeDeg), then hands that bracket to
+// ephemeris.ts's own bisection for the precise instant. Composed here
+// rather than added to ephemeris.ts itself, since the pure module's
+// findAltitudeCrossingUtc deliberately only solves a single bracketed
+// window — this is the "search forward from right now" policy on top of it.
+function findNextAltitudeCrossingUtc(
+  target: EquatorialCoords,
+  observer: ObserverLocation,
+  fromUtc: Date,
+  targetAltitudeDeg: number,
+  searchHours = 24,
+  stepMinutes = 15
+): Date | null {
+  const samples = sampleAltitudeSeries(
+    target,
+    observer,
+    fromUtc,
+    new Date(fromUtc.getTime() + searchHours * 3_600_000),
+    stepMinutes
+  );
+  for (let i = 1; i < samples.length; i++) {
+    const prevDiff = samples[i - 1].altitudeDeg - targetAltitudeDeg;
+    const currDiff = samples[i].altitudeDeg - targetAltitudeDeg;
+    if (prevDiff === 0) return samples[i - 1].timeUtc;
+    if (prevDiff * currDiff < 0) {
+      return findAltitudeCrossingUtc(target, observer, samples[i - 1].timeUtc, samples[i].timeUtc, targetAltitudeDeg);
+    }
+  }
+  return null;
+}
+
+function raHoursToSexagesimal(raHours: number): string {
+  const totalSeconds = Math.round(raHours * 3600);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+}
+
+function decDegToSexagesimal(decDeg: number): string {
+  const sign = decDeg < 0 ? '-' : '+';
+  const totalSeconds = Math.round(Math.abs(decDeg) * 3600);
+  const d = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${sign}${String(d).padStart(2, '0')}° ${String(m).padStart(2, '0')}' ${String(s).padStart(2, '0')}"`;
+}
+
+function buildEphemerisContext(userText: string): string {
+  const match = findMentionedMessierObject(userText);
+  if (!match) return '';
+
+  const target: EquatorialCoords = { raHours: match.raHours, decDeg: match.decDeg };
+  const observer = EPHEMERIS_DEFAULT_OBSERVER;
+  const now = new Date();
+
+  const position = computeHorizontalPosition(target, observer, now);
+  const crossing45 = findNextAltitudeCrossingUtc(target, observer, now, 45);
+
+  return `\n\nSTAR TRACKER ENGINE — verified ground truth for ${match.id} (${match.name}), computed just now by lib/astronomy/ephemeris.ts (deterministic spherical astronomy — Local Sidereal Time, Hour Angle, and the standard equatorial-to-horizontal transform — not a language-model estimate). Observer: this app's Charleston, SC reference location (${observer.latDeg}°N, ${Math.abs(observer.lonDeg)}°W). If you discuss ${match.id}'s current position in this reply, use these exact figures — never state a different altitude, azimuth, RA, Dec, LST, or crossing time for it from memory or estimation. You do not need to call get_live_sky_coordinates for ${match.id} this turn; this block is fresher and more complete (it includes LST, Hour Angle, and the 45° crossing time, which that tool doesn't return).
+- Target RA/Dec (J2000): ${raHoursToSexagesimal(target.raHours)}, ${decDegToSexagesimal(target.decDeg)}
+- Time: ${now.toISOString()}
+- Local Sidereal Time: ${position.lstHours.toFixed(3)}h
+- Hour Angle: ${position.hourAngleDeg.toFixed(2)}°
+- Altitude: ${position.altitudeDeg.toFixed(2)}° (${position.altitudeDeg > 0 ? 'above horizon' : 'below horizon'})
+- Azimuth: ${position.azimuthDeg.toFixed(2)}°
+- Next 45° altitude crossing: ${crossing45 ? crossing45.toISOString() : 'does not cross 45° in the next 24 hours from now'}`;
+}
+
 async function getSkyCoordinates(targetName: string, latitude?: number, longitude?: number): Promise<string> {
   const lat = latitude ?? DEFAULT_OBSERVER.latitude;
   const lon = longitude ?? DEFAULT_OBSERVER.longitude;
@@ -369,11 +477,14 @@ export async function POST(request: Request) {
   }
 
   const resolvedMode: DiscoveryMode = isDiscoveryMode(mode) ? mode : 'synthesis';
-  const retrievedContext = await retrieveContext(latestUserText(messages), resolvedMode);
+  const latestUserQuery = latestUserText(messages);
+  const retrievedContext = await retrieveContext(latestUserQuery, resolvedMode);
+  const ephemerisContext = buildEphemerisContext(latestUserQuery);
   const systemPrompt =
     BASE_SYSTEM_PROMPT +
     MODE_ADDENDA[resolvedMode] +
     (voiceMode === true ? VOICE_MODE_ADDENDUM : '') +
+    ephemerisContext +
     (retrievedContext
       ? `\n\nRelevant excerpts from ingested primary sources — draw on these where genuinely relevant, cite the source naturally, and ignore any that aren't a good fit for this question:\n\n${retrievedContext}`
       : '') +
@@ -516,6 +627,13 @@ export async function POST(request: Request) {
   });
 
   return new Response(body, {
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      // Set synchronously above, before streaming starts — lets the
+      // frontend (AiOneChat.tsx) know this reply had a real ephemeris
+      // payload injected, without changing the plain-text streaming
+      // contract itself. Drives StarTrackerBadge.
+      'X-Kali-Star-Tracker-Verified': ephemerisContext ? 'true' : 'false',
+    },
   });
 }

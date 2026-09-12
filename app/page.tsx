@@ -205,13 +205,15 @@ function HomeInner() {
   // both) into LeftNav's icon rail; state lives here now since LeftNav and
   // TopHeader are siblings, and this is also where StarTrackerView/
   // ISSFeedModal are rendered directly rather than from inside TopHeader.
-  // Defaults to true — Star Tracker PRO (StarTrackerView) is the default
-  // landing view on top of the existing hub layout, per explicit request.
-  // Nothing about the route/layout structure changes: the hub grid
-  // (GalleryGrid, Radio Central, Studio One, Weather, Kali, etc.) is still
-  // fully intact underneath and reachable the moment the visitor presses
-  // Back — this just flips which view renders first.
-  const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(true);
+  // Defaults to false — the main Ai One dashboard (hub grid: GalleryGrid,
+  // Radio Central, Studio One, Weather, Kali, etc.) is the landing view,
+  // per explicit request reverting the earlier Star-Tracker-as-default
+  // choice: the gateway link from protolabsglobal-main-shell's "Open Kali
+  // AI" button points at this same root domain, and should land visitors
+  // on the dashboard, not straight into Star Tracker PRO. Nothing about
+  // the route/layout structure changes — Star Tracker PRO is still one
+  // click away via LeftNav's own toggle.
+  const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(false);
   const [isIssOpen, setIsIssOpen] = useState(false);
   const [isLetsChatOpen, setIsLetsChatOpen] = useState(false);
   // The things allowed to show GlobalPlayerBar within this SPA route: the

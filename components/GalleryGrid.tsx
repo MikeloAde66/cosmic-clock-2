@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight } from 'lucide-react';
+import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight, Lock } from 'lucide-react';
 import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
 import WeatherForecastOverlay from './WeatherForecastOverlay';
 import { useKaliPendingApprovals } from '@/lib/useKaliPendingApprovals';
@@ -842,6 +842,7 @@ export default function GalleryGrid({
   const [docked, setDocked] = useState<boolean[]>(() => Array(9).fill(false));
   const [showWeatherOverlay, setShowWeatherOverlay] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showMediaFlowGate, setShowMediaFlowGate] = useState(false);
   // Only ever polls anything for a signed-in admin — see the hook itself.
   const { isAdmin, approvals: pendingApprovals, refetch: refetchApprovals } = useKaliPendingApprovals();
   const dock = (i: number) => setDocked((prev) => (prev[i] ? prev : prev.map((v, idx) => (idx === i ? true : v))));
@@ -999,14 +1000,19 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={8} docked={docked[8]} onDock={dock}>
-          <button onClick={onOpenLetsChat} className={cardClass}>
-            <DigitalMagazineTickerCardImage />
-            <CardHeader Icon={Newspaper} />
-            <div className="mt-4">
-              <div className="text-sm font-bold text-white">Digital Magazine</div>
-              <p className="mt-1 text-xs text-slate-400">Media Flow &amp; Audio Center — waveform visualizer, Webamp, and every stream.</p>
-            </div>
-          </button>
+          <div className="relative w-full h-full">
+            <button onClick={() => setShowMediaFlowGate(true)} className={cardClass}>
+              <DigitalMagazineTickerCardImage />
+              <CardHeader Icon={Newspaper} />
+              <div className="mt-4">
+                <div className="flex items-center gap-1.5 text-sm font-bold text-white">
+                  Digital Magazine
+                  <Lock className="w-3 h-3 text-slate-400" aria-label="Admin-only" />
+                </div>
+                <p className="mt-1 text-xs text-slate-400">Media Flow &amp; Audio Center — waveform visualizer, Webamp, and every stream.</p>
+              </div>
+            </button>
+          </div>
         </ArrivalSlot>
       </div>
 
@@ -1018,6 +1024,81 @@ export default function GalleryGrid({
           onDecided={refetchApprovals}
         />
       )}
+      {showMediaFlowGate && (
+        <MediaFlowPasskeyGate
+          onClose={() => setShowMediaFlowGate(false)}
+          onSuccess={() => {
+            setShowMediaFlowGate(false);
+            onOpenLetsChat();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Client-side gate only — the passkey lives in this bundle's source, so it
+// deters casual clicks rather than actually securing the route (anyone
+// reading the JS can find "3045"). Good enough for the stated goal (a
+// soft admin-only prompt on this one card); not a real auth boundary.
+const MEDIA_FLOW_PASSKEY = '3045';
+
+function MediaFlowPasskeyGate({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [value, setValue] = useState('');
+  const [invalid, setInvalid] = useState(false);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (value === MEDIA_FLOW_PASSKEY) {
+      onSuccess();
+    } else {
+      setInvalid(true);
+      setValue('');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+        className="w-full max-w-xs p-5 border rounded-2xl border-slate-800 bg-slate-950/95 shadow-2xl"
+      >
+        <div className="flex items-center gap-2 mb-3 text-sm font-bold text-white">
+          <Lock className="w-4 h-4 text-slate-400" />
+          Admin Access — Digital Magazine
+        </div>
+        <input
+          type="password"
+          inputMode="numeric"
+          autoFocus
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setInvalid(false);
+          }}
+          placeholder="Enter passkey"
+          className={`w-full px-3 py-2 text-sm text-white bg-slate-900 border rounded-lg outline-none ${
+            invalid ? 'border-red-500' : 'border-slate-700 focus:border-slate-500'
+          }`}
+        />
+        {invalid && <p className="mt-1.5 text-xs text-red-400">Invalid Passkey</p>}
+        <div className="flex gap-2 mt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-700 text-slate-300 hover:border-slate-500"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="flex-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white text-slate-950 hover:bg-slate-200"
+          >
+            Unlock
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useSpeechToText } from './useSpeechToText';
 import AiOneMessageContent from './AiOneMessageContent';
+import StarTrackerBadge from './StarTrackerBadge';
 import ChatHistoryPanel from './ChatHistoryPanel';
 import ChatImagesPanel from './ChatImagesPanel';
 import { downloadMarkdown, threadToMarkdown } from '@/lib/exportChat';
@@ -356,6 +357,20 @@ export default function AiOneChat({ prefillQuery }: AiOneChatProps = {}) {
         throw new Error(detail || 'Ai One did not respond.');
       }
 
+      // Set synchronously by the route before it starts streaming (see
+      // X-Kali-Star-Tracker-Verified in app/api/ai-one-chat/route.ts) —
+      // available immediately once headers arrive, no need to wait for
+      // the body. Marks this reply's placeholder message right away so
+      // StarTrackerBadge renders above it as soon as text starts arriving.
+      if (res.headers.get('X-Kali-Star-Tracker-Verified') === 'true') {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          updated[updated.length - 1] = { ...last, isVerified: true };
+          return updated;
+        });
+      }
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
 
@@ -501,6 +516,11 @@ export default function AiOneChat({ prefillQuery }: AiOneChatProps = {}) {
           const images = messageImages(m.content);
           return (
             <div key={idx} className="text-base font-mono leading-relaxed break-words text-slate-100">
+              {m.role === 'assistant' && m.isVerified && (
+                <div className="block">
+                  <StarTrackerBadge />
+                </div>
+              )}
               <span
                 className={`mr-1.5 text-[9px] tracking-wider font-bold ${
                   m.role === 'user' ? 'uppercase text-slate-500' : 'text-white'

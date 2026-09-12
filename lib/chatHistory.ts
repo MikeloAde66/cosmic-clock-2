@@ -12,6 +12,13 @@ export type ContentBlock =
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string | ContentBlock[];
+  // Set on an assistant message when /api/ai-one-chat's response carried
+  // the X-Kali-Star-Tracker-Verified header — i.e. this reply had a real,
+  // deterministic ephemeris payload (lib/astronomy/ephemeris.ts) injected
+  // into its system prompt, not just Kali's own estimate. Drives
+  // StarTrackerBadge in AiOneChat.tsx. Optional so older saved threads
+  // (persisted before this field existed) still load fine.
+  isVerified?: boolean;
 }
 
 export type DiscoveryMode = 'cosmic' | 'quantum' | 'synthesis';
