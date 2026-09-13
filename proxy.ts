@@ -18,6 +18,13 @@ export function proxy(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  // claims.protolabsglobal.com — same pattern, for the Insurance Claims
+  // demo (app/insurance-claims/page.tsx).
+  if (hostname.startsWith('claims.') && url.pathname === '/') {
+    url.pathname = '/insurance-claims';
+    return NextResponse.rewrite(url);
+  }
+
   return NextResponse.next();
 }
 

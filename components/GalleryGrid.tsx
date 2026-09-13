@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight, Lock } from 'lucide-react';
+import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight, Lock, ShieldCheck } from 'lucide-react';
 import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
 import WeatherForecastOverlay from './WeatherForecastOverlay';
 import { useKaliPendingApprovals } from '@/lib/useKaliPendingApprovals';
@@ -956,26 +956,19 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
-          {/* Non-interactive — no hardware product lives at this slot
-              anymore (see lib/hardwareProducts.ts), so there's nowhere to
-              link to yet. The animated pipeline keeps the slot's shape and
-              activity on the grid until a real n8n-style workflow product
-              replaces it. */}
-          <div className={`${cardClass} cursor-default hover:border-slate-800/80 hover:bg-slate-900/40`}>
+          {/* Was a non-interactive "Automations" reserved slot (no hardware
+              product lived here — see lib/hardwareProducts.ts). Repurposed
+              for the Insurance Claims demo (app/insurance-claims/page.tsx);
+              the automation-pipeline visual actually fits its own document
+              -> OCR -> fraud detection -> decision pipeline, so it stays. */}
+          <Link href="/insurance-claims" className={cardClass}>
             <AutomationFlowCardImage />
-            <div className="flex items-start justify-between">
-              <div className="flex items-center justify-center border rounded-lg w-9 h-9 border-slate-700 text-slate-300 bg-slate-950/60">
-                <LayoutGrid className="w-4 h-4" />
-              </div>
-              <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded border-slate-700 text-slate-500">
-                Coming Soon
-              </span>
-            </div>
+            <CardHeader Icon={ShieldCheck} />
             <div className="mt-4">
-              <div className="text-sm font-bold text-white">Automations</div>
-              <p className="mt-1 text-xs text-slate-400">n8n-style workflow automations — reserved slot, live preview for now.</p>
+              <div className="text-sm font-bold text-white">Insurance Claims</div>
+              <p className="mt-1 text-xs text-slate-400">AI-powered claims demo — document intake, fraud detection, and instant payout calculation.</p>
             </div>
-          </div>
+          </Link>
         </ArrivalSlot>
 
         <ArrivalSlot index={7} docked={docked[7]} onDock={dock}>
