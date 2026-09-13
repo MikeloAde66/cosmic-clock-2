@@ -43,6 +43,15 @@ class CircuitRequest(BaseModel):
     shots: int = 1000
 
 
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "service": "kali-quantum-service",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
