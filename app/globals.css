@@ -623,3 +623,104 @@ body {
   color: transparent;
   -webkit-text-fill-color: transparent;
 }
+
+/* Star Tracker product page (/products/star-tracker) — "engage" transition
+   for the two dedicated full-view triggers (Observatory Sky Feed / DSN
+   Telemetry) and their Back-button return trip.
+   The focal moment is the cyan scan-line sweep below: a self-contained
+   overlay line that reads as the instrument array "acquiring lock"
+   regardless of whether the sky feed's own async star/constellation fetch
+   has resolved yet — a plain fade+scale doesn't register against a canvas
+   that's still rendering black, the sweep does either way. */
+@keyframes star-tracker-view-enter {
+  0% {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.star-tracker-view-enter {
+  animation: star-tracker-view-enter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes star-tracker-scan-sweep {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+.star-tracker-view-enter::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.9), transparent);
+  box-shadow: 0 0 20px 4px rgba(34, 211, 238, 0.55);
+  animation: star-tracker-scan-sweep 620ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  pointer-events: none;
+  z-index: 60;
+}
+
+/* Quick "disengage" — played on a dedicated view's own root for the brief
+   window before its Back button actually unmounts it, and on the hero for
+   the mirror-image window before a dedicated view takes over. Exit is
+   deliberately shorter and simpler than the entrance (no sweep): a
+   dismissal doesn't earn the same authored beat as the arrival. */
+@keyframes star-tracker-view-exit {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+.star-tracker-view-exit,
+.star-tracker-hero-exit {
+  animation: star-tracker-view-exit 200ms ease-in both;
+}
+
+@keyframes star-tracker-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes star-tracker-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .star-tracker-view-enter {
+    animation: star-tracker-fade-in 120ms linear both;
+  }
+  .star-tracker-view-enter::before {
+    content: none;
+  }
+  .star-tracker-view-exit,
+  .star-tracker-hero-exit {
+    animation: star-tracker-fade-out 120ms linear both;
+  }
+}

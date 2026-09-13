@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { localSiderealTime } from '@/lib/siderealTime';
 
 interface DsnLinkSummary {
@@ -10,7 +9,12 @@ interface DsnLinkSummary {
   spacecraftName: string;
 }
 
-export default function StarTrackerHero() {
+interface StarTrackerHeroProps {
+  onInitializeObservatoryFeed: () => void;
+  onViewDsnTelemetry: () => void;
+}
+
+export default function StarTrackerHero({ onInitializeObservatoryFeed, onViewDsnTelemetry }: StarTrackerHeroProps) {
   // Greenwich Apparent Sidereal Time, ticking every real second — this page
   // has no user-location context of its own (unlike the live app), so it's
   // labeled GAST rather than "LST" to stay accurate about what it actually
@@ -82,20 +86,24 @@ export default function StarTrackerHero() {
           Step into the control room. Real-time deep space telemetry, orbital mechanics, and precision scope control mapped directly to your local horizon.
         </p>
 
-        {/* Action Triggers — both open the real live app at /star-tracker */}
+        {/* Action Triggers — load the real live sky feed / DSN panel inline
+            on this page (dedicated full views, not a stacked modal) rather
+            than navigating away to /star-tracker. */}
         <div className="flex flex-wrap gap-4 pt-4 font-mono text-sm">
-          <Link
-            href="/star-tracker"
+          <button
+            type="button"
+            onClick={onInitializeObservatoryFeed}
             className="px-8 py-4 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded border border-cyan-300 shadow-[0_0_25px_rgba(34,211,238,0.3)] transition-all"
           >
             [ INITIALIZE OBSERVATORY FEED ]
-          </Link>
-          <Link
-            href="/star-tracker"
+          </button>
+          <button
+            type="button"
+            onClick={onViewDsnTelemetry}
             className="px-8 py-4 bg-slate-900/80 hover:bg-slate-800 text-cyan-300 rounded border border-cyan-500/30 backdrop-blur-md transition-all"
           >
             [ VIEW LIVE DSN TELEMETRY ]
-          </Link>
+          </button>
         </div>
       </div>
 

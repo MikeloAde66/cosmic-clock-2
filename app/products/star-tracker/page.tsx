@@ -5,9 +5,19 @@ import Link from 'next/link';
 import { ArrowLeft, Check, Download } from 'lucide-react';
 import Starfield from '@/components/Starfield';
 import StarTrackerHero from '@/components/StarTrackerHero';
+import StarTrackerDsnView from '@/components/StarTrackerDsnView';
+import StarTrackerProCanvas from '@/components/starTrackerPro/StarTrackerProCanvas';
 import PurchaseButton from '@/components/PurchaseButton';
 import { STANDALONE_PRODUCTS } from '@/lib/standaloneProducts';
 import { STAR_TRACKER_LINK, AIONE_PRO_SUBSCRIPTION_LINK } from '@/lib/paymentLinks';
+
+// Matches globals.css's .star-tracker-view-exit / .star-tracker-hero-exit
+// animation duration — whichever side is leaving plays its "disengage"
+// exit before the other mounts, so the swap reads as one continuous
+// transition rather than a hard cut.
+const VIEW_EXIT_MS = 200;
+
+type DedicatedView = 'sky-feed' | 'dsn' | null;
 
 const product = STANDALONE_PRODUCTS.find((p) => p.id === 'star-tracker')!;
 
@@ -27,20 +37,56 @@ type Tier = 'standalone' | 'pro';
 
 export default function StarTrackerProductPage() {
   const [tier, setTier] = useState<Tier>('standalone');
+  const [dedicatedView, setDedicatedView] = useState<DedicatedView>(null);
+  const [heroLeaving, setHeroLeaving] = useState(false);
+  const [viewLeaving, setViewLeaving] = useState(false);
+  // Only true for the render right after a dedicated view hands back
+  // control — gates the hero's own "engage" replay so first page load
+  // stays a plain, uninterrupted arrival rather than page-load choreography.
+  const [heroReturning, setHeroReturning] = useState(false);
+
+  const openView = (view: DedicatedView) => {
+    setHeroLeaving(true);
+    window.setTimeout(() => {
+      setDedicatedView(view);
+      setHeroLeaving(false);
+    }, VIEW_EXIT_MS);
+  };
+
+  const closeView = () => {
+    setViewLeaving(true);
+    window.setTimeout(() => {
+      setDedicatedView(null);
+      setViewLeaving(false);
+      setHeroReturning(true);
+    }, VIEW_EXIT_MS);
+  };
+
+  if (dedicatedView === 'sky-feed') {
+    return <StarTrackerProCanvas onBack={closeView} leaving={viewLeaving} />;
+  }
+  if (dedicatedView === 'dsn') {
+    return <StarTrackerDsnView onBack={closeView} leaving={viewLeaving} />;
+  }
 
   return (
     <div className="relative w-full min-h-screen overflow-hidden bg-[#0a0a0c] text-slate-100">
-      <div className="relative z-10 px-6 pt-6">
-        <Link
-          href="/products"
-          className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-neutral-500 hover:text-neutral-300"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Back to Products
-        </Link>
-      </div>
+      <div className={heroLeaving ? 'star-tracker-hero-exit' : heroReturning ? 'star-tracker-view-enter' : ''}>
+        <div className="relative z-10 px-6 pt-6">
+          <Link
+            href="/products"
+            className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-neutral-500 hover:text-neutral-300"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to Products
+          </Link>
+        </div>
 
-      <StarTrackerHero />
+        <StarTrackerHero
+          onInitializeObservatoryFeed={() => openView('sky-feed')}
+          onViewDsnTelemetry={() => openView('dsn')}
+        />
+      </div>
 
       <Starfield />
       <div className="relative z-10 max-w-2xl px-6 py-16 mx-auto space-y-8">

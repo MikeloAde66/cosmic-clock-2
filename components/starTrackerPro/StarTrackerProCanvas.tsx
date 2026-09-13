@@ -35,7 +35,7 @@ const SEARCHABLE_BODIES: Record<string, Body> = {
   Neptune: Body.Neptune,
 };
 
-export default function StarTrackerProCanvas({ onBack }: { onBack: () => void }) {
+export default function StarTrackerProCanvas({ onBack, leaving }: { onBack: () => void; leaving?: boolean }) {
   const { status: geoStatus, coords } = useGeolocation();
   const location: GeodeticLocation = coords
     ? { latitudeDeg: coords.lat, longitudeDeg: coords.lon, elevationMeters: 0 }
@@ -98,7 +98,9 @@ export default function StarTrackerProCanvas({ onBack }: { onBack: () => void })
     // alongside the hub's own GalleryGrid content, it rendered as an
     // inert block appended below the grid instead of covering it —
     // clicking the "Star Tracker PRO" card looked like nothing happened.
-    <div className="fixed inset-0 z-50 w-full h-full overflow-hidden bg-black">
+    <div
+      className={`${leaving ? 'star-tracker-view-exit' : 'star-tracker-view-enter'} fixed inset-0 z-50 w-full h-full overflow-hidden bg-black`}
+    >
       <button
         type="button"
         onClick={onBack}
