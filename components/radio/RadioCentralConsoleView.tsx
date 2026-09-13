@@ -86,14 +86,10 @@ const TOKENS = {
   cyan: '#00F2FE',
   crimson: '#FF2E63',
   emerald: '#00F5A0',
-  // The holographic shell's oil-slick edge gradient — distinct from the
-  // single-tone cyan glow used everywhere else in this view, deliberately
-  // reserved for the outer casing and a handful of marquee controls so it
-  // reads as a special "metal + light" treatment rather than replacing
-  // the existing cyan HUD language wholesale.
-  holoA: '#2fd9ff',
-  holoB: '#b63cff',
-  holoC: '#ff00a0',
+  // Matches the prismatic glass chassis's own cyan accent (see
+  // RadioCentralConsoleView.module.css's .holoCard) — reused here so the
+  // metric-tile glow reads as the same light source as the shell around it.
+  holoA: '#00f3ff',
 };
 
 // Holographic Glass — shared Tailwind class strings for every interactive
@@ -423,46 +419,25 @@ export default function RadioCentralConsoleView() {
 
   return (
     <div
-      className="w-full h-full overflow-y-auto p-3 sm:p-6 md:p-10"
-      style={{ background: TOKENS.base, color: '#e7f6ff', fontFamily: monoFont }}
+      className="relative w-full h-full overflow-y-auto p-3 sm:p-6 md:p-10"
+      style={{ color: '#e7f6ff', fontFamily: monoFont }}
     >
-      {/* Holographic Metallic Shell Wrap — the whole dashboard sits inside
-          one bulky armored casing: an outer iridescent "oil-slick" edge
-          (holo-shell-edge, an animated 3-stop gradient shifted via
-          background-position) with a 2px reveal around an inner metal
-          shell (dark slate/zinc gradient, industrial bezel, corner
-          brackets, rivets). Both are plain scoped CSS in the <style jsx>
-          block below — no animation library, same performance profile as
-          this file's existing corePulse/eqBar keyframes. */}
-      <div className="relative max-w-6xl mx-auto">
-        <div className={`${styles.holoShellEdge} rounded-[2rem] p-[3px]`}>
-          <div className={`${styles.metalShell} relative rounded-[calc(2rem-3px)] p-3 sm:p-6 overflow-hidden`}>
-            <span className={`${styles.cornerCut} ${styles.cornerCutTl}`} aria-hidden="true" />
-            <span className={`${styles.cornerCut} ${styles.cornerCutTr}`} aria-hidden="true" />
-            <span className={`${styles.cornerCut} ${styles.cornerCutBl}`} aria-hidden="true" />
-            <span className={`${styles.cornerCut} ${styles.cornerCutBr}`} aria-hidden="true" />
-            <span className={`${styles.cornerBracket} ${styles.cornerBracketTl}`} aria-hidden="true" />
-            <span className={`${styles.cornerBracket} ${styles.cornerBracketTr}`} aria-hidden="true" />
-            <span className={`${styles.cornerBracket} ${styles.cornerBracketBl}`} aria-hidden="true" />
-            <span className={`${styles.cornerBracket} ${styles.cornerBracketBr}`} aria-hidden="true" />
-            <span className={styles.rivet} style={{ top: 16, left: 16 }} aria-hidden="true" />
-            <span className={styles.rivet} style={{ top: 16, right: 16 }} aria-hidden="true" />
-            <span className={styles.rivet} style={{ bottom: 16, left: 16 }} aria-hidden="true" />
-            <span className={styles.rivet} style={{ bottom: 16, right: 16 }} aria-hidden="true" />
-            {/* Ventilation grilles — hardware detail along the top edge,
-                clear of the corner brackets/rivets. */}
-            <span className={styles.ventSlits} style={{ top: 14, left: '50%', transform: 'translateX(-140px)' }} aria-hidden="true" />
-            <span className={styles.ventSlits} style={{ top: 14, left: '50%', transform: 'translateX(106px)' }} aria-hidden="true" />
+      {/* Volumetric holographic backdrop — fixed behind the scrollable
+          console (see .holoBackdrop in the CSS module for why it's a
+          separate fixed layer rather than living on this scrolling div
+          directly). */}
+      <div className={styles.holoBackdrop} aria-hidden="true" />
 
-            {/* Recessed screen pit — the real dashboard content (header
-                through footer) sits visibly set back from the metal
-                casing around it, like a real device's display glass. */}
-            <div className={`${styles.screenRecess} relative rounded-[1.25rem] p-4 sm:p-8 md:p-10 space-y-4 overflow-hidden`}>
-              {/* CRT/scanline micro-pattern — a barely-there diagonal
-                  repeating-gradient over the recessed screen so it reads
-                  as the display surface itself rather than a decal on any
-                  single panel. */}
-              <div className={styles.scanlineOverlay} aria-hidden="true" />
+      {/* Prismatic Glass Chassis — the whole dashboard sits inside one
+          pane of holographic glass: a mask-composite refraction border
+          plus a specular glare layer (both in .holoCard, CSS module),
+          replacing the previous metal-armor casing treatment. */}
+      <div className="relative z-[1] max-w-6xl mx-auto">
+        <div className={`${styles.holoCard} relative rounded-[2rem] p-4 sm:p-8 md:p-10 space-y-4 overflow-hidden`}>
+          {/* CRT/scanline micro-pattern — a barely-there diagonal
+              repeating-gradient over the glass so it reads as a lit
+              display surface rather than a flat panel. */}
+          <div className={styles.scanlineOverlay} aria-hidden="true" />
         {/* Header */}
         <div className="flex flex-col gap-4 p-4 rounded-xl md:flex-row md:items-center md:justify-between" style={cardStyle}>
           <div className="flex items-center gap-3">
@@ -827,8 +802,6 @@ export default function RadioCentralConsoleView() {
         <div className="p-3 text-center text-[10px] uppercase tracking-widest text-slate-500">
           Radio Central · Live · Always On
         </div>
-            </div>
-          </div>
         </div>
       </div>
 
