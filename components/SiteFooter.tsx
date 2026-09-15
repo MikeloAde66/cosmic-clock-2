@@ -72,11 +72,6 @@ export default function SiteFooter({
             {clockLabel || '—'}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-slate-500">KALI YUGA</span>
-          <span className="text-slate-100 font-medium">YEAR 5,128</span>
-        </div>
-
         {/* Weather — inline in the footer's normal document flow (not an
             absolutely-positioned overlay/popup), per the standing "dedicated
             surfaces, no floating popups" rule. Three mutually exclusive

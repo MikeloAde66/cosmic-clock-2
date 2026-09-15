@@ -872,7 +872,7 @@ export default function GalleryGrid({
             <CardHeader Icon={RadioIcon} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Radio Central</div>
-              <p className="mt-1 text-xs text-slate-400">Live streaming stations, curated ambient/cosmic channels.</p>
+              <p className="mt-1 text-xs text-slate-200">Live streaming stations, curated ambient/cosmic channels.</p>
             </div>
           </Link>
         </ArrivalSlot>
@@ -883,7 +883,7 @@ export default function GalleryGrid({
             <CardHeader Icon={Mic} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Studio One</div>
-              <p className="mt-1 text-xs text-slate-400">Your track library, uploads, and playlists.</p>
+              <p className="mt-1 text-xs text-slate-200">Your track library, uploads, and playlists.</p>
             </div>
           </button>
         </ArrivalSlot>
@@ -894,7 +894,7 @@ export default function GalleryGrid({
             <CardHeader Icon={Telescope} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Star Tracker PRO</div>
-              <p className="mt-1 text-xs text-slate-400">Live orbital tracking and pass predictions.</p>
+              <p className="mt-1 text-xs text-slate-200">Live orbital tracking and pass predictions.</p>
             </div>
           </Link>
         </ArrivalSlot>
@@ -905,7 +905,7 @@ export default function GalleryGrid({
             <CardHeader Icon={Umbrella} active={weatherActive} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Weather</div>
-              <p className="mt-1 text-xs text-slate-400">Search a ZIP, city, or address for a live NOAA forecast.</p>
+              <p className="mt-1 text-xs text-slate-200">Search a ZIP, city, or address for a live NOAA forecast.</p>
             </div>
           </button>
         </ArrivalSlot>
@@ -917,7 +917,7 @@ export default function GalleryGrid({
               <CardHeader Icon={Sparkles} />
               <div className="mt-4">
                 <div className="text-sm font-bold text-white">Ai One</div>
-                <p className="mt-1 text-xs text-slate-400">Ancient technology, quantum physics, epoch cycles.</p>
+                <p className="mt-1 text-xs text-slate-200">Ancient technology, quantum physics, epoch cycles.</p>
               </div>
             </Link>
             {/* Admin-only notification badge for pending real-QPU approvals
@@ -944,23 +944,25 @@ export default function GalleryGrid({
             <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Products</div>
-              <p className="mt-1 text-xs text-slate-400">Hardware and kits — browse the full catalog.</p>
+              <p className="mt-1 text-xs text-slate-200">Hardware and kits — browse the full catalog.</p>
             </div>
           </Link>
         </ArrivalSlot>
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
           {/* Was a non-interactive "Automations" reserved slot (no hardware
-              product lived here — see lib/hardwareProducts.ts). Repurposed
-              for the Insurance Claims demo (app/insurance-claims/page.tsx);
-              the automation-pipeline visual actually fits its own document
-              -> OCR -> fraud detection -> decision pipeline, so it stays. */}
+              product lived here — see lib/hardwareProducts.ts), then
+              retitled "Insurance Claims" when repurposed for that demo
+              (app/insurance-claims/page.tsx). Card title is back to
+              "Automations" — the automation-pipeline visual and the
+              underlying demo (document -> OCR -> fraud detection ->
+              decision pipeline) are unchanged, still at /insurance-claims. */}
           <Link href="/insurance-claims" className={cardClass}>
             <AutomationFlowCardImage />
             <CardHeader Icon={ShieldCheck} />
             <div className="mt-4">
-              <div className="text-sm font-bold text-white">Insurance Claims</div>
-              <p className="mt-1 text-xs text-slate-400">AI-powered claims demo — document intake, fraud detection, and instant payout calculation.</p>
+              <div className="text-sm font-bold text-white">Automations</div>
+              <p className="mt-1 text-xs text-slate-200">AI-powered claims demo — document intake, fraud detection, and instant payout calculation.</p>
             </div>
           </Link>
         </ArrivalSlot>
@@ -981,7 +983,7 @@ export default function GalleryGrid({
             </div>
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Merch</div>
-              <p className="mt-1 text-xs text-slate-400">Reserved slot, live preview for now.</p>
+              <p className="mt-1 text-xs text-slate-200">Reserved slot, live preview for now.</p>
             </div>
           </div>
         </ArrivalSlot>
@@ -996,7 +998,7 @@ export default function GalleryGrid({
                   Digital Magazine
                   <Lock className="w-3 h-3 text-slate-400" aria-label="Admin-only" />
                 </div>
-                <p className="mt-1 text-xs text-slate-400">Media Flow &amp; Audio Center — waveform visualizer, Webamp, and every stream.</p>
+                <p className="mt-1 text-xs text-slate-200">Media Flow &amp; Audio Center — waveform visualizer, Webamp, and every stream.</p>
               </div>
             </button>
           </div>
