@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Tracker PRO | Proto Labs Global</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            cyan: '#00f0ff',
+                            darkCyan: '#008b9b',
+                            blue: '#0b132b',
+                            navy: '#050a14',
+                            cardBg: 'rgba(9, 16, 32, 0.85)',
+                            border: 'rgba(0, 240, 255, 0.25)',
+                            purple: '#8b5cf6'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Courier New', 'monospace'],
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;0,800;1,400&family=Inter:wght@300;400;600;700&display=swap');
+
+        body {
+            background-color: #030712;
+            color: #e2e8f0;
+            font-family: 'JetBrains Mono', monospace;
+            overflow-x: hidden;
+        }
+
+        /* Glowing text & box effects */
+        .text-glow-cyan {
+            text-shadow: 0 0 14px rgba(0, 240, 255, 0.75), 0 0 28px rgba(0, 240, 255, 0.3);
+        }
+        
+        .box-glow-cyan {
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.35), inset 0 0 10px rgba(0, 240, 255, 0.15);
+        }
+
+        .border-glow {
+            border-color: rgba(0, 240, 255, 0.45);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #050a14;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 240, 255, 0.3);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 240, 255, 0.7);
+        }
+
+        .dev-tool-panel {
+            backdrop-filter: blur(14px);
+            background: rgba(4, 9, 20, 0.92);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+        }
+        
+        .grid-pattern {
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+        }
+
+        .scanline {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 240, 255, 0.02) 50%,
+                rgba(0, 240, 255, 0.02)
+            );
+            background-size: 100% 4px;
+        }
+
+        .view-transition {
+            transition: opacity 0.35s ease-in-out, transform 0.35s ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen relative flex flex-col justify-between selection:bg-cyan-500 selection:text-black">
+
+    <!-- Background Starfield and Grid Overlays -->
+    <canvas id="starfieldCanvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
+    <div class="fixed inset-0 grid-pattern pointer-events-none z-0"></div>
+    <div class="fixed inset-0 scanline pointer-events-none z-10"></div>
+
+    <!-- Header Navigation & Status Bar -->
+    <header class="relative z-20 border-b border-cyan-500/20 bg-black/70 backdrop-blur-md px-4 lg:px-8 py-3 flex flex-wrap items-center justify-between text-xs font-mono">
+        <div class="flex items-center space-x-6">
+            <button id="navBackBtn" onclick="switchToView('landing')" class="flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors uppercase tracking-wider">
+                <i class="fa-solid fa-arrow-left text-xs"></i> BACK TO PRODUCTS
+            </button>
+            <div class="hidden sm:flex items-center gap-2 text-cyan-400/90 bg-cyan-950/40 border border-cyan-500/30 px-2.5 py-1 rounded">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span>DSN LINK: <strong class="text-cyan-300">DSS23 GOLDSTONE — CAPS [ACTIVE]</strong></span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-6 text-slate-300 mt-2 sm:mt-0">
+            <div class="text-right">
+                <span class="text-slate-500 block text-[10px]">GREENWICH SIDEREAL TIME</span>
+                <span id="siderealClock" class="text-cyan-400 font-bold tracking-widest">19:50:24</span>
+            </div>
+            <div class="h-6 w-px bg-cyan-500/30"></div>
+            <div class="text-right">
+                <span class="text-slate-500 block text-[10px]">GAST LOCAL CLOCK</span>
+                <span id="gastClock" class="text-slate-200 font-semibold tracking-wider">GAST: 06:10:55</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="relative z-20 flex-1 flex flex-col items-center justify-center p-4 md:p-8 max-w-7xl mx-auto w-full">
+
+        <!-- ================= VIEW 1: PRODUCT DETAIL PAGE (Image 2 & 3 - Skips Image 1) ================= -->
+        <section id="viewLanding" class="w-full flex flex-col justify-between space-y-12 my-auto view-transition">
+            <div class="max-w-3xl space-y-6 pt-4">
+                <div class="inline-block px-3 py-1 rounded-full text-[11px] font-semibold tracking-wider bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 uppercase">
+                    STANDALONE OBSERVATORY SUITE
+                </div>
+                
+                <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white uppercase font-sans leading-none">
+                    COMMAND THE <br/>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-purple-400 text-glow-cyan">NIGHT SKY.</span>
+                </h1>
+
+                <p class="text-slate-300 text-sm md:text-base leading-relaxed font-sans max-w-2xl">
+                    Step into the control room. Real-time deep space telemetry, orbital mechanics, and precision scope control mapped directly to your local horizon.
+                </p>
+
+                <!-- Action Buttons Matching Image 3 -->
+                <div class="flex flex-wrap items-center gap-4 pt-4">
+                    <button 
+                        onclick="switchToView('feed')"
+                        class="px-6 py-3.5 bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs md:text-sm tracking-widest uppercase rounded shadow-lg shadow-cyan-500/30 hover:shadow-cyan-400/50 transition-all duration-200 active:scale-95 flex items-center gap-2 border border-cyan-300">
+                        <i class="fa-solid fa-satellite"></i> [ INITIALIZE OBSERVATORY FEED ]
+                    </button>
+                    
+                    <button 
+                        onclick="switchToView('telemetry')"
+                        class="px-6 py-3.5 bg-slate-950/80 hover:bg-cyan-950/40 text-cyan-300 hover:text-cyan-200 border border-cyan-500/40 hover:border-cyan-400 font-bold text-xs md:text-sm tracking-widest uppercase rounded transition-all duration-200 active:scale-95 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line"></i> [ VIEW LIVE DSN TELEMETRY ]
+                    </button>
+                </div>
+            </div>
+
+            <!-- Spec Feature Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-8">
+                <div class="dev-tool-panel p-5 rounded-lg border border-cyan-500/20 hover:border-cyan-500/50 transition-colors">
+                    <div class="text-cyan-400 font-semibold text-xs mb-2">01 / DSN DOWNLINK</div>
+                    <p class="text-slate-400 text-xs leading-relaxed">
+                        Live signal band, data rate, and one-way light-time direct from NASA's real Deep Space Network telemetry feeds.
+                    </p>
+                </div>
+                <div class="dev-tool-panel p-5 rounded-lg border border-cyan-500/20 hover:border-cyan-500/50 transition-colors">
+                    <div class="text-cyan-400 font-semibold text-xs mb-2">02 / LX200 & NEXSTAR</div>
+                    <p class="text-slate-400 text-xs leading-relaxed">
+                        Real mount control over Web Serial or Bluetooth — live position polling, GOTO/slew mechanics, and tracking rate locking.
+                    </p>
+                </div>
+                <div class="dev-tool-panel p-5 rounded-lg border border-cyan-500/20 hover:border-cyan-500/50 transition-colors">
+                    <div class="text-cyan-400 font-semibold text-xs mb-2">03 / SPECTRAL OVERLAYS</div>
+                    <p class="text-slate-400 text-xs leading-relaxed">
+                        Multi-wavelength sky mapping across optical, infrared (JWST), radio (21cm hydrogen), and high-energy X-ray bands.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= VIEW 2: OBSERVATORY SKY FEED (Image 4 / impeccable STPro.png) ================= -->
+        <section id="viewFeed" class="w-full flex-1 flex flex-col space-y-4 hidden view-transition opacity-0">
+            <!-- Header bar / Observer location selection -->
+            <div class="dev-tool-panel p-4 rounded-xl border border-cyan-500/30 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <span class="text-cyan-400 text-[10px] tracking-widest block uppercase">SKY ABOVE YOU</span>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        Star Tracker PRO 
+                        <span id="currentLocText" class="text-xs text-slate-400 font-normal">Mauna Kea Observatories — 19.82°, -155.47° · Elev 4207m</span>
+                    </h2>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <div class="relative">
+                        <select id="locationSelector" onchange="updateLocation(this.value)" class="bg-black/90 border border-cyan-500/40 text-cyan-300 text-xs rounded px-3 py-1.5 focus:outline-none focus:border-cyan-400 cursor-pointer">
+                            <option value="mauna">✓ Mauna Kea Observatories (Hawai'i, USA)</option>
+                            <option value="palomar">Palomar Observatory (California, USA)</option>
+                            <option value="greenwich">Royal Observatory Greenwich (London, UK)</option>
+                            <option value="griffith">Griffith Observatory (Los Angeles, USA)</option>
+                            <option value="vlt">Very Large Telescope (VLT) (Atacama, Chile)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Filter & Mode Bar -->
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div class="flex flex-wrap gap-2">
+                    <button class="px-3 py-1 bg-cyan-950/60 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 rounded flex items-center gap-1.5">
+                        <i class="fa-solid fa-satellite text-[10px]"></i> ISS
+                    </button>
+                    <button class="px-3 py-1 bg-cyan-950/60 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 rounded flex items-center gap-1.5">
+                        <i class="fa-solid fa-sun text-[10px]"></i> SPACE WEATHER
+                    </button>
+                    <button class="px-3 py-1 bg-cyan-500/20 border border-cyan-400 text-cyan-200 rounded flex items-center gap-1.5 box-glow-cyan font-semibold">
+                        <i class="fa-solid fa-dharmachakra text-[10px]"></i> MESSIER DEEP-SKY
+                    </button>
+                    <button class="px-3 py-1 bg-cyan-950/60 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 rounded flex items-center gap-1.5">
+                        <i class="fa-solid fa-calendar-day text-[10px]"></i> SKY FEST
+                    </button>
+                </div>
+
+                <div class="flex items-center border border-cyan-500/30 rounded overflow-hidden">
+                    <button id="modeCasual" onclick="setSkyMode('casual')" class="px-3 py-1 text-slate-400 bg-black/60 hover:text-white">CASUAL</button>
+                    <button id="modeExpert" onclick="setSkyMode('expert')" class="px-3 py-1 text-cyan-300 bg-cyan-950/80 font-bold border-l border-cyan-500/30">EXPERT</button>
+                </div>
+            </div>
+
+            <!-- Mount Protocol Selector Box -->
+            <div class="dev-tool-panel p-3.5 rounded-lg border border-cyan-500/30 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="text-slate-400 text-[11px] uppercase tracking-wider">MOUNT PROTOCOL:</span>
+                    <button id="btnUsb" onclick="setMountProtocol('usb')" class="px-3 py-1 bg-black/60 border border-slate-700 hover:border-cyan-500/50 rounded text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-plug text-[10px]"></i> USB / SERIAL
+                    </button>
+                    <button id="btnBle" onclick="setMountProtocol('ble')" class="px-3 py-1 bg-black/60 border border-slate-700 hover:border-cyan-500/50 rounded text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-brands fa-bluetooth-b text-[10px]"></i> BLUETOOTH
+                    </button>
+                    <button id="btnSim" onclick="setMountProtocol('sim')" class="px-3 py-1 bg-purple-950/60 border border-purple-500/50 rounded text-purple-300 font-semibold flex items-center gap-1.5">
+                        <i class="fa-solid fa-crosshairs text-[10px]"></i> SIMULATOR MODE
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <select class="bg-black border border-cyan-500/40 text-cyan-300 text-xs rounded px-2.5 py-1 focus:outline-none">
+                        <option>Meade LX200</option>
+                        <option>Celestron NexStar</option>
+                        <option>Sky-Watcher SynScan</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Sky Map Planisphere Canvas Viewport -->
+            <div class="relative w-full h-[540px] rounded-xl border border-cyan-500/40 overflow-hidden shadow-2xl bg-black">
+                <canvas id="skyMapCanvas" class="w-full h-full cursor-crosshair"></canvas>
+                
+                <!-- Target Reticle Overlay HUD info -->
+                <div class="absolute top-4 left-4 bg-black/85 border border-cyan-500/40 rounded-lg p-3 text-xs text-cyan-300 backdrop-blur-md">
+                    <div class="font-bold text-white text-sm flex items-center gap-2" id="hudSelectedTarget">
+                        Saturn
+                    </div>
+                    <div class="text-[11px] text-cyan-400/90 font-mono mt-0.5" id="hudCoordinates">
+                        E 20.8° · 8.504 AU
+                    </div>
+                </div>
+
+                <div class="absolute top-4 right-4 bg-black/85 border border-cyan-500/40 rounded px-3 py-1 text-[11px] text-cyan-300 backdrop-blur-sm">
+                    1.0x · FOV 180°
+                </div>
+
+                <!-- Canvas Control Hint -->
+                <div class="absolute bottom-4 left-4 text-[10px] text-slate-400 bg-black/70 px-3 py-1.5 rounded-md border border-slate-800 backdrop-blur-sm">
+                    <i class="fa-solid fa-hand-pointer mr-1.5 text-cyan-400"></i> Click targets (M51, M31, Saturn) to focus scope
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= VIEW 3: LIVE DSN TELEMETRY (Image 5 / impeccableSTPro 2.png) ================= -->
+        <section id="viewTelemetry" class="w-full flex-1 flex flex-col space-y-6 hidden view-transition opacity-0">
+            <!-- Telemetry Status Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Latency Card -->
+                <div class="dev-tool-panel p-4 rounded-xl border border-cyan-500/30 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center text-xs text-slate-400 mb-2">
+                            <span>MICROSERVICE LATENCY</span>
+                            <span class="text-emerald-400 font-bold text-base" id="pingValue">142 ms</span>
+                        </div>
+                        <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+                            <div id="pingBar" class="bg-emerald-400 h-full w-[28%] transition-all duration-300"></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+                            <span>0ms</span>
+                            <span>250ms</span>
+                            <span>500ms+</span>
+                        </div>
+                    </div>
+                    <div class="text-[11px] text-cyan-400/80 mt-4 border-t border-cyan-500/10 pt-2 flex items-center justify-between">
+                        <span>ENDPOINT:</span>
+                        <span class="font-mono text-white">kali-quantum-service</span>
+                    </div>
+                </div>
+
+                <!-- Signal Stability Card -->
+                <div class="dev-tool-panel p-4 rounded-xl border border-cyan-500/30 flex flex-col justify-between">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-xs text-slate-400 block">SIGNAL STABILITY</span>
+                            <span class="inline-flex items-center gap-1.5 text-xs text-emerald-400 font-bold mt-1">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                                LIVE STREAM ACTIVE
+                            </span>
+                        </div>
+                        <span class="px-2 py-0.5 bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-[10px] rounded font-bold">
+                            CONNECTED
+                        </span>
+                    </div>
+                    <div class="text-[11px] text-cyan-400/80 mt-4 border-t border-cyan-500/10 pt-2 flex items-center justify-between">
+                        <span>PROTOCOL:</span>
+                        <span class="font-mono text-cyan-300">WSS / JSON-RPC</span>
+                    </div>
+                </div>
+
+                <!-- Session Runtime Card -->
+                <div class="dev-tool-panel p-4 rounded-xl border border-cyan-500/30 text-center flex flex-col justify-between">
+                    <span class="text-xs text-slate-400 block">SESSION RUNTIME</span>
+                    <div id="sessionTimer" class="text-3xl font-extrabold text-cyan-300 tracking-wider font-mono my-1">
+                        00:00:31
+                    </div>
+                    <div class="text-[10px] text-slate-500 uppercase tracking-widest">
+                        EXECUTION STATE: <span class="text-emerald-400 font-bold">LOGGING ACTIVE</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HUD Controls Bar -->
+            <div class="dev-tool-panel p-5 rounded-xl border border-cyan-500/30 space-y-4">
+                <div class="text-xs text-slate-400 font-semibold tracking-wider uppercase border-b border-cyan-500/20 pb-2">
+                    HUD CONTROLS & SCOPE GAIN
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Tracking Rate Toggles -->
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-300 block">TRACKING RATE</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="setTrackingRate(this)" class="px-3 py-1.5 bg-cyan-950 border border-cyan-400 text-cyan-200 text-xs rounded font-bold text-center tracking-button">SIDEREAL</button>
+                            <button onclick="setTrackingRate(this)" class="px-3 py-1.5 bg-black/60 border border-slate-700 text-slate-400 text-xs rounded text-center tracking-button">SOLAR</button>
+                            <button onclick="setTrackingRate(this)" class="px-3 py-1.5 bg-black/60 border border-slate-700 text-slate-400 text-xs rounded text-center tracking-button">LUNAR</button>
+                            <button onclick="setTrackingRate(this)" class="px-3 py-1.5 bg-black/60 border border-slate-700 text-slate-400 text-xs rounded text-center tracking-button">STOPPED</button>
+                        </div>
+                    </div>
+
+                    <!-- HUD Opacity Slider -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs text-slate-300">
+                            <span>HUD OPACITY</span>
+                            <span id="opacityVal" class="text-cyan-400 font-bold">100%</span>
+                        </div>
+                        <input type="range" id="opacitySlider" min="20" max="100" value="100" class="w-full accent-cyan-400 cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Telemetry Stream Logs (Matching DSS23 Goldstone) -->
+            <div class="dev-tool-panel rounded-xl border border-cyan-500/30 overflow-hidden">
+                <div class="px-4 py-3 bg-cyan-950/40 border-b border-cyan-500/20 text-xs text-cyan-300 font-bold flex items-center justify-between">
+                    <span><i class="fa-solid fa-satellite-dish mr-2"></i> LIVE FROM NASA/JPL DEEP SPACE NETWORK</span>
+                    <span class="text-[10px] text-slate-400">GOLDSTONE STATION</span>
+                </div>
+
+                <div class="divide-y divide-cyan-500/10 text-xs">
+                    <!-- DSS23 Uplink -->
+                    <div class="p-4 flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <span class="text-cyan-400 font-bold text-sm">DSS23</span> · <span class="text-slate-300">uplink</span>
+                            <div class="text-[10px] text-slate-500">CAPS NODE</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-slate-300">S-band · <span class="text-slate-500">—</span></div>
+                            <div class="text-[10px] text-slate-400">2 dBm · one-way light-time unavailable</div>
+                        </div>
+                    </div>
+
+                    <!-- DSS23 Downlink -->
+                    <div class="p-4 flex flex-wrap items-center justify-between gap-4 bg-cyan-950/20">
+                        <div>
+                            <span class="text-cyan-400 font-bold text-sm">DSS23</span> · <span class="text-emerald-400 font-semibold">downlink</span>
+                            <div class="text-[10px] text-slate-500">CAPS NODE</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-cyan-300 font-bold">X-band · <span class="text-emerald-400">256.0 kbps</span></div>
+                            <div class="text-[10px] text-slate-400">-120 dBm · telemetry lock nominal</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Interactive Navigation Dock -->
+    <div class="fixed bottom-4 right-4 z-50">
+        <div id="devDock" class="dev-tool-panel rounded-xl p-3 shadow-2xl border border-cyan-500/50 text-xs space-y-2 w-72">
+            <div class="flex items-center justify-between border-b border-cyan-500/30 pb-2">
+                <span class="font-bold text-cyan-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-sliders text-cyan-400"></i> PROTOLABS DEV DOCK
+                </span>
+                <span class="text-[9px] bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded border border-cyan-500/30">PREVIEW</span>
+            </div>
+
+            <div class="space-y-1.5 pt-1">
+                <label class="text-[10px] text-slate-400 block uppercase font-bold">Route View Switcher:</label>
+                <div class="grid grid-cols-3 gap-1">
+                    <button onclick="switchToView('landing')" class="px-2 py-1 bg-black/60 border border-slate-700 hover:border-cyan-400 text-slate-300 rounded text-[10px]">Overview</button>
+                    <button onclick="switchToView('feed')" class="px-2 py-1 bg-black/60 border border-slate-700 hover:border-cyan-400 text-slate-300 rounded text-[10px]">Sky Feed</button>
+                    <button onclick="switchToView('telemetry')" class="px-2 py-1 bg-black/60 border border-slate-700 hover:border-cyan-400 text-slate-300 rounded text-[10px]">Telemetry</button>
+                </div>
+            </div>
+
+            <div class="pt-2 border-t border-cyan-500/20 flex items-center justify-between text-[11px]">
+                <span class="text-slate-400">Animate Skill Overlay:</span>
+                <button id="toggleAnimBtn" onclick="toggleAnimateMode()" class="px-2.5 py-1 bg-cyan-500 text-black font-bold rounded hover:bg-cyan-400">
+                    Active
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        // Global State Controller
+        let activeViewName = 'landing';
+        let animateModeActive = true;
+
+        // View Transition Handler
+        function switchToView(viewName) {
+            const views = {
+                landing: document.getElementById('viewLanding'),
+                feed: document.getElementById('viewFeed'),
+                telemetry: document.getElementById('viewTelemetry')
+            };
+
+            Object.keys(views).forEach(key => {
+                if (key === viewName) {
+                    views[key].classList.remove('hidden');
+                    setTimeout(() => views[key].classList.remove('opacity-0'), 20);
+                } else {
+                    views[key].classList.add('opacity-0');
+                    views[key].classList.add('hidden');
+                }
+            });
+
+            activeViewName = viewName;
+            
+            if (viewName === 'feed') {
+                setTimeout(resizeSkyCanvas, 60);
+            }
+        }
+
+        // Starfield Background Animation
+        const starCanvas = document.getElementById('starfieldCanvas');
+        const starCtx = starCanvas.getContext('2d');
+        let stars = [];
+
+        function initStars() {
+            starCanvas.width = window.innerWidth;
+            starCanvas.height = window.innerHeight;
+            stars = [];
+            const count = Math.floor((starCanvas.width * starCanvas.height) / 3000);
+            for (let i = 0; i < count; i++) {
+                stars.push({
+                    x: Math.random() * starCanvas.width,
+                    y: Math.random() * starCanvas.height,
+                    radius: Math.random() * 1.2,
+                    alpha: Math.random(),
+                    speed: 0.005 + Math.random() * 0.015
+                });
+            }
+        }
+
+        function drawStars() {
+            starCtx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+            starCtx.fillStyle = '#ffffff';
+            stars.forEach(s => {
+                s.alpha += s.speed;
+                if (s.alpha > 1 || s.alpha < 0) s.speed = -s.speed;
+                starCtx.globalAlpha = Math.max(0.1, Math.min(1, s.alpha));
+                starCtx.beginPath();
+                starCtx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+                starCtx.fill();
+            });
+            requestAnimationFrame(drawStars);
+        }
+
+        // Sky Map Interactive Canvas Simulation
+        const skyCanvas = document.getElementById('skyMapCanvas');
+        const skyCtx = skyCanvas.getContext('2d');
+
+        const targets = [
+            { name: 'Saturn', ra: 0.35, dec: 0.25, info: 'E 20.8° · 8.504 AU', color: '#67e8f9' },
+            { name: 'M51', ra: -0.38, dec: 0.45, info: 'Whirlpool Galaxy · Mag 8.4', color: '#c084fc' },
+            { name: 'M31', ra: 0.48, dec: -0.18, info: 'Andromeda Galaxy · 2.5M ly', color: '#c084fc' },
+            { name: 'M13', ra: -0.22, dec: -0.28, info: 'Hercules Cluster · Mag 5.8', color: '#c084fc' },
+            { name: 'M57', ra: -0.10, dec: -0.12, info: 'Ring Nebula · Mag 8.8', color: '#c084fc' },
+            { name: 'M27', ra: 0.08, dec: -0.38, info: 'Dumbbell Nebula · Mag 7.5', color: '#c084fc' }
+        ];
+
+        let selectedTarget = targets[0];
+
+        function resizeSkyCanvas() {
+            if (!skyCanvas.parentElement) return;
+            skyCanvas.width = skyCanvas.parentElement.clientWidth;
+            skyCanvas.height = skyCanvas.parentElement.clientHeight;
+            drawSkyMap();
+        }
+
+        function drawSkyMap() {
+            if (activeViewName !== 'feed') return;
+            
+            const w = skyCanvas.width;
+            const h = skyCanvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+            const radius = Math.min(w, h) * 0.42;
+
+            skyCtx.clearRect(0, 0, w, h);
+
+            // Dark space planisphere disc
+            skyCtx.fillStyle = '#030814';
+            skyCtx.beginPath();
+            skyCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+            skyCtx.fill();
+
+            // Altitude Grid Circles
+            skyCtx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
+            skyCtx.lineWidth = 1;
+            [0.3, 0.65, 1.0].forEach(rRatio => {
+                skyCtx.beginPath();
+                skyCtx.arc(cx, cy, radius * rRatio, 0, Math.PI * 2);
+                skyCtx.stroke();
+            });
+
+            // Radial Azimuth Axes
+            skyCtx.strokeStyle = 'rgba(0, 240, 255, 0.25)';
+            skyCtx.beginPath();
+            skyCtx.moveTo(cx - radius, cy); skyCtx.lineTo(cx + radius, cy);
+            skyCtx.moveTo(cx, cy - radius); skyCtx.lineTo(cx, cy + radius);
+            skyCtx.stroke();
+
+            // Cardinal Compass Labels
+            skyCtx.fillStyle = '#00f0ff';
+            skyCtx.font = 'bold 12px JetBrains Mono';
+            skyCtx.fillText('N', cx - 4, cy - radius + 18);
+            skyCtx.fillText('S', cx - 4, cy + radius - 8);
+            skyCtx.fillText('E', cx + radius - 18, cy + 4);
+            skyCtx.fillText('W', cx - radius + 8, cy + 4);
+            skyCtx.fillText('NW', cx - radius * 0.6, cy - radius * 0.6);
+            skyCtx.fillText('NE', cx + radius * 0.52, cy - radius * 0.6);
+            skyCtx.fillText('ZENITH', cx - 20, cy + 24);
+
+            // Deep-Sky Target Diamond Pins
+            targets.forEach(t => {
+                const tx = cx + t.ra * radius * 1.5;
+                const ty = cy + t.dec * radius * 1.5;
+
+                skyCtx.strokeStyle = t.color;
+                skyCtx.lineWidth = 1.5;
+                skyCtx.beginPath();
+                skyCtx.moveTo(tx, ty - 5);
+                skyCtx.lineTo(tx + 5, ty);
+                skyCtx.lineTo(tx, ty + 5);
+                skyCtx.lineTo(tx - 5, ty);
+                skyCtx.closePath();
+                skyCtx.stroke();
+
+                skyCtx.fillStyle = '#ffffff';
+                skyCtx.font = '10px JetBrains Mono';
+                skyCtx.fillText(t.name, tx + 8, ty + 3);
+            });
+
+            // Highlight Target Reticle Box
+            const stx = cx + selectedTarget.ra * radius * 1.5;
+            const sty = cy + selectedTarget.dec * radius * 1.5;
+
+            skyCtx.strokeStyle = '#00f0ff';
+            skyCtx.lineWidth = 2;
+            skyCtx.beginPath();
+            skyCtx.arc(stx, sty, 12, 0, Math.PI * 2);
+            skyCtx.stroke();
+        }
+
+        // Sky Canvas Interactive Target Selection
+        skyCanvas.addEventListener('click', (e) => {
+            const rect = skyCanvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const cx = skyCanvas.width / 2;
+            const cy = skyCanvas.height / 2;
+            const radius = Math.min(skyCanvas.width, skyCanvas.height) * 0.42;
+
+            targets.forEach(t => {
+                const tx = cx + t.ra * radius * 1.5;
+                const ty = cy + t.dec * radius * 1.5;
+                const dist = Math.hypot(mx - tx, my - ty);
+                if (dist < 22) {
+                    selectedTarget = t;
+                    document.getElementById('hudSelectedTarget').innerText = t.name;
+                    document.getElementById('hudCoordinates').innerText = t.info;
+                    drawSkyMap();
+                }
+            });
+        });
+
+        // Live Clocks and Dynamic Latency Fluctuations
+        function startClocks() {
+            setInterval(() => {
+                const now = new Date();
+                
+                // GAST Clock Format
+                const gastHrs = String(now.getUTCHours()).padStart(2, '0');
+                const gastMins = String(now.getUTCMinutes()).padStart(2, '0');
+                const gastSecs = String(now.getUTCSeconds()).padStart(2, '0');
+                document.getElementById('gastClock').innerText = `GAST: ${gastHrs}:${gastMins}:${gastSecs}`;
+
+                // Sidereal Time Counter
+                const siderealSecs = Math.floor(now.getTime() / 1000) % 86400;
+                const hrs = String(Math.floor(siderealSecs / 3600)).padStart(2, '0');
+                const mins = String(Math.floor((siderealSecs % 3600) / 60)).padStart(2, '0');
+                const secs = String(siderealSecs % 60).padStart(2, '0');
+                document.getElementById('siderealClock').innerText = `${hrs}:${mins}:${secs}`;
+            }, 1000);
+
+            // Microservice Latency Fluctuations
+            setInterval(() => {
+                const lat = 135 + Math.floor(Math.random() * 20);
+                document.getElementById('pingValue').innerText = `${lat} ms`;
+                const barWidth = Math.min(100, Math.max(10, (lat / 300) * 100));
+                document.getElementById('pingBar').style.width = `${barWidth}%`;
+            }, 2500);
+
+            // Session Runtime Counter
+            let secCount = 31;
+            setInterval(() => {
+                secCount++;
+                const mins = String(Math.floor(secCount / 60)).padStart(2, '0');
+                const secs = String(secCount % 60).padStart(2, '0');
+                document.getElementById('sessionTimer').innerText = `00:${mins}:${secs}`;
+            }, 1000);
+        }
+
+        // Control Panel UI Handlers
+        function setTrackingRate(btn) {
+            document.querySelectorAll('.tracking-button').forEach(b => {
+                b.className = 'px-3 py-1.5 bg-black/60 border border-slate-700 text-slate-400 text-xs rounded text-center tracking-button';
+            });
+            btn.className = 'px-3 py-1.5 bg-cyan-950 border border-cyan-400 text-cyan-200 text-xs rounded font-bold text-center tracking-button';
+        }
+
+        function setMountProtocol(protocol) {
+            const btnUsb = document.getElementById('btnUsb');
+            const btnBle = document.getElementById('btnBle');
+            const btnSim = document.getElementById('btnSim');
+
+            [btnUsb, btnBle, btnSim].forEach(b => {
+                b.className = 'px-3 py-1 bg-black/60 border border-slate-700 text-slate-300 rounded text-xs flex items-center gap-1.5';
+            });
+
+            if (protocol === 'usb') {
+                btnUsb.className = 'px-3 py-1 bg-cyan-950 border border-cyan-400 text-cyan-200 font-bold rounded text-xs flex items-center gap-1.5';
+            } else if (protocol === 'ble') {
+                btnBle.className = 'px-3 py-1 bg-cyan-950 border border-cyan-400 text-cyan-200 font-bold rounded text-xs flex items-center gap-1.5';
+            } else {
+                btnSim.className = 'px-3 py-1 bg-purple-950/60 border border-purple-500 text-purple-300 font-bold rounded text-xs flex items-center gap-1.5';
+            }
+        }
+
+        function updateLocation(val) {
+            const locations = {
+                mauna: "Mauna Kea Observatories — 19.82°, -155.47° · Elev 4207m",
+                palomar: "Palomar Observatory — 33.35°, -116.86° · Elev 1706m",
+                greenwich: "Royal Observatory Greenwich — 51.47°, 0.00° · Elev 46m",
+                griffith: "Griffith Observatory — 34.11°, -118.30° · Elev 346m",
+                vlt: "Very Large Telescope (VLT) — -24.62°, -70.40° · Elev 2635m"
+            };
+            document.getElementById('currentLocText').innerText = locations[val] || locations.mauna;
+        }
+
+        document.getElementById('opacitySlider').addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('opacityVal').innerText = `${val}%`;
+            document.getElementById('viewTelemetry').style.opacity = val / 100;
+        });
+
+        function setSkyMode(mode) {
+            const cBtn = document.getElementById('modeCasual');
+            const eBtn = document.getElementById('modeExpert');
+            if (mode === 'casual') {
+                cBtn.className = 'px-3 py-1 text-cyan-300 bg-cyan-950/80 font-bold';
+                eBtn.className = 'px-3 py-1 text-slate-400 bg-black/60 hover:text-white border-l border-cyan-500/30';
+            } else {
+                eBtn.className = 'px-3 py-1 text-cyan-300 bg-cyan-950/80 font-bold border-l border-cyan-500/30';
+                cBtn.className = 'px-3 py-1 text-slate-400 bg-black/60 hover:text-white';
+            }
+        }
+
+        function toggleAnimateMode() {
+            animateModeActive = !animateModeActive;
+            const btn = document.getElementById('toggleAnimBtn');
+            btn.innerText = animateModeActive ? 'Active' : 'Disabled';
+            btn.className = animateModeActive 
+                ? 'px-2.5 py-1 bg-cyan-500 text-black font-bold rounded hover:bg-cyan-400' 
+                : 'px-2.5 py-1 bg-slate-800 text-slate-400 rounded';
+        }
+
+        // Window Load Handler
+        window.onload = function() {
+            initStars();
+            drawStars();
+            startClocks();
+            window.addEventListener('resize', () => {
+                initStars();
+                resizeSkyCanvas();
+            });
+        }
+    </script>
+</body>
+</html>
