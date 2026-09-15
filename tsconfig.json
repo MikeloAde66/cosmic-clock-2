@@ -31,5 +31,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "_local-archive", "star-tracker-standalone"]
+  "exclude": ["node_modules", "_local-archive", "star-tracker-standalone", "public/star-tracker"]
 }
