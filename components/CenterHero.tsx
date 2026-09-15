@@ -5,7 +5,7 @@ import CosmicCanvas from './CosmicCanvas';
 import { useTypewriter } from '@/lib/useTypewriter';
 import type { VaultDrawer } from '@/lib/vaultRegistry';
 
-const HERO_TAGLINE = 'Cosmic Creation & Broadcast Hub';
+const HERO_TAGLINE = 'Cosmic Creation & Broadcast Suite';
 
 interface CenterHeroProps {
   onNavigateToVaultDrawer: (drawer: VaultDrawer) => void;
