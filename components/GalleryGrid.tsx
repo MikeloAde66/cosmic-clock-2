@@ -9,10 +9,7 @@ import { useKaliPendingApprovals } from '@/lib/useKaliPendingApprovals';
 import QuantumApprovalModal from './kali/QuantumApprovalModal';
 
 interface GalleryGridProps {
-  onOpenRadio: () => void;
   onOpenPods: () => void;
-  onOpenKali: () => void;
-  onOpenStarTracker: () => void;
   onOpenLetsChat: () => void;
   weatherActive?: boolean;
 }
@@ -829,10 +826,7 @@ function ArrivalSlot({ index, docked, onDock, children }: { index: number; docke
 // non-interactive animated previews (Automations, Merch) reserving the
 // grid's shape until real products land there.
 export default function GalleryGrid({
-  onOpenRadio,
   onOpenPods,
-  onOpenKali,
-  onOpenStarTracker,
   onOpenLetsChat,
   weatherActive,
 }: GalleryGridProps) {
@@ -873,14 +867,14 @@ export default function GalleryGrid({
         style={{ perspective: '1200px' }}
       >
         <ArrivalSlot index={0} docked={docked[0]} onDock={dock}>
-          <button onClick={onOpenRadio} className={cardClassRadio}>
+          <Link href="/radio" className={cardClassRadio}>
             <RadioWaveformCardImage />
             <CardHeader Icon={RadioIcon} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Radio Central</div>
               <p className="mt-1 text-xs text-slate-400">Live streaming stations, curated ambient/cosmic channels.</p>
             </div>
-          </button>
+          </Link>
         </ArrivalSlot>
 
         <ArrivalSlot index={1} docked={docked[1]} onDock={dock}>
@@ -895,14 +889,14 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={2} docked={docked[2]} onDock={dock}>
-          <button onClick={onOpenStarTracker} className={cardClass}>
+          <Link href="/star" className={cardClass}>
             <StarTrackerRadarCardImage />
             <CardHeader Icon={Telescope} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Star Tracker PRO</div>
               <p className="mt-1 text-xs text-slate-400">Live orbital tracking and pass predictions.</p>
             </div>
-          </button>
+          </Link>
         </ArrivalSlot>
 
         <ArrivalSlot index={3} docked={docked[3]} onDock={dock}>
@@ -918,14 +912,14 @@ export default function GalleryGrid({
 
         <ArrivalSlot index={4} docked={docked[4]} onDock={dock}>
           <div className="relative w-full h-full">
-            <button onClick={onOpenKali} className={cardClass}>
+            <Link href="/kali" className={cardClass}>
               <KaliQuantumEquationCardImage />
               <CardHeader Icon={Sparkles} />
               <div className="mt-4">
                 <div className="text-sm font-bold text-white">Ai One</div>
                 <p className="mt-1 text-xs text-slate-400">Ancient technology, quantum physics, epoch cycles.</p>
               </div>
-            </button>
+            </Link>
             {/* Admin-only notification badge for pending real-QPU approvals
                 (see aws/README.md) — a separate control from the card's own
                 button (which opens Kali chat), not nested inside it. */}

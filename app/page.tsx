@@ -289,8 +289,23 @@ useContextMenuShare();
     // ?view=kali — real deep-link for external sites (e.g. the
     // protolabsglobal-main-shell static site's Kali AI card) to land
     // directly on the Kali chat section instead of the default tab.
+    // changeLayoutMode('hub') first: openHomeView alone only sets activeTab,
+    // and the default landing layoutMode is 'gallery' (GalleryGrid, which
+    // ignores activeTab entirely) — without this the Kali sub-view never
+    // actually renders. Mirrors GalleryGrid's own onOpenKali handler.
     if (searchParams.get('view') === 'kali') {
+      changeLayoutMode('hub');
       openHomeView('kali');
+    }
+
+    // /kali and /star (see app/kali/page.tsx, app/star/page.tsx) are real,
+    // shareable URLs for the dashboard's Kali Console and Star Tracker
+    // cards — thin pages that redirect straight back here with these
+    // params, so the cards keep opening the same in-hub views (no
+    // duplicated component tree, no change to what's mounted) instead of
+    // becoming separate standalone pages.
+    if (searchParams.get('tracker') === 'open') {
+      setIsStarTrackerOpen(true);
     }
 
     // Only ever consumed once, on mount.
@@ -468,16 +483,10 @@ useContextMenuShare();
             // unreachable on real (non-tiny) viewport heights.
             <div className="relative flex-1 min-h-0 overflow-hidden">
               <GalleryGrid
-                onOpenRadio={() => router.push('/radio')}
                 onOpenPods={() => {
                   setActiveTab('pods');
                   changeLayoutMode('hub');
                 }}
-                onOpenKali={() => {
-                  changeLayoutMode('hub');
-                  openHomeView('kali');
-                }}
-                onOpenStarTracker={() => setIsStarTrackerOpen(true)}
                 onOpenLetsChat={() => setIsLetsChatOpen(true)}
                 weatherActive={weather.weatherActive}
               />
