@@ -169,8 +169,8 @@ function VuMeter({ analyserRef, label }: { analyserRef: React.RefObject<Analyser
   }, [analyserRef]);
 
   return (
-    <div className="flex flex-col items-center gap-1 w-6 shrink-0">
-      <div className="relative w-2 h-24 overflow-hidden rounded-full bg-slate-900 border border-slate-800">
+    <div className="flex flex-col items-center w-6 gap-1 shrink-0">
+      <div className="relative w-2 h-24 overflow-hidden border rounded-full bg-slate-900 border-slate-800">
         <div
           className="absolute bottom-0 w-full transition-[height] duration-75 ease-out rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]"
           style={{ height: `${(level * 100).toFixed(1)}%` }}
@@ -866,8 +866,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               applyLoad(pending);
             }
           },
-          onStateChange: (event) => {
-            if (ytPollIntervalRef.current !== null) {
+onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== null) {
               window.clearInterval(ytPollIntervalRef.current);
               ytPollIntervalRef.current = null;
             }
@@ -1438,7 +1437,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               Home
             </button>
           )}
-          <h2 className="text-lg font-mono font-extrabold tracking-widest text-white uppercase whitespace-nowrap">
+          <h2 className="font-mono text-lg font-extrabold tracking-widest text-white uppercase whitespace-nowrap">
             STUDIO ONE
           </h2>
         </div>
@@ -1483,7 +1482,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
             </button>
 
             {showOverflowMenu && (
-              <div className="absolute right-0 z-50 py-1 mt-2 border rounded-md shadow-lg w-40 bg-slate-900 border-neutral-700">
+              <div className="absolute right-0 z-50 w-40 py-1 mt-2 border rounded-md shadow-lg bg-slate-900 border-neutral-700">
                 {[
                   { label: 'Load Link', action: loadMedia },
                   ...(activeEmbedUrl.includes('youtube.com')
@@ -1598,7 +1597,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                     </button>
 
                     {showOutputMonitor && (
-                      <div className="absolute left-0 z-50 p-4 mt-2 border shadow-2xl w-64 rounded-xl bg-slate-950 border-neutral-700">
+                      <div className="absolute left-0 z-50 w-64 p-4 mt-2 border shadow-2xl rounded-xl bg-slate-950 border-neutral-700">
                         <div className="flex items-center justify-between mb-3">
                           <span className="font-bold text-slate-300">OUTPUT MONITOR</span>
                           <span className="text-white">{masterVolume}%</span>
@@ -1676,19 +1675,19 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               <div className="flex items-center gap-3">
                 <button
                   onClick={handlePrevTrack}
-                  className="px-4 py-3 font-mono text-xs font-bold transition rounded-lg bg-slate-800 hover:bg-slate-700 text-white"
+                  className="px-4 py-3 font-mono text-xs font-bold text-white transition rounded-lg bg-slate-800 hover:bg-slate-700"
                 >
                   ◀◀
                 </button>
 
                 {activeTrack.embedUrl ? (
-                  <div className="flex-1 py-3 text-sm font-bold tracking-wide text-center rounded-lg bg-slate-950 border border-neutral-700 text-white">
+                  <div className="flex-1 py-3 text-sm font-bold tracking-wide text-center text-white border rounded-lg bg-slate-950 border-neutral-700">
                     ▶ PLAYING IN BROADCAST MONITOR →
                   </div>
                 ) : (
                   <button
                     onClick={() => setIsPlaying(!isPlaying)}
-                    className="flex-1 py-3 text-sm font-bold tracking-wide transition rounded-lg bg-white hover:bg-neutral-200 text-slate-950"
+                    className="flex-1 py-3 text-sm font-bold tracking-wide transition bg-white rounded-lg hover:bg-neutral-200 text-slate-950"
                   >
                     {isPlaying ? 'PAUSE STREAM' : 'PLAY STREAM'}
                   </button>
@@ -1696,7 +1695,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
 
                 <button
                   onClick={handleNextTrack}
-                  className="px-4 py-3 font-mono text-xs font-bold transition rounded-lg bg-slate-800 hover:bg-slate-700 text-white"
+                  className="px-4 py-3 font-mono text-xs font-bold text-white transition rounded-lg bg-slate-800 hover:bg-slate-700"
                 >
                   ▶▶
                 </button>
@@ -1705,7 +1704,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               {showEq && (
                 <div className="pt-3 space-y-3 transition-all border-t border-slate-800">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs tracking-wider uppercase text-white">
+                    <span className="font-mono text-xs tracking-wider text-white uppercase">
                       Parametric Equalizer
                     </span>
                     <div className="flex items-center gap-2">
@@ -1814,7 +1813,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                     <button
                       onClick={(e) => deleteTrack(e, track.id)}
                       title="Delete Track"
-                      className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                      className="p-1 transition-colors text-slate-500 hover:text-red-400"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -1830,7 +1829,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
           {(
             <div className="bg-[#12141a] border-t-2 border-l-2 border-t-white/90 border-l-white/90 border-b-2 border-r-2 border-b-black border-r-black rounded-xl shadow-[-3px_-3px_10px_rgba(255,255,255,0.3),8px_8px_20px_rgba(0,0,0,0.75),inset_1px_1px_2px_rgba(255,255,255,0.2)] p-5 relative z-10 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 font-mono text-xs tracking-wider uppercase text-white">
+                <span className="flex items-center gap-2 font-mono text-xs tracking-wider text-white uppercase">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                   Podcasts & Broadcast Monitor
                 </span>
@@ -2070,7 +2069,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                       ref={broadcastVideoRef}
                       src={localVideoUrl}
                       controls
-                      className="w-full h-full object-cover"
+                      className="object-cover w-full h-full"
                       onPlay={() => setIsPlaying(true)}
                       onPause={() => setIsPlaying(false)}
                       onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
@@ -2086,7 +2085,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                         ref={broadcastVideoRef}
                         src={activeEmbedUrl}
                         controls
-                        className="w-full h-full object-cover"
+                        className="object-cover w-full h-full"
                         onPlay={() => setIsPlaying(true)}
                         onPause={() => setIsPlaying(false)}
                         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
@@ -2188,7 +2187,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               <button
                 type="submit"
                 disabled={isImportingPlaylist}
-                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-white text-black hover:bg-neutral-200 disabled:opacity-50"
+                className="px-4 py-2 font-mono text-xs font-bold text-black bg-white rounded-lg hover:bg-neutral-200 disabled:opacity-50"
               >
                 {isImportingPlaylist ? 'IMPORTING…' : 'IMPORT'}
               </button>
@@ -2221,7 +2220,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-white text-black hover:bg-neutral-200"
+                className="px-4 py-2 font-mono text-xs font-bold text-black bg-white rounded-lg hover:bg-neutral-200"
               >
                 CREATE & OPEN
               </button>
@@ -2272,7 +2271,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
       {showHelpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-lg p-6 space-y-4 border bg-slate-900 border-slate-800 rounded-xl">
-            <h3 className="pb-2 text-lg font-bold border-b text-white border-slate-800">
+            <h3 className="pb-2 text-lg font-bold text-white border-b border-slate-800">
               Pods Hub & Audio Studio Instructions
             </h3>
             <div className="space-y-2 font-sans text-xs leading-relaxed text-slate-300">
@@ -2283,7 +2282,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
             <div className="flex justify-end pt-2 border-t border-slate-800">
               <button
                 onClick={() => setShowHelpModal(false)}
-                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-white text-black"
+                className="px-4 py-2 font-mono text-xs font-bold text-black bg-white rounded-lg"
               >
                 CLOSE
               </button>
