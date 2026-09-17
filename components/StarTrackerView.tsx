@@ -467,8 +467,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
         // RadioPlayerContext's ad gain staging.
         playerVars: { autoplay: 0, playsinline: 1 },
         events: {
-          onReady: (event) => {
-            event.target.setVolume(71);
+onReady: (event: any) => {            event.target.setVolume(71);
           },
         },
       });
@@ -985,7 +984,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   }, [tourActive, tourStepIndex]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col w-full h-full p-4 overflow-y-auto bg-transparent text-slate-100 pointer-events-none">
+    <div className="fixed inset-0 z-50 flex flex-col w-full h-full p-4 overflow-y-auto bg-transparent pointer-events-none text-slate-100">
       {/* No own background/Starfield here — this view is now mounted as a
           transparent HUD layer over StarTrackerProCanvas's WebGL starfield
           (see app/(standalone)/star-tracker/page.tsx), which replaces what
@@ -995,7 +994,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
           each actual content wrapper below re-enables pointer-events-auto
           for its own buttons/panels. */}
 
-      <div className="relative z-10 flex items-center gap-2 mb-4 shrink-0 pointer-events-auto">
+      <div className="relative z-10 flex items-center gap-2 mb-4 pointer-events-auto shrink-0">
         <button
           type="button"
           onClick={onBack}
@@ -1105,7 +1104,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
           </button>
           {/* Casual/Expert only changes display density on the same real
               data below — not a separate feature or data source. */}
-          <div className="flex items-center border rounded-full border-slate-700 overflow-hidden">
+          <div className="flex items-center overflow-hidden border rounded-full border-slate-700">
             {(['casual', 'expert'] as const).map((m) => (
               <button
                 key={m}
@@ -1168,7 +1167,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                   );
                 })()
               ) : (
-                <p className="text-xs text-center text-slate-500 font-mono py-2">
+                <p className="py-2 font-mono text-xs text-center text-slate-500">
                   Connect a telescope above to see live position, drift, and slew telemetry here.
                 </p>
               )}
@@ -1227,7 +1226,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
                     </div>
                   ) : (
                     <div className="flex items-center justify-center border rounded aspect-video border-slate-800 bg-slate-950/60">
-                      <p className="px-4 text-xs text-center font-mono text-slate-500">
+                      <p className="px-4 font-mono text-xs text-center text-slate-500">
                         Paste a YouTube link below — Mars rover clips, Hubble highlights, any stream link — to save and play it here.
                       </p>
                     </div>
@@ -1380,12 +1379,12 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
           {/* Green-coated-optics edge glare — fades in from the bezel rim,
               transparent at center so it doesn't wash out the reticle. */}
           <div
-            className="absolute inset-0 rounded-2xl pointer-events-none"
+            className="absolute inset-0 pointer-events-none rounded-2xl"
             style={{ background: 'radial-gradient(circle, transparent 55%, rgba(16,185,129,0.15) 85%, rgba(6,78,59,0.3) 100%)' }}
           />
           <svg
             viewBox="0 0 100 100"
-            className="absolute inset-0 w-full h-full pointer-events-none transition-transform duration-300 ease-out"
+            className="absolute inset-0 w-full h-full transition-transform duration-300 ease-out pointer-events-none"
             style={{ transform: `rotate(${(view.scale - 1) * 60}deg)` }}
             aria-hidden="true"
           >
