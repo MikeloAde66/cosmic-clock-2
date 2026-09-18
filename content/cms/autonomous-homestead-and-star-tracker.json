@@ -84,7 +84,7 @@
           "title": "Local Intelligence Link",
           "type": "action_node",
           "label": "Open Kali AI →",
-          "target": "kali_ai_interface",
+          "target": "https://aione.pro.protolabsglobal.com",
           "content": "Connect directly to the local Kali AI node to query orbital positions, power telemetry, or local system diagnostics."
         }
       ]
