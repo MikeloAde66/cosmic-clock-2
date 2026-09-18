@@ -190,10 +190,42 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
   // observe — its own onStateChange has to push the signal through
   // explicitly instead, which is what this call does.
   const { pauseForExternalMedia } = useRadioPlayer();
-  const [playlists, setPlaylists] = useState<Playlist[]>(DEFAULT_PLAYLISTS);
+  const [playlists, setPlaylists] = useState<Playlist[]>(() => {
+    if (typeof window === 'undefined') return DEFAULT_PLAYLISTS;
+    const saved = localStorage.getItem('aione_playlists_v2');
+    if (!saved) return DEFAULT_PLAYLISTS;
+    try {
+      return JSON.parse(saved) as Playlist[];
+    } catch (err) {
+      console.error(err);
+      return DEFAULT_PLAYLISTS;
+    }
+  });
   const [activePlaylistId, setActivePlaylistId] = useState<string>('pods');
-  const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
-  const [activeTrack, setActiveTrack] = useState<Track | null>(null);
+  const [tracks, setTracks] = useState<Track[]>(() => {
+    if (typeof window === 'undefined') return INITIAL_TRACKS;
+    const saved = localStorage.getItem('aione_tracks_v2');
+    if (!saved) return INITIAL_TRACKS;
+    try {
+      const parsed: Track[] = JSON.parse(saved);
+      const validTracks = parsed.filter(t => !t.isLocal || t.src.startsWith('http'));
+      return validTracks.length > 0 ? validTracks : INITIAL_TRACKS;
+    } catch (err) {
+      console.error(err);
+      return INITIAL_TRACKS;
+    }
+  });
+  const [activeTrack, setActiveTrack] = useState<Track | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const saved = localStorage.getItem('aione_tracks_v2');
+    if (!saved) return null;
+    try {
+      const parsed: Track[] = JSON.parse(saved);
+      return parsed.filter(t => !t.isLocal || t.src.startsWith('http'))[0] ?? null;
+    } catch {
+      return null;
+    }
+  });
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('autoplay');
 
@@ -387,28 +419,6 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showOverflowMenu]);
-
-  // Persistence Effects (Sanitize Local Storage Blob References)
-  useEffect(() => {
-    const savedPlaylists = localStorage.getItem('aione_playlists_v2');
-    const savedTracks = localStorage.getItem('aione_tracks_v2');
-    if (savedPlaylists) {
-      try { setPlaylists(JSON.parse(savedPlaylists)); } catch (err) { console.error(err); }
-    }
-    if (savedTracks) {
-      try {
-        const parsed: Track[] = JSON.parse(savedTracks);
-        // Clean out invalid blobs from previous browser sessions
-        const validTracks = parsed.filter(t => !t.isLocal || t.src.startsWith('http'));
-        if (validTracks.length > 0) {
-          setTracks(validTracks);
-          setActiveTrack(validTracks[0]);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-  }, []);
 
   // Keep the Broadcast Monitor in sync with the active track whenever it's video-backed
   // (covers initial mount and localStorage restore, not just clicks handled by selectTrack).

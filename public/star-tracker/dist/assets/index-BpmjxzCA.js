@@ -38,4 +38,4 @@ Error generating stack: `+l.message+`
         .animate-azimuth-sweep {
           animation: azimuth-sweep 8s linear infinite;
         }
-      `})]})}function m8(){return p.jsx(h8,{onBack:()=>{window.location.href="https://aione.protolabsglobal.com"}})}t6.createRoot(document.getElementById("root")).render(p.jsx(V5.StrictMode,{children:p.jsx(m8,{})}));
+      `})]})}function m8(){return p.jsx(h8,{onBack:()=>{window.location.href="https://aione.pro.protolabsglobal.com"}})}t6.createRoot(document.getElementById("root")).render(p.jsx(V5.StrictMode,{children:p.jsx(m8,{})}));

@@ -8,7 +8,7 @@ export default function App() {
   return (
     <StarTrackerView
       onBack={() => {
-        window.location.href = 'https://aione.protolabsglobal.com';
+        window.location.href = 'https://aione.pro.protolabsglobal.com';
       }}
     />
   );
