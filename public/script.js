@@ -831,8 +831,7 @@ const OVERLAY_CONTENT = {
 // no app chrome — see cosmic-clock's app/page.tsx). The href on these links
 // stays a real fallback for no-JS/blocked-iframe cases.
 (function authOverlay() {
-  const AUTH_BASE = 'https://aione.pro.protolabsglobal.com/';
-  const overlay = document.getElementById('authOverlay');
+const AUTH_BASE = 'https://startracker.protolabsglobal.com';  const overlay = document.getElementById('authOverlay');
   const frame = document.getElementById('authFrame');
   const closeBtn = document.getElementById('authOverlayClose');
   if (!overlay || !frame || !closeBtn) return;

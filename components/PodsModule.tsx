@@ -306,6 +306,10 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
   const audioCtxRef = useRef<AudioContext | null>(null);
   const filtersRef = useRef<{ [freq: string]: BiquadFilterNode }>({});
   const analyserRef = useRef<AnalyserNode | null>(null);
+  // The analyser is created lazily when playback starts. Mirror it in state
+  // so rendering does not read a ref and React re-renders when it becomes
+  // available.
+  const [visualizerAnalyser, setVisualizerAnalyser] = useState<AnalyserNode | null>(null);
   // Real per-channel VU meters — a ChannelSplitterNode tapped off the same
   // post-panner point as analyserRef above (a parallel fan-out, not part of
   // the audible signal path itself; splitter isn't connected to
@@ -480,7 +484,8 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
   // Audio Context & Equalizer
   const initAudioContext = () => {
     if (!audioCtxRef.current && audioRef.current) {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx = window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
       audioCtxRef.current = ctx;
 
@@ -530,6 +535,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 128;
       analyserRef.current = analyser;
+      setVisualizerAnalyser(analyser);
       panner.connect(analyser);
       analyser.connect(ctx.destination);
 
@@ -847,7 +853,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     };
 
     const bindPlayer = () => {
-      if (ytPlayerRef.current) {
+      if (ytPlayerRef.current && ytContainerRef.current?.firstElementChild) {
         if (ytPlayerReadyRef.current) applyLoad({ videoId, listId });
         else ytPendingLoadRef.current = { videoId, listId };
         return;
@@ -876,7 +882,8 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               applyLoad(pending);
             }
           },
-onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== null) {
+          onStateChange: (event: YouTubePlayerEvent) => {
+            if (ytPollIntervalRef.current !== null) {
               window.clearInterval(ytPollIntervalRef.current);
               ytPollIntervalRef.current = null;
             }
@@ -918,7 +925,7 @@ onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== nu
         document.head.appendChild(script);
       }
     }
-  }, [isYouTubeEmbed, activeEmbedUrl]);
+  }, [isYouTubeEmbed, activeEmbedUrl, pauseForExternalMedia]);
 
   // Tear the player down when leaving the YouTube branch entirely (switched
   // to plain video/audio, or cleared media) — and on unmount.
@@ -930,7 +937,6 @@ onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== nu
     }
     if (ytPlayerRef.current) {
       ytPlayerRef.current.destroy();
-      ytPlayerRef.current = null;
     }
     // destroy() only removes the <iframe> itself, leaving the empty host
     // div (created imperatively in bindPlayer) behind — clear it out too so
@@ -1024,6 +1030,11 @@ onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== nu
   // playlist. This is real frame-differencing, not gesture/hand-tracking ML
   // — it can't tell a wave from someone walking past, only that something
   // changed a lot, all at once.
+  // The next-track callback is declared below the camera effect, so keep its
+  // latest identity in a ref rather than closing over a not-yet-declared
+  // callback.
+  const handleNextTrackRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     if (!isCameraActive) {
       prevFrameRef.current = null;
@@ -1063,7 +1074,7 @@ onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== nu
         if (avgDiff > MOTION_THRESHOLD && !motionCooldownRef.current) {
           motionCooldownRef.current = true;
           setMotionFlash(true);
-          handleNextTrack();
+          handleNextTrackRef.current();
           setTimeout(() => setMotionFlash(false), 1200);
           setTimeout(() => {
             motionCooldownRef.current = false;
@@ -1074,7 +1085,6 @@ onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== nu
     }, 160);
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCameraActive]);
 
   // Parse & load a custom YouTube video/playlist, Internet Archive item, or
@@ -1098,7 +1108,10 @@ onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== nu
 
     const targetPlaylist = activePlaylistId === 'all' ? 'main-playlist' : activePlaylistId;
     const newTrack: Track = {
-      id: `link-${Date.now()}`,
+      // Derive the id from render state rather than reading the clock during
+      // render; this keeps the component pure while remaining stable for the
+      // newly inserted track.
+      id: `link-${tracks.length}-${input}`,
       title: archiveId || input,
       frequency: 'User Stream',
       description: input,
@@ -1186,6 +1199,9 @@ onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== nu
       playlistId: 'main-playlist',
       contentToRead: `### ${pendingTrack.title}\n\nSent from Media Flow.`,
     };
+    // This effect consumes an externally supplied track; these updates are
+    // intentional synchronization rather than render-derived state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTracks((prev) => [newTrack, ...prev]);
     setActivePlaylistId('main-playlist');
     selectTrack(newTrack);
@@ -1244,6 +1260,9 @@ onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== nu
     const currentIndex = filteredTracks.findIndex(t => t.id === activeTrack?.id);
     selectTrack(filteredTracks[(currentIndex + 1) % filteredTracks.length]);
   }, [filteredTracks, activeTrack, selectTrack]);
+  useEffect(() => {
+    handleNextTrackRef.current = handleNextTrack;
+  }, [handleNextTrack]);
 
   const handlePrevTrack = useCallback(() => {
     if (filteredTracks.length === 0) return;
@@ -1420,7 +1439,7 @@ onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== nu
       {activeView === 'visualizer' && (
         <div className="w-full h-[75vh] rounded-2xl overflow-hidden border border-neutral-700">
           <CosmicVisualizer
-            analyser={analyserRef.current}
+            analyser={visualizerAnalyser}
             isPlaying={isPlaying && !activeTrack?.embedUrl}
             trackTitle={activeTrack?.title}
             onBack={() => setActiveView('player')}
@@ -2110,6 +2129,7 @@ onStateChange: (event: any) => {            if (ytPollIntervalRef.current !== nu
                       <iframe
                         key="archive-embed-player"
                         src={activeEmbedUrl}
+                        title="Internet Archive media player"
                         className="w-full h-full border-0"
                         allow="autoplay; fullscreen"
                         allowFullScreen
