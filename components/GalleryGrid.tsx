@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight, Lock, ShieldCheck, X } from 'lucide-react';
+import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight, Lock, ShieldCheck } from 'lucide-react';
 import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
 import WeatherForecastOverlay from './WeatherForecastOverlay';
 import { useKaliPendingApprovals } from '@/lib/useKaliPendingApprovals';
@@ -837,11 +837,6 @@ export default function GalleryGrid({
   const [showWeatherOverlay, setShowWeatherOverlay] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showMediaFlowGate, setShowMediaFlowGate] = useState(false);
-  // Products card: clicking it swaps the card's own content for the
-  // SoundClick player iframe in place, rather than navigating to /products
-  // or opening a separate overlay — toggled back off via the iframe's own
-  // close control.
-  const [showProductsIframe, setShowProductsIframe] = useState(false);
   // Only ever polls anything for a signed-in admin — see the hook itself.
   const { isAdmin, approvals: pendingApprovals, refetch: refetchApprovals } = useKaliPendingApprovals();
   const dock = (i: number) => setDocked((prev) => (prev[i] ? prev : prev.map((v, idx) => (idx === i ? true : v))));
@@ -944,49 +939,14 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={5} docked={docked[5]} onDock={dock}>
-          {showProductsIframe ? (
-            <div className={cardClass}>
-              <button
-                type="button"
-                onClick={() => setShowProductsIframe(false)}
-                className="absolute z-10 text-slate-400 top-3 right-3 hover:text-white"
-                aria-label="Close"
-              >
-                <X size={16} />
-              </button>
-              <iframe
-                id="embedSoundClick"
-                width="100%"
-                height="100%"
-                src="https://www.soundclick.com/artist/external/standalone.cfm?bandID=465834&instructions=25&showHeader"
-                style={{
-                  border: 0,
-                  margin: '0 auto',
-                  outline: 0,
-                  padding: 0,
-                  verticalAlign: 'baseline',
-                  display: 'block',
-                  maxWidth: 1200,
-                  minHeight: 300,
-                  background: 'rgb(0,35,50)',
-                }}
-              >
-                Check out NICOLE cross on SoundClick:{' '}
-                <a href="https://nicolecross.soundclick.com" target="_blank" rel="noopener noreferrer">
-                  https://nicolecross.soundclick.com
-                </a>
-              </iframe>
+          <a href="https://nicolecross.soundclick.com" target="_blank" rel="noopener noreferrer" className={cardClass}>
+            <MatrixRainCardImage />
+            <CardHeader Icon={LayoutGrid} />
+            <div className="mt-4">
+              <div className="text-sm font-bold text-white">Products</div>
+              <p className="mt-1 text-xs text-slate-200">Hardware and kits — browse the full catalog.</p>
             </div>
-          ) : (
-            <button type="button" onClick={() => setShowProductsIframe(true)} className={cardClass}>
-              <MatrixRainCardImage />
-              <CardHeader Icon={LayoutGrid} />
-              <div className="mt-4">
-                <div className="text-sm font-bold text-white">Products</div>
-                <p className="mt-1 text-xs text-slate-200">Hardware and kits — browse the full catalog.</p>
-              </div>
-            </button>
-          )}
+          </a>
         </ArrivalSlot>
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
