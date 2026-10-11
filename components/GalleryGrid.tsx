@@ -938,6 +938,7 @@ export default function GalleryGrid({
           </div>
         </ArrivalSlot>
 
+<<<<<<< HEAD
         <ArrivalSlot index={5} docked={docked[5]} onDock={dock}>
           <a href="https://nicolecross.soundclick.com" target="_blank" rel="noopener noreferrer" className={cardClass}>
             <MatrixRainCardImage />
@@ -949,6 +950,23 @@ export default function GalleryGrid({
           </a>
         </ArrivalSlot>
 
+=======
+<ArrivalSlot index={5} docked={docked[5]} onDock={dock}>
+  <a 
+    href="https://nicolecross.soundclick.com" 
+    target="_blank" 
+    rel="noopener noreferrer" 
+    className={cardClass}
+  >
+    <MatrixRainCardImage />
+    <CardHeader Icon={LayoutGrid} />
+    <div className="mt-4">
+      <div className="text-sm font-bold text-white">Products</div>
+      <p className="mt-1 text-xs text-slate-200">Hardware and kits — browse the full catalog.</p>
+    </div>
+  </a>
+</ArrivalSlot>
+>>>>>>> 2c40381 (Update Products card to link directly to SoundClick)
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
           {/* Was a non-interactive "Automations" reserved slot (no hardware
               product lived here — see lib/hardwareProducts.ts), then
