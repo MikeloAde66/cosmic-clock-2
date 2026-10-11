@@ -972,7 +972,7 @@ export default function GalleryGrid({
                 }}
               >
                 Check out NICOLE cross on SoundClick:{' '}
-                <a href="https://soundclick.com/nicolecross" target="_blank" rel="noopener noreferrer">
+                <a href="https://nicolecross.soundclick.com" target="_blank" rel="noopener noreferrer">
                   https://nicolecross.soundclick.com
                 </a>
               </iframe>
