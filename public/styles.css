@@ -1,0 +1,1474 @@
+/* ============================================================
+   Protolabs Global — single-view shell
+   Brushed-metal header + dark cosmic magazine body.
+   Cyan accents only — no amber/gold anywhere.
+   ============================================================ */
+
+:root {
+  --bg: #020617;
+  --panel: #0b1120;
+  --panel-border: #1e293b;
+  --panel-border-hover: #334155;
+  --cyan: #22d3ee;
+  --cyan-soft: rgba(34, 211, 238, 0.15);
+  --cyan-glow: rgba(34, 211, 238, 0.25);
+  /* Glassmorphic console surfaces (Radio Central panel/cards) — semi-
+     transparent + backdrop-blur instead of the flat --panel fill, with a
+     glowing cyan border baked into the base state, not just a pulse event. */
+  --glass-bg: rgba(11, 17, 32, 0.55);
+  --glass-border: rgba(34, 211, 238, 0.35);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 24px rgba(34, 211, 238, 0.12);
+  --text: #f8fafc;
+  /* Was dim grey (#94a3b8 / #64748b) — brightened to near-white per
+     request, so all small print/taglines pop against the dark backdrop
+     instead of receding into it. */
+  --text-dim: #f0f4f8;
+  --text-faint: #f0f4f8;
+  --radius: 14px;
+
+  /* Default cover scene palette — overridden per-scene by script.js's
+     COVER_SCENES / applyCoverScene(), never hand-edited per deploy. */
+  --nebula-a: #22d3ee;
+  --nebula-b: #6366f1;
+  --nebula-c: #0ea5e9;
+
+  /* Same exact palette as the header's chrome plaque — kept as one set
+     of tokens so the outer shell frame, header bar, and plaque all read
+     as the same machined metal, not three slightly different greys. */
+  --metal-light: #eef2f5;
+  --metal-highlight: #d4d8dd;
+  --metal-mid: #8a929a;
+  --metal-dark: #4a5056;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ---------- shell layout ---------- */
+
+.shell {
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  /* Heavy machined-metal chassis framing the whole viewport — same exact
+     palette as the header's chrome plaque, cycled back to its start
+     color so the gradient reads continuously around all four sides
+     rather than jumping at a seam. Stays constant regardless of which
+     inner view is active — only the content inside flips. */
+  border: 14px solid var(--metal-mid);
+  border-image: linear-gradient(
+    135deg,
+    var(--metal-highlight) 0%,
+    var(--metal-mid) 25%,
+    var(--metal-light) 50%,
+    var(--metal-dark) 75%,
+    var(--metal-highlight) 100%
+  ) 1;
+  /* The cosmic UI sits recessed inside the housing, not flush with it. */
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.8);
+}
+
+/* ---------- view transitions (main shell <-> Radio Central dashboard) ---------- */
+
+.view-container {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  overflow-y: auto;
+  background: var(--bg);
+  transform: perspective(1400px) rotateY(90deg);
+  transform-origin: center;
+  transition: transform 0.6s cubic-bezier(0.77, 0, 0.175, 1), opacity 0.4s ease-in-out;
+}
+
+.view-container.active-view {
+  opacity: 1;
+  pointer-events: auto;
+  transform: perspective(1400px) rotateY(0deg);
+}
+
+#main-landing-view {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+/* ---------- top nav — brushed metal ---------- */
+
+.topnav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px 24px;
+  border-bottom: 1px solid #52525b;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0px, rgba(255, 255, 255, 0.04) 1px, transparent 1px, transparent 3px),
+    linear-gradient(180deg, var(--metal-light) 0%, var(--metal-mid) 45%, var(--metal-dark) 100%);
+  color: #1e2430;
+}
+
+/* Decorative folded-corner detail, top-right of the header — matches the
+   reference mockup's page-curl. Pure CSS triangle, no image asset. */
+.page-curl {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 34px 34px 0;
+  border-color: transparent #f8fafc transparent transparent;
+  filter: drop-shadow(-2px 2px 3px rgba(0, 0, 0, 0.25));
+}
+
+/* Logo + wordmark, integrated directly into the header rather than
+   mounted on its own solid plaque — no transparent PNG logo asset exists
+   in this project yet (see assets/), so the mark itself is still the real
+   CSS-built ring/pyramid below, just without a background container
+   behind it. */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px 6px 8px;
+}
+
+/* ---------- logo mark: chrome ring + rotating 3D pyramid ---------- */
+
+.ptlg-logo {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.ptlg-ring {
+  position: absolute;
+  inset: 0;
+}
+
+.ptlg-pyramid-stage {
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  perspective: 220px;
+}
+
+.ptlg-pyramid {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  /* Slow, smooth, continuous — "intentional" per spec, not a flashy spin. */
+  animation: ptlg-rotate 10s linear infinite;
+}
+
+@keyframes ptlg-rotate {
+  from { transform: rotateX(-16deg) rotateY(0deg); }
+  to   { transform: rotateX(-16deg) rotateY(360deg); }
+}
+
+/* Four triangular faces meeting at an apex — a real 3D tetrahedron, not a
+   flat image. Deep cosmic black + a handful of pinpoint "stars" via
+   layered radial-gradients, same texture language as the canvas starfield
+   elsewhere in this shell. */
+.ptlg-face {
+  display: block;
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  background:
+    radial-gradient(1px 1px at 22% 35%, #fff, transparent 60%),
+    radial-gradient(1px 1px at 68% 22%, #fff, transparent 60%),
+    radial-gradient(1px 1px at 45% 55%, #fff, transparent 60%),
+    radial-gradient(1px 1px at 80% 65%, #fff, transparent 60%),
+    radial-gradient(1px 1px at 15% 75%, #fff, transparent 60%),
+    linear-gradient(145deg, #07070c 0%, #16161f 60%, #0a0a10 100%);
+  transform-origin: 50% 100%;
+  backface-visibility: hidden;
+}
+
+.ptlg-face:nth-child(1) { transform: rotateY(0deg)   translateZ(6px) rotateX(24deg); }
+.ptlg-face:nth-child(2) { transform: rotateY(90deg)  translateZ(6px) rotateX(24deg); }
+.ptlg-face:nth-child(3) { transform: rotateY(180deg) translateZ(6px) rotateX(24deg); }
+.ptlg-face:nth-child(4) { transform: rotateY(270deg) translateZ(6px) rotateX(24deg); }
+
+/* ---------- wordmark: same cosmic-black + starfield-speck texture ---------- */
+
+.ptlg-wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1.08;
+}
+
+.ptlg-line {
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background:
+    radial-gradient(1px 1px at 8% 30%, #fff, transparent 60%),
+    radial-gradient(1px 1px at 24% 70%, #fff, transparent 60%),
+    radial-gradient(1px 1px at 46% 20%, #fff, transparent 60%),
+    radial-gradient(1px 1px at 63% 65%, #fff, transparent 60%),
+    radial-gradient(1px 1px at 82% 35%, #fff, transparent 60%),
+    radial-gradient(1px 1px at 95% 75%, #fff, transparent 60%),
+    linear-gradient(145deg, #07070c, #1b1b26);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ptlg-line + .ptlg-line {
+  font-weight: 700;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+  justify-content: center;
+}
+
+.nav-link {
+  background: none;
+  border: none;
+  color: #3f4652;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 6px 4px;
+  transition: color 0.15s ease;
+}
+
+.nav-link:hover {
+  color: #0f172a;
+}
+
+/* Same rose/pink hue as the real Ai One app's own navbar Donate button,
+   adapted for this header's light brushed-metal background (the real
+   app's bg-rose-950/40 + text-rose-200 assume a dark background and
+   would have almost no contrast here). */
+.nav-donate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border: 1px solid rgba(190, 24, 93, 0.4);
+  border-radius: 999px;
+  background: rgba(190, 24, 93, 0.08);
+  color: #9d174d;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.nav-donate:hover {
+  background: rgba(190, 24, 93, 0.16);
+  border-color: rgba(190, 24, 93, 0.65);
+}
+
+.nav-donate-icon {
+  flex-shrink: 0;
+}
+
+/* Styled to match the "Open Ai One" pill button (.radio-expand below) —
+   rounded pill, cyan border + outer glow, intensifying on hover/focus.
+   Replaces the two unlabeled view-btn icon glyphs that used to sit here
+   (both did the exact same thing, so this consolidates them into one
+   real, labeled button). */
+.nav-pricing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid #00f0ff;
+  border-radius: 999px;
+  color: #00f0ff;
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+  transition: color 0.15s ease, background 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.nav-pricing:hover,
+.nav-pricing:focus-visible {
+  background: rgba(0, 240, 255, 0.12);
+  color: #ffffff;
+  box-shadow: 0 0 25px rgba(0, 240, 255, 1);
+  transform: scale(1.04);
+  outline: none;
+}
+
+.auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn {
+  appearance: none;
+  background: none;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 8px 16px;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+  border: 1px solid rgba(30, 36, 48, 0.3);
+}
+
+.btn-ghost {
+  color: #1e2430;
+}
+
+.btn-ghost:hover {
+  border-color: rgba(30, 36, 48, 0.6);
+}
+
+.btn-solid {
+  background: #0f172a;
+  color: #f8fafc;
+  border-color: #0f172a;
+  font-weight: 700;
+}
+
+.btn-solid:hover {
+  opacity: 0.85;
+}
+
+/* ---------- main grid: canvas + radio panel ---------- */
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  padding: 16px 24px;
+  min-height: 0;
+}
+
+/* ---------- primary visual magazine canvas ---------- */
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  border: 1px solid var(--panel-border);
+  min-height: 0;
+}
+
+/* Modular background layer — one element, swapped wholesale by
+   applyCoverScene() in script.js. Everything text-related lives in
+   .canvas-overlay instead, so a scene swap never touches the overlay. */
+.cover-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-color: #030a1a;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.starfield {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Global ambient layer — sits behind the whole shell (header, radio panel,
+   footer, not just the canvas), z-index: -1 so it never needs any of the
+   real content above it to declare its own stacking order. Sparse/low
+   opacity by design: an ambient wash, not a second focal starfield. */
+.ambient-stars {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.star {
+  position: absolute;
+  background: #fff;
+  border-radius: 50%;
+  animation: twinkle linear infinite;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.9; }
+}
+
+/* Slow-drifting nebula blobs — procedural CSS, not a photo. Colors come
+   from --nebula-a/b/c, set per-scene so this whole layer is swappable
+   without touching markup. */
+.nebula-layer {
+  position: absolute;
+  inset: -10%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 22% 28%, color-mix(in srgb, var(--nebula-a) 75%, transparent), transparent 45%),
+    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--nebula-b) 65%, transparent), transparent 50%),
+    radial-gradient(circle at 55% 70%, color-mix(in srgb, var(--nebula-c) 60%, transparent), transparent 55%);
+  filter: blur(45px);
+  opacity: 0.8;
+  mix-blend-mode: screen;
+  animation: nebula-drift 26s ease-in-out infinite alternate;
+}
+
+@keyframes nebula-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-3%, 2%) scale(1.06); }
+}
+
+.horizon-glow {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: -30%;
+  height: 55%;
+  background: radial-gradient(ellipse at center, var(--cyan-glow), transparent 70%);
+  filter: blur(30px);
+  pointer-events: none;
+}
+
+/* Sits above .cover-scene (both effectively z-index 0, later in DOM order
+   wins) and below .canvas-overlay (z-index 1) — real drifting particles
+   over the static background image, not a second copy of .starfield. */
+#hero-star-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+
+.canvas-overlay {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* Text sits in the top half, over the real photo's dark sky region. */
+  justify-content: flex-start;
+  padding: 48px 36px 32px;
+  /* The coverline list can genuinely be taller than .canvas's own fixed
+     height (confirmed: 552px of real list content in a 294px-tall canvas
+     on a phone viewport) - body/.shell are deliberately overflow:hidden
+     (the "locked layout" chassis/header/footer chrome), so without this,
+     that overflow was completely unreachable, not just visually clipped.
+     overflow-y here (not on .canvas or .shell) scrolls only this text
+     layer - .cover-scene's background image (position: absolute, a
+     sibling behind this) stays full-bleed and un-scrolled either way. */
+  overflow-y: auto;
+}
+
+/* Subtle, localized wash behind the text column only — fades out well
+   before the right edge, so most of the image stays completely
+   untouched. Not a full-canvas scrim. */
+.canvas-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  max-width: 640px;
+  background: linear-gradient(90deg, rgba(2, 6, 23, 0.55) 0%, rgba(2, 6, 23, 0.3) 55%, transparent 100%);
+}
+
+.edition-tag {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin: 0 0 24px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95), 0 4px 16px rgba(0, 0, 0, 0.7);
+}
+
+.coverline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* Locked hero — same look as a coverline, but hardcoded in index.html so
+   it can never be reordered or dropped by a weekly coverConfig.json swap. */
+.cover-hero {
+  margin-bottom: 22px;
+}
+
+.cover-hero-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0 4px 16px;
+  border-left: 3px solid transparent;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.cover-hero-link:hover {
+  border-left-color: var(--cyan);
+  transform: translateX(4px);
+}
+
+.coverline a {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+  border-left: 3px solid transparent;
+  padding-left: 16px;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.coverline a:hover {
+  border-left-color: var(--cyan);
+  transform: translateX(4px);
+}
+
+.coverline-title {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+  font-size: clamp(32px, 5vw, 58px);
+  font-weight: 300;
+  letter-spacing: 0.005em;
+  line-height: 1.05;
+  color: #ffffff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 6px 24px rgba(0, 0, 0, 0.75);
+}
+
+.coverline-sub {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 3px 12px rgba(0, 0, 0, 0.8);
+}
+
+.coverline-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.coverline-play-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--cyan);
+  background: rgba(0, 242, 254, 0.1);
+  color: var(--cyan);
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* Diagnostic badge next to the title — set directly by the click handler
+   (see script.js), not just by offGridAudio's own play/pause events, so
+   it proves the listener fired even if playback itself gets blocked. */
+.coverline-click-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #00f0ff;
+}
+
+/* "Ai, Off Grid and DIY" — the one coverline that's a real standalone
+   player gets a row layout (text left, cover art right) instead of the
+   stacked title/sub every other card uses. */
+.coverline-audio-link {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  cursor: pointer;
+}
+
+.coverline-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coverline-cover {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.35), rgba(99, 102, 241, 0.35));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+}
+
+/* Persistent highlight while the episode is actually playing — the "clear
+   visual feedback on what's currently active" the layout is built for. */
+.coverline-cover.is-playing {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan), 0 0 30px rgba(34, 211, 238, 0.45);
+  transform: scale(1.05);
+}
+
+.coverline-cover-badge {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--bg);
+  background: var(--cyan);
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.coverline-cover.is-playing .coverline-cover-badge {
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .coverline-audio-link {
+    flex-direction: column !important;
+    align-items: flex-start;
+  }
+}
+
+/* ---------- radio central side panel ---------- */
+
+.radio-panel {
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--glass-shadow);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* Brief highlight when a coverline click jumps focus here — makes the
+   scroll read as a real activation, not just a page shift. */
+.radio-panel.panel-pulse {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan), 0 0 40px rgba(34, 211, 238, 0.35);
+}
+
+.radio-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.radio-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+}
+
+.radio-title {
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+}
+
+.radio-live {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--cyan);
+  border: 1px solid var(--cyan);
+  border-radius: 999px;
+  padding: 2px 8px;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+/* Lit green only while audio is actually streaming — toggled by the real
+   radioAudio 'playing'/'pause' events in script.js, not just a click. */
+.radio-live.is-live-active {
+  color: #00e676;
+  border-color: #00e676;
+  background: rgba(0, 230, 118, 0.12);
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.5);
+}
+
+.radio-station-name {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.radio-station-sub {
+  font-size: 10px;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+.radio-spectrum {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 50px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.spectrum-bar {
+  flex: 1;
+  height: 100%;
+  background: var(--cyan);
+  opacity: 0.6;
+  border-radius: 2px;
+  transform-origin: bottom;
+  animation: bounce 1.2s ease-in-out infinite;
+}
+
+/* transform, not a % height — percentage heights on a flex item's cross
+   axis don't reliably resolve against the container here (Safari/Chrome
+   both collapsed these to 0px in testing); scaleY sidesteps that. */
+@keyframes bounce {
+  0%, 100% { transform: scaleY(0.15); }
+  50% { transform: scaleY(0.8); }
+}
+
+.radio-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.radio-play {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--cyan);
+  background: var(--cyan-soft);
+  color: var(--cyan);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.radio-volume {
+  flex: 1;
+  accent-color: var(--cyan);
+}
+
+.channel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--panel-border);
+  padding-top: 12px;
+}
+
+.channel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.channel-row-placeholder {
+  opacity: 0.5;
+}
+
+#sidebarHistoryDailyRow {
+  cursor: pointer;
+}
+
+#sidebarHistoryDailyRow:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.channel-tag {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--cyan);
+}
+
+/* Slow pulse to draw the eye to this one CTA - RGB 34,211,238 is
+   var(--cyan) (#22d3ee) broken out as a triplet so the glow matches the
+   exact same cyan already used for the LIVE badge, spectrum bars, and
+   this button's own hover state, rather than a slightly different
+   electric-cyan shade. */
+@keyframes radioExpandPulse {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(34, 211, 238, 0.4);
+    border-color: rgba(34, 211, 238, 0.5);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(34, 211, 238, 0.9), 0 0 30px rgba(34, 211, 238, 0.4);
+    border-color: rgba(34, 211, 238, 1);
+    transform: scale(1.02);
+  }
+}
+
+.radio-expand {
+  margin-top: auto;
+  background: none;
+  border: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  transition: color 0.15s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  animation: radioExpandPulse 3s infinite ease-in-out;
+}
+
+.radio-expand:hover {
+  animation: none;
+  border-color: var(--cyan);
+  color: var(--cyan);
+  box-shadow: 0 0 25px rgba(34, 211, 238, 1);
+  transform: scale(1.04);
+}
+
+/* ---------- footer metadata bar ---------- */
+
+.footer-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 24px;
+  border-top: 1px solid var(--panel-border);
+  font-size: 10px;
+  color: var(--text-faint);
+  background: rgba(2, 6, 23, 0.85);
+}
+
+.footer-domain {
+  color: var(--text-dim);
+}
+
+.footer-bar a:hover {
+  color: var(--cyan);
+}
+
+.footer-sep {
+  opacity: 0.4;
+}
+
+.footer-social {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ---------- demo overlay ---------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.overlay.open {
+  display: flex;
+}
+
+/* Dark glassmorphism card — translucent + blurred, with a faint metallic
+   edge highlight echoing the header/bezel language rather than a flat
+   panel color. */
+.overlay-card {
+  position: relative;
+  width: min(440px, 90vw);
+  background: linear-gradient(160deg, rgba(20, 28, 46, 0.65), rgba(8, 13, 24, 0.75));
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid rgba(228, 230, 235, 0.18);
+  border-radius: var(--radius);
+  padding: 28px;
+  box-shadow: 0 0 60px rgba(34, 211, 238, 0.12), 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.overlay-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 14px;
+}
+
+.overlay-close:hover {
+  color: var(--text);
+}
+
+.overlay-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--cyan);
+  border: 1px solid rgba(34, 211, 238, 0.5);
+  background: var(--cyan-soft);
+  border-radius: 999px;
+  padding: 4px 10px;
+  margin: 0 0 14px;
+}
+
+.overlay-card h2 {
+  font-size: 19px;
+  margin: 0 0 10px;
+}
+
+.overlay-card p {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.overlay-cta {
+  display: block;
+  text-align: center;
+  margin-top: 18px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: opacity 0.15s ease;
+}
+
+/* Real auth overlay — hosts an iframe pointing at the genuine Ai One
+   Supabase auth modal (?embed=1 mode), not a demo. Sized to fit that
+   modal's real content rather than the fixed 440px demo card above. */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.auth-overlay.open {
+  display: flex;
+}
+
+.auth-overlay-card {
+  position: relative;
+  width: min(420px, 92vw);
+  height: min(600px, 88vh);
+  background: linear-gradient(160deg, rgba(20, 28, 46, 0.85), rgba(8, 13, 24, 0.92));
+  border: 1px solid rgba(228, 230, 235, 0.18);
+  border-radius: var(--radius);
+  box-shadow: 0 0 60px rgba(34, 211, 238, 0.12), 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.auth-overlay-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+}
+
+.auth-overlay-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 13, 24, 0.6);
+  border: 1px solid rgba(228, 230, 235, 0.18);
+  border-radius: 999px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.auth-overlay-close:hover {
+  color: var(--text);
+}
+
+.overlay-cta:hover {
+  opacity: 0.85;
+}
+
+/* ---------- Radio Central dashboard view ---------- */
+/* Same --cyan accent as the rest of the site (not a separate hardcoded
+   shade) so this view reads as part of the same product, not a bolted-on
+   screen. */
+
+#radio-central-view {
+  padding: 28px 32px;
+  box-sizing: border-box;
+  color: var(--text-dim);
+}
+
+.rc-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+}
+
+.rc-badge {
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.rc-title-area {
+  flex: 1;
+}
+
+.rc-title-area h1 {
+  margin: 0;
+  letter-spacing: 0.1em;
+  color: var(--text);
+  font-size: 22px;
+}
+
+.rc-title-area p {
+  margin: 5px 0 0;
+  font-size: 10px;
+  color: var(--cyan);
+  letter-spacing: 0.05em;
+}
+
+.rc-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11px;
+}
+
+.rc-status-pill {
+  color: var(--text-faint);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.rc-back-btn {
+  background: var(--cyan);
+  color: var(--bg);
+  border: none;
+  padding: 9px 16px;
+  font-weight: 700;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+
+.rc-back-btn:hover {
+  opacity: 0.85;
+}
+
+.rc-categories {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+
+.rc-cat {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  color: var(--text-faint);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.rc-cat.active,
+.rc-cat:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.rc-filter-input {
+  margin-left: auto;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  padding: 8px 15px;
+  border-radius: 999px;
+  width: 200px;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.rc-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 20px;
+}
+
+.rc-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.rc-section-label {
+  font-size: 10px;
+  color: var(--cyan);
+  letter-spacing: 0.1em;
+  display: block;
+  margin-bottom: 14px;
+}
+
+.rc-station-row,
+.rc-chan-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px 14px;
+  border-radius: 8px;
+}
+
+.rc-chan-item {
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.rc-chan-item:hover {
+  border-color: var(--panel-border-hover);
+}
+
+/* Currently-loaded-and-playing track in the dynamic playlist (see
+   renderPlaylist() in script.js) — kept in sync with offGridAudio's real
+   play/pause state, not just the click that started it. */
+.rc-chan-item.is-playing {
+  border-color: var(--cyan);
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.rc-chan-item + .rc-chan-item {
+  margin-top: 10px;
+}
+
+.rc-station-badge,
+.rc-chan-logo {
+  background: var(--cyan-soft);
+  color: var(--cyan);
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 11px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.rc-chan-logo-placeholder {
+  color: var(--text-faint);
+  border-color: var(--panel-border-hover);
+  background: transparent;
+}
+
+.rc-station-info h3,
+.rc-chan-item h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.rc-station-info p,
+.rc-chan-item p {
+  margin: 3px 0 0;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.rc-chan-item > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.rc-chan-tag {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--cyan);
+  flex-shrink: 0;
+}
+
+.rc-chan-tag-demo {
+  color: var(--text-faint);
+}
+
+.rc-chan-item[hidden] {
+  display: none;
+}
+
+.rc-tune-btn,
+.rc-footer-tune {
+  margin-left: auto;
+  background: var(--cyan);
+  color: var(--bg);
+  border: none;
+  padding: 9px 16px;
+  font-weight: 700;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 999px;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+}
+
+.rc-tune-btn:hover,
+.rc-footer-tune:hover {
+  opacity: 0.85;
+}
+
+.rc-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.rc-stat-box {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  padding: 14px;
+  text-align: center;
+  border-radius: 10px;
+}
+
+.rc-stat-box h2 {
+  margin: 0;
+  color: var(--cyan);
+  font-size: 18px;
+}
+
+.rc-stat-box span {
+  font-size: 9px;
+  color: var(--text-faint);
+  letter-spacing: 0.05em;
+}
+
+.rc-control-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.rc-play-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--cyan);
+  background: var(--cyan-soft);
+  color: var(--cyan);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.rc-volume-slider-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.rc-slider {
+  flex: 1;
+  accent-color: var(--cyan);
+}
+
+.rc-footer-bar {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 10px;
+}
+
+.rc-footer-now {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.rc-footer-icon {
+  font-size: 18px;
+}
+
+.rc-footer-label {
+  font-size: 9px;
+  color: var(--cyan);
+  letter-spacing: 0.05em;
+}
+
+.rc-footer-now h4 {
+  margin: 2px 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.rc-footer-now p {
+  margin: 0;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 860px) {
+  /* .shell stays fixed at 100vh at every width now — each .view-container
+     scrolls internally (overflow-y: auto) instead of the page growing
+     taller than the viewport, since the two views are absolutely
+     positioned siblings that need a shared, stable frame to flip inside. */
+
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .footer-bar {
+    flex-wrap: wrap;
+  }
+
+  .rc-header {
+    flex-wrap: wrap;
+  }
+
+  .rc-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rc-filter-input {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .rc-footer-bar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}

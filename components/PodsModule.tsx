@@ -169,8 +169,8 @@ function VuMeter({ analyserRef, label }: { analyserRef: React.RefObject<Analyser
   }, [analyserRef]);
 
   return (
-    <div className="flex flex-col items-center gap-1 w-6 shrink-0">
-      <div className="relative w-2 h-24 overflow-hidden rounded-full bg-slate-900 border border-slate-800">
+    <div className="flex flex-col items-center w-6 gap-1 shrink-0">
+      <div className="relative w-2 h-24 overflow-hidden border rounded-full bg-slate-900 border-slate-800">
         <div
           className="absolute bottom-0 w-full transition-[height] duration-75 ease-out rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]"
           style={{ height: `${(level * 100).toFixed(1)}%` }}
@@ -190,10 +190,42 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
   // observe — its own onStateChange has to push the signal through
   // explicitly instead, which is what this call does.
   const { pauseForExternalMedia } = useRadioPlayer();
-  const [playlists, setPlaylists] = useState<Playlist[]>(DEFAULT_PLAYLISTS);
+  const [playlists, setPlaylists] = useState<Playlist[]>(() => {
+    if (typeof window === 'undefined') return DEFAULT_PLAYLISTS;
+    const saved = localStorage.getItem('aione_playlists_v2');
+    if (!saved) return DEFAULT_PLAYLISTS;
+    try {
+      return JSON.parse(saved) as Playlist[];
+    } catch (err) {
+      console.error(err);
+      return DEFAULT_PLAYLISTS;
+    }
+  });
   const [activePlaylistId, setActivePlaylistId] = useState<string>('pods');
-  const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
-  const [activeTrack, setActiveTrack] = useState<Track | null>(null);
+  const [tracks, setTracks] = useState<Track[]>(() => {
+    if (typeof window === 'undefined') return INITIAL_TRACKS;
+    const saved = localStorage.getItem('aione_tracks_v2');
+    if (!saved) return INITIAL_TRACKS;
+    try {
+      const parsed: Track[] = JSON.parse(saved);
+      const validTracks = parsed.filter(t => !t.isLocal || t.src.startsWith('http'));
+      return validTracks.length > 0 ? validTracks : INITIAL_TRACKS;
+    } catch (err) {
+      console.error(err);
+      return INITIAL_TRACKS;
+    }
+  });
+  const [activeTrack, setActiveTrack] = useState<Track | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const saved = localStorage.getItem('aione_tracks_v2');
+    if (!saved) return null;
+    try {
+      const parsed: Track[] = JSON.parse(saved);
+      return parsed.filter(t => !t.isLocal || t.src.startsWith('http'))[0] ?? null;
+    } catch {
+      return null;
+    }
+  });
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('autoplay');
 
@@ -274,6 +306,10 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
   const audioCtxRef = useRef<AudioContext | null>(null);
   const filtersRef = useRef<{ [freq: string]: BiquadFilterNode }>({});
   const analyserRef = useRef<AnalyserNode | null>(null);
+  // The analyser is created lazily when playback starts. Mirror it in state
+  // so rendering does not read a ref and React re-renders when it becomes
+  // available.
+  const [visualizerAnalyser, setVisualizerAnalyser] = useState<AnalyserNode | null>(null);
   // Real per-channel VU meters — a ChannelSplitterNode tapped off the same
   // post-panner point as analyserRef above (a parallel fan-out, not part of
   // the audible signal path itself; splitter isn't connected to
@@ -388,28 +424,6 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showOverflowMenu]);
 
-  // Persistence Effects (Sanitize Local Storage Blob References)
-  useEffect(() => {
-    const savedPlaylists = localStorage.getItem('aione_playlists_v2');
-    const savedTracks = localStorage.getItem('aione_tracks_v2');
-    if (savedPlaylists) {
-      try { setPlaylists(JSON.parse(savedPlaylists)); } catch (err) { console.error(err); }
-    }
-    if (savedTracks) {
-      try {
-        const parsed: Track[] = JSON.parse(savedTracks);
-        // Clean out invalid blobs from previous browser sessions
-        const validTracks = parsed.filter(t => !t.isLocal || t.src.startsWith('http'));
-        if (validTracks.length > 0) {
-          setTracks(validTracks);
-          setActiveTrack(validTracks[0]);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-  }, []);
-
   // Keep the Broadcast Monitor in sync with the active track whenever it's video-backed
   // (covers initial mount and localStorage restore, not just clicks handled by selectTrack).
   // Gated on isActive: Pods stays mounted (hidden) even on other tabs, and
@@ -470,7 +484,8 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
   // Audio Context & Equalizer
   const initAudioContext = () => {
     if (!audioCtxRef.current && audioRef.current) {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx = window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
       audioCtxRef.current = ctx;
 
@@ -520,6 +535,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 128;
       analyserRef.current = analyser;
+      setVisualizerAnalyser(analyser);
       panner.connect(analyser);
       analyser.connect(ctx.destination);
 
@@ -837,7 +853,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     };
 
     const bindPlayer = () => {
-      if (ytPlayerRef.current) {
+      if (ytPlayerRef.current && ytContainerRef.current?.firstElementChild) {
         if (ytPlayerReadyRef.current) applyLoad({ videoId, listId });
         else ytPendingLoadRef.current = { videoId, listId };
         return;
@@ -866,7 +882,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               applyLoad(pending);
             }
           },
-          onStateChange: (event) => {
+          onStateChange: (event: YouTubePlayerEvent) => {
             if (ytPollIntervalRef.current !== null) {
               window.clearInterval(ytPollIntervalRef.current);
               ytPollIntervalRef.current = null;
@@ -909,7 +925,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
         document.head.appendChild(script);
       }
     }
-  }, [isYouTubeEmbed, activeEmbedUrl]);
+  }, [isYouTubeEmbed, activeEmbedUrl, pauseForExternalMedia]);
 
   // Tear the player down when leaving the YouTube branch entirely (switched
   // to plain video/audio, or cleared media) — and on unmount.
@@ -921,7 +937,6 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     }
     if (ytPlayerRef.current) {
       ytPlayerRef.current.destroy();
-      ytPlayerRef.current = null;
     }
     // destroy() only removes the <iframe> itself, leaving the empty host
     // div (created imperatively in bindPlayer) behind — clear it out too so
@@ -1015,6 +1030,11 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
   // playlist. This is real frame-differencing, not gesture/hand-tracking ML
   // — it can't tell a wave from someone walking past, only that something
   // changed a lot, all at once.
+  // The next-track callback is declared below the camera effect, so keep its
+  // latest identity in a ref rather than closing over a not-yet-declared
+  // callback.
+  const handleNextTrackRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     if (!isCameraActive) {
       prevFrameRef.current = null;
@@ -1054,7 +1074,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
         if (avgDiff > MOTION_THRESHOLD && !motionCooldownRef.current) {
           motionCooldownRef.current = true;
           setMotionFlash(true);
-          handleNextTrack();
+          handleNextTrackRef.current();
           setTimeout(() => setMotionFlash(false), 1200);
           setTimeout(() => {
             motionCooldownRef.current = false;
@@ -1065,7 +1085,6 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     }, 160);
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCameraActive]);
 
   // Parse & load a custom YouTube video/playlist, Internet Archive item, or
@@ -1089,7 +1108,10 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
 
     const targetPlaylist = activePlaylistId === 'all' ? 'main-playlist' : activePlaylistId;
     const newTrack: Track = {
-      id: `link-${Date.now()}`,
+      // Derive the id from render state rather than reading the clock during
+      // render; this keeps the component pure while remaining stable for the
+      // newly inserted track.
+      id: `link-${tracks.length}-${input}`,
       title: archiveId || input,
       frequency: 'User Stream',
       description: input,
@@ -1177,6 +1199,9 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
       playlistId: 'main-playlist',
       contentToRead: `### ${pendingTrack.title}\n\nSent from Media Flow.`,
     };
+    // This effect consumes an externally supplied track; these updates are
+    // intentional synchronization rather than render-derived state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTracks((prev) => [newTrack, ...prev]);
     setActivePlaylistId('main-playlist');
     selectTrack(newTrack);
@@ -1235,6 +1260,9 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     const currentIndex = filteredTracks.findIndex(t => t.id === activeTrack?.id);
     selectTrack(filteredTracks[(currentIndex + 1) % filteredTracks.length]);
   }, [filteredTracks, activeTrack, selectTrack]);
+  useEffect(() => {
+    handleNextTrackRef.current = handleNextTrack;
+  }, [handleNextTrack]);
 
   const handlePrevTrack = useCallback(() => {
     if (filteredTracks.length === 0) return;
@@ -1411,7 +1439,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
       {activeView === 'visualizer' && (
         <div className="w-full h-[75vh] rounded-2xl overflow-hidden border border-neutral-700">
           <CosmicVisualizer
-            analyser={analyserRef.current}
+            analyser={visualizerAnalyser}
             isPlaying={isPlaying && !activeTrack?.embedUrl}
             trackTitle={activeTrack?.title}
             onBack={() => setActiveView('player')}
@@ -1438,7 +1466,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               Home
             </button>
           )}
-          <h2 className="text-lg font-mono font-extrabold tracking-widest text-white uppercase whitespace-nowrap">
+          <h2 className="font-mono text-lg font-extrabold tracking-widest text-white uppercase whitespace-nowrap">
             STUDIO ONE
           </h2>
         </div>
@@ -1483,7 +1511,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
             </button>
 
             {showOverflowMenu && (
-              <div className="absolute right-0 z-50 py-1 mt-2 border rounded-md shadow-lg w-40 bg-slate-900 border-neutral-700">
+              <div className="absolute right-0 z-50 w-40 py-1 mt-2 border rounded-md shadow-lg bg-slate-900 border-neutral-700">
                 {[
                   { label: 'Load Link', action: loadMedia },
                   ...(activeEmbedUrl.includes('youtube.com')
@@ -1598,7 +1626,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                     </button>
 
                     {showOutputMonitor && (
-                      <div className="absolute left-0 z-50 p-4 mt-2 border shadow-2xl w-64 rounded-xl bg-slate-950 border-neutral-700">
+                      <div className="absolute left-0 z-50 w-64 p-4 mt-2 border shadow-2xl rounded-xl bg-slate-950 border-neutral-700">
                         <div className="flex items-center justify-between mb-3">
                           <span className="font-bold text-slate-300">OUTPUT MONITOR</span>
                           <span className="text-white">{masterVolume}%</span>
@@ -1676,19 +1704,19 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               <div className="flex items-center gap-3">
                 <button
                   onClick={handlePrevTrack}
-                  className="px-4 py-3 font-mono text-xs font-bold transition rounded-lg bg-slate-800 hover:bg-slate-700 text-white"
+                  className="px-4 py-3 font-mono text-xs font-bold text-white transition rounded-lg bg-slate-800 hover:bg-slate-700"
                 >
                   ◀◀
                 </button>
 
                 {activeTrack.embedUrl ? (
-                  <div className="flex-1 py-3 text-sm font-bold tracking-wide text-center rounded-lg bg-slate-950 border border-neutral-700 text-white">
+                  <div className="flex-1 py-3 text-sm font-bold tracking-wide text-center text-white border rounded-lg bg-slate-950 border-neutral-700">
                     ▶ PLAYING IN BROADCAST MONITOR →
                   </div>
                 ) : (
                   <button
                     onClick={() => setIsPlaying(!isPlaying)}
-                    className="flex-1 py-3 text-sm font-bold tracking-wide transition rounded-lg bg-white hover:bg-neutral-200 text-slate-950"
+                    className="flex-1 py-3 text-sm font-bold tracking-wide transition bg-white rounded-lg hover:bg-neutral-200 text-slate-950"
                   >
                     {isPlaying ? 'PAUSE STREAM' : 'PLAY STREAM'}
                   </button>
@@ -1696,7 +1724,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
 
                 <button
                   onClick={handleNextTrack}
-                  className="px-4 py-3 font-mono text-xs font-bold transition rounded-lg bg-slate-800 hover:bg-slate-700 text-white"
+                  className="px-4 py-3 font-mono text-xs font-bold text-white transition rounded-lg bg-slate-800 hover:bg-slate-700"
                 >
                   ▶▶
                 </button>
@@ -1705,7 +1733,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               {showEq && (
                 <div className="pt-3 space-y-3 transition-all border-t border-slate-800">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs tracking-wider uppercase text-white">
+                    <span className="font-mono text-xs tracking-wider text-white uppercase">
                       Parametric Equalizer
                     </span>
                     <div className="flex items-center gap-2">
@@ -1814,7 +1842,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                     <button
                       onClick={(e) => deleteTrack(e, track.id)}
                       title="Delete Track"
-                      className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                      className="p-1 transition-colors text-slate-500 hover:text-red-400"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -1830,7 +1858,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
           {(
             <div className="bg-[#12141a] border-t-2 border-l-2 border-t-white/90 border-l-white/90 border-b-2 border-r-2 border-b-black border-r-black rounded-xl shadow-[-3px_-3px_10px_rgba(255,255,255,0.3),8px_8px_20px_rgba(0,0,0,0.75),inset_1px_1px_2px_rgba(255,255,255,0.2)] p-5 relative z-10 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 font-mono text-xs tracking-wider uppercase text-white">
+                <span className="flex items-center gap-2 font-mono text-xs tracking-wider text-white uppercase">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                   Podcasts & Broadcast Monitor
                 </span>
@@ -2070,7 +2098,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                       ref={broadcastVideoRef}
                       src={localVideoUrl}
                       controls
-                      className="w-full h-full object-cover"
+                      className="object-cover w-full h-full"
                       onPlay={() => setIsPlaying(true)}
                       onPause={() => setIsPlaying(false)}
                       onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
@@ -2086,7 +2114,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                         ref={broadcastVideoRef}
                         src={activeEmbedUrl}
                         controls
-                        className="w-full h-full object-cover"
+                        className="object-cover w-full h-full"
                         onPlay={() => setIsPlaying(true)}
                         onPause={() => setIsPlaying(false)}
                         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
@@ -2101,6 +2129,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                       <iframe
                         key="archive-embed-player"
                         src={activeEmbedUrl}
+                        title="Internet Archive media player"
                         className="w-full h-full border-0"
                         allow="autoplay; fullscreen"
                         allowFullScreen
@@ -2188,7 +2217,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               <button
                 type="submit"
                 disabled={isImportingPlaylist}
-                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-white text-black hover:bg-neutral-200 disabled:opacity-50"
+                className="px-4 py-2 font-mono text-xs font-bold text-black bg-white rounded-lg hover:bg-neutral-200 disabled:opacity-50"
               >
                 {isImportingPlaylist ? 'IMPORTING…' : 'IMPORT'}
               </button>
@@ -2221,7 +2250,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-white text-black hover:bg-neutral-200"
+                className="px-4 py-2 font-mono text-xs font-bold text-black bg-white rounded-lg hover:bg-neutral-200"
               >
                 CREATE & OPEN
               </button>
@@ -2272,7 +2301,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
       {showHelpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-lg p-6 space-y-4 border bg-slate-900 border-slate-800 rounded-xl">
-            <h3 className="pb-2 text-lg font-bold border-b text-white border-slate-800">
+            <h3 className="pb-2 text-lg font-bold text-white border-b border-slate-800">
               Pods Hub & Audio Studio Instructions
             </h3>
             <div className="space-y-2 font-sans text-xs leading-relaxed text-slate-300">
@@ -2283,7 +2312,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
             <div className="flex justify-end pt-2 border-t border-slate-800">
               <button
                 onClick={() => setShowHelpModal(false)}
-                className="px-4 py-2 font-mono text-xs font-bold rounded-lg bg-white text-black"
+                className="px-4 py-2 font-mono text-xs font-bold text-black bg-white rounded-lg"
               >
                 CLOSE
               </button>

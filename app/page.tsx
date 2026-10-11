@@ -179,7 +179,6 @@ function HomeInner() {
   const [stackChromeSectionVisible, setStackChromeSectionVisible] = useState(false);
   useEffect(() => {
     if (layoutMode !== 'stack') {
-      setStackChromeSectionVisible(false);
       return;
     }
     const targets = [aioneSectionRef.current, radioSectionRef.current, tenForwardSectionRef.current].filter(
@@ -225,7 +224,7 @@ function HomeInner() {
   // standalone /radio route, opts in independently since it never mounts
   // this component at all.
   const isHomeVisible = !isStarTrackerOpen && (layoutMode === 'gallery' || (layoutMode === 'hub' && activeTab === 'aione'));
-  const showBottomChrome = isLetsChatOpen || isHomeVisible || stackChromeSectionVisible;
+  const showBottomChrome = isLetsChatOpen || isHomeVisible || (layoutMode === 'stack' && stackChromeSectionVisible);
   useEffect(() => {
     setPlayerBarHidden(!showBottomChrome);
     return () => setPlayerBarHidden(true);

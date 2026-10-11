@@ -7,8 +7,7 @@
     "next_article": {
       "id": "star_tracker",
       "title": "Star Tracker: Ai, Off Grid and DIY",
-      "url": "https://aione.pro.protolabsglobal.com/star-tracker"
-    },
+"url": "https://startracker.protolabsglobal.com/star-tracker"    },
     "sections": [
       {
         "section_id": "cover_panel",
@@ -40,8 +39,7 @@
       "subtitle": "Stargazers! What if you had a smart telescope in your pocket? Try Star Tracker.",
       "edition": "Cosmic Creator Edition",
       "source": "Proto Labs Global",
-      "url": "https://aione.pro.protolabsglobal.com/star-tracker",
-      "metadata": {
+"url": "https://startracker.protolabsglobal.com/star-tracker"      "metadata": {
         "earth_time": "Mon, Aug 31, 6:54 AM",
         "kali_yuga_year": "5,128"
       },
@@ -84,8 +82,7 @@
           "title": "Local Intelligence Link",
           "type": "action_node",
           "label": "Open Kali AI →",
-          "target": "kali_ai_interface",
-          "content": "Connect directly to the local Kali AI node to query orbital positions, power telemetry, or local system diagnostics."
+"target": "https://kali.protolabsglobal.com",          "content": "Connect directly to the local Kali AI node to query orbital positions, power telemetry, or local system diagnostics."
         }
       ]
     }
