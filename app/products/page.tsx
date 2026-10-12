@@ -19,7 +19,7 @@ export default function ProductsPage() {
   // checkout/thank-you routes stay live for anyone with a direct link.
   const pages: FlipbookPage[] = [
     { key: 'star-tracker', title: 'Star Tracker PRO', render: () => <StarTrackerHeroCard /> },
-    ...HARDWARE_PRODUCTS.filter((product) => !product.delisted).map((product) => ({
+    ...HARDWARE_PRODUCTS.filter((product): boolean => !product.delisted).map((product) => ({
       key: product.id,
       title: product.name,
       render: () => <HardwareProductSlide product={product} />,

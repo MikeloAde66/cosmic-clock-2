@@ -5,8 +5,8 @@
 // bypassing this Next.js route entirely. Soft-fails to both-off when
 // MEDIA_RADIO_STATE_SERVICE_URL is unset or unreachable, same convention
 // as the media catalog/ingest proxies.
+export const dynamic = 'force-static';
 export const runtime = 'nodejs';
-
 export async function GET() {
   const url = process.env.MEDIA_RADIO_STATE_SERVICE_URL;
   if (!url) {
