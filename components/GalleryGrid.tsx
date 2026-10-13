@@ -939,14 +939,20 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={5} docked={docked[5]} onDock={dock}>
-          <a href="https://nicolecross.soundclick.com" target="_blank" rel="noopener noreferrer" className={cardClass}>
+          {/* Muted per explicit instruction — the hardware/flipbook build this
+              used to link to was a dead end, and BeatBrokerz is promoted
+              through social media instead of this card for now. No <a>/onClick
+              at all (not just a disabled-looking link) so it's genuinely
+              inert; visual layout otherwise matches the live "Products" card
+              exactly (same art, icon, copy) per that same instruction. */}
+          <div aria-disabled="true" className={`${cardClass} opacity-60 cursor-not-allowed hover:border-slate-800/80 hover:bg-slate-900/40`}>
             <MatrixRainCardImage />
             <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
-              <div className="text-sm font-bold text-white">BeatBrokerz</div>
-              <p className="mt-1 text-xs text-slate-200">Gospel & acoustic guitar music — stream on SoundClick.</p>
+              <div className="text-sm font-bold text-white">Products</div>
+              <p className="mt-1 text-xs text-slate-200">Hardware and kits — browse the full catalog.</p>
             </div>
-          </a>
+          </div>
         </ArrivalSlot>
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
