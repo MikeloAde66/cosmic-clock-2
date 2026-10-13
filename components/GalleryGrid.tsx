@@ -943,8 +943,8 @@ export default function GalleryGrid({
             <MatrixRainCardImage />
             <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
-              <div className="text-sm font-bold text-white">Products</div>
-              <p className="mt-1 text-xs text-slate-200">Hardware and kits — browse the full catalog.</p>
+              <div className="text-sm font-bold text-white">BeatBrokerz</div>
+              <p className="mt-1 text-xs text-slate-200">Gospel & acoustic guitar music — stream on SoundClick.</p>
             </div>
           </a>
         </ArrivalSlot>

@@ -4,12 +4,17 @@ import React from 'react';
 import Link from 'next/link';
 import { Home } from 'lucide-react';
 import Starfield from '@/components/Starfield';
-import StarTrackerHeroCard from '@/components/StarTrackerHeroCard';
-import HardwareProductSlide from '@/components/HardwareProductSlide';
-import ProductFlipbook, { type FlipbookPage } from '@/components/ProductFlipbook';
-import { HARDWARE_PRODUCTS } from '@/lib/hardwareProducts';
 
+// Was a flip-page carousel browsing several hardware placeholders plus a
+// Star Tracker PRO teaser — Star Tracker now has its own direct dashboard
+// card and nav-independent sales page, and the hardware placeholders were
+// retired, so this route is just the one real thing left for it: BeatBrokerz
+// (Nicole Cross's SoundClick page), matching the dashboard card of the same
+// name. Nothing currently links here (the dashboard card and LeftNav both
+// go straight to SoundClick/Billing respectively) — this exists so a direct
+// or bookmarked /products hit still lands somewhere coherent instead of 404ing.
 export default function ProductsPage() {
+<<<<<<< HEAD
   // Star Tracker PRO gets its own live glassmorphic/typewriter card
   // (StarTrackerHeroCard) instead of the static hero-image + baked-in-CTA
   // convention the hardware slides below still use — its real interactive
@@ -26,6 +31,8 @@ export default function ProductsPage() {
     })),
   ];
 
+=======
+>>>>>>> d95a5d692cdc163f13ffcc0d1125387393eb1254
   return (
     <div className="relative w-full min-h-screen overflow-hidden bg-[#0a0a0c] text-slate-100">
       <Starfield />
@@ -37,8 +44,20 @@ export default function ProductsPage() {
         <Home className="w-3.5 h-3.5" />
         Home
       </Link>
-      <div className="relative z-10 max-w-4xl px-6 py-16 mx-auto">
-        <ProductFlipbook pages={pages} />
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen gap-6 px-6 text-center">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">BeatBrokerz</p>
+          <h1 className="mt-1 text-2xl font-bold text-white">Gospel &amp; acoustic guitar music</h1>
+          <p className="mt-2 text-sm text-neutral-400">Stream the full catalog on SoundClick.</p>
+        </div>
+        <a
+          href="https://nicolecross.soundclick.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-5 py-3 text-sm font-semibold text-black transition bg-white rounded-lg hover:bg-neutral-200"
+        >
+          Open on SoundClick
+        </a>
       </div>
     </div>
   );
