@@ -212,7 +212,7 @@ function HomeInner() {
   // on the dashboard, not straight into Star Tracker PRO. Nothing about
   // the route/layout structure changes — Star Tracker PRO is still one
   // click away via LeftNav's own toggle.
-  const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(false);
+ const [isStarTrackerOpen, setIsStarTrackerOpen] = useState(false);
   const [isIssOpen, setIsIssOpen] = useState(false);
   const [isLetsChatOpen, setIsLetsChatOpen] = useState(false);
   // The things allowed to show GlobalPlayerBar within this SPA route: the
@@ -356,7 +356,7 @@ useContextMenuShare();
           shorter than h-screen claims. dvh tracks the real visible
           height as the browser chrome shows/hides; identical to vh on
           desktop, where there's no such chrome to account for. */}
-      <div className="w-screen h-dvh bg-black">
+      <div className="w-screen bg-black h-dvh">
         <main className="relative flex w-screen h-dvh overflow-hidden bg-[#0a0a0c]">
         <Starfield />
         <LeftNav
