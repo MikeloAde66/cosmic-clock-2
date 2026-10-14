@@ -128,10 +128,10 @@ export const RADIO_STATIONS: RadioStation[] = [
     badge: 'NPR',
     badgeColor: '#1b3668',
   },
-  // Replaces the earlier WALM - Old Time Radio pick — that was a real,
-  // working station, but a small independent Icecast server with genuine
-  // intermittent uptime (confirmed: worked earlier this session, later
-  // couldn't even be reached via curl). .977 Comedy runs on StreamTheWorld,
+  // Replaces an earlier old-time-radio pick — that was a real, working
+  // station, but a small independent streaming server with genuine intermittent
+  // uptime (confirmed: worked earlier this session, later couldn't even be
+  // reached via curl). .977 Comedy runs on StreamTheWorld,
   // an established commercial CDN, real Access-Control-Allow-Origin: *,
   // and verified via an actual browser <audio> canplay event (not just a
   // curl 200 — that alone wasn't enough to catch SomaFM's hotlink block).

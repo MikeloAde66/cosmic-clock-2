@@ -129,19 +129,28 @@ export default function RadioStreams() {
   // separate, DB-backed layer that renders alongside the hand-picked
   // RADIO_STATIONS list below, not a replacement for it.
   const [adminStations, setAdminStations] = useState<LiveRadioStation[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/admin/radio-stations')
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled && Array.isArray(data.stations)) setAdminStations(data.stations);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+useEffect(() => {
+  let cancelled = false;
+  fetch('/api/admin/radio-stations')
+    .then((res) => {
+      if (!res.ok) throw new Error('Network response was not ok');
+      return res.json();
+    })
+    .then((data) => {
+      if (!cancelled && data && Array.isArray(data.stations)) {
+        setAdminStations(data.stations);
+      }
+    })
+    .catch(() => {
+      // Fallback: use built-in static stations so the player works instantly offline
+      if (!cancelled) {
+        setAdminStations([]);
+      }
+    });
+  return () => {
+    cancelled = true;
+  };
+}, []);
   // Live global search (Radio-Browser) — separate from the plain
   // client-side name/tagline filter on the curated RADIO_STATIONS list
   // below, which stays exactly as it worked before. Debounced so this
@@ -267,6 +276,13 @@ export default function RadioStreams() {
     };
   }, []);
 
+  const handleStationSelect = (station: RadioStation) => {
+    if (!('streamUrl' in station) || !station.streamUrl) {
+      return;
+    }
+    handleTuneIn(station);
+  };
+
   const handleTuneIn = (station: RadioStation) => {
     if (playingStation?.id === station.id) {
       togglePlayPause();
@@ -367,7 +383,7 @@ export default function RadioStreams() {
       />
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-mono font-bold tracking-widest text-white uppercase">
+          <h2 className="font-mono text-sm font-bold tracking-widest text-white uppercase">
             Radio Central
           </h2>
           <div className="relative w-64">
@@ -389,8 +405,10 @@ export default function RadioStreams() {
         <div className="flex items-center justify-between px-3 py-2 border rounded-lg border-slate-800 bg-slate-900/40">
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={toggleProgramManager}
               role="switch"
+              aria-label={programManagerEnabled ? 'Disable Program Manager' : 'Enable Program Manager'}
               aria-checked={programManagerEnabled}
               className={`relative h-5 w-9 rounded-full transition-colors ${
                 programManagerEnabled ? 'bg-white' : 'bg-slate-700'
@@ -424,7 +442,7 @@ export default function RadioStreams() {
                 return;
               }
               const station = allStations.find((s) => s.id === e.target.value);
-              if (station) handleTuneIn(station);
+              if (station) handleStationSelect(station);
             }}
             className={`px-3 py-1.5 rounded-lg text-[11px] font-mono uppercase tracking-wide transition whitespace-nowrap border outline-none ${
               activeCategory === 'ALL CHANNELS'
@@ -534,7 +552,7 @@ export default function RadioStreams() {
               {dynamicLoading && <span className="text-[10px] font-mono text-slate-600 animate-pulse">Searching…</span>}
             </div>
             {!dynamicLoading && dynamicResults.length === 0 && (
-              <p className="text-xs font-mono text-slate-600">No live stations found for &quot;{searchQuery.trim()}&quot;.</p>
+              <p className="font-mono text-xs text-slate-600">No live stations found for &quot;{searchQuery.trim()}&quot;.</p>
             )}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {dynamicResults.map((result) => {
@@ -624,7 +642,7 @@ export default function RadioStreams() {
 
                 <div className="flex items-center gap-3">
                   <div
-                    className="flex items-center justify-center w-12 h-12 text-xs font-mono font-black tracking-wider text-white rounded shrink-0"
+                    className="flex items-center justify-center w-12 h-12 font-mono text-xs font-black tracking-wider text-white rounded shrink-0"
                     style={{ backgroundColor: station.badgeColor }}
                   >
                     {station.badge}
@@ -665,7 +683,7 @@ export default function RadioStreams() {
           onClick={() => setShowCreateModal(false)}
         >
           <div
-            className="w-full max-w-sm p-6 space-y-4 border shadow-2xl bg-slate-950 border-cyan-900/50 rounded-xl shadow-[0_0_30px_rgba(0,240,255,0.08)]"
+            className="w-full max-w-sm p-6 space-y-4 border bg-slate-950 border-cyan-900/50 rounded-xl shadow-[0_0_30px_rgba(0,240,255,0.08)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -683,7 +701,7 @@ export default function RadioStreams() {
               className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-900 border-slate-800 text-slate-200 focus:outline-none focus:border-cyan-500/50"
             />
 
-            <label className="flex items-center justify-center gap-2 w-full p-3 text-xs font-mono uppercase tracking-wide border border-dashed rounded-lg cursor-pointer border-slate-700 text-slate-400 hover:border-cyan-700 hover:text-cyan-300 transition">
+            <label className="flex items-center justify-center w-full gap-2 p-3 font-mono text-xs tracking-wide uppercase transition border border-dashed rounded-lg cursor-pointer border-slate-700 text-slate-400 hover:border-cyan-700 hover:text-cyan-300">
               <Upload className="w-3.5 h-3.5" />
               Upload audio files
               <input type="file" accept="audio/*" multiple className="hidden" onChange={handleFileSelect} />

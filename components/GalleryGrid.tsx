@@ -14,23 +14,6 @@ interface GalleryGridProps {
   weatherActive?: boolean;
 }
 
-// Canonical asset paths — real filenames per the explicit mapping given for
-// the actual gallery source images. Drop each file into public/gallery/
-// under its target name and the matching card picks it up automatically:
-// it fades in on top of the gradient cover below, no further code changes
-// needed. Weather has no source image in the mapping (it gets a live NOAA
-// feed instead, see WeatherCardImage below), so it keeps the plain
-// icon-only card body.
-//
-const GALLERY_IMAGES = {
-  radio: '/gallery/radio.png',
-  studio: '/gallery/studio.png',
-  kali: '/gallery/kali.png',
-  starTracker: '/gallery/star-tracker.png',
-  productsCatalog: '/gallery/products-catalog.png',
-  communityHub: '/gallery/community.png',
-} as const;
-
 // Per-card gradient covers — a concrete, finished-looking visual for every
 // slot from the very first paint, rather than an empty/blurred frame while
 // the real public/gallery/ photos are staged. Colors echo each feature's
@@ -225,8 +208,8 @@ const STUDIO_FRAME_INTERVAL_MS = 33;
 
 // Studio One's preview strip — a canvas-driven "4D content creator" scene:
 // an infinite perspective grid drifting toward the viewer (the classic
-// recycled-depth-line technique, same idea as a synthwave/Tron floor) with
-// floating glowing nodes drifting above it. Blue/violet/white accents
+// recycled-depth-line technique, similar to a retro-futurist grid floor)
+// with floating glowing nodes drifting above it. Blue/violet/white accents
 // only — no amber/gold, per this project's standing "zero yellow" rule
 // (see feedback_zero-yellow-crisp-white memory), which explicitly named
 // this card back when it was called Pods.
@@ -393,7 +376,7 @@ function StarTrackerRadarCardImage() {
       {STAR_TRACKER_MINI_STARS.map((star, i) => (
         <div
           key={i}
-          className="absolute rounded-full bg-white gallery-star-twinkle"
+          className="absolute bg-white rounded-full gallery-star-twinkle"
           style={{
             top: star.top,
             left: star.left,
@@ -476,7 +459,7 @@ const DIGITAL_MAGAZINE_TICKER_TEXT = 'Welcome to the Digital Digest. Where Ancie
 // visibly resetting.
 function DigitalMagazineTickerCardImage() {
   return (
-    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-black">
+    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden bg-black shrink-0">
       <div className="absolute inset-0 flex items-center">
         <div className="flex w-max whitespace-nowrap digital-magazine-ticker-track">
           {[0, 1].map((i) => (
@@ -547,7 +530,7 @@ function KaliQuantumEquationCardImage() {
   const fullText = KALI_EQUATIONS[equationIndex % KALI_EQUATIONS.length];
 
   return (
-    <div className="relative flex items-center justify-center w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-black">
+    <div className="relative flex items-center justify-center w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden bg-black shrink-0">
       <div
         className="px-4 font-mono text-base tracking-wide text-center kali-equation-drift metallic-gold-text"
         style={{ textShadow: '0 0 8px rgba(212,175,55,0.45), 0 0 18px rgba(184,134,11,0.28)' }}
@@ -557,53 +540,6 @@ function KaliQuantumEquationCardImage() {
           |
         </span>
       </div>
-    </div>
-  );
-}
-
-// Preview strip — a finished-looking gradient cover (see CARD_GRADIENTS)
-// plus a faint star-dot texture and an oversized icon watermark render
-// immediately, so every card shows a concrete, rich visual from the first
-// paint. The real photo from public/gallery/ fades in on top the moment it
-// loads; until then (or if it 404s) the gradient cover is the whole show,
-// not a fallback that reads as "missing."
-function CardImage({ src, gradient, Icon }: { src: string; gradient: string; Icon: typeof ArrowUpRight }) {
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  // A cached image (very likely on repeat visits/reloads) can finish
-  // loading before React ever attaches the onLoad listener below, so the
-  // browser never fires 'load' again and the photo stays stuck at
-  // opacity-0, showing only the gradient cover underneath as if the real
-  // photo were missing. This ref-callback checks img.complete the instant
-  // the element mounts, covering the case onLoad alone misses.
-  const checkAlreadyLoaded = (img: HTMLImageElement | null) => {
-    if (img && img.complete && img.naturalWidth > 0) setLoaded(true);
-  };
-
-  return (
-    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0" style={{ background: gradient }}>
-      <div
-        className="absolute inset-0 opacity-30"
-        style={{
-          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1.5px)',
-          backgroundSize: '16px 16px',
-        }}
-      />
-      <Icon className="absolute w-20 h-20 -right-3 -bottom-5 text-white/20" />
-      {!failed && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          ref={checkAlreadyLoaded}
-          src={src}
-          alt=""
-          className={`relative object-cover w-full h-full transition-opacity duration-500 ${
-            loaded ? 'opacity-90 group-hover:opacity-100' : 'opacity-0'
-          }`}
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
-        />
-      )}
     </div>
   );
 }
@@ -735,16 +671,16 @@ function AutomationFlowCardImage() {
 }
 
 // Holographic Lab card's preview strip — fills the old HydroNode Builder
-// Kit slot until real merch exists here. A pulsing containment-field orb:
-// concentric field rings expand and fade outward (see holo-ring-pulse in
-// globals.css) around a glowing core, with a rotating dashed ring (reusing
-// star-tracker-mini-sweep's rotate keyframe — same technique, different
-// center) and a soft vertical scan sweep on top.
+// kit slot until real merchandise exists here. A pulsing containment-field
+// orb: concentric field rings expand and fade outward (see holo-ring-pulse
+// in globals.css) around a glowing core, with a rotating dashed ring
+// (reusing star-tracker-mini-sweep's rotate keyframe — same technique,
+// different center) and a soft vertical scan sweep on top.
 function HolographicLabCardImage() {
   const cx = 110;
   const cy = 48;
   return (
-    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-black">
+    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden bg-black shrink-0">
       <svg viewBox="0 0 220 96" className="absolute inset-0 w-full h-full">
         {[0, 1, 2].map((i) => (
           <ellipse
@@ -785,7 +721,7 @@ function CardHeader({ Icon, active }: { Icon: typeof RadioIcon; active?: boolean
   );
 }
 
-// One grid slot — the glassmorphic skeleton frame is rendered immediately
+// One grid slot — the glassy skeleton frame is rendered immediately
 // (so the 3x3 grid's shape is locked in from the first paint) and stays
 // visible, pulsing, behind whichever card hasn't arrived yet. The card
 // itself travels in on its own delay and is pointer-events-none/cursor-wait
@@ -819,12 +755,12 @@ function ArrivalSlot({ index, docked, onDock, children }: { index: number; docke
 // lib/useWeatherLocation.ts — so its card just opens the same inline footer
 // search the umbrella icon does, without leaving Gallery mode). Digital
 // Magazine opens the Media Flow & Audio Center (TenForwardSection) — a real
-// waveform visualizer + Webamp launcher wired to RadioPlayerContext, not
-// the community forum this slot used to hold. The former Ai One Core and
+// waveform visualizer + audio player launcher wired to RadioPlayerContext,
+// not the community forum this slot used to hold. The former Ai One Core and
 // HydroNode Builder Kit hardware listings are gone (no real inventory
 // existed yet — see lib/hardwareProducts.ts); their two slots are
-// non-interactive animated previews (Automations, Merch) reserving the
-// grid's shape until real products land there.
+// non-interactive animated previews (workflow automation, merchandise)
+// reserving the grid's shape until real products land there.
 export default function GalleryGrid({
   onOpenPods,
   onOpenLetsChat,
@@ -845,7 +781,7 @@ export default function GalleryGrid({
     <div className="w-full h-full overflow-y-auto">
       {/* Hero — max-w-5xl mx-auto matches the card grid below so both
           align at the same edges instead of the banner bleeding wider. */}
-      <div className="flex flex-col items-center justify-center max-w-5xl gap-2 px-4 pt-14 pb-10 mx-auto text-center">
+      <div className="flex flex-col items-center justify-center max-w-5xl gap-2 px-4 pb-10 mx-auto text-center pt-14">
         <h1
           className="text-4xl text-white md:text-5xl"
           style={{
@@ -863,7 +799,7 @@ export default function GalleryGrid({
       {/* 9-card grid — perspective on the grid itself is what gives each
           slot's translateZ arrival real depth instead of a flat scale. */}
       <div
-        className="grid max-w-5xl grid-cols-1 gap-4 px-4 pb-14 mx-auto sm:grid-cols-2 lg:grid-cols-3"
+        className="grid max-w-5xl grid-cols-1 gap-4 px-4 mx-auto pb-14 sm:grid-cols-2 lg:grid-cols-3"
         style={{ perspective: '1200px' }}
       >
         <ArrivalSlot index={0} docked={docked[0]} onDock={dock}>
@@ -956,25 +892,25 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
-          {/* Was a non-interactive "Automations" reserved slot (no hardware
+          {/* Was a non-interactive "Automation" reserved slot (no hardware
               product lived here — see lib/hardwareProducts.ts), then
               retitled "Insurance Claims" when repurposed for that demo
               (app/insurance-claims/page.tsx). Card title is back to
-              "Automations" — the automation-pipeline visual and the
+              "Automation" — the automation-pipeline visual and the
               underlying demo (document -> OCR -> fraud detection ->
               decision pipeline) are unchanged, still at /insurance-claims. */}
           <Link href="/insurance-claims" className={cardClass}>
             <AutomationFlowCardImage />
             <CardHeader Icon={ShieldCheck} />
             <div className="mt-4">
-              <div className="text-sm font-bold text-white">Automations</div>
+              <div className="text-sm font-bold text-white">Automation</div>
               <p className="mt-1 text-xs text-slate-200">AI-powered claims demo — document intake, fraud detection, and instant payout calculation.</p>
             </div>
           </Link>
         </ArrivalSlot>
 
         <ArrivalSlot index={7} docked={docked[7]} onDock={dock}>
-          {/* Non-interactive for the same reason as the Automations slot
+          {/* Non-interactive for the same reason as the Automation slot
               above — HydroNode Builder Kit's hardware listing is gone, this
               is a reserved slot for merch. */}
           <div className={`${cardClass} cursor-default hover:border-slate-800/80 hover:bg-slate-900/40`}>
@@ -1004,7 +940,7 @@ export default function GalleryGrid({
                   Digital Magazine
                   <Lock className="w-3 h-3 text-slate-400" aria-label="Admin-only" />
                 </div>
-                <p className="mt-1 text-xs text-slate-200">Media Flow &amp; Audio Center — waveform visualizer, Webamp, and every stream.</p>
+                <p className="mt-1 text-xs text-slate-200">Media Flow &amp; Audio Center — waveform visualizer, web audio player, and every stream.</p>
               </div>
             </button>
           </div>
@@ -1057,7 +993,7 @@ function MediaFlowPasskeyGate({ onClose, onSuccess }: { onClose: () => void; onS
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
-        className="w-full max-w-xs p-5 border rounded-2xl border-slate-800 bg-slate-950/95 shadow-2xl"
+        className="w-full max-w-xs p-5 border shadow-2xl rounded-2xl border-slate-800 bg-slate-950/95"
       >
         <div className="flex items-center gap-2 mb-3 text-sm font-bold text-white">
           <Lock className="w-4 h-4 text-slate-400" />

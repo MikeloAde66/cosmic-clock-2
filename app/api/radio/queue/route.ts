@@ -5,9 +5,8 @@ import { getSupabaseAdmin, VAULT_BUCKET } from '@/lib/supabaseAdmin';
 import { RADIO_STATIONS } from '@/lib/radioStations';
 import { isBannedTrackTitle } from '@/lib/bannedTracks';
 
-export const dynamic = 'force-static';
-export const runtime = 'nodejs';
-// Efraimidis-Spirakis weighted shuffle: each item gets a random key raised
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';// Efraimidis-Spirakis weighted shuffle: each item gets a random key raised
 // to 1/weight, then sorted descending — higher weight biases toward the
 // front without ever guaranteeing order (still feels shuffled).
 function weightedShuffle<T>(items: T[], weightOf: (item: T) => number): T[] {

@@ -322,8 +322,8 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
         params.set('streamUrl', nextStation.streamUrl);
         params.set('name', nextStation.name);
       }
+
       const res = await fetch(`/api/radio/queue?${params.toString()}`);
-      if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
 
       if (data.kind === 'live') {
