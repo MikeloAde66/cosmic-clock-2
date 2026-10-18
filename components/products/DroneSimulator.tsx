@@ -330,6 +330,20 @@ export default function DroneSimulator() {
           // rather than letting Cesium throw on an unauthenticated terrain
           // request.
           terrainProvider: ionToken ? undefined : new Cesium.EllipsoidTerrainProvider(),
+          // Same reasoning, for imagery: leaving this unset makes Cesium
+          // default to its own Ion-hosted World Imagery, which needs a
+          // valid token just like terrain does — without one, Cesium's
+          // *own* internal code throws trying to resolve that asset (not
+          // caught by this try/catch — the Viewer constructor itself
+          // returns fine; the failure is async, deep inside Cesium.js's
+          // tile-loading pipeline, confirmed directly from a real browser's
+          // console: the globe renders as a bare starfield with no surface
+          // at all, not even the EllipsoidTerrainProvider's plain sphere).
+          // OpenStreetMap tiles need no token at all, so use those instead
+          // whenever there's no Ion token configured.
+          imageryProvider: ionToken
+            ? undefined
+            : new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' }),
           animation: false,
           timeline: false,
           baseLayerPicker: false,
