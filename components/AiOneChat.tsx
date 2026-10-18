@@ -74,9 +74,17 @@ interface AiOneChatProps {
   // A token (not just the text) so asking the same question twice in a row
   // still re-triggers the effect.
   prefillQuery?: { text: string; token: number } | null;
+  // Fires with the latest assistant message's plain text on every change —
+  // including mid-stream, since `messages` itself updates per chunk (see the
+  // streaming loop below) — so a caller mirroring this into its own display
+  // (KaliOracleView's math/equation viewport) gets genuinely live updates,
+  // not just the final answer. Called with '' once a fresh/empty thread has
+  // no real user message yet (just the greeting), so that display can fall
+  // back to its own idle state instead of showing the canned greeting.
+  onLatestAssistantMessage?: (text: string) => void;
 }
 
-export default function AiOneChat({ prefillQuery }: AiOneChatProps = {}) {
+export default function AiOneChat({ prefillQuery, onLatestAssistantMessage }: AiOneChatProps = {}) {
   const { language } = useLanguage();
   // A plain function, not a module-level constant — needs the current
   // language at call time, both for the initial mount and for "New chat"
@@ -128,6 +136,20 @@ export default function AiOneChat({ prefillQuery }: AiOneChatProps = {}) {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
+
+  // See onLatestAssistantMessage's own doc comment above — skips firing
+  // real content until there's an actual user message (a fresh/just-loaded
+  // thread only has the greeting), and updates on every streamed chunk.
+  useEffect(() => {
+    if (!onLatestAssistantMessage) return;
+    const hasUserMessage = messages.some((m) => m.role === 'user');
+    if (!hasUserMessage) {
+      onLatestAssistantMessage('');
+      return;
+    }
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+    onLatestAssistantMessage(lastAssistant ? messageText(lastAssistant.content) : '');
+  }, [messages, onLatestAssistantMessage]);
 
   // Autosaves once a real exchange has happened (more than just the
   // greeting) and streaming has settled — not on every streamed token,

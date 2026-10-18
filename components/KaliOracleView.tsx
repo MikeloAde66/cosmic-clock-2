@@ -1,20 +1,24 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Home } from 'lucide-react';
 import AiOneChat from './AiOneChat';
+import AiOneMessageContent from './AiOneMessageContent';
 import Starfield from './Starfield';
 
 // Minimalist "Kali" HUD — the "Quantum Oracle"/epoch theming, the side
 // telemetry panels, and the avatar artwork are gone per explicit
-// instruction; the center of the view is now a plain dark viewport meant
-// for live math/equation output, with AiOneChat (unmodified — same real
-// greeting, streaming, and speech-to-text button) still doing the actual
-// asking/answering underneath it. The viewport itself is a static idle
-// placeholder for now — wiring real LaTeX/2D/3D rendering into it needs
-// AiOneChat to actually expose its latest message upward, which is a
-// separate change from this layout refactor (see summary to the user).
+// instruction; the center of the view is now a plain dark viewport mirroring
+// AiOneChat's latest answer live (via onLatestAssistantMessage, updated on
+// every streamed chunk), rendered through the same real Markdown/KaTeX/
+// diagram pipeline the chat bubbles themselves use (AiOneMessageContent) —
+// not a second, parallel rendering engine. AiOneChat itself is otherwise
+// unmodified: same real greeting, streaming, and speech-to-text button.
 export default function KaliOracleView({ prefillQuery, onGoHome }: KaliOracleViewProps = {}) {
+  // '' means idle (no real question asked yet this thread) — see
+  // onLatestAssistantMessage's doc comment on AiOneChat for exactly when
+  // this fires vs. falls back to idle.
+  const [liveContent, setLiveContent] = useState('');
   return (
     <div className="relative w-full h-full min-h-0 overflow-hidden" style={{ background: '#07090E' }}>
       <Starfield contained starCount={220} />
@@ -48,15 +52,26 @@ export default function KaliOracleView({ prefillQuery, onGoHome }: KaliOracleVie
             readable max, instead of being squeezed into the old
             260px_1fr_260px grid's center track. */}
         <div className="flex flex-col flex-1 w-full max-w-4xl min-h-0 gap-4 mx-auto mt-4 overflow-y-auto">
-          {/* Live math/equation viewport — solid dark canvas, idle
-              placeholder until a real equation/result is wired in. */}
+          {/* Live math/equation viewport — solid dark canvas. Idle
+              placeholder until liveContent has a real answer in it (see
+              onLatestAssistantMessage below); once it does, the exact same
+              Markdown/KaTeX/diagram renderer the chat bubbles use takes
+              over, updating live as the answer streams in. */}
           <div
-            className="flex items-center justify-center w-full border shrink-0 rounded-xl min-h-[320px] sm:min-h-[420px]"
+            className="w-full overflow-y-auto border shrink-0 rounded-xl min-h-[320px] max-h-[55vh] sm:min-h-[420px]"
             style={{ background: '#0A0B0E', border: '1px solid rgba(0,242,254,0.2)' }}
           >
-            <p className="px-6 text-sm text-center font-mono text-slate-500">
-              Enter an equation or prompt to execute…
-            </p>
+            {liveContent.trim() ? (
+              <div className="p-5 text-sm text-slate-100">
+                <AiOneMessageContent text={liveContent} />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center w-full h-full min-h-[320px] sm:min-h-[420px]">
+                <p className="px-6 text-sm text-center font-mono text-slate-500">
+                  Enter an equation or prompt to execute…
+                </p>
+              </div>
+            )}
           </div>
 
           {/* AiOneChat, unmodified — real greeting, real streaming, real
@@ -64,7 +79,7 @@ export default function KaliOracleView({ prefillQuery, onGoHome }: KaliOracleVie
               expand/copy/export toolbar. This is the interactive footer
               the spec asked for; no separate fake input bar. */}
           <div className="flex-1 w-full min-h-0">
-            <AiOneChat prefillQuery={prefillQuery} />
+            <AiOneChat prefillQuery={prefillQuery} onLatestAssistantMessage={setLiveContent} />
           </div>
         </div>
       </div>
