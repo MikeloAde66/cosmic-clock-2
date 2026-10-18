@@ -218,12 +218,16 @@ function HomeInner() {
   // The things allowed to show GlobalPlayerBar within this SPA route: the
   // Media Flow overlay (isLetsChatOpen), the Ai One Home view itself
   // (Gallery mode's grid, or Hub mode's 'aione' tab) as long as Star
-  // Tracker isn't open on top of it, or Stack mode's Home/Radio Central/
-  // Media Flow sections while actually scrolled into view (see
-  // stackChromeSectionVisible above). Radio Central's other home, the
-  // standalone /radio route, opts in independently since it never mounts
-  // this component at all.
-  const isHomeVisible = !isStarTrackerOpen && (layoutMode === 'gallery' || (layoutMode === 'hub' && activeTab === 'aione'));
+  // Tracker isn't open on top of it AND the Kali sub-view isn't open on top
+  // of it either (Kali's own minimalist refactor explicitly drops this bar
+  // — it was showing through from the gallery grid underneath, since Kali
+  // is an overlay on the same 'aione' tab rather than its own tab/layout
+  // mode), or Stack mode's Home/Radio Central/Media Flow sections while
+  // actually scrolled into view (see stackChromeSectionVisible above).
+  // Radio Central's other home, the standalone /radio route, opts in
+  // independently since it never mounts this component at all.
+  const isHomeVisible =
+    !isStarTrackerOpen && cosmicView !== 'kali' && (layoutMode === 'gallery' || (layoutMode === 'hub' && activeTab === 'aione'));
   const showBottomChrome = isLetsChatOpen || isHomeVisible || (layoutMode === 'stack' && stackChromeSectionVisible);
   useEffect(() => {
     setPlayerBarHidden(!showBottomChrome);
