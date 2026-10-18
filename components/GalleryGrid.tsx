@@ -875,20 +875,19 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={5} docked={docked[5]} onDock={dock}>
-          {/* Muted per explicit instruction — the hardware/flipbook build this
-              used to link to was a dead end, and BeatBrokerz is promoted
-              through social media instead of this card for now. No <a>/onClick
-              at all (not just a disabled-looking link) so it's genuinely
-              inert; visual layout otherwise matches the live "Products" card
-              exactly (same art, icon, copy) per that same instruction. */}
-          <div aria-disabled="true" className={`${cardClass} opacity-60 cursor-not-allowed hover:border-slate-800/80 hover:bg-slate-900/40`}>
+          {/* Re-enabled — was muted after the old hardware/flipbook build
+              behind it turned out to be a dead end. /products now hosts a
+              real product (the CesiumJS drone simulator), so this is a
+              normal link again. BeatBrokerz/SoundClick is still promoted
+              through social media rather than this card. */}
+          <Link href="/products" className={cardClass}>
             <MatrixRainCardImage />
             <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
-              <div className="text-sm font-bold text-white">Products</div>
-              <p className="mt-1 text-xs text-slate-200">Hardware and kits — browse the full catalog.</p>
+              <div className="text-sm font-bold text-white">Drone Simulator</div>
+              <p className="mt-1 text-xs text-slate-200">Fly a virtual drone over real-world 3D terrain.</p>
             </div>
-          </div>
+          </Link>
         </ArrivalSlot>
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
