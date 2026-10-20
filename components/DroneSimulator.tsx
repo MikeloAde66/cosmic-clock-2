@@ -2,10 +2,28 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 
+declare global {
+  interface Window {
+    google?: {
+      maps: {
+        importLibrary: (name: string) => Promise<{
+          Map3DElement: new (options: {
+            center: { lat: number; lng: number; altitude: number };
+            range: number;
+            heading: number;
+            tilt: number;
+            mapId: string;
+          }) => HTMLElement;
+        }>;
+      };
+    };
+  }
+}
+
 export default function DroneSimulator() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [telemetry, setTelemetry] = useState({
+  const [telemetry] = useState({
     alt: 80,
     heading: 45,
     speed: 12,
@@ -38,17 +56,15 @@ export default function DroneSimulator() {
 
     async function renderMap3D() {
       try {
-        const { Map3DElement } = await google.maps.importLibrary("maps3d") as google.maps.Maps3DLibrary;
+        const { Map3DElement } = await window.google!.maps.importLibrary("maps3d");
         
-        const map3D = new Map3DElement({
-          center: { lat: 32.7765, lng: -79.9311, altitude: 80 },
-          zoom: 18,
-          heading: 45,
-          tilt: 67.5,
-          mapId: "90f87085c36e379",
-        });
-
-        if (mapRef.current) {
+const map3D = new Map3DElement({
+  center: { lat: 32.7765, lng: -79.9311, altitude: 80 },
+  range: 500, // Replaces zoom: 18
+  heading: 45,
+  tilt: 67.5,
+  mapId: "90f87085c36e379",
+});        if (mapRef.current) {
           mapRef.current.innerHTML = "";
           mapRef.current.appendChild(map3D);
         }
@@ -69,12 +85,12 @@ export default function DroneSimulator() {
     document.body.appendChild(container);
 
     // Dynamically load Three and Cannon scripts if not present
-    if (!(window as any).THREE) {
+    if (!Reflect.get(window, 'THREE')) {
       const threeScript = document.createElement('script');
       threeScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
       document.head.appendChild(threeScript);
     }
-    if (!(window as any).CANNON) {
+    if (!Reflect.get(window, 'CANNON')) {
       const cannonScript = document.createElement('script');
       cannonScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js';
       document.head.appendChild(cannonScript);
