@@ -59,5 +59,5 @@ export default function PlayerSpectrum({ analyserRef, isPlaying, width = 72, hei
     return () => cancelAnimationFrame(animationId);
   }, [analyserRef, isPlaying]);
 
-  return <canvas ref={canvasRef} width={width} height={height} className="opacity-70 pointer-events-none shrink-0" />;
+  return <canvas ref={canvasRef} width={width} height={height} className="pointer-events-none opacity-70 shrink-0" />;
 }

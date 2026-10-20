@@ -29,6 +29,13 @@ import PricingPlans from '@/components/PricingPlans';
 // anywhere in the app yet — see Studio One's localStorage-only architecture.
 const FEATURES = [
   {
+    title: 'Drone Simulator Engine',
+    description: 'Fly virtual drones over 3D real-world photogrammetry with live AI telemetry.',
+    Icon: Globe,
+    href: '/drone-sim.html',
+    comingSoon: false,
+  },
+  {
     title: 'Deep Cosmic Inquiry',
     description: 'Ask Kali about ancient technology, quantum physics, and epoch cycles — real-time AI chat.',
     Icon: Sparkles,
@@ -75,7 +82,7 @@ export default function ProductGatePage() {
       {/* Compact header bar — Home link left, small glowing "Ai One"
           wordmark centered. No badge on the right: there never was one
           anywhere in this app to remove. */}
-      <div className="relative z-20 flex items-center h-14 max-w-5xl px-6 mx-auto">
+      <div className="relative z-20 flex items-center max-w-5xl px-6 mx-auto h-14">
         <Link
           href="/"
           aria-label="Home"
@@ -85,7 +92,7 @@ export default function ProductGatePage() {
           Home
         </Link>
         <span
-          className="absolute -translate-x-1/2 left-1/2 text-base font-bold tracking-wide text-white"
+          className="absolute text-base font-bold tracking-wide text-white -translate-x-1/2 left-1/2"
           style={{ textShadow: '0 0 12px rgba(103,232,249,0.6), 0 0 20px rgba(168,85,247,0.4)' }}
         >
           Ai One
@@ -238,7 +245,7 @@ export default function ProductGatePage() {
         {/* Tier Pricing Cards — the real, live pricing component, not
             placeholder tiers, so this page never drifts out of sync with
             what checkout actually charges. */}
-        <div className="space-y-6 -mx-6">
+        <div className="-mx-6 space-y-6">
           <h2 className="text-xl font-bold text-center text-white">Unlock Your Cosmic Guide</h2>
           <div className="h-[560px] rounded-xl overflow-hidden border border-white/10 bg-white/[0.03] backdrop-blur-xl shadow-[0_0_40px_rgba(99,102,241,0.08)]">
             <PricingPlans />

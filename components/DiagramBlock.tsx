@@ -60,31 +60,37 @@ interface DiagramBlockProps {
 // renderer for those and there's no reason to pretend otherwise.
 export default function DiagramBlock({ lang, code }: DiagramBlockProps) {
   const reactId = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const [svg, setSvg] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    lang: string;
+    code: string;
+    svg: string | null;
+    error: string | null;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setSvg(null);
-      setError(null);
-    });
 
     if (lang === 'mermaid') {
       getMermaid()
         .then((mermaid) => mermaid.render(`mermaid-${reactId}`, code))
         .then(({ svg: rendered }) => {
-          if (!cancelled) setSvg(sanitizeSvg(rendered));
+          if (!cancelled) setResult({ lang, code, svg: sanitizeSvg(rendered), error: null });
         })
         .catch((err) => {
           console.warn('Mermaid render failed, falling back to raw source:', err);
-          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to render diagram.');
+          if (!cancelled) {
+            setResult({
+              lang,
+              code,
+              svg: null,
+              error: err instanceof Error ? err.message : 'Failed to render diagram.',
+            });
+          }
         });
     } else if (lang === 'svg') {
       const sanitized = sanitizeSvg(code);
       queueMicrotask(() => {
-        if (!cancelled) setSvg(sanitized);
+        if (!cancelled) setResult({ lang, code, svg: sanitized, error: null });
       });
     }
 
@@ -93,9 +99,13 @@ export default function DiagramBlock({ lang, code }: DiagramBlockProps) {
     };
   }, [lang, code, reactId]);
 
+  const currentResult = result?.lang === lang && result.code === code ? result : null;
+  const svg = currentResult?.svg ?? null;
+  const error = currentResult?.error ?? null;
+
   if (lang !== 'mermaid' && lang !== 'svg') {
     return (
-      <pre className="p-2 my-1 overflow-x-auto text-xs border rounded bg-black/40 border-slate-800 text-slate-300 whitespace-pre-wrap">
+      <pre className="p-2 my-1 overflow-x-auto text-xs whitespace-pre-wrap border rounded bg-black/40 border-slate-800 text-slate-300">
         {code}
       </pre>
     );
@@ -107,7 +117,7 @@ export default function DiagramBlock({ lang, code }: DiagramBlockProps) {
   // surfaces as a visible broken/error box, just the diagram's intent as text.
   if (error) {
     return (
-      <pre className="p-2 my-1 overflow-x-auto text-xs border rounded bg-black/40 border-slate-800 text-slate-300 whitespace-pre-wrap">
+      <pre className="p-2 my-1 overflow-x-auto text-xs whitespace-pre-wrap border rounded bg-black/40 border-slate-800 text-slate-300">
         {code}
       </pre>
     );
