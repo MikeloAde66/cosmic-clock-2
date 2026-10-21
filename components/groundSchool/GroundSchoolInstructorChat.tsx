@@ -1,13 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Bot, Send } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Bot, Send, Volume2, VolumeX } from 'lucide-react';
 import AiOneMessageContent from '../AiOneMessageContent';
 
 interface ChatTurn {
   role: 'user' | 'assistant';
   text: string;
 }
+
+// Same Kali voice config as AiOneChat/StarTrackerView, but quieter — this
+// widget sits next to lesson text the learner is already reading, so the
+// read-aloud is a low-volume companion, not the primary channel.
+const INSTRUCTOR_VOICE_VOLUME = 0.35;
 
 // A deliberately small, purpose-built Q&A box — not the full AiOneChat
 // widget (its cosmic/quantum/synthesis mode selector, image attachments,
@@ -20,6 +25,56 @@ export default function GroundSchoolInstructorChat() {
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState('');
+  // On by default, at low volume, per request — the learner can mute it.
+  const [voiceOn, setVoiceOn] = useState(true);
+  const lastAutoSpokenIdxRef = useRef<number | null>(null);
+
+  // Speech never outlives this widget.
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const speak = (text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis || !text.trim()) return;
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.pitch = 0.85;
+    utterance.rate = 0.9;
+    utterance.volume = INSTRUCTOR_VOICE_VOLUME;
+
+    const voices = window.speechSynthesis.getVoices();
+    utterance.voice =
+      voices.find((v) => v.name.includes('Google UK English Female') || v.name.includes('Samantha')) ?? voices[0];
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Speak each assistant reply once, right after it finishes streaming.
+  useEffect(() => {
+    if (!voiceOn || isStreaming) return;
+    const idx = turns.length - 1;
+    const last = turns[idx];
+    if (!last || last.role !== 'assistant' || !last.text.trim()) return;
+    if (lastAutoSpokenIdxRef.current === idx) return;
+    lastAutoSpokenIdxRef.current = idx;
+    speak(last.text);
+  }, [isStreaming, turns, voiceOn]);
+
+  const toggleVoice = () => {
+    setVoiceOn((prev) => {
+      const next = !prev;
+      if (!next && typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      return next;
+    });
+  };
 
   const send = async () => {
     const text = input.trim();
@@ -66,7 +121,17 @@ export default function GroundSchoolInstructorChat() {
     <div className="flex flex-col overflow-hidden border rounded-xl border-purple-500/30 bg-slate-950/60">
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-purple-500/20 text-purple-300">
         <Bot className="w-4 h-4" />
-        <span className="text-xs font-bold tracking-wide uppercase">Ask Your Instructor</span>
+        <span className="flex-1 text-xs font-bold tracking-wide uppercase">Ask Your Instructor</span>
+        <button
+          type="button"
+          onClick={toggleVoice}
+          title={voiceOn ? 'Voice: on (low volume) — click to mute' : 'Voice: muted — click to hear replies read aloud'}
+          className={`flex items-center justify-center w-6 h-6 transition rounded ${
+            voiceOn ? 'text-cyan-300 bg-cyan-500/10' : 'text-slate-500 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          {voiceOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+        </button>
       </div>
 
       <div className="flex flex-col gap-3 p-4 overflow-y-auto max-h-80 min-h-[88px]">
