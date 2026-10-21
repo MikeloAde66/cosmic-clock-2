@@ -47,6 +47,13 @@
   <!-- Google 3D Map WebGL Viewport Container -->
   <div id="map" class="absolute inset-0 z-0 w-full h-full"></div>
 
+  <!-- Day/night mood overlay — the photorealistic 3D tiles themselves are
+       pre-baked static imagery (Google's Maps 3D API has no attribute to
+       re-light them against a moving sun), so this is a tinted overlay
+       approximating dusk/night rather than a true re-lit scene. Opacity is
+       driven by startCharlestonClock() below against real local time. -->
+  <div id="daynight-overlay" class="absolute inset-0 z-[5] pointer-events-none transition-opacity duration-[3000ms]" style="background: linear-gradient(to bottom, #0a1430, #1a2340); opacity: 0;"></div>
+
   <!-- Center Target Reticle -->
   <div class="z-10 flex flex-col items-center justify-center target-reticle text-white/70">
     <div class="flex items-center justify-center w-16 h-16 border border-dashed rounded-full border-white/60 animate-spin" style="animation-duration: 12s;">
@@ -68,6 +75,8 @@
       <div>Camera: <span class="font-bold text-amber-400" id="hud-cam">Chase-Cam</span></div>
       <div>Environment: <span class="font-bold text-cyan-400" id="hud-env">Charleston, SC</span></div>
       <div>Model: <span class="font-bold text-cyan-400" id="hud-model">Rescue Quad-v2</span></div>
+      <div>Local Time: <span class="font-bold text-white" id="hud-local-time">--:--</span></div>
+      <div>Sky: <span class="font-bold text-cyan-400" id="hud-sky-phase">Day</span></div>
     </div>
     <div class="mt-3 pt-2 border-t border-slate-700/60 text-[11px] text-slate-400 flex flex-wrap gap-x-2 gap-y-1">
       <span><kbd class="px-1 border rounded bg-slate-800 border-slate-600 text-slate-200">WASD</kbd> Pan/Fly</span>
@@ -130,6 +139,34 @@
         </div>
       </div>
 
+      <!-- Charleston Dining & Culture — curated downtown spots with real
+           (approximate, demo-grade) coordinates; clicking one flies the
+           camera down to ground level facing it. Anything not listed here
+           (any other cuisine) goes through searchPlacesByText() instead —
+           see sendCommand() below. -->
+      <div>
+        <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <i data-lucide="utensils" class="w-4 h-4"></i> Charleston Dining & Culture
+        </h3>
+        <div class="pr-1 space-y-1 overflow-y-auto text-xs max-h-40">
+          <button onclick="flyToVenue('167 Raw')" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
+            🦪 167 Raw (Seafood)
+          </button>
+          <button onclick="flyToVenue('Chubby Fish')" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
+            🐟 Chubby Fish (Seafood)
+          </button>
+          <button onclick="flyToVenue('Gaillard Center')" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
+            🎭 Gaillard Center
+          </button>
+          <button onclick="flyToVenue('Historic Market Street')" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
+            🏛️ Historic Market Street
+          </button>
+          <button onclick="flyToVenue('College of Charleston')" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
+            🎓 College of Charleston
+          </button>
+        </div>
+      </div>
+
       <!-- Emergency Mapping & Route Engine -->
       <div>
         <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -166,7 +203,7 @@
   <!-- Bottom Command Bar -->
   <div class="absolute z-20 w-full max-w-xl px-4 -translate-x-1/2 bottom-6 left-1/2">
     <div class="flex items-center gap-2 p-2 hud-glass rounded-xl">
-      <input type="text" id="cmd-input" placeholder='Ask Kali AI: "Calculate emergency route", "Check wind", or "Fly to Tokyo"' class="w-full px-4 py-2 text-xs border rounded-lg bg-slate-950/80 border-slate-700 font-mono-code text-cyan-200 placeholder-slate-500 focus:outline-none focus:border-cyan-400">
+      <input type="text" id="cmd-input" placeholder='Ask Kali AI: "seafood restaurant downtown", "Fly to Gaillard Center", "Check wind"' class="w-full px-4 py-2 text-xs border rounded-lg bg-slate-950/80 border-slate-700 font-mono-code text-cyan-200 placeholder-slate-500 focus:outline-none focus:border-cyan-400">
       <button onclick="sendCommand()" class="flex items-center gap-1 px-5 py-2 text-xs font-bold tracking-wider text-white transition bg-purple-600 rounded-lg hover:bg-purple-500">
         <span>KALI</span>
         <i data-lucide="zap" class="w-3.5 h-3.5"></i>
@@ -185,6 +222,137 @@
     let heading = 45;
     let tilt = 75;
     let range = 450;
+    let activeMarker = null;
+
+    // Curated downtown Charleston spots — approximate landmark coordinates
+    // for a demo flight path, not surveyed addresses. Matched against user
+    // commands by the alias list in each entry (see findVenue() below).
+    // Anything not in here (any other restaurant/cuisine) falls through to
+    // searchPlacesByText() instead.
+    const CHARLESTON_VENUES = [
+      { name: '167 Raw', lat: 32.7823, lng: -79.9320, category: 'seafood', aliases: ['167 raw'] },
+      { name: 'The Ordinary', lat: 32.7836, lng: -79.9323, category: 'seafood', aliases: ['the ordinary', 'ordinary'] },
+      { name: "Hank's Seafood", lat: 32.7820, lng: -79.9290, category: 'seafood', aliases: ["hank's", 'hanks'] },
+      { name: 'Chubby Fish', lat: 32.7795, lng: -79.9420, category: 'seafood', aliases: ['chubby fish'] },
+      { name: 'The Darling Oyster Bar', lat: 32.7842, lng: -79.9330, category: 'seafood', aliases: ['the darling', 'darling oyster'] },
+      { name: 'Gaillard Center', lat: 32.7847, lng: -79.9348, category: 'culture', aliases: ['gaillard', 'gaillard center', 'performing arts'] },
+      { name: 'Historic Market Street', lat: 32.7817, lng: -79.9280, category: 'culture', aliases: ['market street', 'city market', 'king st', 'king street', 'art galleries'] },
+      { name: 'MUSC', lat: 32.7850, lng: -79.9460, category: 'institution', aliases: ['musc', 'medical university'] },
+      { name: 'Ralph H. Johnson VA Medical Center', lat: 32.7893, lng: -79.9465, category: 'institution', aliases: ['va medical', 'ralph h. johnson', 'ralph h johnson', 'va hospital'] },
+      { name: 'College of Charleston', lat: 32.7836, lng: -79.9370, category: 'institution', aliases: ['college of charleston', 'cofc'] },
+    ];
+
+    // Open-ended cuisine words Kali recognizes as "search, don't guess" —
+    // anything matching here that ISN'T also a curated venue above goes
+    // through the real Places API text search rather than a fabricated result.
+    const CUISINE_KEYWORDS = ['seafood', 'thai', 'mexican', 'asian', 'indian', 'soul food', 'italian', 'bbq', 'barbecue', 'sushi', 'pizza', 'vegan', 'french', 'southern', 'steakhouse', 'breakfast', 'brunch'];
+
+    function findVenue(text) {
+      const lower = text.toLowerCase();
+      return CHARLESTON_VENUES.find((v) => v.aliases.some((a) => lower.includes(a)));
+    }
+
+    // Real Charleston (America/New_York) local time — drives the HUD clock
+    // and the day/night tint overlay. Doesn't re-light the actual 3D tiles
+    // (see the overlay's own comment above); this is the closest real,
+    // live signal available short of that.
+    function startCharlestonClock() {
+      function tick() {
+        const now = new Date();
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }).formatToParts(now);
+        const hour = Number(parts.find((p) => p.type === 'hour').value);
+        const minute = parts.find((p) => p.type === 'minute').value;
+        const timeEl = document.getElementById('hud-local-time');
+        const skyEl = document.getElementById('hud-sky-phase');
+        const overlay = document.getElementById('daynight-overlay');
+        if (timeEl) timeEl.innerText = `${String(hour).padStart(2, '0')}:${minute} ET`;
+        if (!skyEl || !overlay) return;
+
+        // Rough Charleston sunrise/sunset bands by hour — a seasonal almanac
+        // would be more precise, but this is enough for the HUD label and
+        // overlay mood; actual sun position still comes from nothing more
+        // than this clock (the tiles themselves don't move with it).
+        let phase, opacity;
+        if (hour >= 7 && hour < 18) { phase = 'Day'; opacity = 0; }
+        else if ((hour >= 18 && hour < 20) || (hour >= 5 && hour < 7)) { phase = 'Dusk/Dawn'; opacity = 0.25; }
+        else { phase = 'Night'; opacity = 0.55; }
+        skyEl.innerText = phase;
+        overlay.style.opacity = opacity;
+      }
+      tick();
+      setInterval(tick, 60_000);
+    }
+
+    // Drops/moves a single <gmp-marker-3d> pin and animates the camera down
+    // to street level facing it (alt ~12m, tilt 75deg, range 40m) — the
+    // exact figures the task asked for.
+    function flyToGroundLevel(venueLat, venueLng, label) {
+      lat = venueLat;
+      lng = venueLng;
+      alt = 12;
+      tilt = 75;
+      range = 40;
+      heading = 45;
+      updateMapCamera();
+      document.getElementById('hud-env').innerText = label;
+
+      const map3d = document.getElementById('map-3d');
+      if (map3d && window.google?.maps?.maps3d) {
+        if (activeMarker) activeMarker.remove();
+        activeMarker = document.createElement('gmp-marker-3d');
+        activeMarker.setAttribute('position', `${venueLat},${venueLng},12`);
+        activeMarker.setAttribute('title', label);
+        map3d.appendChild(activeMarker);
+      }
+    }
+
+    function flyToVenue(name) {
+      const venue = CHARLESTON_VENUES.find((v) => v.name === name);
+      if (!venue) return;
+      document.getElementById('kali-status').innerText = `Kali AI: Flying to ${venue.name}...`;
+      flyToGroundLevel(venue.lat, venue.lng, venue.name);
+      setTimeout(() => {
+        document.getElementById('kali-status').innerText = `Kali AI: Now over ${venue.name}.`;
+      }, 600);
+    }
+
+    // Open-ended cuisine search via the real Places API (New) JS library —
+    // google.maps.places.Place.searchByText() runs through the loaded SDK
+    // (not a raw fetch), which is what actually supports a client-side call;
+    // the legacy REST Places endpoints aren't CORS-enabled for the browser.
+    // Requires "Places API (New)" enabled + billed on this key's Cloud
+    // project — if it isn't, this surfaces that clearly in the Kali feed
+    // rather than fabricating a result.
+    async function searchPlacesByText(cuisine) {
+      document.getElementById('kali-status').innerText = `Kali AI: Searching for ${cuisine} restaurants downtown...`;
+      if (!window.google?.maps?.places?.Place) {
+        document.getElementById('kali-status').innerText = `Kali AI: Places search isn't available (Places API (New) library didn't load).`;
+        return;
+      }
+      try {
+        const { places } = await google.maps.places.Place.searchByText({
+          textQuery: `${cuisine} restaurant downtown Charleston SC`,
+          fields: ['displayName', 'location'],
+          maxResultCount: 1,
+        });
+        if (!places || places.length === 0) {
+          document.getElementById('kali-status').innerText = `Kali AI: No ${cuisine} restaurants found downtown — try a different search.`;
+          return;
+        }
+        const place = places[0];
+        const name = place.displayName || cuisine;
+        flyToGroundLevel(place.location.lat(), place.location.lng(), name);
+        document.getElementById('kali-status').innerText = `Kali AI: Found ${name}.`;
+      } catch (err) {
+        console.error('Places search failed:', err);
+        document.getElementById('kali-status').innerText = `Kali AI: Places search failed (${err?.message || 'check that Places API (New) is enabled on this key'}).`;
+      }
+    }
 
     function toggleSidebar() {
       const drawer = document.getElementById('left-drawer');
@@ -256,33 +424,54 @@
     function sendCommand() {
       const input = document.getElementById('cmd-input');
       const val = input.value.trim();
-      if (val) {
+      if (!val) return;
+      const lower = val.toLowerCase();
+
+      // Order matters: a named curated venue (restaurant or
+      // culture/institution) wins over a generic cuisine word — "fly to
+      // Chubby Fish" shouldn't fall through to a Places search for "fish".
+      const venue = findVenue(lower);
+      const cuisine = CUISINE_KEYWORDS.find((c) => lower.includes(c));
+
+      if (lower.includes('route') || lower.includes('rescue')) {
         document.getElementById('kali-status').innerText = `Kali AI: Executing "${val}"`;
-        if (val.toLowerCase().includes('route') || val.toLowerCase().includes('rescue')) {
-          plotRescueRoute();
-        } else if (val.toLowerCase().includes('tokyo')) {
-          setEnv('Tokyo, Japan', 35.6586, 139.7454, 150, 90, 75, 500);
-        } else if (val.includes('orlando')) {
-          setEnv('Orlando, FL 3D', 28.5383, -81.3792, 100, 30, 75, 500);
-        }
-        input.value = '';
+        plotRescueRoute();
+      } else if (lower.includes('tokyo')) {
+        document.getElementById('kali-status').innerText = `Kali AI: Executing "${val}"`;
+        setEnv('Tokyo, Japan', 35.6586, 139.7454, 150, 90, 75, 500);
+      } else if (lower.includes('orlando')) {
+        document.getElementById('kali-status').innerText = `Kali AI: Executing "${val}"`;
+        setEnv('Orlando, FL 3D', 28.5383, -81.3792, 100, 30, 75, 500);
+      } else if (venue) {
+        flyToVenue(venue.name);
+      } else if (cuisine) {
+        searchPlacesByText(cuisine);
+      } else {
+        document.getElementById('kali-status').innerText = `Kali AI: Didn't recognize "${val}" — try a cuisine, a downtown venue, or "generate rescue route".`;
       }
+      input.value = '';
     }
 
     function initMap() {
+      // Maps JS API keys are meant to be client-visible (they're secured by
+      // HTTP-referrer restriction in Google Cloud Console, not secrecy) —
+      // but double-check that restriction is actually set on this key, since
+      // an unrestricted one is usable by anyone who views source.
       const apiKey = "AIzaSyBA-jsBzdH2C5JVZV0MQOTvX2zItBhvp7A";
       const script = document.createElement('script');
-      // Loaded with maptype=satellite configuration for true Google Earth imagery
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=beta&libraries=maps3d&maptype=satellite`;
+      // places added for the venue/cuisine search below (Places API (New) —
+      // must be enabled on this key's Google Cloud project for that to work).
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=beta&libraries=maps3d,places&maptype=satellite`;
       script.async = true;
       script.onload = () => {
         const mapContainer = document.getElementById('map');
         if (mapContainer && window.google) {
           mapContainer.innerHTML = `
-            <gmp-map-3d center="${lat},${lng},${alt}" heading="${heading}" tilt="${tilt}" range="${range}" mode="SATELLITE" style="width:100%; height:100%;">
+            <gmp-map-3d id="map-3d" center="${lat},${lng},${alt}" heading="${heading}" tilt="${tilt}" range="${range}" mode="SATELLITE" style="width:100%; height:100%;">
             </gmp-map-3d>
           `;
         }
+        startCharlestonClock();
       };
       document.head.appendChild(script);
     }

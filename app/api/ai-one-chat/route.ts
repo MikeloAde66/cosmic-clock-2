@@ -460,21 +460,73 @@ async function getLiveWeather(latitude?: number, longitude?: number): Promise<st
   }
 }
 
-export async function POST(request: Request) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return new Response('Ai One is not connected yet — no API key configured.', { status: 500 });
-  }
-
-  const { messages, mode, language, voiceMode } = (await request.json()) as {
-    messages: ChatMessage[];
-    mode?: unknown;
-    language?: unknown;
-    voiceMode?: unknown;
+// Status/body shape of whatever the Anthropic SDK actually throws — covers
+// both a real Anthropic.APIError (status + the provider's own error body)
+// and a plain network/parse failure that never got that far.
+function describeProviderError(err: unknown): { httpStatus: number; message: string; providerError: unknown } {
+  const apiErr = err as { status?: number; error?: unknown; message?: string } | null;
+  const status = apiErr?.status;
+  // Only trust the provider's status when it's an actual 4xx — anything else
+  // (network error, 5xx from Anthropic, missing status) is surfaced as a 500
+  // rather than guessing at a client-error code that isn't ours to report.
+  const httpStatus = typeof status === 'number' && status >= 400 && status < 500 ? status : 500;
+  return {
+    httpStatus,
+    message: err instanceof Error ? err.message : String(err),
+    providerError: apiErr?.error ?? null,
   };
+}
 
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return new Response('No messages provided.', { status: 400 });
+export async function POST(request: Request) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  // Model name now comes from the environment (falls back to the previous
+  // hardcoded value) so it can be swapped per-environment without a
+  // redeploy, same as the API key already was.
+  const modelName = process.env.ANTHROPIC_MODEL?.trim() || 'claude-opus-5';
+
+  if (!apiKey) {
+    return Response.json({ error: 'Ai One is not connected yet — ANTHROPIC_API_KEY is not configured.' }, { status: 500 });
   }
+
+  let parsedBody: { messages?: unknown; mode?: unknown; language?: unknown; voiceMode?: unknown };
+  try {
+    parsedBody = await request.json();
+  } catch (err) {
+    console.error('Ai One chat: request body was not valid JSON:', err);
+    return Response.json({ error: 'Request body must be valid JSON.' }, { status: 400 });
+  }
+  const { messages: rawMessages, mode, language, voiceMode } = parsedBody;
+
+  // 1. Message history must be a non-empty array, and every entry must be
+  // shaped the way the Anthropic Messages API actually requires (a valid
+  // role, and non-empty string or content-block-array content) — checked
+  // up front, before any retrieval/ephemeris work or provider call.
+  if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
+    return Response.json({ error: 'messages must be a non-empty array.' }, { status: 400 });
+  }
+  for (let i = 0; i < rawMessages.length; i++) {
+    const m = rawMessages[i];
+    if (!m || typeof m !== 'object' || (m.role !== 'user' && m.role !== 'assistant')) {
+      return Response.json({ error: `messages[${i}] must be an object with role "user" or "assistant".` }, { status: 400 });
+    }
+    if (typeof m.content === 'string') {
+      if (m.content.trim() === '') {
+        return Response.json({ error: `messages[${i}].content cannot be an empty string.` }, { status: 400 });
+      }
+    } else if (Array.isArray(m.content)) {
+      if (m.content.length === 0) {
+        return Response.json({ error: `messages[${i}].content cannot be an empty array.` }, { status: 400 });
+      }
+      for (const block of m.content) {
+        if (block?.type === 'image' && !isSupportedImageType(block.source?.media_type)) {
+          return Response.json({ error: `Unsupported image type: ${block.source?.media_type}` }, { status: 400 });
+        }
+      }
+    } else {
+      return Response.json({ error: `messages[${i}].content must be a string or an array of content blocks.` }, { status: 400 });
+    }
+  }
+  const messages = rawMessages as ChatMessage[];
 
   const resolvedMode: DiscoveryMode = isDiscoveryMode(mode) ? mode : 'synthesis';
   const latestUserQuery = latestUserText(messages);
@@ -498,17 +550,7 @@ export async function POST(request: Request) {
       ? `\n\nLanguage preference: ${LANGUAGE_NAMES[language]}. Respond entirely in ${LANGUAGE_NAMES[language]}, regardless of what language the user's message is written in. Keep product and brand names exactly as given in English (e.g. "Ai One", "Kali AI", "Star Tracker") — don't translate those.`
       : '');
 
-  for (const m of messages) {
-    if (Array.isArray(m.content)) {
-      for (const block of m.content) {
-        if (block.type === 'image' && !isSupportedImageType(block.source.media_type)) {
-          return new Response(`Unsupported image type: ${block.source.media_type}`, { status: 400 });
-        }
-      }
-    }
-  }
-
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = new Anthropic({ apiKey });
 
   const workingMessages: Anthropic.MessageParam[] = messages.map((m) => ({
     role: m.role,
@@ -536,34 +578,70 @@ export async function POST(request: Request) {
   // rare case; ordinary conversation breaks out on the first pass.
   const MAX_TOOL_ITERATIONS = 4;
 
+  // claude-opus-5 defaults to extended thinking, which counts against
+  // max_tokens — on sufficiently complex questions it can consume the
+  // entire budget on internal reasoning alone and stop before emitting any
+  // visible text, surfacing as an empty response with no error. This app
+  // has no UI for showing thinking content anyway, so disable it and let
+  // the full budget go to the actual answer. max_tokens raised from 800 —
+  // the expanded scope explicitly asks for depth on complex questions and
+  // room for ASCII-art diagrams, both of which would get truncated at the
+  // old limit.
+  function openMessageStream() {
+    return client.messages.stream({
+      model: modelName,
+      max_tokens: 2048,
+      thinking: { type: 'disabled' },
+      system: systemPrompt,
+      tools: [QUANTUM_TOOL, SKY_COORDINATES_TOOL, WEATHER_TOOL],
+      messages: workingMessages,
+    });
+  }
+
+  // 3. Make — and start consuming — the first provider call *before*
+  // committing to a streaming HTTP response. client.messages.stream()
+  // itself doesn't touch the network until iterated, so pulling its first
+  // event here is what actually surfaces a bad API key, an unknown model
+  // name, or a malformed-messages 400 from Anthropic. Catching it at this
+  // point means a real provider failure comes back as a clean JSON error
+  // with the right status code, instead of a text/plain stream that's
+  // already open (200, headers sent) just cutting off.
+  let firstStream: ReturnType<typeof openMessageStream>;
+  let firstIterator: AsyncIterator<Anthropic.RawMessageStreamEvent>;
+  let firstEvent: IteratorResult<Anthropic.RawMessageStreamEvent>;
+  try {
+    firstStream = openMessageStream();
+    firstIterator = firstStream[Symbol.asyncIterator]();
+    firstEvent = await firstIterator.next();
+  } catch (err) {
+    const { httpStatus, message, providerError } = describeProviderError(err);
+    // Logged in full, not just message/status — err here is exactly what
+    // the Anthropic SDK/provider call returned or threw.
+    console.error('Ai One chat: Anthropic provider call failed before any text was sent.', err);
+    return Response.json({ error: 'The AI provider request failed.', details: message, providerError }, { status: httpStatus });
+  }
+
   const body = new ReadableStream({
     async start(controller) {
       try {
-        for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-          const stream = client.messages.stream({
-            model: 'claude-opus-5',
-            // Raised from 800 — the expanded scope explicitly asks for depth
-            // on complex questions and room for ASCII-art diagrams, both of
-            // which would get truncated at the old limit.
-            max_tokens: 2048,
-            // claude-opus-5 defaults to extended thinking, which counts
-            // against max_tokens — on sufficiently complex questions it can
-            // consume the entire budget on internal reasoning alone and stop
-            // before emitting any visible text, surfacing as an empty
-            // response with no error. This app has no UI for showing
-            // thinking content anyway, so disable it and let the full
-            // budget go to the actual answer.
-            thinking: { type: 'disabled' },
-            system: systemPrompt,
-            tools: [QUANTUM_TOOL, SKY_COORDINATES_TOOL, WEATHER_TOOL],
-            messages: workingMessages,
-          });
+        let stream = firstStream;
+        let iterator = firstIterator;
+        let nextEvent = firstEvent;
 
-          for await (const event of stream) {
+        for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+          if (i > 0) {
+            stream = openMessageStream();
+            iterator = stream[Symbol.asyncIterator]();
+            nextEvent = await iterator.next();
+          }
+
+          while (!nextEvent.done) {
+            const event = nextEvent.value;
             if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
               sentAnyText = true;
               controller.enqueue(encoder.encode(event.delta.text));
             }
+            nextEvent = await iterator.next();
           }
 
           const finalMessage = await stream.finalMessage();
@@ -620,7 +698,15 @@ export async function POST(request: Request) {
         }
         controller.close();
       } catch (err) {
-        console.error('Ai One stream error:', err);
+        // The HTTP response is already open (200, text/plain) by the time
+        // anything in this loop can throw — a tool-use round's provider
+        // call failing mid-conversation, for instance — so there's no way
+        // to turn this into a 400/500 JSON response at this point; that's
+        // handled above, before the stream opens, for the first call. This
+        // still logs the exact error object rather than swallowing it, and
+        // ends the stream with controller.error (an explicit failure the
+        // client can detect) instead of letting it hang or close silently.
+        console.error('Ai One stream error (mid-stream, after headers already sent):', err);
         controller.error(err);
       }
     },
