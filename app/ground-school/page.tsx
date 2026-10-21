@@ -151,7 +151,7 @@ export default function GroundSchoolPage() {
   }, [progress]);
 
   if (!progress) {
-    return <div className="w-full min-h-screen bg-[#07090E]" />;
+    return <div className="fixed inset-0 w-full h-full bg-[#07090E]" />;
   }
 
   const score = progress.quizAnswers.reduce<number>(
@@ -185,7 +185,11 @@ export default function GroundSchoolPage() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#07090E] text-slate-100">
+    // body is overflow:hidden globally (the main dashboard scrolls its own
+    // internal containers, not the document) — this page owns its own
+    // fixed, full-viewport scroll container instead, same pattern the rest
+    // of the app already uses for anything that isn't that dashboard.
+    <div className="fixed inset-0 w-full h-full overflow-y-auto bg-[#07090E] text-slate-100">
       <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-[#07090E]/90 backdrop-blur">
         <div>
           <p className="text-xs font-mono tracking-[0.3em] text-cyan-400 uppercase">Flight School</p>

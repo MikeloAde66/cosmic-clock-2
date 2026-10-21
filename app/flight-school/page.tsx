@@ -12,7 +12,11 @@ import { Home, GraduationCap, Gamepad2 } from 'lucide-react';
 // instructor rather than being squeezed into that opaque artifact file.
 export default function FlightSchoolPage() {
   return (
-    <div className="relative flex flex-col items-center justify-center w-full min-h-screen gap-10 px-4 py-16 bg-[#07090E] text-slate-100">
+    // body is overflow:hidden globally (the main dashboard owns its own
+    // internal scroll containers instead of document scroll) — this page
+    // needs its own fixed, scrollable container so short/narrow viewports
+    // where the two cards don't fit above the fold can still scroll to them.
+    <div className="fixed inset-0 flex flex-col items-center justify-center w-full h-full gap-10 px-4 py-16 overflow-y-auto bg-[#07090E] text-slate-100">
       <Link
         href="/"
         aria-label="Home"
