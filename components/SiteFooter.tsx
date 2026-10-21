@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Apple, Music2, Smartphone } from 'lucide-react';
+import { Apple, Music2, Music3, Music4, Smartphone } from 'lucide-react';
 import { FORECAST_STREAM_MS } from '@/lib/useWeatherLocation';
 
 function useLiveClock() {
@@ -23,13 +23,15 @@ function useLiveClock() {
   return label;
 }
 
-// Placeholder destinations — swap for the real profile URLs once they exist.
+// Facebook, Reddit, and YouTube are still placeholders — swap for the real
+// profile URLs once they exist. Instagram, X, and TikTok were dropped in
+// favor of the real music profiles below.
 const SOCIAL_LINKS = [
   { name: 'Facebook', glyph: 'FB', href: 'https://facebook.com/your-page' },
-  { name: 'Instagram', glyph: 'IG', href: 'https://instagram.com/your-handle' },
+  { name: 'SoundClick', icon: Music2, href: 'https://soundclick.com/song/15361676' },
   { name: 'Reddit', glyph: 'r/', href: 'https://reddit.com/r/your-subreddit' },
-  { name: 'TikTok', icon: Music2, href: 'https://tiktok.com/@your-handle' },
-  { name: 'X', glyph: '𝕏', href: 'https://x.com/your-handle' },
+  { name: 'SoundCloud', icon: Music4, href: 'https://soundcloud.com/michael-bradley-307688752' },
+  { name: 'ReverbNation', icon: Music3, href: 'https://reverbnation.com/beatbrokers526' },
   { name: 'YouTube', glyph: 'YT', href: 'https://youtube.com/@your-channel' },
 ];
 
