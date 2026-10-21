@@ -15,13 +15,13 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Rewrite (not redirect) so /drone-sim and /flight-school keep clean
-  // URLs in the browser while actually serving their public/*.html static
-  // assets — which Next already serves at their own paths with no config
-  // needed; this just gives each a second, extension-free entry point.
-  // flight-school.html (Spectre-AI GCS) is a deliberately separate product
-  // from drone-sim.html (Charleston venue explorer) — a beginner flight
-  // trainer with failsafes/MAVLink, not the same experience.
+  // Rewrite (not redirect) so /drone-sim and /flight-school/simulator keep
+  // clean URLs in the browser while actually serving their public/*.html
+  // static assets — which Next already serves at their own paths with no
+  // config needed; this just gives each a second, extension-free entry
+  // point. /flight-school itself is a real page (app/flight-school/page.tsx)
+  // now, not a rewrite — Next resolves filesystem routes before these,
+  // so that page wins over this rule for the bare path.
   async rewrites() {
     return [
       {
@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
         destination: '/drone-sim.html',
       },
       {
-        source: '/flight-school',
+        source: '/flight-school/simulator',
         destination: '/spectre-gcs.html',
       },
     ];

@@ -63,6 +63,16 @@ const VOICE_MODE_ADDENDUM = `
 
 Voice Mode: this response is spoken aloud by text-to-speech, not displayed as rendered text — a listener hears it as dialogue, not a document. Never use Markdown tables, code blocks, bullet or numbered lists, headers, or any dense technical formatting; write only in plain, natural spoken sentences. Keep it short — 2 to 4 sentences. Sound like a warm, knowledgeable space guide talking with someone standing next to you, not a database readout. Lead with the most engaging high-level fact, story, or distance, in plain language; leave the technical deep-dive for if they ask a follow-up, rather than cramming it all into one answer.`;
 
+// Opt-in, same mechanism as VOICE_MODE_ADDENDUM — only applies when a
+// caller explicitly sets groundSchool: true (currently just the Ground
+// School page's "Ask Your Instructor" box). Keeps Kali's own identity
+// (still Kali, just teaching a different subject here) rather than
+// inventing a disconnected second persona.
+const GROUND_SCHOOL_ADDENDUM = `
+
+Ground School Mode: you are acting as a patient, encouraging drone-flight ground school instructor for a beginner working through this app's own self-paced course (terminology, flight modes, pre-flight safety, failsafes, then a simulator "solo flight" checkride). Teach real, accurate multirotor terminology and concepts — arm/disarm, throttle/yaw/pitch/roll, hover, bank, climb/descend, land, flight modes (manual/stabilize, altitude-hold, GPS/loiter, RTL/return-to-launch), pre-flight checklists, LiPo battery safety, geofencing, and failsafe behavior (GPS loss, link loss, battery sag) — never a fabricated or simplified-to-the-point-of-wrong version of any of it.
+On FAA rules specifically: state the real requirements plainly and don't soften them. US recreational flyers must pass the FAA's free TRUST (The Recreational UAS Safety Test) before flying at all, under the Exception for Recreational Flyers; anyone flying for work, business, or any non-recreational purpose needs a Part 107 Remote Pilot Certificate, which requires passing the FAA's in-person/proctored Part 107 Aeronautical Knowledge Test — not just this course. Always be explicit that this app's own lessons, quiz, and "solo flight" checkride are a practice tool and a completion badge for personal accomplishment, never a real FAA credential, license, or legal authorization to fly — if a user implies otherwise ("so I'm certified now?"), correct that directly and point them to the real TRUST or Part 107 path. Keep answers concise and conversational (this renders as chat, not a textbook page) unless the user is clearly asking for the deep-dive.`;
+
 function isDiscoveryMode(value: unknown): value is DiscoveryMode {
   return typeof value === 'string' && value in MODE_ADDENDA;
 }
@@ -488,14 +498,14 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Ai One is not connected yet — ANTHROPIC_API_KEY is not configured.' }, { status: 500 });
   }
 
-  let parsedBody: { messages?: unknown; mode?: unknown; language?: unknown; voiceMode?: unknown };
+  let parsedBody: { messages?: unknown; mode?: unknown; language?: unknown; voiceMode?: unknown; groundSchool?: unknown };
   try {
     parsedBody = await request.json();
   } catch (err) {
     console.error('Ai One chat: request body was not valid JSON:', err);
     return Response.json({ error: 'Request body must be valid JSON.' }, { status: 400 });
   }
-  const { messages: rawMessages, mode, language, voiceMode } = parsedBody;
+  const { messages: rawMessages, mode, language, voiceMode, groundSchool } = parsedBody;
 
   // 1. Message history must be a non-empty array, and every entry must be
   // shaped the way the Anthropic Messages API actually requires (a valid
@@ -536,6 +546,7 @@ export async function POST(request: Request) {
     BASE_SYSTEM_PROMPT +
     MODE_ADDENDA[resolvedMode] +
     (voiceMode === true ? VOICE_MODE_ADDENDUM : '') +
+    (groundSchool === true ? GROUND_SCHOOL_ADDENDUM : '') +
     ephemerisContext +
     (retrievedContext
       ? `\n\nRelevant excerpts from ingested primary sources — draw on these where genuinely relevant, cite the source naturally, and ignore any that aren't a good fit for this question:\n\n${retrievedContext}`
