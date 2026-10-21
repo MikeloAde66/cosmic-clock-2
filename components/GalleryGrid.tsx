@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight, Lock, ShieldCheck } from 'lucide-react';
+import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight, Lock, ShieldCheck, Gamepad2 } from 'lucide-react';
 import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
 import WeatherForecastOverlay from './WeatherForecastOverlay';
 import { useKaliPendingApprovals } from '@/lib/useKaliPendingApprovals';
@@ -909,24 +909,22 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={7} docked={docked[7]} onDock={dock}>
-          {/* Non-interactive for the same reason as the Automation slot
-              above — HydroNode Builder Kit's hardware listing is gone, this
-              is a reserved slot for merch. */}
-          <div className={`${cardClass} cursor-default hover:border-slate-800/80 hover:bg-slate-900/40`}>
+          {/* Was a reserved Merch slot (HydroNode Builder Kit's hardware
+              listing never landed) — now a real product: Spectre-AI GCS,
+              a beginner-friendly standalone flight simulator/trainer
+              (failsafe drills, AI object detection, MAVLink-ready) at
+              public/spectre-gcs.html via the /flight-school rewrite.
+              Deliberately a separate product from the Drone Simulator card
+              above, not a replacement — that one explores real-world
+              Charleston; this one teaches flying itself. */}
+          <Link href="/flight-school" className={cardClass}>
             <HolographicLabCardImage />
-            <div className="flex items-start justify-between">
-              <div className="flex items-center justify-center border rounded-lg w-9 h-9 border-slate-700 text-slate-300 bg-slate-950/60">
-                <LayoutGrid className="w-4 h-4" />
-              </div>
-              <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider border rounded border-slate-700 text-slate-500">
-                Coming Soon
-              </span>
-            </div>
+            <CardHeader Icon={Gamepad2} />
             <div className="mt-4">
-              <div className="text-sm font-bold text-white">Merch</div>
-              <p className="mt-1 text-xs text-slate-200">Reserved slot, live preview for now.</p>
+              <div className="text-sm font-bold text-white">Flight School</div>
+              <p className="mt-1 text-xs text-slate-200">Learn to fly — failsafe drills, AI object detection, and a real flight sim.</p>
             </div>
-          </div>
+          </Link>
         </ArrivalSlot>
 
         <ArrivalSlot index={8} docked={docked[8]} onDock={dock}>
