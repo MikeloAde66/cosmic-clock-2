@@ -10,7 +10,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Inter:wght@300;400;600;700&display=swap');
-    
+
     body {
       font-family: 'Inter', sans-serif;
       background-color: #050505;
@@ -40,33 +40,78 @@
     .sidebar-transition {
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
+
+    /* Chase-cam drone sprite: spinning rotors + a slow hover bob. */
+    #drone-sprite { transform: translate(-50%, 0); }
+    #drone-sprite .bob { animation: drone-bob 3.2s ease-in-out infinite; }
+    #drone-sprite .rotor { transform-box: fill-box; transform-origin: center; animation: rotor-spin 0.12s linear infinite; }
+    @keyframes rotor-spin { to { transform: rotate(360deg); } }
+    @keyframes drone-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+    @media (prefers-reduced-motion: reduce) {
+      #drone-sprite .bob, #drone-sprite .rotor { animation: none; }
+    }
+
+    .seg-btn[aria-pressed="true"] {
+      background: rgba(34, 211, 238, 0.18);
+      border-color: rgba(34, 211, 238, 0.6);
+      color: #fff;
+    }
   </style>
 </head>
 <body class="relative w-screen h-screen select-none">
 
-  <!-- Google 3D Map WebGL Viewport Container -->
+  <!-- Map viewports. Only one is visible at a time (see setMapView()):
+       the photorealistic Google Earth 3D tiles, or the 2D/tilted vector map. -->
   <div id="map" class="absolute inset-0 z-0 w-full h-full"></div>
+  <div id="map-vector" class="absolute inset-0 z-0 hidden w-full h-full"></div>
 
   <!-- Day/night mood overlay — the photorealistic 3D tiles themselves are
        pre-baked static imagery (Google's Maps 3D API has no attribute to
        re-light them against a moving sun), so this is a tinted overlay
        approximating dusk/night rather than a true re-lit scene. Opacity is
-       driven by startCharlestonClock() below against real local time. -->
+       driven by startLocalClock() below against the destination's real
+       local time. -->
   <div id="daynight-overlay" class="absolute inset-0 z-[5] pointer-events-none transition-opacity duration-[3000ms]" style="background: linear-gradient(to bottom, #0a1430, #1a2340); opacity: 0;"></div>
 
-  <!-- Center Target Reticle -->
-  <div class="z-10 flex flex-col items-center justify-center target-reticle text-white/70">
+  <!-- Center Target Reticle (shown when the drone is switched off) -->
+  <div id="reticle" class="z-10 flex flex-col items-center justify-center hidden target-reticle text-white/70">
     <div class="flex items-center justify-center w-16 h-16 border border-dashed rounded-full border-white/60 animate-spin" style="animation-duration: 12s;">
       <div class="w-8 h-8 border rounded-full border-white/80"></div>
     </div>
     <div class="w-1 h-3 my-1 bg-white/90"></div>
   </div>
 
+  <!-- Chase-cam drone (toggle in the drawer). A screen-space sprite riding
+       in front of the camera, not a model placed in the 3D scene. -->
+  <div id="drone-sprite" class="absolute z-10 pointer-events-none left-1/2 bottom-[22%]">
+    <div class="bob">
+      <svg width="170" height="110" viewBox="0 0 170 110" aria-hidden="true">
+        <ellipse cx="85" cy="102" rx="46" ry="6" fill="rgba(0,0,0,0.35)" />
+        <g stroke="#94a3b8" stroke-width="5" stroke-linecap="round">
+          <line x1="85" y1="52" x2="28" y2="30" />
+          <line x1="85" y1="52" x2="142" y2="30" />
+          <line x1="85" y1="52" x2="38" y2="74" />
+          <line x1="85" y1="52" x2="132" y2="74" />
+        </g>
+        <g fill="rgba(226,232,240,0.28)" stroke="rgba(226,232,240,0.55)" stroke-width="1.5">
+          <ellipse class="rotor" cx="28" cy="30" rx="24" ry="7" />
+          <ellipse class="rotor" cx="142" cy="30" rx="24" ry="7" />
+          <ellipse class="rotor" cx="38" cy="74" rx="26" ry="8" />
+          <ellipse class="rotor" cx="132" cy="74" rx="26" ry="8" />
+        </g>
+        <rect x="64" y="40" width="42" height="26" rx="9" fill="#1e293b" stroke="#22d3ee" stroke-width="2" />
+        <circle cx="85" cy="70" r="6" fill="#0f172a" stroke="#22d3ee" stroke-width="2" />
+        <circle cx="71" cy="47" r="2.5" fill="#f43f5e" />
+        <circle cx="99" cy="47" r="2.5" fill="#22c55e" />
+      </svg>
+    </div>
+  </div>
+
   <!-- Top Left: Live HUD Telemetry -->
-  <div class="absolute z-20 p-4 text-xs top-4 left-4 hud-glass rounded-xl w-80 font-mono-code text-slate-200">
+  <div class="absolute z-20 p-4 text-xs top-4 left-4 hud-glass rounded-xl w-80 max-w-[calc(100vw-2rem)] font-mono-code text-slate-200">
     <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-700/60">
       <span class="font-bold tracking-wider text-cyan-400">AiOne VIRTUAL DRONE HUD</span>
-      <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">GOOGLE EARTH</span>
+      <span id="hud-mode" class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">GOOGLE EARTH</span>
     </div>
     <div class="grid grid-cols-2 gap-y-1.5 text-slate-300">
       <div>Altitude: <span class="font-bold text-white" id="hud-alt">80 m</span></div>
@@ -84,87 +129,73 @@
     </div>
   </div>
 
-  <!-- Top Right: NOAA Weather Alert Widget -->
-  <div class="absolute z-20 p-3 text-xs top-4 right-4 hud-glass rounded-xl w-72 font-mono-code text-slate-200">
+  <!-- Top Right: live weather for the current destination (Open-Meteo,
+       which serves NOAA's GFS/HRRR models over the US and national
+       weather-service models elsewhere). -->
+  <div class="absolute z-20 hidden p-3 text-xs top-4 right-4 hud-glass rounded-xl w-72 font-mono-code text-slate-200 sm:block">
     <div class="flex justify-between items-center pb-1.5 border-b border-slate-700/60">
       <span class="font-bold text-amber-400 flex items-center gap-1.5">
-        <i data-lucide="cloud-lightning" class="w-4 h-4 text-amber-400"></i> NOAA FLIGHT FEEDS
+        <i data-lucide="cloud-lightning" class="w-4 h-4 text-amber-400"></i> LIVE FLIGHT WEATHER
       </span>
-      <span id="noaa-status" class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px]">CLEAR</span>
+      <span id="wx-status" class="px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-300 text-[10px]">LOADING</span>
     </div>
     <div class="mt-2 space-y-1 text-[11px] text-slate-300">
-      <div class="flex justify-between"><span>Wind Vector:</span><strong class="text-white" id="noaa-wind">8 kts @ 120° SSE</strong></div>
-      <div class="flex justify-between"><span>Visibility:</span><strong class="text-white" id="noaa-vis">10 Miles (VFR)</strong></div>
-      <div class="flex justify-between"><span>Ceiling Height:</span><strong class="text-white" id="noaa-ceiling">Unlimited</strong></div>
-      <div class="flex justify-between"><span>FAA Airspace:</span><strong class="text-emerald-400" id="noaa-airspace">Class G / Uncontrolled</strong></div>
+      <div class="flex justify-between"><span>Wind:</span><strong class="text-white" id="wx-wind">—</strong></div>
+      <div class="flex justify-between"><span>Gusts:</span><strong class="text-white" id="wx-gusts">—</strong></div>
+      <div class="flex justify-between"><span>Visibility:</span><strong class="text-white" id="wx-vis">—</strong></div>
+      <div class="flex justify-between"><span>Cloud cover:</span><strong class="text-white" id="wx-cloud">—</strong></div>
+      <div class="flex justify-between"><span>Temperature:</span><strong class="text-white" id="wx-temp">—</strong></div>
+      <div class="flex justify-between"><span>Airspace:</span><strong class="text-amber-300" id="wx-airspace">—</strong></div>
     </div>
+    <div class="mt-2 text-[10px] text-slate-500">Source: Open-Meteo (NOAA models in the US)</div>
   </div>
 
   <!-- Collapsible Left Navigation Drawer -->
-  <div id="left-drawer" class="absolute left-0 z-30 flex flex-col justify-between p-4 -translate-x-full border-l-0 sidebar-transition top-24 bottom-20 w-80 hud-glass rounded-r-2xl">
-    
+  <div id="left-drawer" class="absolute left-0 z-30 flex flex-col justify-between p-4 -translate-x-full border-l-0 sidebar-transition top-24 bottom-20 w-96 max-w-[88vw] hud-glass rounded-r-2xl">
+
     <!-- Drawer Toggle Button -->
     <button onclick="toggleSidebar()" aria-label="Toggle Settings" class="absolute -right-10 top-6 bg-slate-900 border border-slate-700 text-cyan-400 p-2.5 rounded-r-lg hover:bg-slate-800 shadow-lg">
       <i data-lucide="settings" class="w-5 h-5"></i>
     </button>
 
-    <div class="pr-1 space-y-4 overflow-y-auto">
-      <!-- Global Environments -->
+    <div class="pr-1 space-y-5 overflow-y-auto">
+      <!-- Map view + drone + cinematic + language -->
       <div>
         <h3 class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <i data-lucide="globe" class="w-4 h-4"></i> Global Environments
+          <i data-lucide="layers" class="w-4 h-4"></i> Map View
         </h3>
-        <div class="pr-1 space-y-1 overflow-y-auto text-xs max-h-48">
-          <button onclick="setEnv('Charleston, SC 3D', 32.7765, -79.9311, 80, 45, 75, 450)" class="w-full text-left px-3 py-1.5 rounded bg-slate-800/80 border border-slate-700 text-white font-medium hover:bg-slate-700">
-            📍 Charleston, SC
-          </button>
-          <button onclick="setEnv('Orlando, FL 3D', 28.5383, -81.3792, 100, 30, 75, 500)" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
-            Orlando, Florida
-          </button>
-          <button onclick="setEnv('New Orleans, LA 3D', 29.9511, -90.0715, 80, 60, 75, 450)" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
-            New Orleans, Louisiana
-          </button>
-          <button onclick="setEnv('New York City 3D', 40.7061, -74.0088, 120, 30, 75, 450)" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
-            New York City
-          </button>
-          <button onclick="setEnv('Cancun, Mexico 3D', 21.1619, -86.8515, 90, 110, 75, 550)" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
-            Cancún, Mexico
-          </button>
-          <button onclick="setEnv('Rio de Janeiro, BR', -22.9068, -43.1729, 150, 180, 75, 600)" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
-            Rio de Janeiro, Brazil
-          </button>
-          <button onclick="setEnv('Tokyo, Japan', 35.6586, 139.7454, 150, 90, 75, 500)" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
-            Tokyo, Japan
-          </button>
+        <div class="grid grid-cols-3 gap-1 text-[11px]" role="group" aria-label="Map view">
+          <button class="seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" data-view="earth" aria-pressed="true" onclick="setMapView('earth')">Earth 3D</button>
+          <button class="seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" data-view="hybrid" aria-pressed="false" onclick="setMapView('hybrid')">Earth + Labels</button>
+          <button class="seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" data-view="vector" aria-pressed="false" onclick="setMapView('vector')">Vector Map</button>
         </div>
+        <div class="grid grid-cols-2 gap-1 mt-1.5 text-[11px]">
+          <button id="drone-toggle" class="seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" aria-pressed="true" onclick="toggleDrone()">Drone: ON</button>
+          <button id="cine-toggle" class="seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" aria-pressed="true" onclick="toggleCinematic()">Cinematic: ON</button>
+        </div>
+        <label class="flex items-center justify-between gap-2 mt-2 text-[11px] text-slate-400">
+          <span>Results language</span>
+          <select id="lang-select" onchange="onLanguageChange()" class="px-2 py-1 border rounded bg-slate-900 border-slate-700 text-slate-200">
+            <option value="en">English</option>
+            <option value="local">Local language</option>
+            <option value="es">Español</option>
+            <option value="pt-BR">Português</option>
+            <option value="ja">日本語</option>
+            <option value="th">ไทย</option>
+            <option value="vi">Tiếng Việt</option>
+            <option value="fil">Filipino</option>
+          </select>
+        </label>
       </div>
 
-      <!-- Charleston Dining & Culture — curated downtown spots with real
-           (approximate, demo-grade) coordinates; clicking one flies the
-           camera down to ground level facing it. Anything not listed here
-           (any other cuisine) goes through searchPlacesByText() instead —
-           see sendCommand() below. -->
+      <!-- Destinations: each city opens into live travel categories
+           (rendered by renderDestinations() below). -->
       <div>
         <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <i data-lucide="utensils" class="w-4 h-4"></i> Charleston Dining & Culture
+          <i data-lucide="globe" class="w-4 h-4"></i> Destinations & Travel
         </h3>
-        <div class="pr-1 space-y-1 overflow-y-auto text-xs max-h-40">
-          <button onclick="flyToVenue('167 Raw')" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
-            🦪 167 Raw (Seafood)
-          </button>
-          <button onclick="flyToVenue('Chubby Fish')" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
-            🐟 Chubby Fish (Seafood)
-          </button>
-          <button onclick="flyToVenue('Gaillard Center')" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
-            🎭 Gaillard Center
-          </button>
-          <button onclick="flyToVenue('Historic Market Street')" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
-            🏛️ Historic Market Street
-          </button>
-          <button onclick="flyToVenue('College of Charleston')" class="w-full text-left px-3 py-1.5 rounded bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
-            🎓 College of Charleston
-          </button>
-        </div>
+        <div id="dest-list" class="space-y-1 text-xs"></div>
+        <p class="mt-2 text-[10px] text-slate-500">Places are live from Google Maps. Tap a name to fly there; ↗ opens it in Google Maps.</p>
       </div>
 
       <!-- Emergency Mapping & Route Engine -->
@@ -196,14 +227,14 @@
     <!-- Status Footer -->
     <div class="pt-3 border-t border-slate-800 text-[11px] text-slate-400 flex justify-between items-center font-mono-code">
       <span>LATENCY: <strong class="text-emerald-400">12ms</strong></span>
-      <span>RENDER: <strong class="text-emerald-400">Earth 3D</strong></span>
+      <span>RENDER: <strong class="text-emerald-400" id="render-label">Earth 3D</strong></span>
     </div>
   </div>
 
   <!-- Bottom Command Bar -->
   <div class="absolute z-20 w-full max-w-xl px-4 -translate-x-1/2 bottom-6 left-1/2">
     <div class="flex items-center gap-2 p-2 hud-glass rounded-xl">
-      <input type="text" id="cmd-input" placeholder='Ask Kali AI: "seafood restaurant downtown", "Fly to Gaillard Center", "Check wind"' class="w-full px-4 py-2 text-xs border rounded-lg bg-slate-950/80 border-slate-700 font-mono-code text-cyan-200 placeholder-slate-500 focus:outline-none focus:border-cyan-400">
+      <input type="text" id="cmd-input" placeholder='Ask Kali AI: "nightlife in Tokyo", "hotels Bangkok", "sushi", "Fly to Gaillard Center"' class="w-full px-4 py-2 text-xs border rounded-lg bg-slate-950/80 border-slate-700 font-mono-code text-cyan-200 placeholder-slate-500 focus:outline-none focus:border-cyan-400">
       <button onclick="sendCommand()" class="flex items-center gap-1 px-5 py-2 text-xs font-bold tracking-wider text-white transition bg-purple-600 rounded-lg hover:bg-purple-500">
         <span>KALI</span>
         <i data-lucide="zap" class="w-3.5 h-3.5"></i>
@@ -213,7 +244,7 @@
 
   <!-- Script Initialization -->
   <script>
-    lucide.createIcons();
+    window.lucide?.createIcons();
 
     let sidebarOpen = false;
     let lat = 32.7765;
@@ -223,12 +254,56 @@
     let tilt = 75;
     let range = 450;
     let activeMarker = null;
+    let vectorMap = null;
+    let vectorMarker = null;
+    let mapView = 'earth';
+    let droneOn = true;
+    let cinematicOn = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let cineRAF = null;
+    let clockTimer = null;
+
+    // Destinations. Coordinates are city-centre camera targets only; every
+    // place inside a city (restaurants, hotels, nightlife...) comes live
+    // from Google Places so names, ratings and map links are real and current.
+    const DESTINATIONS = [
+      { id: 'charleston', name: 'Charleston, SC', country: 'US', lat: 32.7765, lng: -79.9311, alt: 80, heading: 45, range: 450, tz: 'America/New_York', lang: 'en', airport: 'Charleston International Airport CHS', airbnb: 'Charleston--SC', aliases: ['charleston'] },
+      { id: 'nyc', name: 'New York City', country: 'US', lat: 40.7580, lng: -73.9855, alt: 120, heading: 30, range: 600, tz: 'America/New_York', lang: 'en', airport: 'John F. Kennedy International Airport JFK', airbnb: 'New-York--NY', aliases: ['new york', 'nyc', 'manhattan'] },
+      { id: 'tokyo', name: 'Tokyo, Japan', country: 'JP', lat: 35.6586, lng: 139.7454, alt: 150, heading: 90, range: 600, tz: 'Asia/Tokyo', lang: 'ja', airport: 'Haneda Airport HND Tokyo', airbnb: 'Tokyo--Japan', aliases: ['tokyo', 'japan'] },
+      { id: 'rio', name: 'Rio de Janeiro, Brazil', country: 'BR', lat: -22.9068, lng: -43.1729, alt: 150, heading: 180, range: 700, tz: 'America/Sao_Paulo', lang: 'pt-BR', airport: 'Rio de Janeiro Galeão International Airport GIG', airbnb: 'Rio-de-Janeiro--Brazil', aliases: ['rio', 'brazil', 'brasil'] },
+      { id: 'cdmx', name: 'Mexico City, Mexico', country: 'MX', lat: 19.4326, lng: -99.1332, alt: 120, heading: 20, range: 600, tz: 'America/Mexico_City', lang: 'es', airport: 'Mexico City International Airport MEX', airbnb: 'Mexico-City--Mexico', aliases: ['mexico city', 'cdmx'] },
+      { id: 'cancun', name: 'Cancún, Mexico', country: 'MX', lat: 21.1619, lng: -86.8515, alt: 90, heading: 110, range: 550, tz: 'America/Cancun', lang: 'es', airport: 'Cancún International Airport CUN', airbnb: 'Cancun--Mexico', aliases: ['cancun', 'cancún'] },
+      { id: 'manila', name: 'Manila, Philippines', country: 'PH', lat: 14.5547, lng: 121.0244, alt: 120, heading: 60, range: 650, tz: 'Asia/Manila', lang: 'fil', airport: 'Ninoy Aquino International Airport MNL', airbnb: 'Manila--Philippines', aliases: ['manila', 'philippines', 'makati'] },
+      { id: 'bangkok', name: 'Bangkok, Thailand', country: 'TH', lat: 13.7563, lng: 100.5018, alt: 120, heading: 120, range: 650, tz: 'Asia/Bangkok', lang: 'th', airport: 'Suvarnabhumi Airport BKK Bangkok', airbnb: 'Bangkok--Thailand', aliases: ['bangkok', 'thailand'] },
+      { id: 'hcmc', name: 'Ho Chi Minh City, Vietnam', country: 'VN', lat: 10.7769, lng: 106.7009, alt: 100, heading: 45, range: 600, tz: 'Asia/Ho_Chi_Minh', lang: 'vi', airport: 'Tan Son Nhat International Airport SGN', airbnb: 'Ho-Chi-Minh-City--Vietnam', aliases: ['ho chi minh', 'saigon', 'vietnam'] },
+      { id: 'orlando', name: 'Orlando, Florida', country: 'US', lat: 28.5383, lng: -81.3792, alt: 100, heading: 30, range: 500, tz: 'America/New_York', lang: 'en', airport: 'Orlando International Airport MCO', airbnb: 'Orlando--FL', aliases: ['orlando'] },
+      { id: 'nola', name: 'New Orleans, Louisiana', country: 'US', lat: 29.9511, lng: -90.0715, alt: 80, heading: 60, range: 450, tz: 'America/Chicago', lang: 'en', airport: 'Louis Armstrong New Orleans International Airport MSY', airbnb: 'New-Orleans--LA', aliases: ['new orleans', 'nola'] },
+    ];
+
+    // Travel categories per destination; `q` builds the Google Places text query.
+    const CATEGORIES = [
+      { id: 'hotspots', label: '📍 Hot spots', q: (d) => `top tourist attractions in ${d.name}` },
+      { id: 'restaurants', label: '🍽️ Restaurants', q: (d) => `best restaurants in ${d.name}` },
+      { id: 'nightlife', label: '🌙 Nightlife', q: (d) => `nightlife bars and clubs in ${d.name}` },
+      { id: 'hotels', label: '🏨 Hotels', q: (d) => `hotels in ${d.name}` },
+      { id: 'stays', label: '🏠 Airbnb & stays', q: (d) => `vacation rental apartments in ${d.name}` },
+      { id: 'airport', label: '✈️ Airport', q: (d) => d.airport, max: 2 },
+    ];
+    const CATEGORY_WORDS = {
+      hotspots: ['hot spot', 'hotspot', 'attraction', 'sightseeing', 'things to do'],
+      restaurants: ['restaurant', 'food', 'eat', 'dinner', 'lunch'],
+      nightlife: ['nightlife', 'night life', 'club', 'bar', 'party'],
+      hotels: ['hotel'],
+      stays: ['airbnb', 'rental', 'stay'],
+      airport: ['airport', 'flight'],
+    };
+
+    let currentDest = DESTINATIONS[0];
+    let openDestId = null;
+    const placesCache = new Map();
 
     // Curated downtown Charleston spots — approximate landmark coordinates
     // for a demo flight path, not surveyed addresses. Matched against user
     // commands by the alias list in each entry (see findVenue() below).
-    // Anything not in here (any other restaurant/cuisine) falls through to
-    // searchPlacesByText() instead.
     const CHARLESTON_VENUES = [
       { name: '167 Raw', lat: 32.7823, lng: -79.9320, category: 'seafood', aliases: ['167 raw'] },
       { name: 'The Ordinary', lat: 32.7836, lng: -79.9323, category: 'seafood', aliases: ['the ordinary', 'ordinary'] },
@@ -245,38 +320,45 @@
     // Open-ended cuisine words Kali recognizes as "search, don't guess" —
     // anything matching here that ISN'T also a curated venue above goes
     // through the real Places API text search rather than a fabricated result.
-    const CUISINE_KEYWORDS = ['seafood', 'thai', 'mexican', 'asian', 'indian', 'soul food', 'italian', 'bbq', 'barbecue', 'sushi', 'pizza', 'vegan', 'french', 'southern', 'steakhouse', 'breakfast', 'brunch'];
+    const CUISINE_KEYWORDS = ['seafood', 'thai', 'mexican', 'asian', 'indian', 'soul food', 'italian', 'bbq', 'barbecue', 'sushi', 'ramen', 'pizza', 'vegan', 'french', 'southern', 'steakhouse', 'breakfast', 'brunch', 'pho', 'tacos', 'coffee'];
 
     function findVenue(text) {
       const lower = text.toLowerCase();
       return CHARLESTON_VENUES.find((v) => v.aliases.some((a) => lower.includes(a)));
     }
 
-    // Real Charleston (America/New_York) local time — drives the HUD clock
+    function setKali(text) {
+      document.getElementById('kali-status').innerText = text;
+    }
+
+    function resultsLanguage() {
+      const v = document.getElementById('lang-select').value;
+      return v === 'local' ? currentDest.lang : v;
+    }
+
+    /* ---------------- local clock + day/night ---------------- */
+
+    // Real local time at the current destination — drives the HUD clock
     // and the day/night tint overlay. Doesn't re-light the actual 3D tiles
-    // (see the overlay's own comment above); this is the closest real,
-    // live signal available short of that.
-    function startCharlestonClock() {
+    // (see the overlay's own comment above).
+    function startLocalClock() {
       function tick() {
-        const now = new Date();
         const parts = new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/New_York',
+          timeZone: currentDest.tz,
           hour: '2-digit',
           minute: '2-digit',
           hour12: false,
-        }).formatToParts(now);
-        const hour = Number(parts.find((p) => p.type === 'hour').value);
+          timeZoneName: 'short',
+        }).formatToParts(new Date());
+        const hour = Number(parts.find((p) => p.type === 'hour').value) % 24;
         const minute = parts.find((p) => p.type === 'minute').value;
-        const timeEl = document.getElementById('hud-local-time');
+        const zone = parts.find((p) => p.type === 'timeZoneName')?.value || '';
         const skyEl = document.getElementById('hud-sky-phase');
         const overlay = document.getElementById('daynight-overlay');
-        if (timeEl) timeEl.innerText = `${String(hour).padStart(2, '0')}:${minute} ET`;
-        if (!skyEl || !overlay) return;
+        document.getElementById('hud-local-time').innerText = `${String(hour).padStart(2, '0')}:${minute} ${zone}`;
 
-        // Rough Charleston sunrise/sunset bands by hour — a seasonal almanac
-        // would be more precise, but this is enough for the HUD label and
-        // overlay mood; actual sun position still comes from nothing more
-        // than this clock (the tiles themselves don't move with it).
+        // Rough sunrise/sunset bands by hour — enough for the HUD label and
+        // overlay mood; a seasonal almanac per city would be more precise.
         let phase, opacity;
         if (hour >= 7 && hour < 18) { phase = 'Day'; opacity = 0; }
         else if ((hour >= 18 && hour < 20) || (hour >= 5 && hour < 7)) { phase = 'Dusk/Dawn'; opacity = 0.25; }
@@ -285,74 +367,402 @@
         overlay.style.opacity = opacity;
       }
       tick();
-      setInterval(tick, 60_000);
+      if (clockTimer) clearInterval(clockTimer);
+      clockTimer = setInterval(tick, 60_000);
     }
 
-    // Drops/moves a single <gmp-marker-3d> pin and animates the camera down
-    // to street level facing it (alt ~12m, tilt 75deg, range 40m) — the
-    // exact figures the task asked for.
-    function flyToGroundLevel(venueLat, venueLng, label) {
-      lat = venueLat;
-      lng = venueLng;
-      alt = 12;
-      tilt = 75;
-      range = 40;
-      heading = 45;
-      updateMapCamera();
-      document.getElementById('hud-env').innerText = label;
+    /* ---------------- camera ---------------- */
 
+    // Rough mapping from the 3D camera's range (metres) to a 2D zoom level,
+    // so switching views keeps roughly the same framing.
+    function rangeToZoom(r) {
+      return Math.max(3, Math.min(21, 26.5 - Math.log2(Math.max(r, 20))));
+    }
+
+    function updateMapCamera() {
+      const mapElement = document.getElementById('map-3d');
+      if (mapElement) {
+        mapElement.setAttribute('center', `${lat},${lng},${alt}`);
+        mapElement.setAttribute('heading', heading);
+        mapElement.setAttribute('tilt', tilt);
+        mapElement.setAttribute('range', range);
+      }
+      if (vectorMap && mapView === 'vector') {
+        vectorMap.moveCamera({ center: { lat, lng }, zoom: rangeToZoom(range), heading, tilt: Math.min(tilt, 67.5) });
+      }
+      document.getElementById('hud-alt').innerText = `${Math.round(alt)} m`;
+      document.getElementById('hud-heading').innerText = `${Math.round(((heading % 360) + 360) % 360)}°`;
+    }
+
+    function cancelCinematic() {
+      if (cineRAF) cancelAnimationFrame(cineRAF);
+      cineRAF = null;
+    }
+
+    // Tween every camera value to `to` over `ms` with a sine ease, then call
+    // `done`. Used for both legs of the cinematic arrival.
+    function tweenCamera(to, ms, done) {
+      const from = { lat, lng, alt, heading, tilt, range };
+      const start = performance.now();
+      const step = (now) => {
+        const t = Math.min(1, (now - start) / ms);
+        const e = 0.5 - 0.5 * Math.cos(Math.PI * t);
+        for (const k of Object.keys(to)) {
+          const v = from[k] + (to[k] - from[k]) * e;
+          if (k === 'lat') lat = v;
+          else if (k === 'lng') lng = v;
+          else if (k === 'alt') alt = v;
+          else if (k === 'heading') heading = v;
+          else if (k === 'tilt') tilt = v;
+          else if (k === 'range') range = v;
+        }
+        updateMapCamera();
+        if (t < 1) cineRAF = requestAnimationFrame(step);
+        else { cineRAF = null; done && done(); }
+      };
+      cineRAF = requestAnimationFrame(step);
+    }
+
+    // Arrive at a place. Cinematic mode: a 2.5 s glide over to it, then a
+    // long, slow push-in toward the subject with a gentle drift in heading,
+    // the slow dolly move film-makers use for reveals. Any flight key cancels it.
+    function flyToPlace(pLat, pLng, label, opts = {}) {
+      cancelCinematic();
+      document.getElementById('hud-env').innerText = label;
+      placeMarker(pLat, pLng, label);
+      const endRange = opts.range || 160;
+      const endAlt = opts.alt || 15;
+      if (!cinematicOn) {
+        lat = pLat; lng = pLng; alt = endAlt; tilt = 72; range = endRange;
+        updateMapCamera();
+        return;
+      }
+      tweenCamera({ lat: pLat, lng: pLng, alt: endAlt, tilt: 62, range: endRange * 4 }, 2500, () => {
+        tweenCamera({ range: endRange, tilt: 72, heading: heading + 14 }, 11000);
+      });
+    }
+
+    function placeMarker(pLat, pLng, label) {
       const map3d = document.getElementById('map-3d');
       if (map3d && window.google?.maps?.maps3d) {
         if (activeMarker) activeMarker.remove();
         activeMarker = document.createElement('gmp-marker-3d');
-        activeMarker.setAttribute('position', `${venueLat},${venueLng},12`);
+        activeMarker.setAttribute('position', `${pLat},${pLng},12`);
         activeMarker.setAttribute('title', label);
         map3d.appendChild(activeMarker);
+      }
+      if (vectorMap && window.google?.maps?.marker?.AdvancedMarkerElement) {
+        if (vectorMarker) vectorMarker.map = null;
+        vectorMarker = new google.maps.marker.AdvancedMarkerElement({ map: vectorMap, position: { lat: pLat, lng: pLng }, title: label });
       }
     }
 
     function flyToVenue(name) {
       const venue = CHARLESTON_VENUES.find((v) => v.name === name);
       if (!venue) return;
-      document.getElementById('kali-status').innerText = `Kali AI: Flying to ${venue.name}...`;
-      flyToGroundLevel(venue.lat, venue.lng, venue.name);
-      setTimeout(() => {
-        document.getElementById('kali-status').innerText = `Kali AI: Now over ${venue.name}.`;
-      }, 600);
+      if (currentDest.id !== 'charleston') goToDestination('charleston', { quiet: true });
+      setKali(`Kali AI: Flying to ${venue.name}...`);
+      flyToPlace(venue.lat, venue.lng, venue.name);
     }
 
-    // Open-ended cuisine search via the real Places API (New) JS library —
-    // google.maps.places.Place.searchByText() runs through the loaded SDK
-    // (not a raw fetch), which is what actually supports a client-side call;
-    // the legacy REST Places endpoints aren't CORS-enabled for the browser.
-    // Requires "Places API (New)" enabled + billed on this key's Cloud
-    // project — if it isn't, this surfaces that clearly in the Kali feed
-    // rather than fabricating a result.
-    async function searchPlacesByText(cuisine) {
-      document.getElementById('kali-status').innerText = `Kali AI: Searching for ${cuisine} restaurants downtown...`;
-      if (!window.google?.maps?.places?.Place) {
-        document.getElementById('kali-status').innerText = `Kali AI: Places search isn't available (Places API (New) library didn't load).`;
-        return;
+    /* ---------------- map views ---------------- */
+
+    function setMapView(view) {
+      mapView = view;
+      document.querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+      const map3dEl = document.getElementById('map');
+      const vecEl = document.getElementById('map-vector');
+      const label = { earth: 'Earth 3D', hybrid: 'Earth + Labels', vector: 'Vector Map' }[view];
+      document.getElementById('render-label').innerText = label;
+      document.getElementById('hud-mode').innerText = view === 'vector' ? 'VECTOR MAP' : 'GOOGLE EARTH';
+
+      if (view === 'vector') {
+        map3dEl.classList.add('hidden');
+        vecEl.classList.remove('hidden');
+        ensureVectorMap();
+      } else {
+        vecEl.classList.add('hidden');
+        map3dEl.classList.remove('hidden');
+        const m = document.getElementById('map-3d');
+        if (m) m.setAttribute('mode', view === 'hybrid' ? 'HYBRID' : 'SATELLITE');
       }
-      try {
-        const { places } = await google.maps.places.Place.searchByText({
-          textQuery: `${cuisine} restaurant downtown Charleston SC`,
-          fields: ['displayName', 'location'],
-          maxResultCount: 1,
-        });
-        if (!places || places.length === 0) {
-          document.getElementById('kali-status').innerText = `Kali AI: No ${cuisine} restaurants found downtown — try a different search.`;
-          return;
-        }
-        const place = places[0];
-        const name = place.displayName || cuisine;
-        flyToGroundLevel(place.location.lat(), place.location.lng(), name);
-        document.getElementById('kali-status').innerText = `Kali AI: Found ${name}.`;
-      } catch (err) {
-        console.error('Places search failed:', err);
-        document.getElementById('kali-status').innerText = `Kali AI: Places search failed (${err?.message || 'check that Places API (New) is enabled on this key'}).`;
+      updateMapCamera();
+      setKali(`Kali AI: ${label} view active.`);
+    }
+
+    function ensureVectorMap() {
+      if (vectorMap || !window.google?.maps?.Map) return;
+      vectorMap = new google.maps.Map(document.getElementById('map-vector'), {
+        mapId: 'DEMO_MAP_ID',
+        renderingType: google.maps.RenderingType?.VECTOR,
+        center: { lat, lng },
+        zoom: rangeToZoom(range),
+        heading,
+        tilt: Math.min(tilt, 67.5),
+        disableDefaultUI: true,
+        gestureHandling: 'greedy',
+      });
+      if (activeMarker) {
+        const [mLat, mLng] = activeMarker.getAttribute('position').split(',').map(Number);
+        placeMarker(mLat, mLng, activeMarker.getAttribute('title'));
       }
     }
+
+    function toggleDrone() {
+      droneOn = !droneOn;
+      const btn = document.getElementById('drone-toggle');
+      btn.setAttribute('aria-pressed', String(droneOn));
+      btn.innerText = `Drone: ${droneOn ? 'ON' : 'OFF'}`;
+      document.getElementById('drone-sprite').classList.toggle('hidden', !droneOn);
+      document.getElementById('reticle').classList.toggle('hidden', droneOn);
+      document.getElementById('hud-cam').innerText = droneOn ? 'Chase-Cam' : 'Free-Cam';
+    }
+
+    function toggleCinematic() {
+      cinematicOn = !cinematicOn;
+      const btn = document.getElementById('cine-toggle');
+      btn.setAttribute('aria-pressed', String(cinematicOn));
+      btn.innerText = `Cinematic: ${cinematicOn ? 'ON' : 'OFF'}`;
+      if (!cinematicOn) cancelCinematic();
+    }
+
+    /* ---------------- destinations + live travel lists ---------------- */
+
+    function goToDestination(id, opts = {}) {
+      const d = DESTINATIONS.find((x) => x.id === id);
+      if (!d) return;
+      currentDest = d;
+      cancelCinematic();
+      document.getElementById('hud-env').innerText = d.name;
+      if (cinematicOn && !opts.quiet) {
+        tweenCamera({ lat: d.lat, lng: d.lng, alt: d.alt, tilt: 60, range: d.range * 2.2 }, 2500, () => {
+          tweenCamera({ range: d.range, tilt: 72, heading: d.heading }, 9000);
+        });
+      } else {
+        lat = d.lat; lng = d.lng; alt = d.alt; heading = d.heading; tilt = 72; range = d.range;
+        updateMapCamera();
+      }
+      startLocalClock();
+      fetchWeather(d);
+      if (!opts.quiet) setKali(`Kali AI: Flying to ${d.name}.`);
+    }
+
+    function mapsSearchUrl(query) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    }
+
+    function el(tag, cls, text) {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text != null) n.textContent = text;
+      return n;
+    }
+
+    function externalLink(href, text, cls) {
+      const a = el('a', cls || 'shrink-0 px-1.5 py-0.5 rounded border border-slate-700 text-cyan-300 hover:text-white hover:border-cyan-500', text);
+      a.href = href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      return a;
+    }
+
+    function renderDestinations() {
+      const list = document.getElementById('dest-list');
+      list.textContent = '';
+      for (const d of DESTINATIONS) {
+        const wrap = el('div', 'rounded border ' + (openDestId === d.id ? 'border-cyan-500/50 bg-slate-900/70' : 'border-slate-800 bg-slate-900/50'));
+        const head = el('button', 'w-full flex items-center justify-between px-3 py-1.5 text-left hover:text-white ' + (currentDest.id === d.id ? 'text-white font-semibold' : 'text-slate-300'));
+        head.setAttribute('aria-expanded', String(openDestId === d.id));
+        head.appendChild(el('span', '', `${currentDest.id === d.id ? '📍 ' : ''}${d.name}`));
+        head.appendChild(el('span', 'text-slate-500', openDestId === d.id ? '▾' : '▸'));
+        head.onclick = () => {
+          openDestId = openDestId === d.id ? null : d.id;
+          if (currentDest.id !== d.id) goToDestination(d.id);
+          renderDestinations();
+        };
+        wrap.appendChild(head);
+
+        if (openDestId === d.id) {
+          const body = el('div', 'px-2 pb-2 space-y-1');
+          for (const c of CATEGORIES) body.appendChild(renderCategory(d, c));
+          wrap.appendChild(body);
+        }
+        list.appendChild(wrap);
+      }
+    }
+
+    function renderCategory(d, c) {
+      const box = el('details', 'rounded bg-slate-950/60 border border-slate-800');
+      box.dataset.cat = c.id;
+      const sum = el('summary', 'cursor-pointer px-2.5 py-1.5 text-slate-200 hover:text-white select-none', c.label);
+      box.appendChild(sum);
+      const body = el('div', 'px-2 pb-2 space-y-1');
+      box.appendChild(body);
+      box.addEventListener('toggle', () => {
+        if (box.open && !body.dataset.loaded) {
+          body.dataset.loaded = '1';
+          loadCategory(d, c, body);
+        }
+      });
+      return box;
+    }
+
+    async function loadCategory(d, c, body) {
+      body.textContent = '';
+      const query = c.q(d);
+      if (c.id === 'stays') {
+        const row = el('div', 'flex items-center justify-between gap-2 px-2 py-1.5 rounded bg-rose-500/10 border border-rose-500/30');
+        row.appendChild(el('span', 'text-rose-200', `Airbnb homes in ${d.name}`));
+        row.appendChild(externalLink(`https://www.airbnb.com/s/${d.airbnb}/homes`, 'Airbnb ↗'));
+        body.appendChild(row);
+      }
+      const status = el('div', 'px-2 py-1 text-[11px] text-slate-400', 'Loading from Google Maps…');
+      body.appendChild(status);
+
+      try {
+        const places = await searchPlaces(query, d, c.max || 6);
+        status.remove();
+        if (!places.length) {
+          body.appendChild(el('div', 'px-2 py-1 text-[11px] text-slate-400', 'Nothing found.'));
+        }
+        for (const p of places) body.appendChild(renderPlaceRow(p));
+      } catch (err) {
+        console.error('Places search failed:', err);
+        status.textContent = 'Live results unavailable right now.';
+      }
+      const more = el('div', 'flex justify-end pt-1');
+      more.appendChild(externalLink(mapsSearchUrl(query), 'More on Google Maps ↗', 'text-[11px] text-cyan-300 hover:text-white'));
+      body.appendChild(more);
+    }
+
+    function renderPlaceRow(p) {
+      const row = el('div', 'flex items-start gap-2 px-2 py-1.5 rounded hover:bg-slate-800/70');
+      const btn = el('button', 'flex-1 min-w-0 text-left');
+      btn.appendChild(el('div', 'text-slate-100 truncate', p.name));
+      const meta = [];
+      if (p.rating) meta.push(`★ ${p.rating.toFixed(1)}${p.count ? ` (${p.count.toLocaleString()})` : ''}`);
+      if (p.price) meta.push(p.price);
+      if (p.address) meta.push(p.address);
+      btn.appendChild(el('div', 'text-[10px] text-slate-400 truncate', meta.join(' · ')));
+      btn.onclick = () => {
+        setKali(`Kali AI: Flying to ${p.name}...`);
+        flyToPlace(p.lat, p.lng, p.name);
+      };
+      row.appendChild(btn);
+      row.appendChild(externalLink(p.url || mapsSearchUrl(p.name), '↗'));
+      return row;
+    }
+
+    const PRICE_LABELS = { INEXPENSIVE: '$', MODERATE: '$$', EXPENSIVE: '$$$', VERY_EXPENSIVE: '$$$$' };
+
+    // Live Google Places (New) text search through the loaded JS SDK. Biased
+    // to the destination, in the chosen results language. Requires
+    // "Places API (New)" to be enabled on this key's Cloud project.
+    async function searchPlaces(query, d, max) {
+      const language = resultsLanguage();
+      const key = `${query}|${language}|${max}`;
+      if (placesCache.has(key)) return placesCache.get(key);
+      if (!window.google?.maps?.places?.Place) throw new Error('Places library not loaded');
+      const { places } = await google.maps.places.Place.searchByText({
+        textQuery: query,
+        fields: ['displayName', 'location', 'rating', 'userRatingCount', 'formattedAddress', 'googleMapsURI', 'priceLevel'],
+        locationBias: { center: { lat: d.lat, lng: d.lng }, radius: 30000 },
+        language,
+        maxResultCount: max,
+      });
+      // Keep it a general-audience travel guide: drop adult venues that a
+      // "nightlife" search can surface.
+      const ADULT = /gentlem[ae]n'?’?s club|strip ?club|adult (club|entertainment)|cabaret show girls/i;
+      const out = (places || []).filter((p) => !ADULT.test(p.displayName || '')).map((p) => ({
+        name: p.displayName || 'Unnamed place',
+        lat: p.location.lat(),
+        lng: p.location.lng(),
+        rating: p.rating || null,
+        count: p.userRatingCount || null,
+        price: PRICE_LABELS[p.priceLevel] || '',
+        address: (p.formattedAddress || '').split(',').slice(0, 2).join(','),
+        url: p.googleMapsURI || '',
+      }));
+      placesCache.set(key, out);
+      return out;
+    }
+
+    function onLanguageChange() {
+      // Reload any open category in the new language.
+      renderDestinations();
+      setKali(`Kali AI: Results language set to ${document.getElementById('lang-select').selectedOptions[0].text}.`);
+    }
+
+    // Open a destination's category from a Kali command ("nightlife in Tokyo").
+    function openCategory(destId, catId) {
+      if (!sidebarOpen) toggleSidebar();
+      if (currentDest.id !== destId) goToDestination(destId);
+      openDestId = destId;
+      renderDestinations();
+      const box = document.querySelector(`#dest-list details[data-cat="${catId}"]`);
+      if (box) {
+        box.open = true;
+        box.scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    // Free-text cuisine search near the current destination.
+    async function searchPlacesByText(cuisine) {
+      setKali(`Kali AI: Searching for ${cuisine} in ${currentDest.name}...`);
+      try {
+        const places = await searchPlaces(`${cuisine} restaurant in ${currentDest.name}`, currentDest, 1);
+        if (!places.length) {
+          setKali(`Kali AI: No ${cuisine} places found in ${currentDest.name}. Try a different search.`);
+          return;
+        }
+        flyToPlace(places[0].lat, places[0].lng, places[0].name);
+        setKali(`Kali AI: Found ${places[0].name}.`);
+      } catch (err) {
+        console.error('Places search failed:', err);
+        setKali(`Kali AI: Places search failed (${err?.message || 'check that Places API (New) is enabled on this key'}).`);
+      }
+    }
+
+    /* ---------------- weather ---------------- */
+
+    function compass(deg) {
+      const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+      return dirs[Math.round(deg / 22.5) % 16];
+    }
+
+    async function fetchWeather(d) {
+      const status = document.getElementById('wx-status');
+      status.innerText = 'LOADING';
+      status.className = 'px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-300 text-[10px]';
+      document.getElementById('wx-airspace').innerText = d.country === 'US' ? 'Check B4UFLY (FAA)' : 'Check local aviation rules';
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${d.lat}&longitude=${d.lng}` +
+          '&current=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,cloud_cover' +
+          '&wind_speed_unit=kn&timezone=auto';
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const c = (await res.json()).current;
+        if (currentDest.id !== d.id) return;
+        const us = d.country === 'US';
+        document.getElementById('wx-wind').innerText = `${Math.round(c.wind_speed_10m)} kts @ ${Math.round(c.wind_direction_10m)}° ${compass(c.wind_direction_10m)}`;
+        document.getElementById('wx-gusts').innerText = `${Math.round(c.wind_gusts_10m)} kts`;
+        const km = c.visibility / 1000;
+        document.getElementById('wx-vis').innerText = us ? `${Math.min(10, km * 0.621).toFixed(1)} mi` : `${Math.min(20, km).toFixed(1)} km`;
+        document.getElementById('wx-cloud').innerText = `${Math.round(c.cloud_cover)}%`;
+        document.getElementById('wx-temp').innerText = us
+          ? `${Math.round(c.temperature_2m * 9 / 5 + 32)}°F`
+          : `${Math.round(c.temperature_2m)}°C`;
+        const windy = c.wind_gusts_10m >= 20;
+        status.innerText = windy ? 'GUSTY' : 'LIVE';
+        status.className = `px-1.5 py-0.5 rounded text-[10px] ${windy ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-400'}`;
+      } catch (err) {
+        console.error('Weather fetch failed:', err);
+        status.innerText = 'OFFLINE';
+        status.className = 'px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px]';
+      }
+    }
+
+    /* ---------------- drawer, keys, commands ---------------- */
 
     function toggleSidebar() {
       const drawer = document.getElementById('left-drawer');
@@ -364,20 +774,12 @@
       }
     }
 
-    function updateMapCamera() {
-      const mapElement = document.querySelector('gmp-map-3d');
-      if (mapElement) {
-        mapElement.setAttribute('center', `${lat},${lng},${alt}`);
-        mapElement.setAttribute('heading', heading);
-        mapElement.setAttribute('tilt', tilt);
-        mapElement.setAttribute('range', range);
-      }
-      document.getElementById('hud-alt').innerText = `${Math.round(alt)} m`;
-      document.getElementById('hud-heading').innerText = `${Math.round(heading)}°`;
-    }
-
-    // Keyboard Flight Controls (WASD + Space/Shift)
+    // Keyboard Flight Controls (WASD + Space/Shift). Ignored while typing.
     window.addEventListener('keydown', (e) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
+        if (e.key === 'Enter' && e.target.id === 'cmd-input') sendCommand();
+        return;
+      }
       const key = e.key.toLowerCase();
       const step = 0.0005;
 
@@ -389,6 +791,7 @@
       if (key === 'shift') { e.preventDefault(); alt = Math.max(10, alt - 10); } // Shift = Descend
 
       if (['w','s','a','d',' ','shift'].includes(key)) {
+        cancelCinematic();
         document.getElementById('hud-speed').innerText = '15 m/s';
         updateMapCamera();
       }
@@ -398,27 +801,16 @@
       document.getElementById('hud-speed').innerText = '0 m/s';
     });
 
-    function setEnv(envName, nLat, nLng, nAlt, nHeading, nTilt, nRange) {
-      lat = nLat; lng = nLng; alt = nAlt; heading = nHeading; tilt = nTilt; range = nRange;
-      document.getElementById('hud-env').innerText = envName;
-      updateMapCamera();
-      fetchNOAAConditions(lat, lng);
-    }
-
     function plotRescueRoute() {
-      document.getElementById('kali-status').innerText = `Kali AI: Plotting emergency rescue route...`;
+      cancelCinematic();
+      setKali(`Kali AI: Plotting emergency rescue route...`);
       range = 1200;
       tilt = 60;
       updateMapCamera();
 
       setTimeout(() => {
-        document.getElementById('kali-status').innerText = `Kali AI: Rescue waypoints mapped on satellite view.`;
+        setKali(`Kali AI: Rescue waypoints mapped on satellite view.`);
       }, 800);
-    }
-
-    function fetchNOAAConditions(lat, lng) {
-      document.getElementById('noaa-status').innerText = 'UPDATED';
-      document.getElementById('noaa-wind').innerText = `${Math.floor(5 + Math.random() * 10)} kts @ ${Math.floor(Math.random() * 360)}°`;
     }
 
     function sendCommand() {
@@ -431,23 +823,30 @@
       // culture/institution) wins over a generic cuisine word — "fly to
       // Chubby Fish" shouldn't fall through to a Places search for "fish".
       const venue = findVenue(lower);
+      const dest = DESTINATIONS.find((d) => d.aliases.some((a) => lower.includes(a)) && !(d.id === 'charleston' && venue));
+      const cat = Object.keys(CATEGORY_WORDS).find((k) => CATEGORY_WORDS[k].some((w) => lower.includes(w)));
       const cuisine = CUISINE_KEYWORDS.find((c) => lower.includes(c));
 
       if (lower.includes('route') || lower.includes('rescue')) {
-        document.getElementById('kali-status').innerText = `Kali AI: Executing "${val}"`;
+        setKali(`Kali AI: Executing "${val}"`);
         plotRescueRoute();
-      } else if (lower.includes('tokyo')) {
-        document.getElementById('kali-status').innerText = `Kali AI: Executing "${val}"`;
-        setEnv('Tokyo, Japan', 35.6586, 139.7454, 150, 90, 75, 500);
-      } else if (lower.includes('orlando')) {
-        document.getElementById('kali-status').innerText = `Kali AI: Executing "${val}"`;
-        setEnv('Orlando, FL 3D', 28.5383, -81.3792, 100, 30, 75, 500);
       } else if (venue) {
         flyToVenue(venue.name);
       } else if (cuisine) {
+        if (dest && dest.id !== currentDest.id) goToDestination(dest.id, { quiet: true });
         searchPlacesByText(cuisine);
+      } else if (cat) {
+        openCategory((dest || currentDest).id, cat);
+        setKali(`Kali AI: ${CATEGORIES.find((c) => c.id === cat).label.replace(/^\S+\s/, '')} in ${(dest || currentDest).name}.`);
+      } else if (dest) {
+        goToDestination(dest.id);
+        renderDestinations();
+      } else if (lower.includes('vector')) {
+        setMapView('vector');
+      } else if (lower.includes('earth') || lower.includes('satellite')) {
+        setMapView('earth');
       } else {
-        document.getElementById('kali-status').innerText = `Kali AI: Didn't recognize "${val}" — try a cuisine, a downtown venue, or "generate rescue route".`;
+        setKali(`Kali AI: Didn't recognize "${val}". Try a city, "nightlife in Tokyo", a cuisine, or "generate rescue route".`);
       }
       input.value = '';
     }
@@ -459,9 +858,8 @@
       // an unrestricted one is usable by anyone who views source.
       const apiKey = "AIzaSyBA-jsBzdH2C5JVZV0MQOTvX2zItBhvp7A";
       const script = document.createElement('script');
-      // places added for the venue/cuisine search below (Places API (New) —
-      // must be enabled on this key's Google Cloud project for that to work).
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=beta&libraries=maps3d,places&maptype=satellite`;
+      // maps3d = Earth view, places = live travel lists, marker = pins on the vector map.
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=beta&libraries=maps3d,places,marker&maptype=satellite`;
       script.async = true;
       script.onload = () => {
         const mapContainer = document.getElementById('map');
@@ -471,9 +869,16 @@
             </gmp-map-3d>
           `;
         }
-        startCharlestonClock();
+        startLocalClock();
       };
       document.head.appendChild(script);
+      renderDestinations();
+      fetchWeather(currentDest);
+      if (!cinematicOn) {
+        const cine = document.getElementById('cine-toggle');
+        cine.setAttribute('aria-pressed', 'false');
+        cine.innerText = 'Cinematic: OFF';
+      }
     }
 
     window.onload = initMap;
