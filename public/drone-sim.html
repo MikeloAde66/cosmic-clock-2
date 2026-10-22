@@ -165,8 +165,8 @@
           <i data-lucide="layers" class="w-4 h-4"></i> Map View
         </h3>
         <div class="grid grid-cols-3 gap-1 text-[11px]" role="group" aria-label="Map view">
-          <button class="seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" data-view="earth" aria-pressed="true" onclick="setMapView('earth')">Earth 3D</button>
-          <button class="seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" data-view="hybrid" aria-pressed="false" onclick="setMapView('hybrid')">Earth + Labels</button>
+          <button class="seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" data-view="earth" aria-pressed="false" onclick="setMapView('earth')">Earth 3D</button>
+          <button class="seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" data-view="hybrid" aria-pressed="true" onclick="setMapView('hybrid')">Earth + Labels</button>
           <button class="seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" data-view="vector" aria-pressed="false" onclick="setMapView('vector')">Vector Map</button>
         </div>
         <div class="grid grid-cols-2 gap-1 mt-1.5 text-[11px]">
@@ -219,7 +219,7 @@
             <span class="w-2 h-2 bg-purple-400 rounded-full animate-ping"></span>
             KALI AI ONLINE
           </div>
-          <div class="text-[11px] text-slate-300" id="kali-status">Google Earth Satellite 3D Active. Use WASD keys to fly.</div>
+          <div class="text-[11px] text-slate-300" id="kali-status">Google Earth 3D + Labels active. Use WASD keys to fly.</div>
         </div>
       </div>
     </div>
@@ -227,7 +227,7 @@
     <!-- Status Footer -->
     <div class="pt-3 border-t border-slate-800 text-[11px] text-slate-400 flex justify-between items-center font-mono-code">
       <span>LATENCY: <strong class="text-emerald-400">12ms</strong></span>
-      <span>RENDER: <strong class="text-emerald-400" id="render-label">Earth 3D</strong></span>
+      <span>RENDER: <strong class="text-emerald-400" id="render-label">Earth + Labels</strong></span>
     </div>
   </div>
 
@@ -256,7 +256,7 @@
     let activeMarker = null;
     let vectorMap = null;
     let vectorMarker = null;
-    let mapView = 'earth';
+    let mapView = 'hybrid';
     let droneOn = true;
     let cinematicOn = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let cineRAF = null;
@@ -270,8 +270,7 @@
       { id: 'nyc', name: 'New York City', country: 'US', lat: 40.7580, lng: -73.9855, alt: 120, heading: 30, range: 600, tz: 'America/New_York', lang: 'en', airport: 'John F. Kennedy International Airport JFK', airbnb: 'New-York--NY', aliases: ['new york', 'nyc', 'manhattan'] },
       { id: 'tokyo', name: 'Tokyo, Japan', country: 'JP', lat: 35.6586, lng: 139.7454, alt: 150, heading: 90, range: 600, tz: 'Asia/Tokyo', lang: 'ja', airport: 'Haneda Airport HND Tokyo', airbnb: 'Tokyo--Japan', aliases: ['tokyo', 'japan'] },
       { id: 'rio', name: 'Rio de Janeiro, Brazil', country: 'BR', lat: -22.9068, lng: -43.1729, alt: 150, heading: 180, range: 700, tz: 'America/Sao_Paulo', lang: 'pt-BR', airport: 'Rio de Janeiro Galeão International Airport GIG', airbnb: 'Rio-de-Janeiro--Brazil', aliases: ['rio', 'brazil', 'brasil'] },
-      { id: 'cdmx', name: 'Mexico City, Mexico', country: 'MX', lat: 19.4326, lng: -99.1332, alt: 120, heading: 20, range: 600, tz: 'America/Mexico_City', lang: 'es', airport: 'Mexico City International Airport MEX', airbnb: 'Mexico-City--Mexico', aliases: ['mexico city', 'cdmx'] },
-      { id: 'cancun', name: 'Cancún, Mexico', country: 'MX', lat: 21.1619, lng: -86.8515, alt: 90, heading: 110, range: 550, tz: 'America/Cancun', lang: 'es', airport: 'Cancún International Airport CUN', airbnb: 'Cancun--Mexico', aliases: ['cancun', 'cancún'] },
+      { id: 'cancun', name: 'Cancún, Mexico', country: 'MX', lat: 21.1619, lng: -86.8515, alt: 90, heading: 110, range: 550, tz: 'America/Cancun', lang: 'es', airport: 'Cancún International Airport CUN', airbnb: 'Cancun--Mexico', aliases: ['cancun', 'cancún', 'mexico'] },
       { id: 'manila', name: 'Manila, Philippines', country: 'PH', lat: 14.5547, lng: 121.0244, alt: 120, heading: 60, range: 650, tz: 'Asia/Manila', lang: 'fil', airport: 'Ninoy Aquino International Airport MNL', airbnb: 'Manila--Philippines', aliases: ['manila', 'philippines', 'makati'] },
       { id: 'bangkok', name: 'Bangkok, Thailand', country: 'TH', lat: 13.7563, lng: 100.5018, alt: 120, heading: 120, range: 650, tz: 'Asia/Bangkok', lang: 'th', airport: 'Suvarnabhumi Airport BKK Bangkok', airbnb: 'Bangkok--Thailand', aliases: ['bangkok', 'thailand'] },
       { id: 'hcmc', name: 'Ho Chi Minh City, Vietnam', country: 'VN', lat: 10.7769, lng: 106.7009, alt: 100, heading: 45, range: 600, tz: 'Asia/Ho_Chi_Minh', lang: 'vi', airport: 'Tan Son Nhat International Airport SGN', airbnb: 'Ho-Chi-Minh-City--Vietnam', aliases: ['ho chi minh', 'saigon', 'vietnam'] },
@@ -865,7 +864,7 @@
         const mapContainer = document.getElementById('map');
         if (mapContainer && window.google) {
           mapContainer.innerHTML = `
-            <gmp-map-3d id="map-3d" center="${lat},${lng},${alt}" heading="${heading}" tilt="${tilt}" range="${range}" mode="SATELLITE" style="width:100%; height:100%;">
+            <gmp-map-3d id="map-3d" center="${lat},${lng},${alt}" heading="${heading}" tilt="${tilt}" range="${range}" mode="HYBRID" style="width:100%; height:100%;">
             </gmp-map-3d>
           `;
         }
