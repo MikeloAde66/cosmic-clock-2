@@ -808,7 +808,6 @@ export default function GalleryGrid({
             <CardHeader Icon={RadioIcon} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Radio Central</div>
-              <p className="mt-1 text-xs text-slate-200">Live streaming stations, curated ambient/cosmic channels.</p>
             </div>
           </Link>
         </ArrivalSlot>
@@ -819,7 +818,6 @@ export default function GalleryGrid({
             <CardHeader Icon={Mic} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Studio One</div>
-              <p className="mt-1 text-xs text-slate-200">Your track library, uploads, and playlists.</p>
             </div>
           </button>
         </ArrivalSlot>
@@ -830,7 +828,6 @@ export default function GalleryGrid({
             <CardHeader Icon={Telescope} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Star Tracker PRO</div>
-              <p className="mt-1 text-xs text-slate-200">Live orbital tracking and pass predictions.</p>
             </div>
           </Link>
         </ArrivalSlot>
@@ -841,7 +838,6 @@ export default function GalleryGrid({
             <CardHeader Icon={Umbrella} active={weatherActive} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Weather</div>
-              <p className="mt-1 text-xs text-slate-200">Search a ZIP, city, or address for a live NOAA forecast.</p>
             </div>
           </button>
         </ArrivalSlot>
@@ -853,7 +849,6 @@ export default function GalleryGrid({
               <CardHeader Icon={Sparkles} />
               <div className="mt-4">
                 <div className="text-sm font-bold text-white">Ai One</div>
-                <p className="mt-1 text-xs text-slate-200">Ancient technology, quantum physics, epoch cycles.</p>
               </div>
             </Link>
             {/* Admin-only notification badge for pending real-QPU approvals
@@ -885,7 +880,6 @@ export default function GalleryGrid({
             <CardHeader Icon={LayoutGrid} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Drone Simulator</div>
-              <p className="mt-1 text-xs text-slate-200">Fly a virtual drone over real-world 3D terrain.</p>
             </div>
           </Link>
         </ArrivalSlot>
@@ -903,7 +897,6 @@ export default function GalleryGrid({
             <CardHeader Icon={ShieldCheck} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Automation</div>
-              <p className="mt-1 text-xs text-slate-200">AI-powered claims demo — document intake, fraud detection, and instant payout calculation.</p>
             </div>
           </Link>
         </ArrivalSlot>
@@ -922,7 +915,6 @@ export default function GalleryGrid({
             <CardHeader Icon={Gamepad2} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Flight School</div>
-              <p className="mt-1 text-xs text-slate-200">Learn to fly — failsafe drills, AI object detection, and a real flight sim.</p>
             </div>
           </Link>
         </ArrivalSlot>
@@ -937,7 +929,6 @@ export default function GalleryGrid({
                   Digital Magazine
                   <Lock className="w-3 h-3 text-slate-400" aria-label="Admin-only" />
                 </div>
-                <p className="mt-1 text-xs text-slate-200">Media Flow &amp; Audio Center — waveform visualizer, web audio player, and every stream.</p>
               </div>
             </button>
           </div>
