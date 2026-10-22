@@ -17,11 +17,12 @@ interface GalleryGridProps {
 // Per-card gradient covers — a concrete, finished-looking visual for every
 // slot from the very first paint, rather than an empty/blurred frame while
 // the real public/gallery/ photos are staged. Colors echo each feature's
-// own accent elsewhere in the app (cyan for radio, violet for Kali, etc.)
+// own accent elsewhere in the app (fire for radio, violet for Kali, etc.)
 // rather than being generic. Pure CSS + the icon already imported for that
 // card — no external image requests, so nothing to fail or hotlink.
 const CARD_GRADIENTS: Record<string, string> = {
-  radio: 'linear-gradient(135deg, #22d3ee 0%, #0e7490 55%, #082f49 100%)',
+  // Radio Central burns: ember-dark at the top, heating to orange at the base.
+  radio: 'radial-gradient(120% 90% at 50% 115%, #f97316 0%, #c2410c 30%, #7f1d1d 60%, #1c0705 100%)',
   studio: 'linear-gradient(135deg, #c084fc 0%, #7e22ce 55%, #2e1065 100%)',
   starTracker: 'linear-gradient(135deg, #7dd3fc 0%, #1d4ed8 55%, #0f172a 100%)',
   kali: 'linear-gradient(135deg, #f0abfc 0%, #9333ea 55%, #1e1b4b 100%)',
@@ -39,7 +40,7 @@ const cardClass =
 // Radio Central's own border variant — cyan-tinted per the live waveform
 // inside it, instead of the neutral slate every other card uses.
 const cardClassRadio =
-  'group relative flex flex-col justify-between w-full h-full p-5 text-left border rounded-2xl border-cyan-500/20 bg-slate-900/40 backdrop-blur-md hover:border-cyan-400/40 hover:bg-slate-900/60 transition-all min-h-[240px] overflow-hidden';
+  'group relative flex flex-col justify-between w-full h-full p-5 text-left border rounded-2xl border-orange-500/25 bg-slate-900/40 backdrop-blur-md hover:border-orange-400/50 hover:bg-slate-900/60 transition-all min-h-[240px] overflow-hidden';
 
 // Fixed per-bar profile (no Math.random()) — a random height per render
 // would disagree between the server-rendered HTML and the client's first
@@ -71,24 +72,29 @@ const RADIO_WAVEFORM_BARS = Array.from({ length: 32 }, (_, i) => ({
 // of the static gallery photo every other card fades in (see CardImage).
 // Same gradient/dot-texture/icon-watermark base as CardImage, so it still
 // reads as part of the same card family.
+// Each bar is a flame: deep red at the base through orange and gold to a
+// white-hot tip.
+const RADIO_FIRE_BAR = 'linear-gradient(to top, #991b1b 0%, #ea580c 38%, #f59e0b 64%, #fde047 84%, #fffbeb 100%)';
+
 function RadioWaveformCardImage() {
   return (
     <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0" style={{ background: CARD_GRADIENTS.radio }}>
       <div
         className="absolute inset-0 opacity-30"
         style={{
-          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1.5px)',
+          backgroundImage: 'radial-gradient(circle, rgba(254,215,170,0.9) 1px, transparent 1.5px)',
           backgroundSize: '16px 16px',
         }}
       />
-      <RadioIcon className="absolute w-20 h-20 -right-3 -bottom-5 text-white/20" />
+      <RadioIcon className="absolute w-20 h-20 -right-3 -bottom-5 text-amber-100/20" />
       <div className="radio-waveform-scan" />
       <div className="absolute inset-x-0 bottom-0 flex items-end h-16 gap-[2px] px-3 pb-1.5">
         {RADIO_WAVEFORM_BARS.map((bar, i) => (
           <span
             key={i}
-            className="flex-1 min-w-[2px] rounded-t-sm radio-waveform-bar bg-cyan-200 shadow-[0_0_6px_rgba(103,232,249,0.85)]"
+            className="flex-1 min-w-[2px] rounded-t-sm radio-waveform-bar shadow-[0_0_8px_rgba(251,146,60,0.9)]"
             style={{
+              background: RADIO_FIRE_BAR,
               height: `${bar.height}%`,
               animationDuration: `${bar.duration}s`,
               animationDelay: `${bar.delay}s`,
@@ -216,10 +222,10 @@ function StudioPreviewCardImage() {
     <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
       {reduceMotion ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src="/media/studio-flight.jpg" alt="" className="absolute inset-0 object-cover w-full h-full" />
+        <img src="/media/studio-lab.jpg" alt="" className="absolute inset-0 object-cover w-full h-full" />
       ) : (
         <video
-          poster="/media/studio-flight.jpg"
+          poster="/media/studio-lab.jpg"
           autoPlay
           muted
           loop
@@ -228,8 +234,8 @@ function StudioPreviewCardImage() {
           aria-hidden="true"
           className="absolute inset-0 object-cover w-full h-full"
         >
-          <source src="/media/studio-flight.webm" type="video/webm" />
-          <source src="/media/studio-flight.mp4" type="video/mp4" />
+          <source src="/media/studio-lab.webm" type="video/webm" />
+          <source src="/media/studio-lab.mp4" type="video/mp4" />
         </video>
       )}
     </div>

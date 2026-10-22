@@ -261,7 +261,7 @@ body {
   position: absolute;
   inset: 0 auto 0 0;
   width: 40%;
-  background: linear-gradient(90deg, transparent, rgba(165, 243, 252, 0.35), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 237, 180, 0.4), transparent);
   animation: radio-waveform-scan 3.2s linear infinite;
   pointer-events: none;
 }
