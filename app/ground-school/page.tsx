@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Home, CheckCircle2, Circle, ExternalLink, Award, AlertTriangle } from 'lucide-react';
+import { Home, CheckCircle2, Circle, ExternalLink, Award } from 'lucide-react';
 import GroundSchoolInstructorChat from '@/components/groundSchool/GroundSchoolInstructorChat';
 
 const STORAGE_KEY = 'ai-one-ground-school-progress-v1';
@@ -206,27 +206,6 @@ export default function GroundSchoolPage() {
       </div>
 
       <div className="max-w-3xl px-4 py-8 mx-auto space-y-6">
-        {/* Disclaimer banner — up top, not buried, per the real FAA framing
-            we agreed on: this course is a practice tool and a personal
-            accomplishment badge, never a real FAA credential. */}
-        <div className="flex gap-3 p-4 text-sm border rounded-xl border-amber-500/30 bg-amber-500/5 text-amber-200">
-          <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
-          <p>
-            This course and its completion certificate are a personal-accomplishment badge from Ai One — they are{' '}
-            <strong>not a real FAA credential, license, or legal authorization to fly</strong>. US recreational
-            flyers must pass the FAA&apos;s free{' '}
-            <a
-              href="https://www.faasafety.gov/gslac/ALC/course_catalog.aspx"
-              target="_blank"
-              rel="noreferrer"
-              className="underline hover:text-amber-100"
-            >
-              TRUST exam
-            </a>{' '}
-            before flying at all; anyone flying for work or business needs a real Part 107 Remote Pilot Certificate.
-          </p>
-        </div>
-
         <Section title="1 · Core Controls & Terminology">
           <p><strong className="text-slate-100">Throttle</strong> — climbs or descends the aircraft (altitude).</p>
           <p><strong className="text-slate-100">Yaw</strong> — rotates the nose left or right around the vertical axis.</p>
@@ -394,6 +373,23 @@ export default function GroundSchoolPage() {
           </section>
         )}
       </div>
+
+      <footer className="border-t border-slate-800/80">
+        <div className="max-w-3xl px-4 py-6 mx-auto text-[11px] leading-relaxed text-slate-500">
+          This course and its completion certificate are a personal-accomplishment badge from Ai One. They are not a
+          real FAA credential, license, or legal authorization to fly. US recreational flyers must pass the FAA&apos;s
+          free{' '}
+          <a
+            href="https://www.faasafety.gov/gslac/ALC/course_catalog.aspx"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-slate-300"
+          >
+            TRUST exam
+          </a>{' '}
+          before flying at all; anyone flying for work or business needs a real Part 107 Remote Pilot Certificate.
+        </div>
+      </footer>
     </div>
   );
 }
