@@ -81,11 +81,26 @@ export default function BillingPage() {
       <div className="relative w-full min-h-screen overflow-hidden bg-[#0a0a0c] text-slate-100">
         <Starfield />
         <div className="relative z-10 flex flex-col items-center justify-center w-full h-screen gap-4 px-6 text-center">
-          <p className="text-sm text-neutral-400">Sign in to manage your billing.</p>
-          <button
-            onClick={() => router.replace('/')}
-            className="px-4 py-2 text-xs font-mono border rounded bg-neutral-900 border-neutral-700 hover:border-neutral-500 text-neutral-300"
-          >
+          <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Billing</p>
+          <h1 className="text-2xl font-bold text-white">Sign in to manage your billing</h1>
+          <p className="max-w-sm text-sm text-neutral-400">
+            New here? Every plan starts with a 14-day free trial, from $12 a month.
+          </p>
+          <div className="flex flex-wrap justify-center gap-3 mt-2">
+            <button
+              onClick={() => router.replace('/?auth=login')}
+              className="px-5 py-2.5 text-xs font-mono font-bold uppercase tracking-wide rounded-lg bg-white text-black hover:bg-neutral-200"
+            >
+              Sign in
+            </button>
+            <button
+              onClick={() => router.replace('/?checkout=required')}
+              className="px-5 py-2.5 text-xs font-mono uppercase tracking-wide border rounded-lg bg-neutral-900 border-neutral-700 hover:border-neutral-500 text-neutral-200"
+            >
+              See plans
+            </button>
+          </div>
+          <button onClick={() => router.replace('/')} className="mt-1 text-[11px] font-mono text-neutral-500 hover:text-neutral-300">
             Back to Home
           </button>
         </div>

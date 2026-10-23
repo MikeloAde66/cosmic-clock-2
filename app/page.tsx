@@ -280,6 +280,9 @@ useContextMenuShare();
 
     const checkout = searchParams.get('checkout');
     if (checkout === 'cancelled' || checkout === 'required') {
+      // Pricing lives in the hub layout; the landing layout is the gallery,
+      // which would otherwise swallow this request (same as ?view=kali).
+      changeLayoutMode('hub');
       setActiveTab('aione');
       setPricingRequestToken(Date.now());
     }
