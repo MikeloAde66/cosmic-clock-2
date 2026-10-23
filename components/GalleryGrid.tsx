@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Radio as RadioIcon, Mic, LayoutGrid, Umbrella, Sparkles, Telescope, Newspaper, ArrowUpRight, Lock, ShieldCheck, Gamepad2 } from 'lucide-react';
+import { Radio as RadioIcon, ArrowUpRight, Lock } from 'lucide-react';
 import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
 import WeatherForecastOverlay from './WeatherForecastOverlay';
 import { useKaliPendingApprovals } from '@/lib/useKaliPendingApprovals';
@@ -511,17 +511,17 @@ function HolographicLabCardImage() {
   );
 }
 
-function CardHeader({ Icon, active }: { Icon: typeof RadioIcon; active?: boolean }) {
+// Top row of a card: just the "open" arrow in the corner (shown on hover).
+// The weather card's arrow stays visible and turns green while its live
+// forecast overlay is on.
+function CardHeader({ active }: { active?: boolean }) {
   return (
-    <div className="flex items-start justify-between">
-      <div
-        className={`flex items-center justify-center w-9 h-9 rounded-lg border ${
-          active ? 'border-green-500/50 text-green-400 bg-green-500/10' : 'border-slate-700 text-slate-300 bg-slate-950/60'
+    <div className="flex items-start justify-end h-9">
+      <ArrowUpRight
+        className={`w-4 h-4 transition-opacity ${
+          active ? 'opacity-100 text-green-400' : 'opacity-0 text-slate-500 group-hover:opacity-100'
         }`}
-      >
-        <Icon className="w-4 h-4" />
-      </div>
-      <ArrowUpRight className="w-4 h-4 transition-opacity opacity-0 text-slate-500 group-hover:opacity-100" />
+      />
     </div>
   );
 }
@@ -610,7 +610,7 @@ export default function GalleryGrid({
         <ArrivalSlot index={0} docked={docked[0]} onDock={dock}>
           <Link href="/radio" className={cardClassRadio}>
             <RadioWaveformCardImage />
-            <CardHeader Icon={RadioIcon} />
+            <CardHeader />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Radio Central</div>
             </div>
@@ -620,7 +620,7 @@ export default function GalleryGrid({
         <ArrivalSlot index={1} docked={docked[1]} onDock={dock}>
           <button onClick={onOpenPods} className={cardClass}>
             <StudioPreviewCardImage />
-            <CardHeader Icon={Mic} />
+            <CardHeader />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Studio One</div>
             </div>
@@ -630,7 +630,7 @@ export default function GalleryGrid({
         <ArrivalSlot index={2} docked={docked[2]} onDock={dock}>
           <Link href="/star" className={cardClass}>
             <StarTrackerCardImage />
-            <CardHeader Icon={Telescope} />
+            <CardHeader />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Star Tracker PRO</div>
             </div>
@@ -640,7 +640,7 @@ export default function GalleryGrid({
         <ArrivalSlot index={3} docked={docked[3]} onDock={dock}>
           <button onClick={() => setShowWeatherOverlay(true)} className={cardClass}>
             <WeatherCardImage />
-            <CardHeader Icon={Umbrella} active={weatherActive} />
+            <CardHeader active={weatherActive} />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Weather</div>
             </div>
@@ -651,7 +651,7 @@ export default function GalleryGrid({
           <div className="relative w-full h-full">
             <Link href="/kali" className={cardClass}>
               <KaliQuantumEquationCardImage />
-              <CardHeader Icon={Sparkles} />
+              <CardHeader />
               <div className="mt-4">
                 <div className="text-sm font-bold text-white">Ai One</div>
               </div>
@@ -682,7 +682,7 @@ export default function GalleryGrid({
               through social media rather than this card. */}
           <Link href="/products" className={cardClass}>
             <MatrixRainCardImage />
-            <CardHeader Icon={LayoutGrid} />
+            <CardHeader />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Drone Simulator</div>
             </div>
@@ -699,7 +699,7 @@ export default function GalleryGrid({
               decision pipeline) are unchanged, still at /insurance-claims. */}
           <Link href="/insurance-claims" className={cardClass}>
             <AutomationFlowCardImage />
-            <CardHeader Icon={ShieldCheck} />
+            <CardHeader />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Automation</div>
             </div>
@@ -717,7 +717,7 @@ export default function GalleryGrid({
               Charleston; this one teaches flying itself. */}
           <Link href="/flight-school" className={cardClass}>
             <HolographicLabCardImage />
-            <CardHeader Icon={Gamepad2} />
+            <CardHeader />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Flight School</div>
             </div>
@@ -728,7 +728,7 @@ export default function GalleryGrid({
           <div className="relative w-full h-full">
             <button onClick={() => setShowMediaFlowGate(true)} className={cardClass}>
               <DigitalMagazineTickerCardImage />
-              <CardHeader Icon={Newspaper} />
+              <CardHeader />
               <div className="mt-4">
                 <div className="flex items-center gap-1.5 text-sm font-bold text-white">
                   Digital Magazine
