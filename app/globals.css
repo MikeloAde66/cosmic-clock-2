@@ -542,60 +542,6 @@ body {
   animation: automation-branch-flash 3.6s ease-in-out infinite;
 }
 
-/* Holographic Lab card (fills the old HydroNode Builder Kit slot) — a
-   pulsing containment-field orb: concentric field rings expand and fade
-   outward (sonar-ping technique, transform-box: fill-box so each ellipse
-   scales from its own center rather than the SVG viewport's origin) while
-   a rotating dashed ring and a soft vertical scan sweep keep it reading as
-   an active holographic projection rather than a static graphic. */
-@keyframes holo-ring-pulse {
-  0% {
-    transform: scale(0.55);
-    opacity: 0;
-  }
-  15% {
-    opacity: 0.85;
-  }
-  100% {
-    transform: scale(1.2);
-    opacity: 0;
-  }
-}
-.holo-ring-pulse {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation-name: holo-ring-pulse;
-  animation-timing-function: ease-out;
-  animation-iteration-count: infinite;
-}
-@keyframes holo-orb-glow {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 4px rgba(94, 234, 212, 0.6));
-  }
-  50% {
-    filter: drop-shadow(0 0 13px rgba(94, 234, 212, 0.95));
-  }
-}
-.holo-orb-glow {
-  animation: holo-orb-glow 2.4s ease-in-out infinite;
-}
-@keyframes holo-scan-sweep {
-  0% {
-    transform: translateY(-120%);
-  }
-  100% {
-    transform: translateY(120%);
-  }
-}
-.holo-scan-sweep {
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 40%;
-  background: linear-gradient(180deg, transparent, rgba(94, 234, 212, 0.25), transparent);
-  animation: holo-scan-sweep 3.6s linear infinite;
-  pointer-events: none;
-}
 
 /* Shared "metallic gold" text fill — used by the Kali equation and the
    main "Ai One" hero logo (see GalleryGrid.tsx). A deliberate, confirmed

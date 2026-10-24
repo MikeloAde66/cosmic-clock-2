@@ -78,7 +78,7 @@ const RADIO_FIRE_BAR = 'linear-gradient(to top, #991b1b 0%, #ea580c 38%, #f59e0b
 
 function RadioWaveformCardImage() {
   return (
-    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0" style={{ background: CARD_GRADIENTS.radio }}>
+    <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0" style={{ background: CARD_GRADIENTS.radio }}>
       <div
         className="absolute inset-0 opacity-30"
         style={{
@@ -197,7 +197,7 @@ function MatrixRainCardImage() {
   }, []);
 
   return (
-    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
+    <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
@@ -220,7 +220,7 @@ function LoopVideoCardImage({ name }: { name: string }) {
   }, []);
 
   return (
-    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
+    <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
       {reduceMotion ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={`/media/${name}.jpg`} alt="" className="absolute inset-0 object-cover w-full h-full" />
@@ -264,7 +264,7 @@ const DIGITAL_MAGAZINE_TICKER_TEXT = 'Welcome to the Digital Digest. Where Ancie
 // visibly resetting.
 function DigitalMagazineTickerCardImage() {
   return (
-    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden bg-black shrink-0">
+    <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden bg-black shrink-0">
       <div className="absolute inset-0 flex items-center">
         <div className="flex w-max whitespace-nowrap digital-magazine-ticker-track">
           {[0, 1].map((i) => (
@@ -335,7 +335,7 @@ function KaliQuantumEquationCardImage() {
   const fullText = KALI_EQUATIONS[equationIndex % KALI_EQUATIONS.length];
 
   return (
-    <div className="relative flex items-center justify-center w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden bg-black shrink-0">
+    <div className="relative flex items-center justify-center w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden bg-black shrink-0">
       <div
         className="px-4 font-mono text-base tracking-wide text-center kali-equation-drift metallic-gold-text"
         style={{ textShadow: '0 0 8px rgba(212,175,55,0.45), 0 0 18px rgba(184,134,11,0.28)' }}
@@ -365,7 +365,7 @@ function WeatherCardImage() {
   const [failed, setFailed] = useState(false);
 
   return (
-    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-gradient-to-br from-sky-900 via-slate-900 to-slate-950">
+    <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-gradient-to-br from-sky-900 via-slate-900 to-slate-950">
       {!failed && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -416,7 +416,7 @@ const AUTOMATION_NODE_DELAYS = AUTOMATION_NODES.map((_, i) =>
 // actually running end-to-end, not a static wiring diagram.
 function AutomationFlowCardImage() {
   return (
-    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#050810]">
+    <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#050810]">
       <div
         className="absolute inset-0 opacity-20"
         style={{
@@ -475,40 +475,10 @@ function AutomationFlowCardImage() {
   );
 }
 
-// Holographic Lab card's preview strip — fills the old HydroNode Builder
-// kit slot until real merchandise exists here. A pulsing containment-field
-// orb: concentric field rings expand and fade outward (see holo-ring-pulse
-// in globals.css) around a glowing core, with a rotating dashed ring
-// (reusing star-tracker-mini-sweep's rotate keyframe — same technique,
-// different center) and a soft vertical scan sweep on top.
-function HolographicLabCardImage() {
-  const cx = 110;
-  const cy = 48;
-  return (
-    <div className="relative w-full h-24 mb-3 -mx-5 -mt-5 overflow-hidden bg-black shrink-0">
-      <svg viewBox="0 0 220 96" className="absolute inset-0 w-full h-full">
-        {[0, 1, 2].map((i) => (
-          <ellipse
-            key={i}
-            cx={cx}
-            cy={cy}
-            rx={16 + i * 12}
-            ry={8 + i * 6}
-            fill="none"
-            stroke="rgba(94,234,212,0.7)"
-            strokeWidth={1}
-            className="holo-ring-pulse"
-            style={{ animationDuration: '2.8s', animationDelay: `${i * 0.7}s` }}
-          />
-        ))}
-        <g className="star-tracker-mini-sweep" style={{ transformOrigin: `${cx}px ${cy}px`, animationDuration: '9s' }}>
-          <circle cx={cx} cy={cy} r={30} fill="none" stroke="rgba(94,234,212,0.55)" strokeWidth={1.5} strokeDasharray="4 10" />
-        </g>
-        <circle cx={cx} cy={cy} r={9} fill="#0f766e" stroke="#5eead4" strokeWidth={1.5} className="holo-orb-glow" />
-      </svg>
-      <div className="holo-scan-sweep" />
-    </div>
-  );
+// Flight School: a drone flying low over open fields. The clip plays
+// forward and then in reverse so the loop never cuts or crossfades.
+function FlightSchoolCardImage() {
+  return <LoopVideoCardImage name="flight-drone" />;
 }
 
 // Top row of a card: just the "open" arrow in the corner (shown on hover).
@@ -716,7 +686,7 @@ export default function GalleryGrid({
               above, not a replacement — that one explores real-world
               Charleston; this one teaches flying itself. */}
           <Link href="/flight-school" className={cardClass}>
-            <HolographicLabCardImage />
+            <FlightSchoolCardImage />
             <CardHeader />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Flight School</div>
