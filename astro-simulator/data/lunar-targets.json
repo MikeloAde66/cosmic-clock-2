@@ -1,0 +1,501 @@
+{
+  "_readme": "Named lunar targets. Coordinates are selenographic degrees, latitude north-positive, longitude east-positive in (-180,180]. EVERY ROW IS UNVERIFIED: these were hand-entered from memory because planetarynames.wr.usgs.gov was unreachable (network 403) when this file was built. Run scripts/verify-targets.mjs against a Gazetteer export to check them and flip status to VERIFIED. Do not present these as authoritative until then. A depthKm of null means unknown/not entered, not zero.",
+  "source": "IAU / USGS Gazetteer of Planetary Nomenclature (Moon) -- NOT YET CHECKED",
+  "targets": [
+    {
+      "name": "Tycho",
+      "type": "crater",
+      "latDeg": -43.3,
+      "lonDeg": -11.2,
+      "diameterKm": 85,
+      "depthKm": 4.7,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Copernicus",
+      "type": "crater",
+      "latDeg": 9.6,
+      "lonDeg": -20.1,
+      "diameterKm": 96,
+      "depthKm": 3.8,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Kepler",
+      "type": "crater",
+      "latDeg": 8.1,
+      "lonDeg": -38,
+      "diameterKm": 31,
+      "depthKm": 2.7,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Aristarchus",
+      "type": "crater",
+      "latDeg": 23.7,
+      "lonDeg": -47.5,
+      "diameterKm": 40,
+      "depthKm": 3,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Plato",
+      "type": "crater",
+      "latDeg": 51.6,
+      "lonDeg": -9.4,
+      "diameterKm": 101,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Clavius",
+      "type": "crater",
+      "latDeg": -58.6,
+      "lonDeg": -14,
+      "diameterKm": 231,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Eratosthenes",
+      "type": "crater",
+      "latDeg": 14.5,
+      "lonDeg": -11.3,
+      "diameterKm": 58,
+      "depthKm": 3.6,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Archimedes",
+      "type": "crater",
+      "latDeg": 29.7,
+      "lonDeg": -4,
+      "diameterKm": 83,
+      "depthKm": 2.1,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Ptolemaeus",
+      "type": "crater",
+      "latDeg": -9.2,
+      "lonDeg": -1.9,
+      "diameterKm": 153,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Alphonsus",
+      "type": "crater",
+      "latDeg": -13.4,
+      "lonDeg": -3.2,
+      "diameterKm": 119,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Arzachel",
+      "type": "crater",
+      "latDeg": -17.7,
+      "lonDeg": -1.9,
+      "diameterKm": 96,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Theophilus",
+      "type": "crater",
+      "latDeg": -11.4,
+      "lonDeg": 26.4,
+      "diameterKm": 100,
+      "depthKm": 4.4,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Cyrillus",
+      "type": "crater",
+      "latDeg": -13.2,
+      "lonDeg": 24,
+      "diameterKm": 98,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Catharina",
+      "type": "crater",
+      "latDeg": -18.1,
+      "lonDeg": 23.4,
+      "diameterKm": 100,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Posidonius",
+      "type": "crater",
+      "latDeg": 31.8,
+      "lonDeg": 29.9,
+      "diameterKm": 95,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Langrenus",
+      "type": "crater",
+      "latDeg": -8.9,
+      "lonDeg": 61.1,
+      "diameterKm": 132,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Petavius",
+      "type": "crater",
+      "latDeg": -25.1,
+      "lonDeg": 60.4,
+      "diameterKm": 177,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Grimaldi",
+      "type": "crater",
+      "latDeg": -5.5,
+      "lonDeg": -68.3,
+      "diameterKm": 172,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Riccioli",
+      "type": "crater",
+      "latDeg": -3.3,
+      "lonDeg": -74.6,
+      "diameterKm": 146,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Schickard",
+      "type": "crater",
+      "latDeg": -44,
+      "lonDeg": -54.6,
+      "diameterKm": 227,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Gassendi",
+      "type": "crater",
+      "latDeg": -17.5,
+      "lonDeg": -40.1,
+      "diameterKm": 110,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Bailly",
+      "type": "crater",
+      "latDeg": -66.5,
+      "lonDeg": -69.1,
+      "diameterKm": 303,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Aristoteles",
+      "type": "crater",
+      "latDeg": 50.2,
+      "lonDeg": 17.4,
+      "diameterKm": 87,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Eudoxus",
+      "type": "crater",
+      "latDeg": 44.3,
+      "lonDeg": 16.3,
+      "diameterKm": 67,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Stöfler",
+      "type": "crater",
+      "latDeg": -41.1,
+      "lonDeg": 5.9,
+      "diameterKm": 126,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Maginus",
+      "type": "crater",
+      "latDeg": -50.5,
+      "lonDeg": -6.3,
+      "diameterKm": 194,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Hipparchus",
+      "type": "crater",
+      "latDeg": -5.5,
+      "lonDeg": 4.8,
+      "diameterKm": 150,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Albategnius",
+      "type": "crater",
+      "latDeg": -11.2,
+      "lonDeg": 4.1,
+      "diameterKm": 114,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Pitatus",
+      "type": "crater",
+      "latDeg": -29.8,
+      "lonDeg": -13.5,
+      "diameterKm": 106,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Bullialdus",
+      "type": "crater",
+      "latDeg": -20.7,
+      "lonDeg": -22.2,
+      "diameterKm": 61,
+      "depthKm": 3.5,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Lansberg",
+      "type": "crater",
+      "latDeg": -0.3,
+      "lonDeg": -26.6,
+      "diameterKm": 39,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Reinhold",
+      "type": "crater",
+      "latDeg": 3.3,
+      "lonDeg": -22.8,
+      "diameterKm": 42,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Aristillus",
+      "type": "crater",
+      "latDeg": 33.9,
+      "lonDeg": 1.2,
+      "diameterKm": 55,
+      "depthKm": 3.6,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Autolycus",
+      "type": "crater",
+      "latDeg": 30.7,
+      "lonDeg": 1.5,
+      "diameterKm": 39,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Hercules",
+      "type": "crater",
+      "latDeg": 46.7,
+      "lonDeg": 39.1,
+      "diameterKm": 69,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Atlas",
+      "type": "crater",
+      "latDeg": 46.7,
+      "lonDeg": 44.4,
+      "diameterKm": 87,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Messier",
+      "type": "crater",
+      "latDeg": -1.9,
+      "lonDeg": 47.6,
+      "diameterKm": 15,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Proclus",
+      "type": "crater",
+      "latDeg": 16.1,
+      "lonDeg": 46.9,
+      "diameterKm": 28,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Tsiolkovskiy",
+      "type": "crater",
+      "latDeg": -20.4,
+      "lonDeg": 129.1,
+      "diameterKm": 185,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Mare Tranquillitatis",
+      "type": "mare",
+      "latDeg": 8.5,
+      "lonDeg": 31.4,
+      "diameterKm": 875,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Mare Imbrium",
+      "type": "mare",
+      "latDeg": 32.8,
+      "lonDeg": -15.6,
+      "diameterKm": 1123,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Mare Serenitatis",
+      "type": "mare",
+      "latDeg": 28,
+      "lonDeg": 17.5,
+      "diameterKm": 707,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Mare Crisium",
+      "type": "mare",
+      "latDeg": 17,
+      "lonDeg": 59.1,
+      "diameterKm": 418,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Oceanus Procellarum",
+      "type": "mare",
+      "latDeg": 18.4,
+      "lonDeg": -57.4,
+      "diameterKm": 2568,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Mare Nubium",
+      "type": "mare",
+      "latDeg": -21.3,
+      "lonDeg": -16.6,
+      "diameterKm": 715,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Mare Fecunditatis",
+      "type": "mare",
+      "latDeg": -7.8,
+      "lonDeg": 51.3,
+      "diameterKm": 909,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Mare Humorum",
+      "type": "mare",
+      "latDeg": -24.4,
+      "lonDeg": -38.6,
+      "diameterKm": 389,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Montes Apenninus",
+      "type": "mons",
+      "latDeg": 18.9,
+      "lonDeg": -3.7,
+      "diameterKm": 401,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Rupes Recta",
+      "type": "rupes",
+      "latDeg": -22,
+      "lonDeg": -7.8,
+      "diameterKm": 110,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Apollo 11 (Statio Tranquillitatis)",
+      "type": "landing site",
+      "latDeg": 0.67,
+      "lonDeg": 23.47,
+      "diameterKm": null,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Apollo 12",
+      "type": "landing site",
+      "latDeg": -3.01,
+      "lonDeg": -23.42,
+      "diameterKm": null,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Apollo 14",
+      "type": "landing site",
+      "latDeg": -3.65,
+      "lonDeg": -17.47,
+      "diameterKm": null,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Apollo 15",
+      "type": "landing site",
+      "latDeg": 26.13,
+      "lonDeg": 3.63,
+      "diameterKm": null,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Apollo 16",
+      "type": "landing site",
+      "latDeg": -8.97,
+      "lonDeg": 15.5,
+      "diameterKm": null,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    },
+    {
+      "name": "Apollo 17",
+      "type": "landing site",
+      "latDeg": 20.19,
+      "lonDeg": 30.77,
+      "diameterKm": null,
+      "depthKm": null,
+      "status": "UNVERIFIED"
+    }
+  ]
+}
