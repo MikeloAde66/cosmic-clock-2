@@ -47,7 +47,7 @@ export const HUB_PLANS: HubPlan[] = [
       'Ai One and Kali AI',
       'Automation',
     ],
-    links: { monthly: AIONE_PRO_SUBSCRIPTION_LINK, yearly: '' },
+    links: { monthly: AIONE_PRO_SUBSCRIPTION_LINK, yearly: 'https://buy.stripe.com/4gM00dgn095Zh0W09i2wU0c' },
   },
   {
     id: 'pro',
@@ -62,7 +62,7 @@ export const HUB_PLANS: HubPlan[] = [
       'Fly the simulator with a real RC transmitter or gamepad',
       'Live drone telemetry in the Spectre-AI ground station',
     ],
-    links: { monthly: 'https://buy.stripe.com/aFadR32wYcibh0We082wU06', yearly: '' },
+    links: { monthly: 'https://buy.stripe.com/aFadR32wYcibh0We082wU06', yearly: 'https://buy.stripe.com/14A28lc7y6XReS0e082wU0d' },
   },
   {
     id: 'advanced',
@@ -77,7 +77,7 @@ export const HUB_PLANS: HubPlan[] = [
       'Network telescopes over ASCOM Alpaca',
       'Priority support',
     ],
-    links: { monthly: 'https://buy.stripe.com/fZu4gtc7y5TN4ea09i2wU05', yearly: '' },
+    links: { monthly: 'https://buy.stripe.com/fZu4gtc7y5TN4ea09i2wU05', yearly: 'https://buy.stripe.com/aFa6oB9Zq4PJ2628F02wU0e' },
   },
 ];
 
