@@ -203,7 +203,7 @@ export default function DronePage() {
                 <div className="p-3 text-purple-400 border rounded-lg bg-purple-500/10 border-purple-500/30">
                   <GraduationCap className="w-5 h-5" />
                 </div>
-                <span className="text-xs px-2.5 py-1 rounded bg-purple-500/20 text-purple-300 font-bold">13 lessons</span>
+                <span className="text-xs px-2.5 py-1 rounded bg-purple-500/20 text-purple-300 font-bold">16 lessons</span>
               </div>
               <h3 className="mb-2 text-lg font-bold text-white">Flight Academy</h3>
               <p className="mb-4 text-xs leading-relaxed text-slate-400">

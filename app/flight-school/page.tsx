@@ -16,7 +16,15 @@ import {
   RotateCcw,
   ChevronRight,
 } from 'lucide-react';
-import { LESSONS, MODULES, isUnlocked, lessonsIn, nextLesson, type ModuleId } from '@/lib/flightAcademy/curriculum';
+import {
+  CORE_LESSONS,
+  LESSONS,
+  MODULES,
+  isUnlocked,
+  lessonsIn,
+  nextLesson,
+  type ModuleId,
+} from '@/lib/flightAcademy/curriculum';
 import { EMPTY_PROGRESS, formatTime, loadProgress, rankFor, type PilotProgress } from '@/lib/flightAcademy/progress';
 
 // Flight Academy: the landing page for /flight-school. A progression path
@@ -42,7 +50,7 @@ const STEPS = [
     icon: ClipboardCheck,
     title: 'Debrief',
     kind: 'Review',
-    text: 'Stars against par time, your time on every step, and one takeaway to carry into the next flight.',
+    text: 'A score out of 100 from time, precision and smoothness. Three stars takes 85+. The instructor names the two things to fix first.',
   },
 ];
 
@@ -51,6 +59,7 @@ const MODULE_ACCENT: Record<ModuleId, string> = {
   m1: 'text-cyan-300 border-cyan-500/40 bg-cyan-500/10',
   m2: 'text-rose-300 border-rose-500/40 bg-rose-500/10',
   m3: 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10',
+  adv: 'text-violet-300 border-violet-500/40 bg-violet-500/10',
 };
 
 function Stars({ n }: { n: number }) {
@@ -77,7 +86,8 @@ export default function FlightSchoolPage() {
   const next = nextLesson(done);
   const doneCount = LESSONS.filter((l) => done[l.id]).length;
   const totalStars = LESSONS.reduce((a, l) => a + (done[l.id]?.stars ?? 0), 0);
-  const wings = doneCount === LESSONS.length;
+  const wings = CORE_LESSONS.every((l) => done[l.id]);
+  const advanced = lessonsIn('adv').every((l) => done[l.id]);
   const started = doneCount > 0;
 
   return (
@@ -258,7 +268,12 @@ export default function FlightSchoolPage() {
                               </p>
                             </div>
                             {res ? (
-                              <Stars n={res.stars} />
+                              <span className="flex items-center gap-2">
+                                {res.bestScore != null && (
+                                  <span className="text-[11px] tabular-nums text-slate-500">{res.bestScore}</span>
+                                )}
+                                <Stars n={res.stars} />
+                              </span>
                             ) : open ? (
                               <span
                                 className={`flex items-center gap-1 text-[11px] uppercase tracking-wide ${
@@ -307,8 +322,13 @@ export default function FlightSchoolPage() {
                 <h3 className={`text-base font-bold ${wings ? 'text-amber-200' : 'text-slate-500'}`}>Ai One Wings</h3>
                 <p className="mt-1 text-xs text-slate-400">
                   {wings
-                    ? 'Every lesson and checkride flown. You earned your wings.'
-                    : 'Finish every lesson and both checkrides to earn your wings.'}
+                    ? 'Every core lesson and checkride flown. You earned your wings.'
+                    : 'Finish Modules 1–3 and both checkrides to earn your wings.'}
+                </p>
+                <p className={`mt-1 text-xs ${advanced ? 'text-violet-300' : 'text-slate-500'}`}>
+                  {advanced
+                    ? 'Advanced Proficiency complete: nose-in, figure-8 and the nose-in box checkride.'
+                    : 'Advanced Proficiency is optional, for pilots who want a ceiling to chase.'}
                 </p>
               </div>
             </li>
@@ -350,6 +370,7 @@ export default function FlightSchoolPage() {
                     <li key={e.at} className="flex items-center justify-between gap-3 text-[11px]">
                       <span className="truncate text-slate-300">{e.title}</span>
                       <span className="flex items-center gap-3 shrink-0">
+                        {e.score != null && <span className="tabular-nums text-slate-500">{e.score}</span>}
                         <Stars n={e.stars} />
                         <span className="w-10 text-right tabular-nums text-slate-500">{formatTime(e.time)}</span>
                       </span>

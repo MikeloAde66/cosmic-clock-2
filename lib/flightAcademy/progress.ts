@@ -7,6 +7,8 @@ const STORAGE_KEY = 'ai-one-flight-academy-v1';
 export interface LessonResult {
   stars: number;
   bestTime: number;
+  /** Best 0-100 flight score (absent for results saved before scoring). */
+  bestScore?: number;
   at: number;
 }
 
@@ -24,6 +26,7 @@ export interface LogEntry {
   title: string;
   stars: number;
   time: number;
+  score?: number;
   at: number;
 }
 
@@ -86,6 +89,7 @@ export function recordResult(
   stars: number,
   time: number,
   evaluation?: EvalProfile | null,
+  score?: number,
 ): { next: PilotProgress; gained: number } {
   const prev = p.done[lesson.id];
   const prevXp = prev ? xpFor(prev.stars, !!lesson.checkride) : 0;
@@ -94,6 +98,7 @@ export function recordResult(
   const result: LessonResult = {
     stars: Math.max(stars, prev?.stars ?? 0),
     bestTime: prev ? Math.min(prev.bestTime, time) : time,
+    bestScore: Math.max(score ?? 0, prev?.bestScore ?? 0) || undefined,
     at: Date.now(),
   };
   const next: PilotProgress = {
@@ -102,7 +107,7 @@ export function recordResult(
     xp: p.xp + gained,
     flightSecs: p.flightSecs + time,
     evaluation: evaluation ?? p.evaluation,
-    log: [{ lessonId: lesson.id, title: lesson.title, stars, time, at: Date.now() }, ...p.log].slice(0, 30),
+    log: [{ lessonId: lesson.id, title: lesson.title, stars, time, score, at: Date.now() }, ...p.log].slice(0, 30),
   };
   return { next, gained };
 }

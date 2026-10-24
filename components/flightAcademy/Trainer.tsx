@@ -15,6 +15,7 @@ import {
   Zap,
   AlertTriangle,
   BookOpen,
+  Radio,
 } from 'lucide-react';
 import { GcsBridge, type HudKey, type StickInput } from '@/lib/flightAcademy/gcs';
 import { LESSONS, MODULES, lessonById, type Lesson, type Mem } from '@/lib/flightAcademy/curriculum';
@@ -25,6 +26,21 @@ import {
   saveProgress,
   type EvalProfile,
 } from '@/lib/flightAcademy/progress';
+import {
+  THREE_STAR,
+  formatErr,
+  scoreFlight,
+  smoothnessScore,
+  type FlightScore,
+  type GradeTally,
+} from '@/lib/flightAcademy/scoring';
+import {
+  instructorCall,
+  newStickHistory,
+  trackReversals,
+  type Callout,
+  type StickHistory,
+} from '@/lib/flightAcademy/instructor';
 
 type Phase = 'loading' | 'brief' | 'flying' | 'debrief' | 'crashed';
 
@@ -41,11 +57,17 @@ interface Debrief {
   time: number;
   gained: number;
   objTimes: number[];
-  smoothness: number;
+  score: FlightScore;
+  /** False when every stick input was all-or-nothing (keyboard). */
+  analog: boolean;
   evaluation: EvalProfile | null;
 }
 
 const TICK = 0.1;
+// A new instructor callout only replaces a different one after this long,
+// so the card reads as advice rather than flicker.
+const CALLOUT_HOLD_MS = 2500;
+const MANUAL_ONLY_NOTE = 'Fully manual lesson: this step only counts in STABILIZE. Switch MODE back.';
 
 // "Aero Link": what the student's current stick input is physically doing
 // to the propellers, and which HUD element shows it. Wording changes with
@@ -129,7 +151,7 @@ function evalProfile(mem: Mem, objTimes: number[], jerkRate: number): EvalProfil
   const altitude = clamp100(100 - altDev * 30);
   const response = clamp100(100 - Math.max(0, (objTimes[3] ?? 0) + (objTimes[4] ?? 0) - 4) * 5);
   const orientation = clamp100(100 - Math.max(0, (objTimes[5] ?? 0) - 2) * 8);
-  const smoothness = clamp100(100 - jerkRate * 40);
+  const smoothness = smoothnessScore(jerkRate);
   const overall = Math.round((hover + altitude + response + orientation + smoothness) / 5);
   return { hover, altitude, response, orientation, smoothness, overall };
 }
@@ -156,7 +178,11 @@ export default function Trainer({ lessonId }: { lessonId: string }) {
     mem: {} as Mem,
     jerk: 0,
     lastInput: { pitch: 0, roll: 0, yaw: 0, thr: 0 } as StickInput,
+    tallies: [] as GradeTally[],
+    analog: false,
+    sticks: newStickHistory() as StickHistory,
   });
+  const calloutRef = useRef<{ c: Callout | null; at: number }>({ c: null, at: 0 });
   const coachRef = useRef<{ coach: Coach | null; at: number }>({ coach: null, at: 0 });
   const hlKeyRef = useRef('');
   const setupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -167,6 +193,7 @@ export default function Trainer({ lessonId }: { lessonId: string }) {
   const [elapsed, setElapsed] = useState(0);
   const [note, setNote] = useState<string | null>(null);
   const [coach, setCoach] = useState<Coach | null>(null);
+  const [callout, setCallout] = useState<Callout | null>(null);
   const [debrief, setDebrief] = useState<Debrief | null>(null);
   const [crashReason, setCrashReason] = useState('');
   const [telemetry, setTelemetry] = useState({ mode: '—', wind: 0 });
@@ -213,7 +240,12 @@ export default function Trainer({ lessonId }: { lessonId: string }) {
       mem: {},
       jerk: 0,
       lastInput: { pitch: 0, roll: 0, yaw: 0, thr: 0 },
+      tallies: [],
+      analog: false,
+      sticks: newStickHistory(),
     };
+    calloutRef.current = { c: null, at: 0 };
+    setCallout(null);
     setObjIdx(0);
     setProg(0);
     setElapsed(0);
@@ -237,14 +269,20 @@ export default function Trainer({ lessonId }: { lessonId: string }) {
       const run = runRef.current;
       const time = run.t;
       const jerkRate = run.jerk / Math.max(1, time);
-      const smoothness = clamp100(100 - jerkRate * 40);
-      let stars = time <= l.par ? 3 : time <= l.par * 1.6 ? 2 : 1;
-      // Camera work is judged on smoothness as much as speed.
-      if (l.module === 'm3' && l.id === 'aerial-photo' && smoothness < 60) stars = Math.max(1, stars - 1);
+      const score = scoreFlight(time, l.par, jerkRate, run.tallies);
       const evaluation = l.id === 'evaluation' ? evalProfile(run.mem, run.objTimes, jerkRate) : null;
-      const { next, gained } = recordResult(loadProgress(), l, stars, time, evaluation);
+      const { next, gained } = recordResult(loadProgress(), l, score.stars, time, evaluation, score.total);
       saveProgress(next);
-      setDebrief({ stars, time, gained, objTimes: [...run.objTimes], smoothness, evaluation });
+      setDebrief({
+        stars: score.stars,
+        time,
+        gained,
+        objTimes: [...run.objTimes],
+        score,
+        analog: run.analog,
+        evaluation,
+      });
+      setCallout(null);
       setPhase('debrief');
       bridgeRef.current?.clearAll();
     };
@@ -277,6 +315,12 @@ export default function Trainer({ lessonId }: { lessonId: string }) {
           Math.abs(s.input.thr - run.lastInput.thr);
         run.jerk += d;
         run.lastInput = { ...s.input };
+        // Keyboard input is only ever 0 or ±1; anything in between is a
+        // proportional stick (gamepad, RC transmitter, on-screen sticks).
+        if (!run.analog && Object.values(s.input).some((v) => Math.abs(v) > 0.02 && Math.abs(v) < 0.98)) {
+          run.analog = true;
+        }
+        const reversals = trackReversals(run.sticks, s, run.t);
 
         if (s.crashed) {
           const fs = [...s.logs].reverse().find((l) => l.type === 'FS');
@@ -295,9 +339,21 @@ export default function Trainer({ lessonId }: { lessonId: string }) {
             run.mem.note = undefined;
             o.onStart?.(s, run.mem, b);
             b.point(o.point ?? null);
+            (o.grades ?? []).forEach((grade) => run.tallies.push({ grade, sum: 0, n: 0 }));
           }
           o.onTick?.(s, run.mem, TICK);
-          const ok = o.check(s, run.mem);
+          const manualOk = !o.manual || s.mode === 'STABILIZE';
+          if (manualOk && o.grades) {
+            const live = run.tallies.slice(-o.grades.length);
+            o.grades.forEach((g, i) => {
+              const err = g.err(s, run.mem);
+              if (err != null) {
+                live[i].sum += err;
+                live[i].n += 1;
+              }
+            });
+          }
+          const ok = manualOk && o.check(s, run.mem);
           let done = false;
           let p = 0;
           if (o.hold) {
@@ -311,8 +367,21 @@ export default function Trainer({ lessonId }: { lessonId: string }) {
           }
           objectiveHud = o.watch ?? [];
           setProg(Math.min(1, p));
-          setNote(run.mem.note ?? null);
+          setNote(manualOk ? (run.mem.note ?? null) : MANUAL_ONLY_NOTE);
           setElapsed(run.t);
+
+          const call = manualOk ? instructorCall(s, run.mem, o, reversals) : null;
+          const cur = calloutRef.current;
+          if ((call?.key ?? null) === (cur.c?.key ?? null)) {
+            // Same callout: just keep its numbers current.
+            if (call && call.text !== cur.c?.text) {
+              setCallout(call);
+              cur.c = call;
+            }
+          } else if (now - cur.at > CALLOUT_HOLD_MS || call?.tone === 'warn') {
+            setCallout(call);
+            calloutRef.current = { c: call, at: now };
+          }
           if (done) {
             o.onDone?.(s, run.mem, b);
             run.objTimes.push(run.t - run.objStart);
@@ -507,6 +576,33 @@ export default function Trainer({ lessonId }: { lessonId: string }) {
                   Highlighted in the cockpit: <span className="text-cyan-300">{obj.watch.join(' · ')}</span>
                 </p>
               )}
+              <section
+                aria-live="polite"
+                className={`p-3 border rounded-xl ${
+                  callout?.tone === 'warn'
+                    ? 'border-amber-500/50 bg-amber-500/10'
+                    : callout?.tone === 'good'
+                      ? 'border-emerald-500/40 bg-emerald-500/5'
+                      : 'border-cyan-500/30 bg-cyan-500/5'
+                }`}
+              >
+                <h2 className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-cyan-300">
+                  <span className="flex items-center gap-1.5">
+                    <Radio className="w-3.5 h-3.5" /> Instructor
+                  </span>
+                  <span className="text-[9px] font-normal text-slate-500">live from your telemetry</span>
+                </h2>
+                <p
+                  className={`mt-1.5 text-xs leading-relaxed ${
+                    callout?.tone === 'warn' ? 'text-amber-200' : callout?.tone === 'good' ? 'text-emerald-200' : 'text-slate-200'
+                  }`}
+                >
+                  {callout?.text ??
+                    (obj?.grades
+                      ? 'Watching your position, altitude and heading. Corrections appear here as you fly.'
+                      : 'Fly the step. Corrections appear here when precision counts.')}
+                </p>
+              </section>
             </>
           )}
 
@@ -545,11 +641,86 @@ export default function Trainer({ lessonId }: { lessonId: string }) {
                     />
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-slate-400">
+                <p className="mt-2 text-2xl font-bold text-white tabular-nums">
+                  {debrief.score.total}
+                  <span className="text-xs font-normal text-slate-500"> / 100</span>
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
                   {formatTime(debrief.time)} flown · par {formatTime(lesson.par)} ·{' '}
                   <span className="text-cyan-300">+{debrief.gained} XP</span>
                 </p>
               </section>
+
+              <section className="p-3 border rounded-xl border-slate-800 bg-slate-900/60">
+                <h2 className="text-[11px] font-bold uppercase tracking-wide text-cyan-300">Flight score</h2>
+                <div className="mt-3 space-y-2">
+                  {(
+                    [
+                      ['Time', debrief.score.time, debrief.score.precision == null ? '75%' : '30%'],
+                      ...(debrief.score.precision == null
+                        ? []
+                        : ([['Precision', debrief.score.precision, '55%']] as [string, number, string][])),
+                      ['Smoothness', debrief.score.smoothness, debrief.score.precision == null ? '25%' : '15%'],
+                    ] as [string, number, string][]
+                  ).map(([label, v, weight]) => (
+                    <div key={label}>
+                      <div className="flex justify-between text-[11px] text-slate-400">
+                        <span>
+                          {label} <span className="text-slate-600">· {weight}</span>
+                        </span>
+                        <span className="tabular-nums text-slate-200">{v}</span>
+                      </div>
+                      <div className="h-1.5 mt-1 overflow-hidden rounded-full bg-slate-800">
+                        <div className="h-full rounded-full bg-cyan-400" style={{ width: `${v}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {debrief.score.grades.length > 0 && (
+                  <ul className="mt-3 space-y-1 text-[11px] text-slate-400 border-t border-slate-800 pt-2">
+                    {debrief.score.grades.map((g) => (
+                      <li key={g.label} className="flex justify-between gap-3">
+                        <span className="truncate">{g.label}</span>
+                        <span className="tabular-nums shrink-0">
+                          <span className="text-slate-200">avg {formatErr(g.mean, g.unit)}</span>
+                          <span className="ml-2 text-slate-500">{g.score}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-2 text-[10px] text-slate-500">
+                  Three stars at {THREE_STAR}+, two at 60+. Measured against this lesson&apos;s tolerances in the
+                  simulator.
+                </p>
+              </section>
+
+              {(() => {
+                const notes = [...debrief.score.grades]
+                  .filter((g) => g.score < THREE_STAR)
+                  .sort((a, b) => a.score - b.score)
+                  .slice(0, 2)
+                  .map((g) => `${g.label}: ${g.advice}`);
+                if (!debrief.analog && debrief.score.smoothness < 70)
+                  notes.push(
+                    'You flew on the keyboard, which is all-or-nothing input. A gamepad or an RC transmitter in USB joystick mode gives proportional control, the way a real aircraft flies.',
+                  );
+                else if (debrief.score.smoothness < 50)
+                  notes.push('Smoothness: lots of stick movement. Hold an input, let the drone respond, then adjust.');
+                if (!notes.length) return null;
+                return (
+                  <section className="p-3 border rounded-xl border-amber-500/30 bg-amber-500/5">
+                    <h2 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-300">
+                      <Radio className="w-3.5 h-3.5" /> Instructor notes
+                    </h2>
+                    <ul className="mt-1.5 space-y-1.5 text-xs leading-relaxed text-slate-300">
+                      {notes.map((n) => (
+                        <li key={n}>{n}</li>
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })()}
 
               {debrief.evaluation && (
                 <section className="p-3 border rounded-xl border-slate-800 bg-slate-900/60">
@@ -589,12 +760,6 @@ export default function Trainer({ lessonId }: { lessonId: string }) {
                     </li>
                   ))}
                 </ol>
-                {lesson.id === 'aerial-photo' && (
-                  <p className="mt-2 text-[11px] text-slate-400">
-                    Smoothness <span className="text-slate-200">{debrief.smoothness}</span>/100
-                    {debrief.smoothness < 60 && ' (cost a star; hold steadier inputs)'}
-                  </p>
-                )}
               </section>
 
               <section className="p-3 border rounded-xl border-cyan-500/30 bg-cyan-500/5">

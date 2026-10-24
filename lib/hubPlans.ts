@@ -43,7 +43,7 @@ export const HUB_PLANS: HubPlan[] = [
       'Radio Central and Studio One',
       'Star Tracker PRO',
       'Drone Simulator with live travel guide',
-      'Flight Academy: all 13 lessons',
+      'Flight Academy: all 16 lessons, including the advanced track',
       'Ai One and Kali AI',
       'Automation',
     ],

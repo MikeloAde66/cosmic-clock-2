@@ -6,9 +6,14 @@ import { angleDiff, type ControlKey, type GcsBridge, type HudKey, type Snap } fr
 //
 // Structure (stage → module → lesson) mirrors how real pilots are trained:
 // feel the aircraft first (evaluation), learn why it moves (aero), learn to
-// read and trust the cockpit when things fail, then fly real jobs.
+// read and trust the cockpit when things fail, then fly real jobs. An
+// optional advanced track gives experienced pilots a ceiling to chase.
+//
+// Passing is pass/fail on the objectives; stars come from a 0-100 score
+// (time, precision, smoothness — see lib/flightAcademy/scoring.ts), where
+// precision is measured by each objective's `grades` while it is active.
 
-export type ModuleId = 'eval' | 'm1' | 'm2' | 'm3';
+export type ModuleId = 'eval' | 'm1' | 'm2' | 'm3' | 'adv';
 
 // Per-run scratch memory objectives share with each other.
 export interface Mem {
@@ -31,6 +36,24 @@ export interface Mem {
   hoverDevSum?: number;
   hoverAltSum?: number;
   hoverN?: number;
+  orbitRSum?: number;
+  orbitRN?: number;
+}
+
+// One precision measurement, sampled every tick while its objective is
+// active. `err` returns null for ticks that shouldn't count (for example
+// the transit to a target altitude, before the pilot is settling on it).
+// Mean error at or under `good` scores 100, at or over `bad` scores 0.
+export interface Grade {
+  label: string;
+  unit: 'm' | '°' | 'm/s';
+  good: number;
+  bad: number;
+  err: (s: Snap, m: Mem) => number | null;
+  /** Live correction, worded as stick inputs, when the error is large. */
+  fix?: (s: Snap, m: Mem) => string;
+  /** Debrief advice when this was one of the weakest grades. */
+  advice: string;
 }
 
 export interface Objective {
@@ -49,6 +72,9 @@ export interface Objective {
   onDone?: (s: Snap, m: Mem, gcs: GcsBridge) => void;
   watch?: HudKey[];
   point?: ControlKey;
+  grades?: Grade[];
+  /** Advanced lessons: the objective only counts in STABILIZE. */
+  manual?: boolean;
 }
 
 export interface Lesson {
@@ -117,6 +143,14 @@ export const MODULES: ModuleInfo[] = [
     mental: 'Plan the job, then fly the plan.',
     physical: 'Camera, gimbal and stick work at the same time.',
   },
+  {
+    id: 'adv',
+    label: 'Advanced',
+    title: 'Advanced Proficiency',
+    summary: 'For pilots who found the rest easy. A nose-in hover, a figure-8 and a nose-in box in gusty wind, all flown fully manual and graded on tight tolerances. Opens once Module 1 is complete.',
+    mental: 'Orientation when every input looks reversed.',
+    physical: 'Two sticks, four axes, all at once.',
+  },
 ];
 
 /* ---------- small helpers shared by objectives ---------- */
@@ -173,6 +207,99 @@ function lastTouchdown(s: Snap, m: Mem): number | null {
 }
 
 const altHold = (target: number, tol: number): Objective['check'] => (s) => Math.abs(s.alt - target) <= tol;
+
+/** Compass bearing from the drone to the launch pad. */
+function bearingHome(s: Snap) {
+  return ((Math.atan2(-s.e, -s.n) * 180) / Math.PI + 360) % 360;
+}
+
+/** Compass direction the drone is actually moving. */
+function trackHdg(s: Snap) {
+  return ((Math.atan2(s.ve, s.vn) * 180) / Math.PI + 360) % 360;
+}
+
+/** Distance from point (e, n) to the segment a→b. */
+function segDist(e: number, n: number, ae: number, an: number, be: number, bn: number) {
+  const de = be - ae;
+  const dn = bn - an;
+  const len2 = de * de + dn * dn || 1;
+  const t = Math.max(0, Math.min(1, ((e - ae) * de + (n - an) * dn) / len2));
+  return Math.hypot(e - (ae + t * de), n - (an + t * dn));
+}
+
+/* ---------- live corrections, worded as stick inputs ---------- */
+
+// Turns "the target is over there" into which way to push the right stick,
+// relative to where the nose points (that is what the pilot feels).
+function stickToward(s: Snap, te: number, tn: number) {
+  const de = te - s.e;
+  const dn = tn - s.n;
+  const dist = Math.hypot(de, dn);
+  const y = (s.yaw * Math.PI) / 180;
+  const fwd = de * Math.sin(y) + dn * Math.cos(y);
+  const right = de * Math.cos(y) - dn * Math.sin(y);
+  const parts: string[] = [];
+  if (Math.abs(fwd) > dist * 0.38) parts.push(fwd > 0 ? 'forward' : 'back');
+  if (Math.abs(right) > dist * 0.38) parts.push(right > 0 ? 'right' : 'left');
+  return `${dist.toFixed(1)} m off. Ease the right stick ${parts.join(' and ')}.`;
+}
+
+const fixToRing = (s: Snap, m: Mem) => stickToward(s, m.ringE ?? 0, m.ringN ?? 0);
+
+const fixAlt = (s: Snap, m: Mem) => {
+  const d = s.alt - (m.altRef ?? s.alt);
+  return `${Math.abs(d).toFixed(1)} m ${d < 0 ? 'low. A touch of throttle up' : 'high. Ease the throttle down'}.`;
+};
+
+const fixHdg = (target: (s: Snap) => number) => (s: Snap) => {
+  const d = angleDiff(s.yaw, target(s));
+  return `Nose ${Math.abs(d).toFixed(0)}° ${d > 0 ? 'right' : 'left'} of where it should be. Yaw ${d > 0 ? 'left' : 'right'} a touch.`;
+};
+
+/* ---------- reusable grades ---------- */
+
+const ringGrade = (good: number, bad: number, label = 'Drift from the spot'): Grade => ({
+  label,
+  unit: 'm',
+  good,
+  bad,
+  err: (s, m) => ringDist(s, m),
+  fix: fixToRing,
+  advice: 'Correct drift the moment it starts. A small early input beats a big late one, and it stops the overshoot.',
+});
+
+const altWanderGrade = (good: number, bad: number): Grade => ({
+  label: 'Altitude wander',
+  unit: 'm',
+  good,
+  bad,
+  err: (s, m) => (m.altRef == null ? null : Math.abs(s.alt - m.altRef)),
+  fix: fixAlt,
+  advice: 'Altitude slips while your attention is on the right stick. Glance at the ALT tape every few seconds as part of your scan.',
+});
+
+const settleGrade = (target: number, good: number, bad: number): Grade => ({
+  label: `Altitude error settling on ${target} m`,
+  unit: 'm',
+  good,
+  bad,
+  err: (s) => (Math.abs(s.alt - target) < 5 ? Math.abs(s.alt - target) : null),
+  fix: (s) => `${Math.abs(s.alt - target).toFixed(1)} m ${s.alt < target ? 'low' : 'high'} of ${target}. Small throttle input, then centre it.`,
+  advice: 'Start easing the throttle a few metres before the target so you settle on it instead of bouncing through it.',
+});
+
+// Straight-line track error between two gates of a box, both given as
+// offsets from the lesson's start point.
+const boxLineGrade = (a: [number, number], b: [number, number], good: number, bad: number): Grade => ({
+  label: 'Off the box line',
+  unit: 'm',
+  good,
+  bad,
+  err: (s, m) =>
+    segDist(s.e, s.n, (m.startE ?? 0) + a[0], (m.startN ?? 0) + a[1], (m.startE ?? 0) + b[0], (m.startN ?? 0) + b[1]),
+  fix: (s, m) => stickToward(s, (m.startE ?? 0) + b[0], (m.startN ?? 0) + b[1]),
+  advice: 'Fly each leg as a straight line: pick the next gate on the map and correct sideways drift before it builds.',
+});
 
 /* ---------- the syllabus ---------- */
 
@@ -233,6 +360,7 @@ export const LESSONS: Lesson[] = [
           m.hoverAltSum = (m.hoverAltSum ?? 0) + Math.abs(s.alt - (m.altRef ?? s.alt));
           m.hoverN = (m.hoverN ?? 0) + 1;
         },
+        grades: [ringGrade(1.5, 6, 'Hover drift'), altWanderGrade(0.5, 3)],
         check: (s, m) => inRing(s, m) && s.alt > 3,
       },
       {
@@ -295,6 +423,7 @@ export const LESSONS: Lesson[] = [
         tip: 'Left stick down. Start easing off around 23 m.',
         hold: 4,
         watch: ['altTape', 'vsi'],
+        grades: [settleGrade(20, 0.3, 2)],
         check: altHold(20, 1.5),
       },
       {
@@ -302,6 +431,7 @@ export const LESSONS: Lesson[] = [
         tip: 'Up to 3 m/s climb. Watch the VSI fall back to 0 as you level off.',
         hold: 4,
         watch: ['altTape', 'vsi'],
+        grades: [settleGrade(45, 0.3, 2)],
         check: altHold(45, 1.5),
       },
     ],
@@ -343,6 +473,7 @@ export const LESSONS: Lesson[] = [
           m.yawAcc = inRing(s, m) ? (m.yawAcc ?? 0) + d : 0;
         },
         progress: (s, m) => Math.min(1, Math.abs(m.yawAcc ?? 0) / 360),
+        grades: [ringGrade(1, 6, 'Drift during the pirouette')],
         check: (s, m) => Math.abs(m.yawAcc ?? 0) >= 360,
       },
       {
@@ -350,6 +481,20 @@ export const LESSONS: Lesson[] = [
         tip: 'Ease off early. Yaw has momentum too.',
         hold: 2,
         watch: ['heading'],
+        grades: [
+          {
+            label: 'Heading error at the stop',
+            unit: '°',
+            good: 2,
+            bad: 12,
+            err: (s) => {
+              const d = Math.abs(angleDiff(s.yaw, 0));
+              return d < 45 ? d : null;
+            },
+            fix: fixHdg(() => 0),
+            advice: 'Yaw carries momentum. Start centring the left stick about 15° before the heading you want.',
+          },
+        ],
         check: (s) => hdgNear(s, 0, 10),
       },
     ],
@@ -380,29 +525,36 @@ export const LESSONS: Lesson[] = [
         text: 'Set MODE to STABILIZE (MANUAL)',
         point: 'mode',
         watch: ['mode'],
-        onStart: (s, m) => startPoint(s, m),
+        onStart: (s, m) => {
+          startPoint(s, m);
+          m.altRef = s.alt;
+        },
         check: (s) => s.mode === 'STABILIZE',
       },
       {
         text: 'Gate 1: fly 40 m North of your start',
         tip: 'Face north first (heading 000°) so forward means north.',
         watch: ['horizon', 'map'],
+        grades: [boxLineGrade([0, 0], [0, 40], 2, 10), altWanderGrade(1, 5)],
         check: (s, m) => Math.hypot(s.e - (m.startE ?? 0), s.n - ((m.startN ?? 0) + 40)) < 7,
       },
       {
         text: 'Gate 2: 40 m East of Gate 1',
         watch: ['horizon', 'map'],
+        grades: [boxLineGrade([0, 40], [40, 40], 2, 10), altWanderGrade(1, 5)],
         check: (s, m) => Math.hypot(s.e - ((m.startE ?? 0) + 40), s.n - ((m.startN ?? 0) + 40)) < 7,
       },
       {
         text: 'Gate 3: 40 m South',
         watch: ['horizon', 'map'],
+        grades: [boxLineGrade([40, 40], [40, 0], 2, 10), altWanderGrade(1, 5)],
         check: (s, m) => Math.hypot(s.e - ((m.startE ?? 0) + 40), s.n - (m.startN ?? 0)) < 7,
       },
       {
         text: 'Gate 4: back to the start and stop (under 1.5 m/s)',
         tip: 'Counter-tilt to brake. Arrive slow.',
         watch: ['horizon', 'spdTape', 'map'],
+        grades: [boxLineGrade([40, 0], [0, 0], 2, 10), altWanderGrade(1, 5)],
         check: (s, m) => fromStart(s, m) < 7 && s.gs < 1.5,
       },
     ],
@@ -440,6 +592,17 @@ export const LESSONS: Lesson[] = [
         text: 'Land on the pad: within 3 m, touchdown under 1.5 m/s',
         tip: 'Slow down below 5 m. If you land off the pad, throttle up and try again.',
         watch: ['vsi', 'altTape', 'distHome'],
+        grades: [
+          {
+            label: 'Distance from the pad on final',
+            unit: 'm',
+            good: 0.5,
+            bad: 3,
+            err: (s) => (s.alt < 4 && !s.landed ? s.distHome : null),
+            fix: (s) => stickToward(s, 0, 0),
+            advice: 'Line up over the pad above 5 m, then descend. Chasing position in the last metre is where landings go wrong.',
+          },
+        ],
         onStart: (s, m) => markLogs(s, m),
         onTick: (s, m) => {
           const td = lastTouchdown(s, m);
@@ -480,12 +643,27 @@ export const LESSONS: Lesson[] = [
         text: 'Turn to heading 270° (West) ±8° and hold 2 s',
         hold: 2,
         watch: ['heading'],
+        grades: [
+          {
+            label: 'Heading error',
+            unit: '°',
+            good: 2,
+            bad: 8,
+            err: (s) => {
+              const d = Math.abs(angleDiff(s.yaw, 270));
+              return d < 30 ? d : null;
+            },
+            fix: fixHdg(() => 270),
+            advice: 'Read the HEADING box, not the map arrow. Small yaw taps once you are within 10°.',
+          },
+        ],
         check: (s) => hdgNear(s, 270, 8),
       },
       {
         text: 'Climb to 50 m on the ALT tape (±2 m), hold 2 s',
         hold: 2,
         watch: ['altTape', 'vsi'],
+        grades: [settleGrade(50, 0.5, 2)],
         check: altHold(50, 2),
       },
       {
@@ -493,6 +671,20 @@ export const LESSONS: Lesson[] = [
         tip: 'Hold steady forward stick. POSHOLD tops out at 10 m/s.',
         hold: 3,
         watch: ['spdTape', 'mavlink'],
+        grades: [
+          {
+            label: 'Speed error',
+            unit: 'm/s',
+            good: 0.3,
+            bad: 1.5,
+            err: (s) => (Math.abs(s.gs - 8) < 3 ? Math.abs(s.gs - 8) : null),
+            fix: (s) =>
+              s.gs < 8
+                ? `${(8 - s.gs).toFixed(1)} m/s slow. A little more forward stick.`
+                : `${(s.gs - 8).toFixed(1)} m/s fast. Ease the forward stick back a touch.`,
+            advice: 'Set the stick, then wait for the SPD tape to settle before you correct again.',
+          },
+        ],
         check: (s) => Math.abs(s.gs - 8) <= 1.5,
       },
       {
@@ -540,6 +732,7 @@ export const LESSONS: Lesson[] = [
         cumulative: true,
         watch: ['horizon', 'map'],
         onStart: (s, m) => setRing(s, m, 8),
+        grades: [ringGrade(2, 8)],
         check: (s, m) => inRing(s, m),
       },
       {
@@ -595,6 +788,7 @@ export const LESSONS: Lesson[] = [
         cumulative: true,
         watch: ['horizon', 'cam'],
         onStart: (s, m) => setRing(s, m, 10),
+        grades: [ringGrade(2, 10)],
         check: (s, m) => inRing(s, m) && s.alt > 3,
       },
       {
@@ -738,14 +932,36 @@ export const LESSONS: Lesson[] = [
         onStart: (s, m) => {
           m.lastAng = Math.atan2(s.n, s.e);
           m.orbitAcc = 0;
+          m.orbitRSum = 0;
+          m.orbitRN = 0;
+          m.altRef = s.alt;
         },
         onTick: (s, m) => {
           const ang = Math.atan2(s.n, s.e);
           let d = ((ang - (m.lastAng ?? ang)) * 180) / Math.PI;
           d = angleDiff(d, 0);
           m.lastAng = ang;
-          if (s.padInFrame && s.distHome >= 15 && s.distHome <= 70) m.orbitAcc = (m.orbitAcc ?? 0) + d;
+          if (s.padInFrame && s.distHome >= 15 && s.distHome <= 70) {
+            m.orbitAcc = (m.orbitAcc ?? 0) + d;
+            m.orbitRSum = (m.orbitRSum ?? 0) + s.distHome;
+            m.orbitRN = (m.orbitRN ?? 0) + 1;
+          }
         },
+        grades: [
+          {
+            label: 'Orbit radius wobble',
+            unit: 'm',
+            good: 2,
+            bad: 10,
+            err: (s, m) => ((m.orbitRN ?? 0) > 10 ? Math.abs(s.distHome - (m.orbitRSum ?? 0) / (m.orbitRN ?? 1)) : null),
+            fix: (s, m) =>
+              s.distHome > (m.orbitRSum ?? 0) / (m.orbitRN ?? 1)
+                ? 'Drifting wide of your circle. A little more yaw into the turn.'
+                : 'Cutting inside your circle. Ease off the yaw a touch.',
+            advice: 'Radius comes from the ratio of roll to yaw. Find the pair that works, then hold both sticks still.',
+          },
+          altWanderGrade(1, 5),
+        ],
         progress: (s, m) => Math.min(1, Math.abs(m.orbitAcc ?? 0) / 360),
         check: (s, m) => Math.abs(m.orbitAcc ?? 0) >= 360,
       },
@@ -878,6 +1094,329 @@ export const LESSONS: Lesson[] = [
     ],
     takeaway: 'On AUTO, the pilot\'s job is to plan well and stay ready to take over.',
   },
+
+  /* ---------------- Advanced Proficiency ---------------- */
+  {
+    id: 'nose-in-hover',
+    module: 'adv',
+    code: 'A.1',
+    title: 'Nose-In Hover',
+    skill: 'Reversed orientation',
+    minutes: 4,
+    par: 80,
+    start: 'air',
+    wind: 4,
+    windFrom: 200,
+    gusts: true,
+    brief: {
+      why: [
+        'Nose-in means the drone faces you, the pilot standing at the launch pad. Every right-stick input now looks reversed from where you stand: stick right moves it to your left, stick forward brings it toward you.',
+        'Most pilots can hover tail-in. Nose-in is where orientation breaks down under pressure, which is why proficiency tests use it.',
+        'Fully manual, in gusts. The autopilot will not hold anything for you, and the lesson only counts while you are in STABILIZE.',
+      ],
+      watch: ['Mission Map: the drone arrow should point at the H pad.', 'HEADING box, ALT tape and the Artificial Horizon.'],
+      chairFly: 'Picture the drone 25 m out, facing you. Say it: "stick right, it goes my left. Stick back, it goes away from me." Run it until you stop hesitating.',
+      realWorld: 'Nose-in station-keeping is a standard maneuver in multirotor proficiency evaluations, and the one that separates pilots who think about the sticks from pilots who don\'t.',
+    },
+    objectives: [
+      {
+        text: 'Set MODE to STABILIZE (MANUAL)',
+        point: 'mode',
+        watch: ['mode'],
+        check: (s) => s.mode === 'STABILIZE',
+      },
+      {
+        text: 'Fly to the spot 25 m North of the pad (within 4 m)',
+        tip: 'The pad is the H on the Mission Map. DIST HOME should read about 25.',
+        watch: ['map', 'distHome'],
+        manual: true,
+        onStart: (s, m) => {
+          m.ringE = 0;
+          m.ringN = 25;
+          m.ringR = 4;
+        },
+        check: (s, m) => inRing(s, m),
+      },
+      {
+        text: 'Turn nose-in: point the nose at the pad (±10°) for 2 s',
+        tip: 'Heading about 180°. Keep correcting drift while you yaw.',
+        hold: 2,
+        manual: true,
+        watch: ['heading', 'map'],
+        check: (s, m) => hdgNear(s, bearingHome(s), 10) && ringDist(s, m) < 6,
+      },
+      {
+        text: 'Hold nose-in: within 3 m, ±1.5 m altitude, nose ±15° for 12 s',
+        tip: 'The timer resets if any limit breaks. Small inputs, and remember they look reversed.',
+        hold: 12,
+        manual: true,
+        watch: ['horizon', 'altTape', 'heading', 'map'],
+        onStart: (s, m) => {
+          m.ringR = 3;
+          m.altRef = s.alt;
+        },
+        grades: [
+          ringGrade(0.7, 3, 'Drift from the spot'),
+          altWanderGrade(0.3, 1.5),
+          {
+            label: 'Nose off the pad',
+            unit: '°',
+            good: 3,
+            bad: 15,
+            err: (s) => Math.abs(angleDiff(s.yaw, bearingHome(s))),
+            fix: fixHdg(bearingHome),
+            advice: 'Heading drifts while you fight position. Make yaw part of the scan: position, altitude, nose, repeat.',
+          },
+        ],
+        check: (s, m) =>
+          inRing(s, m) && Math.abs(s.alt - (m.altRef ?? s.alt)) <= 1.5 && hdgNear(s, bearingHome(s), 15),
+      },
+    ],
+    takeaway: 'Nose-in is a translation problem, not a hand problem. Once "reversed" stops needing thought, you have it.',
+  },
+  {
+    id: 'figure-eight',
+    module: 'adv',
+    code: 'A.2',
+    title: 'Figure-8',
+    skill: 'Coordinated turns',
+    minutes: 5,
+    par: 120,
+    start: 'air',
+    wind: 3,
+    brief: {
+      why: [
+        'A figure-8 is two circles that cross over the pad: one clockwise, one counter-clockwise. You fly roll, pitch and yaw together and swap direction in the middle.',
+        'Coordinated means the nose points along your flight path the whole way, like an aircraft turning, not a drone sliding sideways. Your score counts it.',
+        'Each loop is centred 15 m from the pad, east then west, so both pass straight over the H. Watch the map, not just the camera.',
+      ],
+      watch: ['Mission Map: two even circles that touch at the pad.', 'HEADING against your direction of travel.', 'ALT tape: hold one height all the way round.'],
+      chairFly: 'Over the pad heading north: curve right, all the way round, back over the pad still heading north, then curve left. Hands: forward stick for speed, right stick and yaw together for the turn.',
+      realWorld: 'Figure-8s are a standard proficiency maneuver because they expose every weak axis: orientation flips twice per lap.',
+    },
+    objectives: [
+      {
+        text: 'Set MODE to STABILIZE (MANUAL)',
+        point: 'mode',
+        watch: ['mode'],
+        check: (s) => s.mode === 'STABILIZE',
+      },
+      {
+        text: 'Fly over the pad (DIST HOME under 3 m)',
+        manual: true,
+        watch: ['distHome', 'map'],
+        check: (s) => s.distHome < 3,
+      },
+      {
+        text: 'Loop 1: a clockwise circle around a point 15 m East of the pad',
+        tip: 'Head north over the pad, then curve right. Stay 8–22 m from the loop centre.',
+        manual: true,
+        watch: ['map', 'heading', 'altTape'],
+        onStart: (s, m) => {
+          m.altRef = s.alt;
+          m.lastAng = Math.atan2(s.n, s.e - 15);
+          m.orbitAcc = 0;
+        },
+        onTick: (s, m) => {
+          const ang = Math.atan2(s.n, s.e - 15);
+          const d = angleDiff(((ang - (m.lastAng ?? ang)) * 180) / Math.PI, 0);
+          m.lastAng = ang;
+          const r = Math.hypot(s.e - 15, s.n);
+          if (s.mode === 'STABILIZE' && r >= 8 && r <= 22) m.orbitAcc = (m.orbitAcc ?? 0) + d;
+        },
+        progress: (s, m) => Math.max(0, Math.min(1, -(m.orbitAcc ?? 0) / 360)),
+        grades: [
+          {
+            label: 'Loop radius error',
+            unit: 'm',
+            good: 2,
+            bad: 8,
+            err: (s) => Math.abs(Math.hypot(s.e - 15, s.n) - 15),
+            fix: (s) =>
+              Math.hypot(s.e - 15, s.n) > 15 ? 'Running wide. Tighten the turn: more yaw and roll into it.' : 'Cutting inside. Open the turn a little.',
+            advice: 'Pick a bank and yaw rate that give a 15 m circle and hold them. Most wobble comes from re-deciding the turn every second.',
+          },
+          altWanderGrade(1, 5),
+          {
+            label: 'Nose off the flight path',
+            unit: '°',
+            good: 10,
+            bad: 60,
+            err: (s) => (s.gs > 2 ? Math.abs(angleDiff(s.yaw, trackHdg(s))) : null),
+            fix: fixHdg(trackHdg),
+            advice: 'Lead the turn with yaw so the nose stays on the path. If you are sliding sideways, the yaw is late.',
+          },
+        ],
+        check: (s, m) => -(m.orbitAcc ?? 0) >= 360,
+      },
+      {
+        text: 'Loop 2: a counter-clockwise circle around a point 15 m West',
+        tip: 'Back over the pad heading north, then curve left.',
+        manual: true,
+        watch: ['map', 'heading', 'altTape'],
+        onStart: (s, m) => {
+          m.lastAng = Math.atan2(s.n, s.e + 15);
+          m.orbitAcc = 0;
+        },
+        onTick: (s, m) => {
+          const ang = Math.atan2(s.n, s.e + 15);
+          const d = angleDiff(((ang - (m.lastAng ?? ang)) * 180) / Math.PI, 0);
+          m.lastAng = ang;
+          const r = Math.hypot(s.e + 15, s.n);
+          if (s.mode === 'STABILIZE' && r >= 8 && r <= 22) m.orbitAcc = (m.orbitAcc ?? 0) + d;
+        },
+        progress: (s, m) => Math.max(0, Math.min(1, (m.orbitAcc ?? 0) / 360)),
+        grades: [
+          {
+            label: 'Loop radius error',
+            unit: 'm',
+            good: 2,
+            bad: 8,
+            err: (s) => Math.abs(Math.hypot(s.e + 15, s.n) - 15),
+            fix: (s) =>
+              Math.hypot(s.e + 15, s.n) > 15 ? 'Running wide. Tighten the turn: more yaw and roll into it.' : 'Cutting inside. Open the turn a little.',
+            advice: 'Pick a bank and yaw rate that give a 15 m circle and hold them. Most wobble comes from re-deciding the turn every second.',
+          },
+          altWanderGrade(1, 5),
+          {
+            label: 'Nose off the flight path',
+            unit: '°',
+            good: 10,
+            bad: 60,
+            err: (s) => (s.gs > 2 ? Math.abs(angleDiff(s.yaw, trackHdg(s))) : null),
+            fix: fixHdg(trackHdg),
+            advice: 'Lead the turn with yaw so the nose stays on the path. If you are sliding sideways, the yaw is late.',
+          },
+        ],
+        check: (s, m) => (m.orbitAcc ?? 0) >= 360,
+      },
+      {
+        text: 'Finish over the pad and stop (under 1.5 m/s)',
+        manual: true,
+        watch: ['distHome', 'spdTape'],
+        check: (s) => s.distHome < 3 && s.gs < 1.5,
+      },
+    ],
+    takeaway: 'Lead with yaw, hold the bank, and let the circle come to you. Smooth and steady is what makes it round.',
+  },
+  {
+    id: 'nose-in-box',
+    module: 'adv',
+    code: 'A.3',
+    title: 'Nose-In Box in Wind',
+    skill: 'Checkride',
+    minutes: 5,
+    par: 120,
+    start: 'air',
+    wind: 5,
+    windFrom: 300,
+    gusts: true,
+    checkride: true,
+    brief: {
+      why: [
+        'The Module 1 box again, but with the nose held facing south the whole way, toward you at the pad. The first leg north is flown backwards.',
+        'Every leg uses a different stick: back, then left, then forward, then right, and the gusts push you off each one differently.',
+        'Gates are 4 m wide and only count with the nose within 25° of south. Fully manual.',
+      ],
+      watch: ['Mission Map: your track against the box.', 'HEADING: hold 180°.', 'ALT tape and the Artificial Horizon.'],
+      chairFly: 'Nose south. North is "stick back." East is "stick left." South is "stick forward." West is "stick right." Say each leg before you fly it.',
+      realWorld: 'Holding a fixed heading while translating in every direction is exactly what inspection work asks for: the camera stays on the structure while you move around it.',
+    },
+    objectives: [
+      {
+        text: 'STABILIZE, then point the nose South (180° ±10°) for 2 s',
+        point: 'mode',
+        hold: 2,
+        watch: ['mode', 'heading'],
+        onStart: (s, m) => {
+          startPoint(s, m);
+          m.altRef = s.alt;
+        },
+        check: (s) => s.mode === 'STABILIZE' && hdgNear(s, 180, 10),
+      },
+      {
+        text: 'Gate 1: 30 m North, flown backwards, nose still South',
+        tip: 'Right stick back. Keep the left stick ready for heading.',
+        manual: true,
+        watch: ['map', 'heading'],
+        grades: [
+          boxLineGrade([0, 0], [0, 30], 1.5, 8),
+          altWanderGrade(1, 5),
+          {
+            label: 'Heading off 180°',
+            unit: '°',
+            good: 4,
+            bad: 25,
+            err: (s) => Math.abs(angleDiff(s.yaw, 180)),
+            fix: fixHdg(() => 180),
+            advice: 'Gusts yaw you as well as push you. Keep a light touch on the left stick and check HEADING every few seconds.',
+          },
+        ],
+        check: (s, m) => Math.hypot(s.e - (m.startE ?? 0), s.n - ((m.startN ?? 0) + 30)) < 4 && hdgNear(s, 180, 25),
+      },
+      {
+        text: 'Gate 2: 30 m East, nose South',
+        tip: 'Right stick left: with the nose south, left is east.',
+        manual: true,
+        watch: ['map', 'heading'],
+        grades: [
+          boxLineGrade([0, 30], [30, 30], 1.5, 8),
+          altWanderGrade(1, 5),
+          {
+            label: 'Heading off 180°',
+            unit: '°',
+            good: 4,
+            bad: 25,
+            err: (s) => Math.abs(angleDiff(s.yaw, 180)),
+            fix: fixHdg(() => 180),
+            advice: 'Gusts yaw you as well as push you. Keep a light touch on the left stick and check HEADING every few seconds.',
+          },
+        ],
+        check: (s, m) =>
+          Math.hypot(s.e - ((m.startE ?? 0) + 30), s.n - ((m.startN ?? 0) + 30)) < 4 && hdgNear(s, 180, 25),
+      },
+      {
+        text: 'Gate 3: 30 m South, nose South',
+        manual: true,
+        watch: ['map', 'heading'],
+        grades: [
+          boxLineGrade([30, 30], [30, 0], 1.5, 8),
+          altWanderGrade(1, 5),
+          {
+            label: 'Heading off 180°',
+            unit: '°',
+            good: 4,
+            bad: 25,
+            err: (s) => Math.abs(angleDiff(s.yaw, 180)),
+            fix: fixHdg(() => 180),
+            advice: 'Gusts yaw you as well as push you. Keep a light touch on the left stick and check HEADING every few seconds.',
+          },
+        ],
+        check: (s, m) => Math.hypot(s.e - ((m.startE ?? 0) + 30), s.n - (m.startN ?? 0)) < 4 && hdgNear(s, 180, 25),
+      },
+      {
+        text: 'Gate 4: back to the start, nose South, and stop',
+        tip: 'Right stick right. Counter-tilt early so you arrive under 1.5 m/s.',
+        manual: true,
+        watch: ['map', 'heading', 'spdTape'],
+        grades: [
+          boxLineGrade([30, 0], [0, 0], 1.5, 8),
+          altWanderGrade(1, 5),
+          {
+            label: 'Heading off 180°',
+            unit: '°',
+            good: 4,
+            bad: 25,
+            err: (s) => Math.abs(angleDiff(s.yaw, 180)),
+            fix: fixHdg(() => 180),
+            advice: 'Gusts yaw you as well as push you. Keep a light touch on the left stick and check HEADING every few seconds.',
+          },
+        ],
+        check: (s, m) => fromStart(s, m) < 4 && s.gs < 1.5 && hdgNear(s, 180, 25),
+      },
+    ],
+    takeaway: 'Heading and track are separate jobs. Pilots who can hold one while flying the other can do inspection work.',
+  },
 ];
 
 export function lessonById(id: string) {
@@ -888,13 +1427,18 @@ export function lessonsIn(mod: ModuleId) {
   return LESSONS.filter((l) => l.module === mod);
 }
 
+/** The core syllabus that earns wings; the advanced track is optional. */
+export const CORE_LESSONS = LESSONS.filter((l) => l.module !== 'adv');
+
 // Learn-in-order gating: within a module each lesson unlocks the next, and
 // each module unlocks once the previous one is finished. Module 3 missions
-// are independent jobs, so they all open together.
+// are independent jobs, so they all open together. The advanced track opens
+// after Module 1, since it builds purely on manual stick skills.
 export function isUnlocked(lesson: Lesson, done: Record<string, unknown>) {
   const idx = LESSONS.indexOf(lesson);
   if (idx <= 0) return true;
   if (lesson.module === 'm3') return lessonsIn('m2').every((l) => done[l.id]);
+  if (lesson.module === 'adv' && LESSONS[idx - 1].module !== 'adv') return lessonsIn('m1').every((l) => done[l.id]);
   return !!done[LESSONS[idx - 1].id];
 }
 
