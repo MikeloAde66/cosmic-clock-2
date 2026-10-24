@@ -49,7 +49,7 @@ export default function SunView() {
   const [code, setCode] = useState(SDO_FILTERS[0].code);
   const [bust, setBust] = useState(0);
   const [load, setLoad] = useState<Load>('loading');
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
   const [observer, setObserver] = useState(DEFAULT_OBSERVER);
   const filter = SDO_FILTERS.find((f) => f.code === code)!;
 
@@ -57,7 +57,10 @@ export default function SunView() {
     const refresh = setInterval(() => setBust(Date.now()), REFRESH_MS);
     const tick = setInterval(() => setNow(new Date()), 1000);
     // First cache-bust after mount (Date.now() is impure during render).
-    const first = setTimeout(() => setBust(Date.now()), 0);
+    const first = setTimeout(() => {
+      setBust(Date.now());
+      setNow(new Date());
+    }, 0);
     return () => {
       clearInterval(refresh);
       clearInterval(tick);
@@ -72,8 +75,8 @@ export default function SunView() {
       { timeout: 8000 },
     );
 
-  const sun = bodyHorizon('Sun', observer, now);
-  const lst = localSiderealHours(now, observer.lonDeg);
+  const sun = now ? bodyHorizon('Sun', observer, now) : null;
+  const lst = now ? localSiderealHours(now, observer.lonDeg) : 0;
   const hms = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}h ${String(Math.floor((h % 1) * 60)).padStart(2, '0')}m`;
 
   return (
@@ -145,6 +148,7 @@ export default function SunView() {
               </button>
             </div>
             <p className="mt-1 text-[11px] text-slate-400">{observer.label}</p>
+            {sun && (
             <dl className="grid grid-cols-2 mt-3 text-[11px] gap-y-1.5 tabular-nums">
               <dt className="text-slate-500">Altitude</dt>
               <dd className="text-right">{sun.altDeg.toFixed(1)}° {sun.altDeg < 0 ? '(below horizon)' : ''}</dd>
@@ -155,6 +159,7 @@ export default function SunView() {
               <dt className="text-slate-500">Local sidereal</dt>
               <dd className="text-right">{hms(lst)}</dd>
             </dl>
+            )}
             <p className="mt-3 text-[10px] text-slate-600">Ephemeris math (astronomy-engine), not an instrument reading.</p>
           </div>
         </aside>

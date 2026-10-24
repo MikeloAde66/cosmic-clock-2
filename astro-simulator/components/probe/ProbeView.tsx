@@ -144,7 +144,7 @@ export default function ProbeView() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 auto-rows-min sm:grid-cols-3">
           <Bar label="Pressure" value={bar < 10 ? bar.toFixed(2) : bar.toFixed(1)} unit="bar" frac={bar / planet.hullPressureBar} warn={bar > planet.hullPressureBar} />
           <Bar label="Hull temp" value={p.hullTempK.toFixed(0)} unit="K" frac={p.hullTempK / planet.hullTempK} warn={p.hullTempK > planet.hullTempK} />
           <Bar label="Ambient" value={ambient.toFixed(0)} unit="K" frac={ambient / planet.hullTempK} />
