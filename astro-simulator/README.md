@@ -47,3 +47,5 @@ Telescope hardware control. `lib/telescope/interface.ts` is an interface stub on
 ## Deploy
 
 Vercel project with **Root Directory = `astro-simulator`**, framework Next.js, domain `astrosim.protolabsglobal.com` (`CNAME astrosim -> cname.vercel-dns.com.`). No environment variables are required.
+
+Vercel project: `astro-simulator` (team Mekelo Ade's projects). `astrosim.protolabsglobal.com` is attached to it for the `claude/astro-simulator` branch; `main` is not used by this app yet.
