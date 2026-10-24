@@ -206,7 +206,8 @@ function MatrixRainCardImage() {
 // A card's preview strip as a muted, looping video clip. Each clip is cut
 // to loop without a visible seam or a fade to black, so it plays as one
 // steady scene. Plays inline on phones; viewers who ask for reduced
-// motion get the still poster frame instead.
+// motion get the still poster frame instead. The poster also sits behind
+// the video as the strip's background, so it never shows blank.
 function LoopVideoCardImage({ name }: { name: string }) {
   const [reduceMotion, setReduceMotion] = useState(false);
 
@@ -220,7 +221,10 @@ function LoopVideoCardImage({ name }: { name: string }) {
   }, []);
 
   return (
-    <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
+    <div
+      className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617] bg-cover bg-center"
+      style={{ backgroundImage: `url(/media/${name}.jpg)` }}
+    >
       {reduceMotion ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={`/media/${name}.jpg`} alt="" className="absolute inset-0 object-cover w-full h-full" />
@@ -475,8 +479,8 @@ function AutomationFlowCardImage() {
   );
 }
 
-// Flight School: a drone flying low over open fields. The clip plays
-// forward and then in reverse so the loop never cuts or crossfades.
+// Flight School: a drone holding a steady hover over open fields, on a
+// 5-second loop that restarts on the still photo behind it.
 function FlightSchoolCardImage() {
   return <LoopVideoCardImage name="flight-drone" />;
 }
