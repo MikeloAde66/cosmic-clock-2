@@ -62,7 +62,7 @@ export const HUB_PLANS: HubPlan[] = [
       'Fly the simulator with a real RC transmitter or gamepad',
       'Live drone telemetry in the Spectre-AI ground station',
     ],
-    links: { monthly: '', yearly: '' },
+    links: { monthly: 'https://buy.stripe.com/aFadR32wYcibh0We082wU06', yearly: '' },
   },
   {
     id: 'advanced',
@@ -77,7 +77,7 @@ export const HUB_PLANS: HubPlan[] = [
       'Network telescopes over ASCOM Alpaca',
       'Priority support',
     ],
-    links: { monthly: '', yearly: '' },
+    links: { monthly: 'https://buy.stripe.com/fZu4gtc7y5TN4ea09i2wU05', yearly: '' },
   },
 ];
 
