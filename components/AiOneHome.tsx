@@ -218,7 +218,9 @@ export default function AiOneHome({
                 className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-mono uppercase tracking-wide rounded border transition bg-slate-900/60 border-neutral-700 text-white/70 hover:border-neutral-500 hover:text-white hover:bg-white/10"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                Back
+                {/* The header's own "← BACK" leaves for protolabsglobal.com;
+                    this one only closes the section, so it says where it goes. */}
+                Back to the hub
               </button>
             </div>
             <div className="flex-1 min-h-0">
