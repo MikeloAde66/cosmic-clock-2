@@ -13,7 +13,8 @@ export default function DroneView() {
   const [label, setLabel] = useState('T-3');
   const [cover, setCover] = useState(false);
   const [run, setRun] = useState(0);
-  const [hud, setHud] = useState<DroneHud>({ speed: 0, throttle: 0, moonDist: 0, pitchDeg: 0, rollDeg: 0, headingDeg: 0, sunGlow: 0 });
+  const [assist, setAssist] = useState(true);
+  const [hud, setHud] = useState<DroneHud>({ speed: 0, throttle: 0, moonDist: 0, pitchDeg: 0, rollDeg: 0, headingDeg: 0, sunGlow: 0, stage: 'approach', orbit: 0, toRing: 0, assisting: false });
   const inputs = useRef<DroneInputs>({ lx: 0, ly: 0, rx: 0, ry: 0 });
 
   const toFlight = useCallback(() => {
@@ -35,6 +36,17 @@ export default function DroneView() {
 
   const faceMoon = useCallback(() => {
     inputs.current.recenter = Date.now();
+  }, []);
+
+  const toggleAssist = useCallback(() => {
+    setAssist((a) => {
+      inputs.current.assist = !a;
+      return !a;
+    });
+  }, []);
+
+  const restartMission = useCallback(() => {
+    inputs.current.resetMission = Date.now();
   }, []);
 
   const replay = () => {
@@ -63,7 +75,7 @@ export default function DroneView() {
           </button>
         </>
       ) : (
-        <CockpitHud hud={hud} onLeft={onLeft} onRight={onRight} onReplay={replay} onFaceMoon={faceMoon} />
+        <CockpitHud hud={hud} assist={assist} onLeft={onLeft} onRight={onRight} onReplay={replay} onFaceMoon={faceMoon} onToggleAssist={toggleAssist} onRestart={restartMission} />
       )}
     </div>
   );

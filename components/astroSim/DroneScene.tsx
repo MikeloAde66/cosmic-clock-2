@@ -14,6 +14,10 @@ export interface DroneInputs {
   ry: number;
   /** Set to a new timestamp to ask the autopilot to swing the nose toward the Moon. */
   recenter?: number;
+  /** Orbit assist: gently holds the orbit ring once the pilot lets go of the sticks. */
+  assist?: boolean;
+  /** Set to a new timestamp to restart the mission. */
+  resetMission?: number;
 }
 
 export interface DroneHud {
@@ -25,6 +29,12 @@ export interface DroneHud {
   headingDeg: number;
   /** 0..1, how directly the pilot is looking into the Sun. */
   sunGlow: number;
+  stage: 'approach' | 'orbit' | 'done';
+  /** 0..1, how much of the single orbit has been flown. */
+  orbit: number;
+  /** distance from the ship to the orbit ring, in units */
+  toRing: number;
+  assisting: boolean;
 }
 
 const LAUNCH_SECONDS = 5;
@@ -137,11 +147,38 @@ function PadScene({ onLabel, onDone }: { onLabel: (s: string) => void; onDone: (
 
 // -------------------------------------------------------------------- flight
 
-const MOON_RADIUS = 4000;
-const MOON_POS = new THREE.Vector3(-2600, -500, -9000);
-const MAX_SPEED = 420;
+// Everything here is deliberately small and slow: the Moon starts as a modest
+// disc, and the pilot crawls toward it. Speed is felt, not seen.
+const MOON_RADIUS = 450;
+const MOON_POS = new THREE.Vector3(-350, -60, -2400);
+const MAX_SPEED = 80;
 const MIN_THROTTLE = 0.12; // the vessel never sits still: there is always a cruise
+const ORBIT_ALT = 150;
+const ORBIT_R = MOON_RADIUS + ORBIT_ALT;
+const ORBIT_N = new THREE.Vector3(0.12, 1, 0.1).normalize(); // the ring's plane
 const SUN_DIR = new THREE.Vector3(3000, 1200, 2000).normalize();
+
+// Fixed in-plane basis for measuring how far round the ring the ship has gone.
+const RING_E1 = new THREE.Vector3().crossVectors(ORBIT_N, new THREE.Vector3(0, 0, 1)).normalize();
+const RING_E2 = new THREE.Vector3().crossVectors(ORBIT_N, RING_E1).normalize();
+
+// A thin guide ring marking the orbit.
+function OrbitRing() {
+  const ring = useMemo(() => {
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= 160; i++) {
+      const a = (i / 160) * Math.PI * 2;
+      pts.push(RING_E1.clone().multiplyScalar(Math.cos(a) * ORBIT_R).add(RING_E2.clone().multiplyScalar(Math.sin(a) * ORBIT_R)));
+    }
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: '#67e8f9', transparent: true, opacity: 0.55, depthWrite: false }),
+    );
+    line.position.copy(MOON_POS);
+    return line;
+  }, []);
+  return <primitive object={ring} />;
+}
 
 function Moon() {
   const [map, setMap] = useState<THREE.Texture | null>(null);
@@ -197,7 +234,7 @@ function SunGlow() {
 // Pilot's-eye flight: no vehicle in view, the camera IS the cockpit window.
 function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; onHud: (h: DroneHud) => void }) {
   const ship = useRef<THREE.Group>(null);
-  const state = useRef({ thr: 0.25, speed: 90, yawS: 0, pitchS: 0, rollS: 0, t: 0, hudT: 0, lastRecenter: 0, auto: 0 });
+  const state = useRef({ thr: 0.35, speed: 28, yawS: 0, pitchS: 0, rollS: 0, t: 0, hudT: 0, lastRecenter: 0, auto: 0, lastReset: 0, look: 0, accum: 0, prevA: null as number | null, dir: 0, stage: 'approach' as 'approach' | 'orbit' | 'done', assisting: false });
   const lookM = useMemo(() => new THREE.Matrix4(), []);
   const goalQ = useMemo(() => new THREE.Quaternion(), []);
   const keys = useRef({ w: 0, s: 0, a: 0, d: 0, up: 0, down: 0, left: 0, right: 0 });
@@ -206,6 +243,10 @@ function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; 
   const fwd = useMemo(() => new THREE.Vector3(), []);
   const euler = useMemo(() => new THREE.Euler(), []);
   const dq = useMemo(() => new THREE.Quaternion(), []);
+  const rel = useMemo(() => new THREE.Vector3(), []);
+  const radial = useMemo(() => new THREE.Vector3(), []);
+  const tang = useMemo(() => new THREE.Vector3(), []);
+  const aim = useMemo(() => new THREE.Vector3(), []);
   const camQ = useMemo(() => new THREE.Quaternion(), []);
   const swayQ = useMemo(() => new THREE.Quaternion(), []);
   const swayE = useMemo(() => new THREE.Euler(), []);
@@ -262,16 +303,16 @@ function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; 
 
     // Ease every control toward its target, so nothing snaps or stops dead:
     // a critically damped feel, rates blend in and out rather than switching.
-    const ease = 1 - Math.exp(-dt * 4.2);
+    const ease = 1 - Math.exp(-dt * 2.2);
     s.yawS += (yawIn - s.yawS) * ease;
     s.pitchS += (pitchIn - s.pitchS) * ease;
     s.rollS += (rollIn - s.rollS) * ease;
 
-    s.thr = Math.max(MIN_THROTTLE, Math.min(1, s.thr + thrIn * dt * 0.45));
-    s.speed += (s.thr * MAX_SPEED - s.speed) * (1 - Math.exp(-dt * 1.1));
+    s.thr = Math.max(MIN_THROTTLE, Math.min(1, s.thr + thrIn * dt * 0.22));
+    s.speed += (s.thr * MAX_SPEED - s.speed) * (1 - Math.exp(-dt * 0.6));
 
     // orientation in the vessel's own axes (+ a whisper of constant drift)
-    euler.set(s.pitchS * dt * 0.9, -(s.yawS * 0.8 + 0.02) * dt, -(s.rollS * 0.9 + 0.015) * dt, 'YXZ');
+    euler.set(s.pitchS * dt * 0.32, -(s.yawS * 0.28 + 0.004) * dt, -(s.rollS * 0.32 + 0.003) * dt, 'YXZ');
     dq.setFromEuler(euler);
     g.quaternion.multiply(dq).normalize();
 
@@ -279,13 +320,39 @@ function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; 
     const rc = i.recenter ?? 0;
     if (rc && rc !== s.lastRecenter) {
       s.lastRecenter = rc;
-      s.auto = 2.6;
+      s.auto = 4.5;
     }
     if (s.auto > 0) {
       s.auto -= dt;
       lookM.lookAt(g.position, MOON_POS, tmp.set(0, 1, 0));
       goalQ.setFromRotationMatrix(lookM);
-      g.quaternion.slerp(goalQ, 1 - Math.exp(-dt * 2.2));
+      g.quaternion.slerp(goalQ, 1 - Math.exp(-dt * 1.0));
+    }
+
+    // orbit assist: when the sticks rest and the ship is near the ring, steer along it
+    if (i.resetMission && i.resetMission !== s.lastReset) {
+      s.lastReset = i.resetMission;
+      s.stage = 'approach';
+      s.accum = 0;
+      s.prevA = null;
+      s.dir = 0;
+    }
+    rel.copy(g.position).sub(MOON_POS);
+    const rDist = rel.length();
+    const handsOn = Math.abs(yawIn) + Math.abs(pitchIn) + Math.abs(rollIn) > 0.2;
+    s.assisting = (i.assist ?? true) && !handsOn && s.stage !== 'done' && rDist < ORBIT_R + 500 && s.auto <= 0;
+    if (s.assisting) {
+      // project onto the ring plane, then aim a little way ahead along the ring
+      radial.copy(rel).addScaledVector(ORBIT_N, -rel.dot(ORBIT_N));
+      if (radial.lengthSq() < 1) radial.copy(RING_E1);
+      radial.normalize();
+      fwd.set(0, 0, -1).applyQuaternion(g.quaternion);
+      tang.crossVectors(ORBIT_N, radial);
+      const dirSign = s.dir !== 0 ? s.dir : tang.dot(fwd) >= 0 ? 1 : -1;
+      aim.copy(MOON_POS).addScaledVector(radial, ORBIT_R * Math.cos(0.4)).addScaledVector(tang, dirSign * ORBIT_R * Math.sin(0.4));
+      lookM.lookAt(g.position, aim, tmp.set(0, 1, 0));
+      goalQ.setFromRotationMatrix(lookM);
+      g.quaternion.slerp(goalQ, 1 - Math.exp(-dt * 0.9));
     }
 
     fwd.set(0, 0, -1).applyQuaternion(g.quaternion);
@@ -294,15 +361,48 @@ function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; 
     // slide around the Moon rather than stopping against it
     const toMoon = tmp.copy(g.position).sub(MOON_POS);
     const dist = toMoon.length() - MOON_RADIUS;
-    if (dist < 40) {
-      g.position.copy(MOON_POS).add(toMoon.normalize().multiplyScalar(MOON_RADIUS + 40));
+    const toRing = Math.abs(dist + MOON_RADIUS - ORBIT_R);
+    if (dist < 60) {
+      g.position.copy(MOON_POS).add(toMoon.normalize().multiplyScalar(MOON_RADIUS + 60));
+    }
+
+    // mission: one full lap of the ring, measured as angle swept about the Moon
+    if (s.stage !== 'done') {
+      rel.copy(g.position).sub(MOON_POS);
+      const rr = rel.length();
+      const offPlane = Math.abs(rel.dot(ORBIT_N));
+      const onRing = Math.abs(rr - ORBIT_R) < 140 && offPlane < 140;
+      if (onRing) {
+        const a = Math.atan2(rel.dot(RING_E2), rel.dot(RING_E1));
+        if (s.prevA !== null) {
+          let d = a - s.prevA;
+          if (d > Math.PI) d -= Math.PI * 2;
+          if (d < -Math.PI) d += Math.PI * 2;
+          s.accum += d;
+          if (s.dir === 0 && Math.abs(s.accum) > 0.05) s.dir = Math.sign(s.accum);
+        }
+        s.prevA = a;
+        if (s.stage === 'approach') s.stage = 'orbit';
+        if (Math.abs(s.accum) >= Math.PI * 2) s.stage = 'done';
+      } else {
+        s.prevA = null;
+        if (rr > ORBIT_R + 700 && s.stage === 'orbit') {
+          s.stage = 'approach'; // wandered off: start the lap again
+          s.accum = 0;
+          s.dir = 0;
+        }
+      }
     }
 
     // the camera is the pilot's head: ship pose + gentle sway + lean into turns
+    // while the assist flies the ring, the pilot turns their head toward the Moon
+    aim.set(1, 0, 0).applyQuaternion(g.quaternion);
+    const side = aim.dot(rel.copy(MOON_POS).sub(g.position)) >= 0 ? -1 : 1;
+    s.look += ((s.assisting ? 0.9 * side : 0) - s.look) * (1 - Math.exp(-dt * 0.7));
     swayE.set(
-      Math.sin(s.t * 0.7) * 0.0035 + Math.sin(s.t * 1.9) * 0.0014,
-      Math.sin(s.t * 0.5 + 1) * 0.003,
-      -s.yawS * 0.07 + Math.sin(s.t * 0.9 + 2) * 0.0035,
+      Math.sin(s.t * 0.7) * 0.0035 + Math.sin(s.t * 1.9) * 0.0014 - Math.abs(s.look) * 0.08,
+      Math.sin(s.t * 0.5 + 1) * 0.003 + s.look,
+      -s.yawS * 0.04 + Math.sin(s.t * 0.9 + 2) * 0.0035,
       'YXZ',
     );
     swayQ.setFromEuler(swayE);
@@ -321,7 +421,7 @@ function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; 
       const headingDeg = ((Math.atan2(f.x, -f.z) * 180) / Math.PI + 360) % 360;
       const sunDot = f.dot(SUN_DIR);
       const sunGlow = Math.max(0, Math.min(1, (sunDot - 0.82) / 0.17));
-      onHud({ speed: s.speed, throttle: s.thr, moonDist: Math.max(0, dist), pitchDeg, rollDeg, headingDeg, sunGlow });
+      onHud({ speed: s.speed, throttle: s.thr, moonDist: Math.max(0, dist), pitchDeg, rollDeg, headingDeg, sunGlow, stage: s.stage, orbit: Math.min(1, Math.abs(s.accum) / (Math.PI * 2)), toRing, assisting: s.assisting });
     }
   });
 
@@ -333,6 +433,7 @@ function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; 
       <Stars radius={60000} depth={2000} count={5000} factor={400} fade={false} speed={0.6} />
       <SunGlow />
       <Moon />
+      <OrbitRing />
       <group ref={ship} />
     </>
   );
@@ -354,7 +455,7 @@ export default function DroneScene({
   onHud: (h: DroneHud) => void;
 }) {
   return (
-    <Canvas camera={{ position: [70, 14, 105], fov: 50, near: 0.5, far: 200000 }} dpr={[1, 2]}>
+    <Canvas camera={{ position: [70, 14, 105], fov: 50, near: 0.5, far: 120000 }} dpr={[1, 2]}>
       {phase === 'pad' ? <PadScene onLabel={onLabel} onDone={onLaunchDone} /> : <FlightScene inputs={inputs} onHud={onHud} />}
     </Canvas>
   );

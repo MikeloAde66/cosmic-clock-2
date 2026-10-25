@@ -34,7 +34,13 @@ export default function FlightStick({ label, color, onChange }: { label: string;
       <p className="mb-1 text-[9px] tracking-[0.14em] uppercase text-slate-400">{label}</p>
       <div
         ref={pad}
-        className="relative w-[96px] h-[96px] sm:w-[104px] sm:h-[104px] rounded-full border border-slate-600 bg-slate-950/80 touch-none cursor-grab shadow-[inset_0_0_18px_rgba(0,0,0,0.9)]"
+        className="relative w-[96px] h-[96px] sm:w-[104px] sm:h-[104px] rounded-full touch-none cursor-grab"
+        style={{
+          border: '4px solid transparent',
+          background:
+            'radial-gradient(circle at 50% 38%, #1b1f25 0%, #07090c 70%) padding-box, linear-gradient(135deg,#f5f7fa 0%,#9aa3ad 18%,#3a4048 38%,#c9ced4 52%,#6c737b 70%,#e8ebee 86%,#555c64 100%) border-box',
+          boxShadow: 'inset 0 0 18px rgba(0,0,0,0.95), 0 2px 6px rgba(0,0,0,0.8)',
+        }}
         onPointerDown={(e) => {
           active.current = e.pointerId;
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -49,12 +55,15 @@ export default function FlightStick({ label, color, onChange }: { label: string;
         onPointerCancel={reset}
         onLostPointerCapture={reset}
       >
-        <div className="absolute left-1/2 top-2 bottom-2 w-px bg-slate-800" />
+        <div className="absolute left-1/2 top-2 bottom-2 w-px bg-slate-700/70" />
         <div className="absolute top-1/2 left-2 right-2 h-px bg-slate-800" />
         <div
           ref={knob}
           className="absolute w-[38px] h-[38px] -mt-[19px] -ml-[19px] rounded-full pointer-events-none left-1/2 top-1/2"
-          style={{ border: `2px solid ${color}`, background: `${color}33`, boxShadow: `0 0 10px ${color}66` }}
+          style={{
+            background: 'radial-gradient(circle at 35% 28%, #ffffff 0%, #b8c0c8 28%, #4b525a 68%, #14171b 100%)',
+            boxShadow: `0 0 0 2px ${color}, 0 0 10px ${color}77, 0 3px 6px rgba(0,0,0,0.7)`,
+          }}
         />
       </div>
     </div>
