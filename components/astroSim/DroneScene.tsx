@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Stars } from '@react-three/drei';
 import * as THREE from 'three';
-import { LaunchStack, Orbiter } from './Shuttle';
+import { LaunchStack } from './Shuttle';
 
 // Stick values, each -1..1, y up-positive. Left = yaw + throttle, right = roll + pitch.
 export interface DroneInputs {
@@ -12,12 +12,19 @@ export interface DroneInputs {
   ly: number;
   rx: number;
   ry: number;
+  /** Set to a new timestamp to ask the autopilot to swing the nose toward the Moon. */
+  recenter?: number;
 }
 
 export interface DroneHud {
   speed: number;
   throttle: number;
   moonDist: number;
+  pitchDeg: number;
+  rollDeg: number;
+  headingDeg: number;
+  /** 0..1, how directly the pilot is looking into the Sun. */
+  sunGlow: number;
 }
 
 const LAUNCH_SECONDS = 5;
@@ -133,9 +140,12 @@ function PadScene({ onLabel, onDone }: { onLabel: (s: string) => void; onDone: (
 const MOON_RADIUS = 4000;
 const MOON_POS = new THREE.Vector3(-2600, -500, -9000);
 const MAX_SPEED = 420;
+const MIN_THROTTLE = 0.12; // the vessel never sits still: there is always a cruise
+const SUN_DIR = new THREE.Vector3(3000, 1200, 2000).normalize();
 
 function Moon() {
   const [map, setMap] = useState<THREE.Texture | null>(null);
+  const mesh = useRef<THREE.Mesh>(null);
   useEffect(() => {
     let alive = true;
     new THREE.TextureLoader().load(
@@ -151,24 +161,54 @@ function Moon() {
       alive = false;
     };
   }, []);
+  useFrame((_, dt) => {
+    if (mesh.current) mesh.current.rotation.y += dt * 0.004; // slow, endless turn
+  });
   return (
-    <mesh position={MOON_POS} rotation={[0.1, 2.2, 0]}>
+    <mesh ref={mesh} position={MOON_POS} rotation={[0.1, 2.2, 0]}>
       <sphereGeometry args={[MOON_RADIUS, 96, 64]} />
       <meshStandardMaterial key={map ? 'textured' : 'plain'} map={map ?? undefined} color={map ? '#ffffff' : '#7a7a7a'} roughness={1} />
     </mesh>
   );
 }
 
+// A soft additive glow standing in for the Sun's disc and halo.
+function SunGlow() {
+  const tex = useMemo(() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const g = c.getContext('2d')!;
+    const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, 'rgba(255,255,245,1)');
+    grad.addColorStop(0.08, 'rgba(255,244,214,0.95)');
+    grad.addColorStop(0.25, 'rgba(255,200,120,0.35)');
+    grad.addColorStop(1, 'rgba(255,160,60,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 256, 256);
+    return new THREE.CanvasTexture(c);
+  }, []);
+  return (
+    <sprite position={SUN_DIR.clone().multiplyScalar(60000)} scale={[16000, 16000, 1]}>
+      <spriteMaterial map={tex} transparent blending={THREE.AdditiveBlending} depthWrite={false} />
+    </sprite>
+  );
+}
+
+// Pilot's-eye flight: no vehicle in view, the camera IS the cockpit window.
 function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; onHud: (h: DroneHud) => void }) {
   const ship = useRef<THREE.Group>(null);
-  const state = useRef({ thr: 0, speed: 0, hudT: 0 });
+  const state = useRef({ thr: 0.25, speed: 90, yawS: 0, pitchS: 0, rollS: 0, t: 0, hudT: 0, lastRecenter: 0, auto: 0 });
+  const lookM = useMemo(() => new THREE.Matrix4(), []);
+  const goalQ = useMemo(() => new THREE.Quaternion(), []);
   const keys = useRef({ w: 0, s: 0, a: 0, d: 0, up: 0, down: 0, left: 0, right: 0 });
-  const [thrust, setThrust] = useState(0);
   const { camera } = useThree();
-  const q = useMemo(() => new THREE.Quaternion(), []);
   const tmp = useMemo(() => new THREE.Vector3(), []);
-  const camTarget = useMemo(() => new THREE.Vector3(), []);
+  const fwd = useMemo(() => new THREE.Vector3(), []);
   const euler = useMemo(() => new THREE.Euler(), []);
+  const dq = useMemo(() => new THREE.Quaternion(), []);
+  const camQ = useMemo(() => new THREE.Quaternion(), []);
+  const swayQ = useMemo(() => new THREE.Quaternion(), []);
+  const swayE = useMemo(() => new THREE.Euler(), []);
 
   useEffect(() => {
     const map: Record<string, keyof typeof keys.current> = {
@@ -194,16 +234,14 @@ function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; 
     };
   }, []);
 
-  useEffect(() => {
-    camera.position.set(0, 16, 70);
-  }, [camera]);
-
   useFrame((_, rawDt) => {
     const g = ship.current;
     if (!g) return;
     const dt = Math.min(rawDt, 0.05);
     const s = state.current;
     const k = keys.current;
+    s.t += dt;
+
     // gamepad (standard mapping): left stick yaw/throttle, right stick roll/pitch
     let gl = { x: 0, y: 0 }, gr = { x: 0, y: 0 };
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -217,44 +255,73 @@ function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; 
     }
     const clamp = (v: number) => Math.max(-1, Math.min(1, v));
     const i = inputs.current;
-    const yaw = clamp(i.lx + gl.x + k.d - k.a);
+    const yawIn = clamp(i.lx + gl.x + k.d - k.a);
     const thrIn = clamp(i.ly + gl.y + k.w - k.s);
-    const roll = clamp(i.rx + gr.x + k.right - k.left);
-    const pitch = clamp(i.ry + gr.y + k.up - k.down);
+    const rollIn = clamp(i.rx + gr.x + k.right - k.left);
+    const pitchIn = clamp(i.ry + gr.y + k.up - k.down);
 
-    s.thr = Math.max(0, Math.min(1, s.thr + thrIn * dt * 0.45));
-    s.speed += (s.thr * MAX_SPEED - s.speed) * Math.min(1, dt * 1.4);
+    // Ease every control toward its target, so nothing snaps or stops dead:
+    // a critically damped feel, rates blend in and out rather than switching.
+    const ease = 1 - Math.exp(-dt * 4.2);
+    s.yawS += (yawIn - s.yawS) * ease;
+    s.pitchS += (pitchIn - s.pitchS) * ease;
+    s.rollS += (rollIn - s.rollS) * ease;
 
-    // orientation in the ship's own axes: yaw right = -Y, pitch up = +X, roll right = -Z
-    q.copy(g.quaternion);
-    euler.set(pitch * dt * 0.9, -yaw * dt * 0.8, -roll * dt * 1.3, 'YXZ');
-    const dq = new THREE.Quaternion().setFromEuler(euler);
-    g.quaternion.copy(q.multiply(dq)).normalize();
+    s.thr = Math.max(MIN_THROTTLE, Math.min(1, s.thr + thrIn * dt * 0.45));
+    s.speed += (s.thr * MAX_SPEED - s.speed) * (1 - Math.exp(-dt * 1.1));
 
-    tmp.set(0, 0, -1).applyQuaternion(g.quaternion).multiplyScalar(s.speed * dt);
-    g.position.add(tmp);
+    // orientation in the vessel's own axes (+ a whisper of constant drift)
+    euler.set(s.pitchS * dt * 0.9, -(s.yawS * 0.8 + 0.02) * dt, -(s.rollS * 0.9 + 0.015) * dt, 'YXZ');
+    dq.setFromEuler(euler);
+    g.quaternion.multiply(dq).normalize();
 
-    // keep out of the Moon
-    const toMoon = g.position.clone().sub(MOON_POS);
-    const dist = toMoon.length() - MOON_RADIUS;
-    if (dist < 25) {
-      g.position.copy(MOON_POS).add(toMoon.normalize().multiplyScalar(MOON_RADIUS + 25));
-      s.speed *= 0.9;
-      s.thr *= 0.9;
+    // autopilot: swing the nose onto the Moon, wings level, over a couple of seconds
+    const rc = i.recenter ?? 0;
+    if (rc && rc !== s.lastRecenter) {
+      s.lastRecenter = rc;
+      s.auto = 2.6;
+    }
+    if (s.auto > 0) {
+      s.auto -= dt;
+      lookM.lookAt(g.position, MOON_POS, tmp.set(0, 1, 0));
+      goalQ.setFromRotationMatrix(lookM);
+      g.quaternion.slerp(goalQ, 1 - Math.exp(-dt * 2.2));
     }
 
-    // chase camera
-    camTarget.set(0, 16, 70).applyQuaternion(g.quaternion).add(g.position);
-    camera.position.lerp(camTarget, 1 - Math.exp(-dt * 4));
-    camera.up.set(0, 1, 0).applyQuaternion(g.quaternion);
-    tmp.set(0, 3, -80).applyQuaternion(g.quaternion).add(g.position);
-    camera.lookAt(tmp);
+    fwd.set(0, 0, -1).applyQuaternion(g.quaternion);
+    g.position.addScaledVector(fwd, s.speed * dt);
+
+    // slide around the Moon rather than stopping against it
+    const toMoon = tmp.copy(g.position).sub(MOON_POS);
+    const dist = toMoon.length() - MOON_RADIUS;
+    if (dist < 40) {
+      g.position.copy(MOON_POS).add(toMoon.normalize().multiplyScalar(MOON_RADIUS + 40));
+    }
+
+    // the camera is the pilot's head: ship pose + gentle sway + lean into turns
+    swayE.set(
+      Math.sin(s.t * 0.7) * 0.0035 + Math.sin(s.t * 1.9) * 0.0014,
+      Math.sin(s.t * 0.5 + 1) * 0.003,
+      -s.yawS * 0.07 + Math.sin(s.t * 0.9 + 2) * 0.0035,
+      'YXZ',
+    );
+    swayQ.setFromEuler(swayE);
+    camQ.copy(g.quaternion).multiply(swayQ);
+    camera.quaternion.slerp(camQ, 1 - Math.exp(-dt * 12));
+    camera.position.copy(g.position);
 
     s.hudT += dt;
-    if (s.hudT > 0.15) {
+    if (s.hudT > 0.1) {
       s.hudT = 0;
-      setThrust(s.thr);
-      onHud({ speed: s.speed, throttle: s.thr, moonDist: Math.max(0, dist) });
+      const f = fwd;
+      const up = tmp.set(0, 1, 0).applyQuaternion(g.quaternion);
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(g.quaternion);
+      const pitchDeg = (Math.asin(Math.max(-1, Math.min(1, f.y))) * 180) / Math.PI;
+      const rollDeg = (Math.atan2(right.y, up.y) * 180) / Math.PI;
+      const headingDeg = ((Math.atan2(f.x, -f.z) * 180) / Math.PI + 360) % 360;
+      const sunDot = f.dot(SUN_DIR);
+      const sunGlow = Math.max(0, Math.min(1, (sunDot - 0.82) / 0.17));
+      onHud({ speed: s.speed, throttle: s.thr, moonDist: Math.max(0, dist), pitchDeg, rollDeg, headingDeg, sunGlow });
     }
   });
 
@@ -263,11 +330,10 @@ function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; 
       <color attach="background" args={['#000005']} />
       <ambientLight intensity={0.28} />
       <directionalLight position={[3000, 1200, 2000]} intensity={2.6} />
-      <Stars radius={60000} depth={2000} count={5000} factor={400} fade={false} />
+      <Stars radius={60000} depth={2000} count={5000} factor={400} fade={false} speed={0.6} />
+      <SunGlow />
       <Moon />
-      <group ref={ship}>
-        <Orbiter throttle={thrust} />
-      </group>
+      <group ref={ship} />
     </>
   );
 }
