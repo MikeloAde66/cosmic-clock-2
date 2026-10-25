@@ -487,8 +487,6 @@ function FlightSchoolCardImage() {
 
 // Astro Simulator: a lat/lon-gridded moon with a targeting reticle. Static
 // SVG (no video asset), so it is a decorative preview, not imagery.
-const ASTRO_SIM_URL = 'https://astrosim.protolabsglobal.com';
-
 function AstroSimCardImage() {
   return (
     <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
@@ -745,16 +743,15 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={9} docked={docked[9]} onDock={dock}>
-          {/* Astro Simulator ships as its own Vercel project (astro-simulator/
-              in this repo) on its own domain, so this is a plain external
-              link rather than a Next route. */}
-          <a href={ASTRO_SIM_URL} className={cardClass}>
+          {/* Astro Simulator is a real route in this app (app/astro-sim), the
+              same pattern as Flight School. */}
+          <Link href="/astro-sim" className={cardClass}>
             <AstroSimCardImage />
             <CardHeader />
             <div className="mt-4">
               <div className="text-sm font-bold text-white">Astro Simulator</div>
             </div>
-          </a>
+          </Link>
         </ArrivalSlot>
       </div>
 
