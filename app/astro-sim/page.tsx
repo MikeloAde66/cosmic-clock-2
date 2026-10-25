@@ -25,8 +25,8 @@ const TILES: { href: string; title: string; bg: string; size: string; position: 
     sunImg: 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0304.jpg',
   },
   {
-    href: '/astro-sim/probe',
-    title: 'Probe Drop',
+    href: '/astro-sim/drone',
+    title: 'Space Drone',
     bg: 'linear-gradient(180deg,#1b1209 0%,#6b4a2a 14%,#c9a06a 24%,#8a5a34 34%,#d8b98a 46%,#7a4a2c 58%,#c28d58 70%,#5a3a22 84%,#1b1209 100%)',
     size: 'cover',
     position: 'center',
