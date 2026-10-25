@@ -25,6 +25,13 @@ const TILES: { href: string; title: string; bg: string; size: string; position: 
     sunImg: 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0304.jpg',
   },
   {
+    href: '/astro-sim/atlas',
+    title: 'Planet Atlas',
+    bg: 'url(/textures/atlas-mars.jpg)',
+    size: 'cover',
+    position: '50% 50%',
+  },
+  {
     href: '/astro-sim/drone',
     title: 'Space Drone',
     bg: 'linear-gradient(180deg,#1b1209 0%,#6b4a2a 14%,#c9a06a 24%,#8a5a34 34%,#d8b98a 46%,#7a4a2c 58%,#c28d58 70%,#5a3a22 84%,#1b1209 100%)',
@@ -39,7 +46,7 @@ export default function AstroSimPage() {
   return (
     <div className="fixed inset-0 flex flex-col w-full h-full bg-[#07090E] text-slate-100 font-mono">
       <SiteHeader eyebrow="Astro Simulator" title="Ai One Virtual Observatory" />
-      <main className="grid flex-1 min-h-0 grid-rows-3 sm:grid-rows-1 sm:grid-cols-3">
+      <main className="grid flex-1 min-h-0 grid-rows-4 sm:grid-rows-1 sm:grid-cols-4">
         {TILES.map((t) => (
           <Link
             key={t.href}

@@ -1,0 +1,134 @@
+{
+  "_readme": "Every value below was extracted programmatically from NASA NSSDC Planetary Fact Sheet pages on retrievedOn. Nothing is typed from memory. Each world lists its source page and that page's own Last Updated line.",
+  "worlds": {
+    "moon": {
+      "source": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+      "lastUpdated": "11 January 2024",
+      "retrievedOn": "2026-10-25",
+      "facts": [
+        {
+          "label": "Mass",
+          "value": "0.07346",
+          "unit": "10²⁴ kg"
+        },
+        {
+          "label": "Mean radius",
+          "value": "1737.4",
+          "unit": "km"
+        },
+        {
+          "label": "Mean density",
+          "value": "3344",
+          "unit": "kg/m³"
+        },
+        {
+          "label": "Surface gravity",
+          "value": "1.62",
+          "unit": "m/s²"
+        },
+        {
+          "label": "Escape velocity",
+          "value": "2.38",
+          "unit": "km/s"
+        },
+        {
+          "label": "Topographic range",
+          "value": "13",
+          "unit": "km"
+        },
+        {
+          "label": "Sidereal rotation period",
+          "value": "655.720",
+          "unit": "hours"
+        },
+        {
+          "label": "Distance from Earth (semimajor axis)",
+          "value": "0.3844",
+          "unit": "10⁶ km"
+        },
+        {
+          "label": "Orbital period around Earth",
+          "value": "27.3217",
+          "unit": "days"
+        },
+        {
+          "label": "Bond albedo",
+          "value": "0.11",
+          "unit": ""
+        },
+        {
+          "label": "Surface pressure (night)",
+          "value": "3 × 10⁻¹⁵ bar (2 × 10⁻¹² torr)",
+          "unit": ""
+        }
+      ]
+    },
+    "mars": {
+      "source": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html",
+      "lastUpdated": "19 May 2025",
+      "retrievedOn": "2026-10-25",
+      "facts": [
+        {
+          "label": "Mass",
+          "value": "0.64169",
+          "unit": "10²⁴ kg"
+        },
+        {
+          "label": "Mean radius",
+          "value": "3389.5",
+          "unit": "km"
+        },
+        {
+          "label": "Mean density",
+          "value": "3934",
+          "unit": "kg/m³"
+        },
+        {
+          "label": "Surface gravity (mean)",
+          "value": "3.73",
+          "unit": "m/s²"
+        },
+        {
+          "label": "Escape velocity",
+          "value": "5.03",
+          "unit": "km/s"
+        },
+        {
+          "label": "Topographic range",
+          "value": "30",
+          "unit": "km"
+        },
+        {
+          "label": "Sidereal rotation period",
+          "value": "24.6229",
+          "unit": "hours"
+        },
+        {
+          "label": "Length of day",
+          "value": "24.6597",
+          "unit": "hours"
+        },
+        {
+          "label": "Distance from Sun (semimajor axis)",
+          "value": "227.956",
+          "unit": "10⁶ km"
+        },
+        {
+          "label": "Orbital period around the Sun",
+          "value": "686.980",
+          "unit": "days"
+        },
+        {
+          "label": "Bond albedo",
+          "value": "0.250",
+          "unit": ""
+        },
+        {
+          "label": "Surface pressure",
+          "value": "6.36 mb at mean radius (variable from 4.0 to 8.7 mb depending on season)",
+          "unit": ""
+        }
+      ]
+    }
+  }
+}
