@@ -80,6 +80,11 @@ export default function MoonView() {
                 : 'No real lunar map is bundled in this build. This is a procedural stand-in, not imagery of the Moon'
             }
           />
+          {tex?.real && (
+            <p className="max-w-[16rem] text-[10px] leading-snug text-amber-200/80">
+              Surface: NASA/GSFC/SVS CGI Moon Kit, from LRO LROC and LOLA data. Colour map, enhanced for display.
+            </p>
+          )}
           {!tex?.real && tex && (
             <p className="max-w-[16rem] text-[10px] leading-snug text-fuchsia-200/80">
               Procedural surface. Add public/textures/moon.jpg (NASA LRO map) for real imagery.
@@ -130,11 +135,21 @@ export default function MoonView() {
                 <dt className="text-slate-500">Diameter</dt>
                 <dd className="text-right text-slate-100">{shown.diameterKm != null ? `${shown.diameterKm} km` : '—'}</dd>
                 <dt className="text-slate-500">Depth</dt>
-                <dd className="text-right text-slate-100">{shown.depthKm != null ? `${shown.depthKm} km` : '—'}</dd>
+                <dd className="text-right text-slate-100">{shown.depthKm != null ? `~${shown.depthKm} km` : '—'}</dd>
               </dl>
-              {unverified && (
+              {unverified ? (
                 <p className="mt-3 text-[10px] leading-snug text-rose-300/90">
-                  UNVERIFIED: coordinates not yet checked against the IAU/USGS Gazetteer.
+                  UNVERIFIED: {shown.note ?? 'coordinates not yet checked against the IAU/USGS Gazetteer.'}
+                </p>
+              ) : (
+                <p className="mt-3 text-[10px] leading-snug text-emerald-300/90">
+                  Verified: IAU/USGS Gazetteer.{' '}
+                  {shown.source && (
+                    <a href={shown.source} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-200">
+                      Record
+                    </a>
+                  )}
+                  {shown.depthKm != null && ' Depth is approximate, from NASA LOLA elevation data.'}
                 </p>
               )}
             </>

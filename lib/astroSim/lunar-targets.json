@@ -1,447 +1,533 @@
 {
-  "_readme": "Named lunar targets. Coordinates are selenographic degrees, latitude north-positive, longitude east-positive in (-180,180]. EVERY ROW IS UNVERIFIED: these were hand-entered from memory because planetarynames.wr.usgs.gov was unreachable (network 403) when this file was built. Run scripts/verify-targets.mjs against a Gazetteer export to check them and flip status to VERIFIED. Do not present these as authoritative until then. A depthKm of null means unknown/not entered, not zero.",
-  "source": "IAU / USGS Gazetteer of Planetary Nomenclature (Moon) -- NOT YET CHECKED",
+  "_readme": "Named lunar targets. Coordinates are selenographic degrees, latitude north-positive, longitude east-positive in (-180,180]. Rows marked VERIFIED were checked against, and take their coordinates and diameter from, the IAU / USGS Gazetteer of Planetary Nomenclature (MOON_nomenclature_center_pts, planetarynames.wr.usgs.gov). Depth is NOT in the Gazetteer: where present it is an approximate rim-to-floor value derived from NASA LOLA LDEM_16 elevation data (SVS 4720), craters only. depthKm null means not derived, not zero. Rows marked UNVERIFIED have no matching Gazetteer feature and their coordinates are from memory.",
+  "source": "IAU / USGS Gazetteer of Planetary Nomenclature (Moon), fetched 2026-10-25; depths from NASA LOLA LDEM_16",
   "targets": [
     {
       "name": "Tycho",
       "type": "crater",
       "latDeg": -43.3,
-      "lonDeg": -11.2,
-      "diameterKm": 85,
-      "depthKm": 4.7,
-      "status": "UNVERIFIED"
+      "lonDeg": -11.22,
+      "diameterKm": 85.3,
+      "depthKm": 4.3,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/6163",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Copernicus",
       "type": "crater",
-      "latDeg": 9.6,
-      "lonDeg": -20.1,
-      "diameterKm": 96,
-      "depthKm": 3.8,
-      "status": "UNVERIFIED"
+      "latDeg": 9.62,
+      "lonDeg": -20.08,
+      "diameterKm": 96.1,
+      "depthKm": 3.5,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/1296",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Kepler",
       "type": "crater",
-      "latDeg": 8.1,
-      "lonDeg": -38,
-      "diameterKm": 31,
-      "depthKm": 2.7,
-      "status": "UNVERIFIED"
+      "latDeg": 8.12,
+      "lonDeg": -38.01,
+      "diameterKm": 29.5,
+      "depthKm": 2.4,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/2990",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Aristarchus",
       "type": "crater",
-      "latDeg": 23.7,
-      "lonDeg": -47.5,
-      "diameterKm": 40,
-      "depthKm": 3,
-      "status": "UNVERIFIED"
+      "latDeg": 23.73,
+      "lonDeg": -47.49,
+      "diameterKm": 40.0,
+      "depthKm": 2.8,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/380",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Plato",
       "type": "crater",
-      "latDeg": 51.6,
-      "lonDeg": -9.4,
-      "diameterKm": 101,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": 51.62,
+      "lonDeg": -9.38,
+      "diameterKm": 100.7,
+      "depthKm": 1.3,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/4757",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Clavius",
       "type": "crater",
-      "latDeg": -58.6,
-      "lonDeg": -14,
-      "diameterKm": 231,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -58.62,
+      "lonDeg": -14.73,
+      "diameterKm": 230.8,
+      "depthKm": 3.4,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/1236",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Eratosthenes",
       "type": "crater",
-      "latDeg": 14.5,
-      "lonDeg": -11.3,
-      "diameterKm": 58,
-      "depthKm": 3.6,
-      "status": "UNVERIFIED"
+      "latDeg": 14.47,
+      "lonDeg": -11.32,
+      "diameterKm": 58.8,
+      "depthKm": 2.9,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/1820",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Archimedes",
       "type": "crater",
-      "latDeg": 29.7,
-      "lonDeg": -4,
-      "diameterKm": 83,
-      "depthKm": 2.1,
-      "status": "UNVERIFIED"
+      "latDeg": 29.72,
+      "lonDeg": -3.99,
+      "diameterKm": 81.0,
+      "depthKm": 1.4,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/350",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Ptolemaeus",
       "type": "crater",
-      "latDeg": -9.2,
-      "lonDeg": -1.9,
-      "diameterKm": 153,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -9.16,
+      "lonDeg": -1.84,
+      "diameterKm": 153.7,
+      "depthKm": 1.2,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/4860",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Alphonsus",
       "type": "crater",
-      "latDeg": -13.4,
-      "lonDeg": -3.2,
-      "diameterKm": 119,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -13.39,
+      "lonDeg": -2.85,
+      "diameterKm": 110.5,
+      "depthKm": 1.1,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/206",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Arzachel",
       "type": "crater",
-      "latDeg": -17.7,
-      "lonDeg": -1.9,
-      "diameterKm": 96,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -18.26,
+      "lonDeg": -1.93,
+      "diameterKm": 97.0,
+      "depthKm": 2.8,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/412",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Theophilus",
       "type": "crater",
-      "latDeg": -11.4,
-      "lonDeg": 26.4,
-      "diameterKm": 100,
-      "depthKm": 4.4,
-      "status": "UNVERIFIED"
+      "latDeg": -11.45,
+      "lonDeg": 26.28,
+      "diameterKm": 98.6,
+      "depthKm": 3.5,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/5965",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Cyrillus",
       "type": "crater",
-      "latDeg": -13.2,
-      "lonDeg": 24,
-      "diameterKm": 98,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -13.29,
+      "lonDeg": 24.07,
+      "diameterKm": 98.1,
+      "depthKm": 2.2,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/1372",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Catharina",
       "type": "crater",
-      "latDeg": -18.1,
-      "lonDeg": 23.4,
-      "diameterKm": 100,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -17.98,
+      "lonDeg": 23.55,
+      "diameterKm": 98.8,
+      "depthKm": 2.5,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/1076",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Posidonius",
       "type": "crater",
-      "latDeg": 31.8,
-      "lonDeg": 29.9,
-      "diameterKm": 95,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": 31.88,
+      "lonDeg": 29.99,
+      "diameterKm": 95.1,
+      "depthKm": 0.7,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/4808",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Langrenus",
       "type": "crater",
-      "latDeg": -8.9,
-      "lonDeg": 61.1,
-      "diameterKm": 132,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -8.86,
+      "lonDeg": 61.04,
+      "diameterKm": 132.0,
+      "depthKm": 3.8,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/3273",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Petavius",
       "type": "crater",
-      "latDeg": -25.1,
-      "lonDeg": 60.4,
-      "diameterKm": 177,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -25.39,
+      "lonDeg": 60.78,
+      "diameterKm": 184.1,
+      "depthKm": 1.8,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/4668",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Grimaldi",
       "type": "crater",
-      "latDeg": -5.5,
-      "lonDeg": -68.3,
-      "diameterKm": 172,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -5.38,
+      "lonDeg": -68.36,
+      "diameterKm": 235.0,
+      "depthKm": 1.6,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/2252",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Riccioli",
       "type": "crater",
-      "latDeg": -3.3,
-      "lonDeg": -74.6,
-      "diameterKm": 146,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -2.9,
+      "lonDeg": -74.42,
+      "diameterKm": 155.7,
+      "depthKm": 1.4,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/5022",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Schickard",
       "type": "crater",
-      "latDeg": -44,
-      "lonDeg": -54.6,
-      "diameterKm": 227,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -44.38,
+      "lonDeg": -55.11,
+      "diameterKm": 212.2,
+      "depthKm": 1.8,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/5368",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Gassendi",
       "type": "crater",
-      "latDeg": -17.5,
-      "lonDeg": -40.1,
-      "diameterKm": 110,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -17.55,
+      "lonDeg": -39.96,
+      "diameterKm": 111.4,
+      "depthKm": 0.9,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/2111",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Bailly",
       "type": "crater",
-      "latDeg": -66.5,
-      "lonDeg": -69.1,
-      "diameterKm": 303,
+      "latDeg": -66.82,
+      "lonDeg": -68.9,
+      "diameterKm": 300.6,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/561"
     },
     {
       "name": "Aristoteles",
       "type": "crater",
-      "latDeg": 50.2,
-      "lonDeg": 17.4,
-      "diameterKm": 87,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": 50.24,
+      "lonDeg": 17.32,
+      "diameterKm": 87.6,
+      "depthKm": 3.2,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/382",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Eudoxus",
       "type": "crater",
-      "latDeg": 44.3,
-      "lonDeg": 16.3,
-      "diameterKm": 67,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": 44.27,
+      "lonDeg": 16.23,
+      "diameterKm": 70.2,
+      "depthKm": 3.5,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/1863",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Stöfler",
       "type": "crater",
-      "latDeg": -41.1,
-      "lonDeg": 5.9,
-      "diameterKm": 126,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -41.24,
+      "lonDeg": 5.93,
+      "diameterKm": 129.9,
+      "depthKm": 2.3,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/5736",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Maginus",
       "type": "crater",
-      "latDeg": -50.5,
-      "lonDeg": -6.3,
-      "diameterKm": 194,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -50.03,
+      "lonDeg": -5.98,
+      "diameterKm": 155.6,
+      "depthKm": 3.3,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/3581",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Hipparchus",
       "type": "crater",
-      "latDeg": -5.5,
-      "lonDeg": 4.8,
-      "diameterKm": 150,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -5.36,
+      "lonDeg": 4.91,
+      "diameterKm": 143.9,
+      "depthKm": 0.5,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/2516",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Albategnius",
       "type": "crater",
-      "latDeg": -11.2,
-      "lonDeg": 4.1,
-      "diameterKm": 114,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -11.24,
+      "lonDeg": 4.01,
+      "diameterKm": 130.8,
+      "depthKm": 2.8,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/162",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Pitatus",
       "type": "crater",
-      "latDeg": -29.8,
-      "lonDeg": -13.5,
-      "diameterKm": 106,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -29.88,
+      "lonDeg": -13.53,
+      "diameterKm": 100.6,
+      "depthKm": 0.5,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/4740",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Bullialdus",
       "type": "crater",
-      "latDeg": -20.7,
-      "lonDeg": -22.2,
-      "diameterKm": 61,
-      "depthKm": 3.5,
-      "status": "UNVERIFIED"
+      "latDeg": -20.75,
+      "lonDeg": -22.26,
+      "diameterKm": 60.7,
+      "depthKm": 3.2,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/917",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Lansberg",
       "type": "crater",
-      "latDeg": -0.3,
-      "lonDeg": -26.6,
-      "diameterKm": 39,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -0.31,
+      "lonDeg": -26.63,
+      "diameterKm": 38.7,
+      "depthKm": 2.6,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/3276",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Reinhold",
       "type": "crater",
-      "latDeg": 3.3,
-      "lonDeg": -22.8,
-      "diameterKm": 42,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": 3.28,
+      "lonDeg": -22.86,
+      "diameterKm": 43.3,
+      "depthKm": 2.7,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/4988",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Aristillus",
       "type": "crater",
-      "latDeg": 33.9,
-      "lonDeg": 1.2,
-      "diameterKm": 55,
-      "depthKm": 3.6,
-      "status": "UNVERIFIED"
+      "latDeg": 33.88,
+      "lonDeg": 1.21,
+      "diameterKm": 54.4,
+      "depthKm": 3.2,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/381",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Autolycus",
       "type": "crater",
-      "latDeg": 30.7,
-      "lonDeg": 1.5,
-      "diameterKm": 39,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": 30.68,
+      "lonDeg": 1.49,
+      "diameterKm": 38.9,
+      "depthKm": 3.1,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/493",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Hercules",
       "type": "crater",
-      "latDeg": 46.7,
-      "lonDeg": 39.1,
-      "diameterKm": 69,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": 46.82,
+      "lonDeg": 39.21,
+      "diameterKm": 68.3,
+      "depthKm": 3.1,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/2467",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Atlas",
       "type": "crater",
-      "latDeg": 46.7,
-      "lonDeg": 44.4,
-      "diameterKm": 87,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": 46.74,
+      "lonDeg": 44.38,
+      "diameterKm": 88.1,
+      "depthKm": 2.1,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/458",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Messier",
       "type": "crater",
       "latDeg": -1.9,
-      "lonDeg": 47.6,
-      "diameterKm": 15,
+      "lonDeg": 47.65,
+      "diameterKm": 13.8,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/3869"
     },
     {
       "name": "Proclus",
       "type": "crater",
-      "latDeg": 16.1,
-      "lonDeg": 46.9,
-      "diameterKm": 28,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": 16.09,
+      "lonDeg": 46.89,
+      "diameterKm": 26.9,
+      "depthKm": 3.2,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/4827",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Tsiolkovskiy",
       "type": "crater",
-      "latDeg": -20.4,
-      "lonDeg": 129.1,
-      "diameterKm": 185,
-      "depthKm": null,
-      "status": "UNVERIFIED"
+      "latDeg": -20.38,
+      "lonDeg": 128.97,
+      "diameterKm": 184.4,
+      "depthKm": 3.4,
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/6108",
+      "depthNote": "rim-to-floor, derived from NASA LOLA LDEM_16"
     },
     {
       "name": "Mare Tranquillitatis",
       "type": "mare",
-      "latDeg": 8.5,
-      "lonDeg": 31.4,
-      "diameterKm": 875,
+      "latDeg": 8.35,
+      "lonDeg": 30.83,
+      "diameterKm": 875.7,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/3691"
     },
     {
       "name": "Mare Imbrium",
       "type": "mare",
-      "latDeg": 32.8,
-      "lonDeg": -15.6,
-      "diameterKm": 1123,
+      "latDeg": 34.72,
+      "lonDeg": -14.91,
+      "diameterKm": 1145.5,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/3678"
     },
     {
       "name": "Mare Serenitatis",
       "type": "mare",
-      "latDeg": 28,
-      "lonDeg": 17.5,
-      "diameterKm": 707,
+      "latDeg": 27.29,
+      "lonDeg": 18.36,
+      "diameterKm": 674.3,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/3686"
     },
     {
       "name": "Mare Crisium",
       "type": "mare",
-      "latDeg": 17,
+      "latDeg": 16.18,
       "lonDeg": 59.1,
-      "diameterKm": 418,
+      "diameterKm": 555.9,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/3671"
     },
     {
       "name": "Oceanus Procellarum",
       "type": "mare",
-      "latDeg": 18.4,
-      "lonDeg": -57.4,
-      "diameterKm": 2568,
+      "latDeg": 20.67,
+      "lonDeg": -56.68,
+      "diameterKm": 2592.2,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/4395"
     },
     {
       "name": "Mare Nubium",
       "type": "mare",
-      "latDeg": -21.3,
-      "lonDeg": -16.6,
-      "diameterKm": 715,
+      "latDeg": -20.59,
+      "lonDeg": -17.29,
+      "diameterKm": 714.5,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/3684"
     },
     {
       "name": "Mare Fecunditatis",
       "type": "mare",
-      "latDeg": -7.8,
-      "lonDeg": 51.3,
-      "diameterKm": 909,
+      "latDeg": -7.83,
+      "lonDeg": 53.67,
+      "diameterKm": 840.4,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/3673"
     },
     {
       "name": "Mare Humorum",
       "type": "mare",
-      "latDeg": -24.4,
-      "lonDeg": -38.6,
-      "diameterKm": 389,
+      "latDeg": -24.48,
+      "lonDeg": -38.57,
+      "diameterKm": 419.7,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/3677"
     },
     {
       "name": "Montes Apenninus",
       "type": "mons",
-      "latDeg": 18.9,
-      "lonDeg": -3.7,
-      "diameterKm": 401,
+      "latDeg": 19.87,
+      "lonDeg": 0.03,
+      "diameterKm": 599.7,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/4004"
     },
     {
       "name": "Rupes Recta",
       "type": "rupes",
-      "latDeg": -22,
-      "lonDeg": -7.8,
-      "diameterKm": 110,
+      "latDeg": -21.67,
+      "lonDeg": -7.7,
+      "diameterKm": 115.9,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/5230"
     },
     {
       "name": "Apollo 11 (Statio Tranquillitatis)",
@@ -450,7 +536,8 @@
       "lonDeg": 23.47,
       "diameterKm": null,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "VERIFIED",
+      "source": "https://planetarynames.wr.usgs.gov/Feature/5684"
     },
     {
       "name": "Apollo 12",
@@ -459,7 +546,8 @@
       "lonDeg": -23.42,
       "diameterKm": null,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "UNVERIFIED",
+      "note": "Landing site, not a Gazetteer feature under this name. Coordinates entered from memory."
     },
     {
       "name": "Apollo 14",
@@ -468,7 +556,8 @@
       "lonDeg": -17.47,
       "diameterKm": null,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "UNVERIFIED",
+      "note": "Landing site, not a Gazetteer feature under this name. Coordinates entered from memory."
     },
     {
       "name": "Apollo 15",
@@ -477,7 +566,8 @@
       "lonDeg": 3.63,
       "diameterKm": null,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "UNVERIFIED",
+      "note": "Landing site, not a Gazetteer feature under this name. Coordinates entered from memory."
     },
     {
       "name": "Apollo 16",
@@ -486,7 +576,8 @@
       "lonDeg": 15.5,
       "diameterKm": null,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "UNVERIFIED",
+      "note": "Landing site, not a Gazetteer feature under this name. Coordinates entered from memory."
     },
     {
       "name": "Apollo 17",
@@ -495,7 +586,8 @@
       "lonDeg": 30.77,
       "diameterKm": null,
       "depthKm": null,
-      "status": "UNVERIFIED"
+      "status": "UNVERIFIED",
+      "note": "Landing site, not a Gazetteer feature under this name. Coordinates entered from memory."
     }
   ]
 }

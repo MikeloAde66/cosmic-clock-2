@@ -9,6 +9,10 @@ export interface LunarTarget {
   diameterKm: number | null;
   depthKm: number | null;
   status: 'UNVERIFIED' | 'VERIFIED';
+  /** Gazetteer page for a VERIFIED row. */
+  source?: string;
+  note?: string;
+  depthNote?: string;
 }
 
 export const LUNAR_TARGETS = raw.targets as LunarTarget[];
