@@ -2,6 +2,7 @@
 
 import type { DroneHud } from './DroneScene';
 import FlightStick from './FlightStick';
+import type { RadioLine } from '@/lib/astroSim/droneMission';
 
 // The pilot's view: a single instrument dash along the bottom of the screen in
 // polished black and chrome, with cinema layers over the live 3D scene. The
@@ -11,21 +12,24 @@ import FlightStick from './FlightStick';
 // film grain.
 
 const CHROME = 'linear-gradient(135deg,#f5f7fa 0%,#9aa3ad 18%,#3a4048 38%,#c9ced4 52%,#6c737b 70%,#e8ebee 86%,#555c64 100%)';
-const MAX_SPEED = 80;
 
 const CSS = `
 @keyframes cp-blink { 0%,100% { opacity: .22 } 50% { opacity: 1 } }
 @keyframes cp-spin { to { transform: rotate(360deg) } }
 @keyframes cp-grain { 0% { transform: translate(0,0) } 20% { transform: translate(-3%,2%) } 40% { transform: translate(2%,-3%) } 60% { transform: translate(-2%,-1%) } 80% { transform: translate(3%,3%) } 100% { transform: translate(0,0) } }
 @keyframes cp-glare { 0% { transform: translateX(-30%) } 100% { transform: translateX(130%) } }
+@keyframes cp-in { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
+@keyframes cp-bar { 0%,100% { height: 2px } 50% { height: 10px } }
 @keyframes cp-breathe { 0%,100% { opacity: .55 } 50% { opacity: .9 } }
 .cp-blink { animation: cp-blink var(--d, 4s) ease-in-out var(--o, 0s) infinite }
 .cp-spin { animation: cp-spin 60s linear infinite; transform-origin: 50% 50% }
 .cp-grain { animation: cp-grain .9s steps(5) infinite }
 .cp-glare { animation: cp-glare 22s linear infinite }
 .cp-sweep { animation: cp-glare 38s linear infinite }
+.cp-in { animation: cp-in .6s ease-out }
+.cp-bar { animation: cp-bar .5s ease-in-out var(--o, 0s) infinite }
 .cp-breathe { animation: cp-breathe 5s ease-in-out infinite }
-@media (prefers-reduced-motion: reduce) { .cp-blink, .cp-spin, .cp-grain, .cp-glare, .cp-sweep, .cp-breathe { animation: none !important } }
+@media (prefers-reduced-motion: reduce) { .cp-blink, .cp-spin, .cp-grain, .cp-glare, .cp-sweep, .cp-breathe, .cp-in, .cp-bar { animation: none !important } }
 `;
 
 const GRAIN =
@@ -83,43 +87,6 @@ function Gear({ teeth = 12, r = 22 }: { teeth?: number; r?: number }) {
       <circle cx="30" cy="30" r="3" fill="url(#cp-gear-ch)" />
       <circle cx="30" cy="30" r="1.2" fill="#22d3ee" />
     </svg>
-  );
-}
-
-function SpeedDial({ speed, max }: { speed: number; max: number }) {
-  const sweep = 270;
-  const ang = -135 + (Math.min(speed, max) / max) * sweep;
-  const ticks = Array.from({ length: 21 }, (_, i) => i);
-  const labels = [0, 20, 40, 60, 80];
-  return (
-    <div className="relative w-[118px] h-[118px] sm:w-[132px] sm:h-[132px]">
-      <svg viewBox="0 0 120 120" className="w-full h-full" aria-label={`Speed ${Math.round(speed)} units per second`}>
-        <ChromeDefs id="cp-spd" />
-        <circle cx="60" cy="60" r="58" fill="url(#cp-spd-ch)" />
-        <circle cx="60" cy="60" r="52" fill="url(#cp-spd-face)" stroke="#000" strokeWidth="1" />
-        {ticks.map((i) => {
-          const a = ((-135 + (i / 20) * sweep) * Math.PI) / 180;
-          const major = i % 5 === 0;
-          const r1 = 49, r2 = major ? 41 : 45;
-          return <line key={i} x1={60 + Math.sin(a) * r1} y1={60 - Math.cos(a) * r1} x2={60 + Math.sin(a) * r2} y2={60 - Math.cos(a) * r2} stroke={major ? '#e5e9ee' : '#7c8591'} strokeWidth={major ? 1.6 : 1} />;
-        })}
-        {labels.map((v) => {
-          const a = ((-135 + (v / max) * sweep) * Math.PI) / 180;
-          return (
-            <text key={v} x={60 + Math.sin(a) * 32} y={60 - Math.cos(a) * 32 + 3} fontSize="8" fill="#b6bdc6" textAnchor="middle" fontFamily="monospace">
-              {v}
-            </text>
-          );
-        })}
-        <g style={{ transform: `rotate(${ang}deg)`, transformOrigin: '60px 60px', transition: 'transform 600ms cubic-bezier(.25,.8,.3,1)' }}>
-          <polygon points="60,15 62.2,60 57.8,60" fill="#ff7a1a" />
-          <circle cx="60" cy="60" r="5" fill="url(#cp-spd-ch)" />
-        </g>
-        <text x="60" y="88" fontSize="7" fill="#8892a0" textAnchor="middle" fontFamily="monospace">SPEED u/s</text>
-        <text x="60" y="100" fontSize="10" fill="#67e8f9" textAnchor="middle" fontFamily="monospace">{Math.round(speed)}</text>
-        <Glass />
-      </svg>
-    </div>
   );
 }
 
@@ -199,9 +166,91 @@ function ChromeButton({ onClick, children, on }: { onClick: () => void; children
   );
 }
 
+// A digital readout cell: chrome bezel around a dark LCD with glowing digits.
+function Cell({ label, value, unit, sub, warn, className = '' }: { label: string; value: string; unit?: string; sub?: string; warn?: boolean; className?: string }) {
+  return (
+    <div className={`p-[2px] rounded-sm ${className}`} style={{ background: CHROME }}>
+      <div className="px-2 py-1 rounded-[2px]" style={{ background: 'linear-gradient(180deg,#05100f,#020605)', boxShadow: 'inset 0 0 8px rgba(0,0,0,0.9)' }}>
+        <div className="text-[7px] tracking-[0.18em] text-slate-500 whitespace-nowrap">{label}</div>
+        <div className="font-mono text-[14px] sm:text-[15px] leading-tight tabular-nums whitespace-nowrap" style={{ color: warn ? '#fb7185' : '#7ff5ff', textShadow: '0 0 6px currentColor' }}>
+          {value}
+          {unit && <span className="ml-1 text-[8px] text-slate-400" style={{ textShadow: 'none' }}>{unit}</span>}
+        </div>
+        <div className="h-[9px] text-[7px] leading-[9px] text-slate-500 whitespace-nowrap">{sub ?? ''}</div>
+      </div>
+    </div>
+  );
+}
+
+const WHO: Record<RadioLine['who'], { tag: string; color: string }> = {
+  CAPCOM: { tag: 'MISSION CTRL', color: '#67e8f9' },
+  SURFACE: { tag: 'SHACKLETON', color: '#fbbf24' },
+  'NAV-AI': { tag: 'NAV-AI', color: '#c4b5fd' },
+};
+
+function clock(sec: number) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `T+${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function Radio({ log, t, linkLost }: { log: RadioLine[]; t: number; linkLost: boolean }) {
+  const last = log[log.length - 1];
+  const live = !!last && t - last.at < 6;
+  return (
+    <div className="absolute left-3 top-[104px] sm:top-3 w-[calc(100vw-150px)] sm:w-[330px]">
+      <div className="p-[2px] rounded" style={{ background: CHROME }}>
+        <div className="rounded-[3px] px-2.5 py-1.5" style={{ background: 'linear-gradient(180deg,rgba(23,27,33,0.94),rgba(5,6,8,0.94))' }}>
+          <div className="flex items-center gap-2 text-[8px] tracking-[0.2em] text-slate-400">
+            <span className={`w-1.5 h-1.5 rounded-full ${live ? 'cp-blink' : ''}`} style={{ ['--d' as string]: '0.7s', background: linkLost ? '#fb7185' : '#34d399', boxShadow: '0 0 6px currentColor' } as React.CSSProperties} />
+            {linkLost ? <span className="text-rose-300">COMMS · NO SIGNAL · FAR SIDE</span> : <span>COMMS · CH 1</span>}
+            <span className="flex items-end gap-[2px] h-2.5 ml-auto" aria-hidden="true">
+              {[0, 1, 2, 3, 4].map((n) => (
+                <span key={n} className={`w-[2px] bg-cyan-300/80 ${live && !linkLost ? 'cp-bar' : ''}`} style={{ height: live && !linkLost ? undefined : 2, ['--o' as string]: `${n * 0.13}s` } as React.CSSProperties} />
+              ))}
+            </span>
+          </div>
+          <div className="mt-1 space-y-1.5 min-h-[34px]">
+            {log.slice(-3).map((l, idx, arr) => {
+              const age = arr.length - 1 - idx;
+              return (
+                <p key={l.id} className={`cp-in text-[10.5px] leading-snug text-slate-200 line-clamp-3 sm:line-clamp-none ${age >= 1 ? 'hidden sm:block' : ''}`} style={{ opacity: age === 0 ? 1 : age === 1 ? 0.62 : 0.4 }}>
+                  <span className="mr-1.5 text-[8px] tracking-[0.14em]" style={{ color: WHO[l.who].color }}>{WHO[l.who].tag}</span>
+                  <span className="mr-1.5 text-[8px] text-slate-500 tabular-nums">{clock(l.at)}</span>
+                  {l.text}
+                </p>
+              );
+            })}
+            {log.length === 0 && <p className="text-[10px] text-slate-500">Standing by…</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function objective(hud: DroneHud): { title: string; status: string; fill: number } {
+  const lapPct = Math.round(hud.orbit * 100);
+  switch (hud.stage) {
+    case 'acquire':
+      return { title: 'OBJECTIVE 1 · POINT THE NOSE AT THE MOON', status: `Lock ${Math.round(hud.lock * 100)}% · Moon ${Math.round(hud.facingDeg)}° off the nose`, fill: hud.lock };
+    case 'burn':
+      return { title: 'OBJECTIVE 2 · INSERTION BURN · THROTTLE ABOVE 60%', status: `Altitude ${Math.round(hud.altKm).toLocaleString()} km → 110 km`, fill: Math.max(0, Math.min(1, 1 - (hud.altKm - 110) / (1900 - 110))) };
+    case 'orbit':
+      return {
+        title: 'OBJECTIVE 3 · FLY ONE FULL LAP',
+        status: hud.linkLost ? `Lap ${lapPct}% · behind the Moon · radio silent` : `Lap ${lapPct}% · keep the Moon in the window`,
+        fill: hud.orbit,
+      };
+    default:
+      return { title: 'MISSION 01 COMPLETE', status: 'ORBIT COMPLETE', fill: 1 };
+  }
+}
+
 export default function CockpitHud({
   hud,
   assist,
+  log,
   onLeft,
   onRight,
   onReplay,
@@ -211,6 +260,7 @@ export default function CockpitHud({
 }: {
   hud: DroneHud;
   assist: boolean;
+  log: RadioLine[];
   onLeft: (x: number, y: number) => void;
   onRight: (x: number, y: number) => void;
   onReplay: () => void;
@@ -218,13 +268,8 @@ export default function CockpitHud({
   onToggleAssist: () => void;
   onRestart: () => void;
 }) {
-  const pct = Math.round(hud.orbit * 100);
-  const status =
-    hud.stage === 'done'
-      ? 'ORBIT COMPLETE'
-      : hud.stage === 'orbit'
-        ? `ORBIT ${pct}%${hud.assisting ? ' · assist holding the ring' : ''}`
-        : `Fly to the cyan ring · ${Math.round(hud.toRing).toLocaleString()} u to go`;
+  const obj = objective(hud);
+  const sign = hud.tempC > 0 ? '+' : '';
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
@@ -244,18 +289,20 @@ export default function CockpitHud({
         <div className="absolute inset-y-0 w-1/3 cp-glare" style={{ background: 'linear-gradient(100deg, transparent, rgba(255,255,255,0.9), transparent)' }} />
       </div>
 
-      {/* ---- mission plate ---- */}
+      {/* ---- objective plate ---- */}
       <div className="absolute inset-x-0 flex justify-center top-3">
         <Plate>
-          <div className="min-w-[230px] sm:min-w-[320px] text-center">
-            <p className="text-[9px] tracking-[0.22em] text-slate-400">MISSION 01 · ORBIT THE MOON ONCE</p>
-            <p className="mt-0.5 text-[11px] tabular-nums text-cyan-200">{status}</p>
+          <div className="min-w-[230px] sm:min-w-[340px] text-center">
+            <p className="text-[8.5px] sm:text-[9px] tracking-[0.18em] text-slate-400">{obj.title}</p>
+            <p className="mt-0.5 text-[11px] tabular-nums text-cyan-200">{obj.status}</p>
             <div className="h-1.5 mt-1.5 overflow-hidden rounded-full bg-black/80 border border-slate-700">
-              <div className="h-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg,#0891b2,#67e8f9)', transition: 'width 600ms ease' }} />
+              <div className="h-full" style={{ width: `${Math.round(obj.fill * 100)}%`, background: 'linear-gradient(90deg,#0891b2,#67e8f9)', transition: 'width 600ms ease' }} />
             </div>
           </div>
         </Plate>
       </div>
+
+      <Radio log={log} t={hud.t} linkLost={hud.linkLost} />
 
       <div className="absolute flex flex-col items-end gap-2 top-[104px] sm:top-3 right-3">
         <ChromeButton onClick={onFaceMoon}>Face Moon</ChromeButton>
@@ -264,12 +311,12 @@ export default function CockpitHud({
       </div>
 
       {hud.stage === 'done' && (
-        <div className="absolute inset-x-0 flex justify-center top-[26%]">
+        <div className="absolute inset-x-0 flex justify-center top-[34%]">
           <div className="p-[2px] rounded pointer-events-auto" style={{ background: CHROME }}>
             <div className="px-8 py-5 text-center rounded-[3px]" style={{ background: 'linear-gradient(180deg,#171b21,#050608)' }}>
               <p className="text-[10px] tracking-[0.3em] text-slate-400">MISSION 01</p>
               <p className="mt-1 text-xl tracking-[0.2em] text-cyan-200">ORBIT COMPLETE</p>
-              <p className="mt-1 text-[11px] text-slate-400">One full lap of the Moon, flown.</p>
+              <p className="mt-1 text-[11px] text-slate-400">The relay is aligned. The lights stay on.</p>
               <button onClick={onRestart} className="mt-3 h-8 px-4 text-[11px] uppercase tracking-[0.14em] border rounded border-cyan-500/60 text-cyan-100 hover:text-white">
                 Fly again
               </button>
@@ -303,7 +350,7 @@ export default function CockpitHud({
             {/* left: stick + switch bank */}
             <div className="flex items-end gap-3">
               <FlightStick label="Yaw / Throttle" color="#22d3ee" onChange={onLeft} />
-              <div className="hidden md:grid grid-cols-4 gap-1.5 p-2 rounded-sm" style={{ background: 'linear-gradient(180deg,#0e1115,#040506)', boxShadow: 'inset 0 0 0 1px #3a4048' }} aria-hidden="true">
+              <div className="hidden lg:grid grid-cols-4 gap-1.5 p-2 rounded-sm" style={{ background: 'linear-gradient(180deg,#0e1115,#040506)', boxShadow: 'inset 0 0 0 1px #3a4048' }} aria-hidden="true">
                 {SWITCHES.map(([label, d, o]) => (
                   <div key={label} className="flex flex-col items-center justify-center w-11 h-9 rounded-sm" style={{ background: CHROME, padding: 1.5 }}>
                     <div className="flex flex-col items-center justify-center w-full h-full rounded-[2px]" style={{ background: 'linear-gradient(180deg,#232830,#080a0d)' }}>
@@ -318,13 +365,12 @@ export default function CockpitHud({
               </div>
             </div>
 
-            {/* centre: instruments */}
+            {/* centre: digital instruments */}
             <div className="flex flex-col items-center gap-2">
               <div className="hidden sm:block"><HeadingTape heading={hud.headingDeg} /></div>
-              <div className="flex items-end gap-2 sm:gap-4">
-                <Attitude pitch={hud.pitchDeg} roll={hud.rollDeg} />
-                <div className="flex flex-col items-center gap-1">
-                  {/* throttle stack */}
+              <div className="flex items-end gap-2 sm:gap-3">
+                <div className="hidden sm:block"><Attitude pitch={hud.pitchDeg} roll={hud.rollDeg} /></div>
+                <div className="flex-col items-center hidden gap-1 sm:flex">
                   <div className="p-[2px] rounded" style={{ background: CHROME }}>
                     <div className="flex flex-col-reverse gap-[2px] p-1 rounded-[2px] bg-black" aria-label={`Throttle ${Math.round(hud.throttle * 100)} percent`}>
                       {Array.from({ length: 10 }, (_, i) => {
@@ -335,24 +381,22 @@ export default function CockpitHud({
                   </div>
                   <span className="text-[8px] tracking-widest text-slate-500">THR {Math.round(hud.throttle * 100)}%</span>
                 </div>
-                <SpeedDial speed={hud.speed} max={MAX_SPEED} />
-              </div>
-              <div className="hidden sm:block">
-                <Plate>
-                  <span className="text-[10px] tabular-nums text-cyan-200">
-                    ALT {Math.round(hud.moonDist).toLocaleString()} u
-                    <span className="mx-2 text-slate-600">|</span>
-                    PITCH {Math.round(hud.pitchDeg)}°
-                    <span className="mx-2 text-slate-600">|</span>
-                    ROLL {Math.round(hud.rollDeg)}°
-                  </span>
-                </Plate>
+                <div className="grid grid-cols-2 gap-1 w-[164px] sm:w-[218px]" aria-label="Flight data">
+                  <Cell label="ALTITUDE" value={Math.round(hud.altKm).toLocaleString()} unit="km" sub={hud.stage === 'acquire' ? 'APPROACH' : hud.stage === 'burn' ? 'DESCENDING' : 'ORBITAL'} />
+                  <Cell label="VELOCITY" value={hud.velKms.toFixed(2)} unit="km/s" sub={`THR ${Math.round(hud.throttle * 100)}%`} />
+                  <Cell className="hidden sm:block" label="RANGE · CENTRE" value={Math.round(hud.rangeKm).toLocaleString()} unit="km" sub="TO MOON" />
+                  <Cell label="SURFACE TEMP" value={`${sign}${Math.round(hud.tempC)}`} unit="°C" sub={hud.tempC > 20 ? 'DAY SIDE' : hud.tempC < -60 ? 'NIGHT SIDE' : 'TERMINATOR'} />
+                  <Cell className="hidden sm:block" label="AMBIENT PRESS" value={`${(hud.pressureBar * 1e15).toFixed(1)}E-15`} unit="bar" sub="VACUUM · EXOSPHERE" />
+                  <Cell className="hidden sm:block" label="G-LOAD" value={hud.gLoad.toFixed(2)} unit="g" sub={`MOON FIELD ${hud.localG.toFixed(2)} m/s²`} />
+                  <Cell className="hidden sm:block" label="RADIATION" value={hud.radUsv.toFixed(2)} unit="µSv/h" sub={hud.sunGlow > 0.3 ? 'SOLAR GLARE' : 'BACKGROUND'} />
+                  <Cell label="RADIO LINK" value={hud.linkLost ? 'LOS' : `${Math.round(hud.linkDb)}`} unit={hud.linkLost ? undefined : 'dB'} sub={hud.linkLost ? 'FAR SIDE' : 'S-BAND'} warn={hud.linkLost} />
+                </div>
               </div>
             </div>
 
             {/* right: gyro wheel + stick */}
             <div className="flex items-end gap-3">
-              <div className="flex-col items-center hidden gap-1 md:flex" aria-hidden="true">
+              <div className="flex-col items-center hidden gap-1 lg:flex" aria-hidden="true">
                 <Gear />
                 <span className="text-[7px] tracking-widest text-slate-500">REACTION WHEEL</span>
                 <span className="text-[8px] tracking-wider text-emerald-300 cp-blink" style={{ ['--d' as string]: '5s' } as React.CSSProperties}>SYS NOMINAL</span>

@@ -5,6 +5,9 @@ import { useCallback, useRef, useState } from 'react';
 import { SkipForward } from 'lucide-react';
 import CockpitHud from './CockpitHud';
 import type { DroneHud, DroneInputs } from './DroneScene';
+import { missionStep, newMission } from '@/lib/astroSim/droneMission';
+import type { RadioLine } from '@/lib/astroSim/droneMission';
+import { playTargetLock, unlockAudio } from '@/lib/astroSim/audio';
 
 const DroneScene = dynamic(() => import('./DroneScene'), { ssr: false });
 
@@ -14,10 +17,27 @@ export default function DroneView() {
   const [cover, setCover] = useState(false);
   const [run, setRun] = useState(0);
   const [assist, setAssist] = useState(true);
-  const [hud, setHud] = useState<DroneHud>({ speed: 0, throttle: 0, moonDist: 0, pitchDeg: 0, rollDeg: 0, headingDeg: 0, sunGlow: 0, stage: 'approach', orbit: 0, toRing: 0, assisting: false });
+  const [log, setLog] = useState<RadioLine[]>([]);
+  const mission = useRef(newMission());
+  const [hud, setHud] = useState<DroneHud>({
+    speed: 0, throttle: 0, pitchDeg: 0, rollDeg: 0, headingDeg: 0, sunGlow: 0, t: 0, stage: 'acquire', orbit: 0, facingDeg: 0, lock: 0, assisting: false,
+    altKm: 1900, velKms: 0, rangeKm: 3637, tempC: -18, pressureBar: 3e-15, gLoad: 0, localG: 0.9, radUsv: 0.5, linkDb: 36, linkLost: false,
+  });
   const inputs = useRef<DroneInputs>({ lx: 0, ly: 0, rx: 0, ry: 0 });
 
+  const onHud = useCallback((h: DroneHud) => {
+    setHud(h);
+    const lines = missionStep(mission.current, h);
+    if (lines.length) {
+      setLog((l) => [...l, ...lines].slice(-8));
+      playTargetLock(); // a short blip: the radio keyed
+    }
+  }, []);
+
   const toFlight = useCallback(() => {
+    unlockAudio();
+    mission.current = newMission();
+    setLog([]);
     setCover(true);
     window.setTimeout(() => {
       setPhase('flight');
@@ -46,6 +66,8 @@ export default function DroneView() {
   }, []);
 
   const restartMission = useCallback(() => {
+    mission.current = newMission();
+    setLog([]);
     inputs.current.resetMission = Date.now();
   }, []);
 
@@ -57,7 +79,7 @@ export default function DroneView() {
 
   return (
     <div className="relative flex-1 min-h-0 touch-none select-none">
-      <DroneScene key={`${phase}-${run}`} phase={phase} inputs={inputs} onLabel={setLabel} onLaunchDone={toFlight} onHud={setHud} />
+      <DroneScene key={`${phase}-${run}`} phase={phase} inputs={inputs} onLabel={setLabel} onLaunchDone={toFlight} onHud={onHud} />
 
       {/* fade between pad and flight */}
       <div className={`absolute inset-0 bg-black pointer-events-none transition-opacity duration-500 ${cover ? 'opacity-100' : 'opacity-0'}`} />
@@ -75,7 +97,7 @@ export default function DroneView() {
           </button>
         </>
       ) : (
-        <CockpitHud hud={hud} assist={assist} onLeft={onLeft} onRight={onRight} onReplay={replay} onFaceMoon={faceMoon} onToggleAssist={toggleAssist} onRestart={restartMission} />
+        <CockpitHud hud={hud} assist={assist} log={log} onLeft={onLeft} onRight={onRight} onReplay={replay} onFaceMoon={faceMoon} onToggleAssist={toggleAssist} onRestart={restartMission} />
       )}
     </div>
   );
