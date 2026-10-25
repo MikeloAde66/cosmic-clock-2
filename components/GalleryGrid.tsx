@@ -391,94 +391,6 @@ function WeatherCardImage() {
   );
 }
 
-// Fixed node layout for the Automation Pipeline card — a compact stand-in
-// for a real n8n-style workflow diagram (incoming call -> spam check ->
-// branch -> AI-handled response), not a literal reproduction: at 220x96
-// there's no room for readable labels, so each stage is a distinct shape
-// (circle = trigger, rounded rect = process, diamond = decision) instead.
-const AUTOMATION_NODES: { x: number; y: number; shape: 'circle' | 'rect' | 'diamond' }[] = [
-  { x: 20, y: 48, shape: 'circle' },
-  { x: 62, y: 48, shape: 'rect' },
-  { x: 104, y: 48, shape: 'diamond' },
-  { x: 150, y: 48, shape: 'rect' },
-  { x: 196, y: 48, shape: 'rect' },
-];
-const AUTOMATION_PATH = AUTOMATION_NODES.map((n, i) => `${i === 0 ? 'M' : 'L'}${n.x},${n.y}`).join(' ');
-// Node delays spaced evenly across the dot's travel duration so each one
-// lights up right as the traveling pulse passes it (see automation-node-pulse
-// in globals.css) rather than glowing on its own unrelated schedule.
-const AUTOMATION_DUR_S = 3.6;
-const AUTOMATION_NODE_DELAYS = AUTOMATION_NODES.map((_, i) =>
-  Number(((i / AUTOMATION_NODES.length) * AUTOMATION_DUR_S).toFixed(4))
-);
-
-// Automation Pipeline card's preview strip — fills the old Ai One Core
-// slot until a real n8n workflow product exists here (see GalleryGrid
-// below). A single glowing dot rides the node path on a native SVG
-// <animateMotion> loop (cheaper and simpler than canvas/rAF for one dot),
-// with each node pulsing in sequence so the whole thing reads as a workflow
-// actually running end-to-end, not a static wiring diagram.
-function AutomationFlowCardImage() {
-  return (
-    <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#050810]">
-      <div
-        className="absolute inset-0 opacity-20"
-        style={{
-          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1.5px)',
-          backgroundSize: '16px 16px',
-        }}
-      />
-      <svg viewBox="0 0 220 96" className="absolute inset-0 w-full h-full">
-        {/* Main pipeline edges. */}
-        <path d={AUTOMATION_PATH} fill="none" stroke="rgba(129,140,248,0.35)" strokeWidth={1.5} />
-        {/* Decision branch stub off the diamond node — a dead-end "log it"
-            offshoot, purely to read as a real Yes/No branch like the
-            reference automation, not a literal reconnecting path. */}
-        <path
-          d={`M104,48 L104,20 L136,20`}
-          fill="none"
-          stroke="rgba(129,140,248,0.25)"
-          strokeWidth={1.2}
-          strokeDasharray="3 3"
-        />
-        <rect x={136} y={14} width={20} height={12} rx={2} fill="rgba(15,23,42,0.9)" stroke="rgba(165,180,252,0.5)" strokeWidth={1} className="automation-branch-flash" />
-
-        {AUTOMATION_NODES.map((node, i) => (
-          <g key={i} className="automation-node-pulse" style={{ animationDuration: `${AUTOMATION_DUR_S}s`, animationDelay: `${AUTOMATION_NODE_DELAYS[i]}s` }}>
-            {node.shape === 'circle' && (
-              <circle cx={node.x} cy={node.y} r={7} fill="rgba(30,27,75,0.9)" stroke="#a5b4fc" strokeWidth={1.5} />
-            )}
-            {node.shape === 'rect' && (
-              <rect x={node.x - 8} y={node.y - 7} width={16} height={14} rx={3} fill="rgba(30,27,75,0.9)" stroke="#a5b4fc" strokeWidth={1.5} />
-            )}
-            {node.shape === 'diamond' && (
-              <rect
-                x={node.x - 7}
-                y={node.y - 7}
-                width={14}
-                height={14}
-                fill="rgba(30,27,75,0.9)"
-                stroke="#a5b4fc"
-                strokeWidth={1.5}
-                transform={`rotate(45 ${node.x} ${node.y})`}
-              />
-            )}
-          </g>
-        ))}
-
-        {/* Faint trailing dot, slightly behind the lead dot — a cheap comet
-            trail with no per-frame trail tracking. */}
-        <circle r={2} fill="#67e8f9" opacity={0.4}>
-          <animateMotion path={AUTOMATION_PATH} dur={`${AUTOMATION_DUR_S}s`} begin="-0.15s" repeatCount="indefinite" />
-        </circle>
-        <circle r={3} fill="#a5f3fc" style={{ filter: 'drop-shadow(0 0 5px rgba(103,232,249,0.95))' }}>
-          <animateMotion path={AUTOMATION_PATH} dur={`${AUTOMATION_DUR_S}s`} repeatCount="indefinite" />
-        </circle>
-      </svg>
-    </div>
-  );
-}
-
 // Flight School: a drone holding a steady hover over open fields, on a
 // 5-second loop that restarts on the still photo behind it.
 function FlightSchoolCardImage() {
@@ -577,7 +489,7 @@ export default function GalleryGrid({
   // One flag per grid slot — flips true once that slot's arrival animation
   // finishes (see ArrivalSlot's onAnimationEnd below), which is also what
   // switches the card from pointer-events-none/cursor-wait to clickable.
-  const [docked, setDocked] = useState<boolean[]>(() => Array(10).fill(false));
+  const [docked, setDocked] = useState<boolean[]>(() => Array(9).fill(false));
   const [showWeatherOverlay, setShowWeatherOverlay] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showMediaFlowGate, setShowMediaFlowGate] = useState(false);
@@ -693,23 +605,6 @@ export default function GalleryGrid({
         </ArrivalSlot>
 
         <ArrivalSlot index={6} docked={docked[6]} onDock={dock}>
-          {/* Was a non-interactive "Automation" reserved slot (no hardware
-              product lived here — see lib/hardwareProducts.ts), then
-              retitled "Insurance Claims" when repurposed for that demo
-              (app/insurance-claims/page.tsx). Card title is back to
-              "Automation" — the automation-pipeline visual and the
-              underlying demo (document -> OCR -> fraud detection ->
-              decision pipeline) are unchanged, still at /insurance-claims. */}
-          <Link href="/insurance-claims" className={cardClass}>
-            <AutomationFlowCardImage />
-            <CardHeader />
-            <div className="mt-4">
-              <div className="text-sm font-bold text-white">Automation</div>
-            </div>
-          </Link>
-        </ArrivalSlot>
-
-        <ArrivalSlot index={7} docked={docked[7]} onDock={dock}>
           {/* Was a reserved Merch slot (HydroNode Builder Kit's hardware
               listing never landed) — now a real product: Spectre-AI GCS,
               a beginner-friendly standalone flight simulator/trainer
@@ -727,7 +622,7 @@ export default function GalleryGrid({
           </Link>
         </ArrivalSlot>
 
-        <ArrivalSlot index={8} docked={docked[8]} onDock={dock}>
+        <ArrivalSlot index={7} docked={docked[7]} onDock={dock}>
           <div className="relative w-full h-full">
             <button onClick={() => setShowMediaFlowGate(true)} className={cardClass}>
               <DigitalMagazineTickerCardImage />
@@ -742,7 +637,7 @@ export default function GalleryGrid({
           </div>
         </ArrivalSlot>
 
-        <ArrivalSlot index={9} docked={docked[9]} onDock={dock}>
+        <ArrivalSlot index={8} docked={docked[8]} onDock={dock}>
           {/* Astro Simulator is a real route in this app (app/astro-sim), the
               same pattern as Flight School. */}
           <Link href="/astro-sim" className={cardClass}>
