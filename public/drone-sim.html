@@ -1023,5 +1023,141 @@
 
     window.onload = initMap;
   </script>
+
+  <!-- Manual Pilot Deck: OFF by default. Opt-in dual-stick overlay that flies the
+       same camera state (lat/lng/alt/heading) as the WASD keys. Self-contained:
+       nothing above this block depends on it, and nothing runs until "Manual"
+       is pressed. Left stick = yaw + climb/descend. Right stick = move
+       forward/back and strafe, relative to the current heading. Also reads a
+       USB/Bluetooth gamepad, and the arrow keys while the deck is open. -->
+  <style>
+    #pd-toggle { position:absolute; z-index:25; right:5rem; bottom:6.25rem; padding:.5rem .9rem; font:700 11px ui-monospace,Menlo,monospace; letter-spacing:.08em; text-transform:uppercase; color:#cbd5e1; background:rgba(2,6,23,.78); border:1px solid #334155; border-radius:.6rem; cursor:pointer; backdrop-filter:blur(8px); }
+    #pd-toggle[aria-pressed="true"] { color:#67e8f9; border-color:#22d3ee; }
+    #pd-deck { position:absolute; z-index:25; right:5rem; bottom:9.5rem; display:none; padding:.75rem .9rem .6rem; background:rgba(2,6,23,.78); border:1px solid #334155; border-radius:.9rem; backdrop-filter:blur(8px); font:11px ui-monospace,Menlo,monospace; color:#94a3b8; user-select:none; -webkit-user-select:none; }
+    #pd-deck.pd-open { display:block; }
+    .pd-sticks { display:flex; gap:1rem; }
+    .pd-col { text-align:center; }
+    .pd-label { margin-bottom:.35rem; letter-spacing:.12em; text-transform:uppercase; font-size:10px; }
+    .pd-pad { position:relative; width:110px; height:110px; border-radius:50%; border:1px solid #475569; background:radial-gradient(circle,#0b1220 0%,#020617 100%); touch-action:none; cursor:grab; }
+    .pd-pad::before, .pd-pad::after { content:""; position:absolute; background:#1e293b; }
+    .pd-pad::before { left:50%; top:8px; bottom:8px; width:1px; }
+    .pd-pad::after { top:50%; left:8px; right:8px; height:1px; }
+    .pd-knob { position:absolute; left:50%; top:50%; width:38px; height:38px; margin:-19px 0 0 -19px; border-radius:50%; background:rgba(34,211,238,.25); border:2px solid #22d3ee; pointer-events:none; }
+    #pd-right .pd-knob { background:rgba(251,191,36,.25); border-color:#fbbf24; }
+    .pd-foot { margin-top:.5rem; display:flex; justify-content:space-between; gap:.75rem; }
+    .pd-foot b { color:#e2e8f0; font-weight:700; }
+    @media (max-width:640px) { #pd-toggle, #pd-deck { right:.75rem; } .pd-pad { width:96px; height:96px; } }
+  </style>
+  <button id="pd-toggle" type="button" aria-pressed="false" aria-controls="pd-deck">Manual</button>
+  <div id="pd-deck" role="group" aria-label="Manual pilot deck">
+    <div class="pd-sticks">
+      <div class="pd-col"><div class="pd-label">Yaw / Climb</div><div class="pd-pad" id="pd-left"><div class="pd-knob"></div></div></div>
+      <div class="pd-col"><div class="pd-label">Move / Strafe</div><div class="pd-pad" id="pd-right"><div class="pd-knob"></div></div></div>
+    </div>
+    <div class="pd-foot"><span>Pad: <b id="pd-pad-state">none</b></span><span>Keys: arrows</span></div>
+  </div>
+  <script>
+  (function () {
+    var MAX_SPEED = 15;      // m/s horizontal, matches the HUD's "15 m/s"
+    var MAX_CLIMB = 25;      // m/s
+    var MAX_YAW = 70;        // deg/s
+    var MIN_ALT = 10, MAX_ALT = 1500;
+    var DEAD = 0.12;
+    var M_PER_DEG = 111320;
+
+    var toggle = document.getElementById('pd-toggle');
+    var deck = document.getElementById('pd-deck');
+    var padState = document.getElementById('pd-pad-state');
+    var open = false, raf = null, last = 0;
+    var stick = { left: { x: 0, y: 0 }, right: { x: 0, y: 0 } };   // y: up positive
+    var keys = { up: false, down: false, left: false, right: false };
+    var gp = { lx: 0, ly: 0, rx: 0, ry: 0 };
+
+    function dz(v) { return Math.abs(v) < DEAD ? 0 : (v - Math.sign(v) * DEAD) / (1 - DEAD); }
+
+    function bindStick(padEl, state) {
+      var knob = padEl.querySelector('.pd-knob');
+      var active = null;
+      function set(e) {
+        var r = padEl.getBoundingClientRect();
+        var R = r.width / 2 - 19;
+        var dx = e.clientX - (r.left + r.width / 2);
+        var dy = e.clientY - (r.top + r.height / 2);
+        var d = Math.hypot(dx, dy);
+        if (d > R) { dx *= R / d; dy *= R / d; }
+        knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        state.x = dx / R; state.y = -dy / R;
+      }
+      function reset() { active = null; knob.style.transform = ''; state.x = 0; state.y = 0; }
+      padEl.addEventListener('pointerdown', function (e) { active = e.pointerId; padEl.setPointerCapture(e.pointerId); set(e); e.preventDefault(); });
+      padEl.addEventListener('pointermove', function (e) { if (e.pointerId === active) set(e); });
+      padEl.addEventListener('pointerup', function (e) { if (e.pointerId === active) reset(); });
+      padEl.addEventListener('pointercancel', reset);
+      padEl.addEventListener('lostpointercapture', reset);
+    }
+    bindStick(document.getElementById('pd-left'), stick.left);
+    bindStick(document.getElementById('pd-right'), stick.right);
+
+    function readGamepad() {
+      var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      var p = null;
+      for (var i = 0; i < pads.length; i++) { if (pads[i] && pads[i].connected) { p = pads[i]; break; } }
+      if (!p) { gp.lx = gp.ly = gp.rx = gp.ry = 0; padState.textContent = 'none'; return; }
+      padState.textContent = 'connected';
+      // Standard mapping: axes 0/1 = left stick, 2/3 = right stick (y is down-positive).
+      gp.lx = dz(p.axes[0] || 0); gp.ly = -dz(p.axes[1] || 0);
+      gp.rx = dz(p.axes[2] || 0); gp.ry = -dz(p.axes[3] || 0);
+    }
+
+    function clamp(v) { return Math.max(-1, Math.min(1, v)); }
+
+    function frame(now) {
+      raf = requestAnimationFrame(frame);
+      var dt = Math.min(0.1, (now - last) / 1000); last = now;
+      readGamepad();
+      var yaw = clamp(stick.left.x + gp.lx + (keys.right ? 1 : 0) - (keys.left ? 1 : 0));
+      var climb = clamp(stick.left.y + gp.ly);
+      var fwd = clamp(stick.right.y + gp.ry + (keys.up ? 1 : 0) - (keys.down ? 1 : 0));
+      var side = clamp(stick.right.x + gp.rx);
+      if (!yaw && !climb && !fwd && !side) { if (moving) { moving = false; document.getElementById('hud-speed').innerText = '0 m/s'; } return; }
+
+      cancelCinematic();
+      heading = heading + yaw * MAX_YAW * dt;
+      alt = Math.max(MIN_ALT, Math.min(MAX_ALT, alt + climb * MAX_CLIMB * dt));
+      var h = heading * Math.PI / 180;
+      var v = MAX_SPEED * dt;
+      var north = (Math.cos(h) * fwd - Math.sin(h) * side) * v;
+      var east = (Math.sin(h) * fwd + Math.cos(h) * side) * v;
+      lat += north / M_PER_DEG;
+      lng += east / (M_PER_DEG * Math.max(0.05, Math.cos(lat * Math.PI / 180)));
+      moving = true;
+      document.getElementById('hud-speed').innerText = Math.round(Math.hypot(fwd, side) * MAX_SPEED) + ' m/s';
+      updateMapCamera();
+    }
+    var moving = false;
+
+    function setOpen(on) {
+      open = on;
+      deck.classList.toggle('pd-open', on);
+      toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+      toggle.textContent = on ? 'Manual: ON' : 'Manual';
+      if (on && !raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
+      if (!on && raf) {
+        cancelAnimationFrame(raf); raf = null;
+        stick.left.x = stick.left.y = stick.right.x = stick.right.y = 0;
+        keys.up = keys.down = keys.left = keys.right = false;
+        moving = false;
+        document.getElementById('hud-speed').innerText = '0 m/s';
+      }
+    }
+    toggle.addEventListener('click', function () { setOpen(!open); });
+
+    function typing(e) { return e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement; }
+    var map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+    window.addEventListener('keydown', function (e) { if (open && !typing(e) && map[e.key]) { keys[map[e.key]] = true; e.preventDefault(); } });
+    window.addEventListener('keyup', function (e) { if (map[e.key]) keys[map[e.key]] = false; });
+    window.addEventListener('blur', function () { keys.up = keys.down = keys.left = keys.right = false; });
+  })();
+  </script>
 </body>
 </html>
