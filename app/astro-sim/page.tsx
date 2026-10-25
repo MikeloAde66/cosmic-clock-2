@@ -8,20 +8,21 @@ export const metadata = { title: 'Astro Simulator · Ai One' };
 // LIVE / ENHANCED / SIM badge once you open it (see SiteHeader and the views).
 // Backgrounds: the real NASA Moon map, the latest NASA SDO 304 Å frame (falls
 // back to black if NASA is unreachable), and a CSS-drawn banded gas giant.
-const TILES: { href: string; title: string; bg: string; size: string; position: string }[] = [
+const TILES: { href: string; title: string; bg: string; size: string; position: string; sunImg?: string }[] = [
   {
     href: '/astro-sim/moon',
     title: 'Moon Grid',
     bg: 'url(/textures/moon.jpg)',
-    size: '300% auto',
-    position: '52% 40%',
+    size: 'cover',
+    position: '50% 42%',
   },
   {
     href: '/astro-sim/sun',
     title: 'Live Sun',
-    bg: 'url(https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0304.jpg)',
+    bg: '',
     size: 'contain',
     position: 'center',
+    sunImg: 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0304.jpg',
   },
   {
     href: '/astro-sim/probe',
@@ -46,11 +47,26 @@ export default function AstroSimPage() {
             aria-label={t.title}
             className="relative flex items-center justify-center overflow-hidden group border border-slate-800/60 bg-black"
           >
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 transition duration-500 opacity-55 group-hover:opacity-90 group-hover:scale-[1.03]"
-              style={{ backgroundImage: t.bg, backgroundSize: t.size, backgroundPosition: t.position, backgroundRepeat: 'no-repeat' }}
-            />
+            {t.sunImg ? (
+              // NASA's frame has a small caption baked into its bottom edge; the
+              // square wrapper is clipped so only the Sun itself is shown.
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 flex items-center justify-center transition duration-500 opacity-60 group-hover:opacity-95"
+                style={{ containerType: 'size' }}
+              >
+                <div style={{ width: 'min(100cqw, 100cqh)', height: 'min(100cqw, 100cqh)', clipPath: 'inset(0 0 9% 0)' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={t.sunImg} alt="" className="object-contain w-full h-full" />
+                </div>
+              </div>
+            ) : (
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 transition duration-500 opacity-55 group-hover:opacity-90 group-hover:scale-[1.03]"
+                style={{ backgroundImage: t.bg, backgroundSize: t.size, backgroundPosition: t.position, backgroundRepeat: 'no-repeat' }}
+              />
+            )}
             <span className="relative text-sm tracking-[0.4em] text-center text-white uppercase sm:text-base">
               {t.title}
               <span className="block w-8 h-px mx-auto mt-3 bg-white" />
