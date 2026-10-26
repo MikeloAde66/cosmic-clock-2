@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { DISPATCHES, findDispatch } from '@/lib/signal/dispatches';
 import type { Dispatch } from '@/lib/signal/dispatches';
+import { dispatchScript, issueScript } from '@/lib/signal/speech';
 import { signalBody, signalDisplay, signalMono } from './fonts';
+import ListenBar from './ListenBar';
 import styles from './signal.module.css';
 
 // Signal, the digital magazine. A grid of dispatches that swaps, through a
@@ -54,6 +56,7 @@ function KindLabel({ kind }: { kind: Dispatch['kind'] }) {
 
 function Reader({ d }: { d: Dispatch }) {
   const sample = d.kind === 'sample';
+  const script = useMemo(() => dispatchScript(d), [d]);
   return (
     <div className={styles.article}>
       <div className={styles.artTagRow}>
@@ -80,6 +83,7 @@ function Reader({ d }: { d: Dispatch }) {
           </>
         )}
       </p>
+      <ListenBar chunks={script} label="LISTEN" />
       <div className={styles.artBody}>
         {d.body.map((p) => (
           <p key={p.slice(0, 40)}>{p}</p>
@@ -130,6 +134,7 @@ function Reader({ d }: { d: Dispatch }) {
 export default function SignalView() {
   const hash = useSyncExternalStore(subscribeHash, snapshotHash, serverHash);
   const open = hash ? findDispatch(hash) : undefined;
+  const briefing = useMemo(() => issueScript(DISPATCHES), []);
 
   return (
     <div className={`${styles.root} ${signalDisplay.variable} ${signalBody.variable} ${signalMono.variable}`}>
@@ -168,6 +173,9 @@ export default function SignalView() {
                 <b>PREVIEW</b>
                 <span>Signal is a design preview. The explainers are general background, not breaking news, and the sample dispatches use illustrative figures, not live data.</span>
               </p>
+            </div>
+            <div className={styles.briefingRow}>
+              <ListenBar chunks={briefing} label="PLAY THE BRIEFING" />
             </div>
             <div className={styles.issueMeta}>SAMPLE ISSUE · {DISPATCHES.length} DISPATCHES · EVERGREEN EXPLAINERS, NOT LIVE NEWS</div>
             <div className={styles.grid}>

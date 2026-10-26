@@ -1,0 +1,92 @@
+// Turns Signal dispatches into text that reads well aloud. Pure functions, so
+// the script can be tested without a browser or a speech engine.
+
+import type { Dispatch } from './dispatches.ts';
+
+const MAX_CHUNK = 220;
+
+/** Make written text easier on a speech engine. */
+export function speakable(text: string): string {
+  return text
+    .replace(/\s+—\s+|—/g, ', ')
+    .replace(/\bvs\.\s/g, 'versus ')
+    .replace(/\s&\s/g, ' and ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Split text into sentences, then pack them into pieces short enough that browsers do not cut them off. */
+export function chunk(text: string, max = MAX_CHUNK): string[] {
+  const sentences = speakable(text).split(/(?<=[.!?])\s+/).filter(Boolean);
+  const out: string[] = [];
+  let cur = '';
+  const push = () => {
+    if (cur) out.push(cur);
+    cur = '';
+  };
+  for (const s of sentences) {
+    if (s.length > max) {
+      // a very long sentence: break at commas or semicolons, never mid-word
+      push();
+      let part = '';
+      for (const piece of s.split(/(?<=[,;:])\s+/)) {
+        if (part && (part + ' ' + piece).length > max) {
+          out.push(part);
+          part = piece;
+        } else {
+          part = part ? part + ' ' + piece : piece;
+        }
+      }
+      if (part) out.push(part);
+    } else if (cur && (cur + ' ' + s).length > max) {
+      push();
+      cur = s;
+    } else {
+      cur = cur ? cur + ' ' + s : s;
+    }
+  }
+  push();
+  return out;
+}
+
+const sentenceCase = (s: string) => {
+  const lower = s.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+};
+
+/** The spoken script for one dispatch, labelled honestly up front. */
+export function dispatchScript(d: Dispatch): string[] {
+  const parts: string[] = [d.headline + '.', d.dek];
+  parts.push(
+    d.kind === 'sample'
+      ? 'This is a sample dispatch. The companies and figures are illustrative, not real reporting.'
+      : 'This is an explainer: general background, not a news report.',
+  );
+  parts.push(...d.body);
+  if (d.brief) {
+    d.brief.forEach((b, i) => {
+      const label = b.num.split('·')[1]?.trim() ?? '';
+      parts.push(`Number ${i + 1}${label ? ', ' + sentenceCase(label) : ''}. ${b.h}. ${b.p}`);
+    });
+  }
+  if (d.ticker) {
+    for (const t of d.ticker) parts.push(`${t.h}: ${t.status}. ${t.p}`);
+  }
+  if (d.callout) parts.push(`${sentenceCase(d.callout.k)}. ${d.callout.text}`);
+  return parts.flatMap((p) => chunk(p));
+}
+
+/** A short spoken briefing of the whole issue: each headline and its one-line summary. */
+export function issueScript(list: Dispatch[]): string[] {
+  const parts = [
+    `Signal. A sample issue with ${list.length} dispatches. These are evergreen explainers and sample formats, not live news.`,
+    ...list.map((d, i) => `${i + 1}. ${d.headline}. ${d.dek}`),
+  ];
+  return parts.flatMap((p) => chunk(p));
+}
+
+/** Rough listening time in whole minutes (at least 1), at a typical speaking pace. */
+export function listenMinutes(chunks: string[]): number {
+  const words = chunks.join(' ').split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 150));
+}
