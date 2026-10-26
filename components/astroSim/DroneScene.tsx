@@ -42,6 +42,8 @@ export interface DroneHud {
   // simulated surroundings
   altKm: number;
   velKms: number;
+  /** change in velocity per second, km/s */
+  velDelta: number;
   rangeKm: number;
   tempC: number;
   pressureBar: number;
@@ -451,6 +453,7 @@ function FlightScene({ inputs, onHud }: { inputs: React.RefObject<DroneInputs>; 
         assisting: s.assisting,
         altKm: s.alt,
         velKms: 0.1 + (s.speed / MAX_SPEED) * 1.6,
+        velDelta: ((s.thr * MAX_SPEED - s.speed) / MAX_SPEED) * 1.6 * 0.6,
         rangeKm: s.alt + REAL_MOON_KM,
         tempC: s.temp,
         pressureBar: 3e-15 * (1 + 0.12 * Math.sin(s.t * 1.7) + 0.08 * Math.sin(s.t * 0.6)),

@@ -182,13 +182,13 @@ function Cell({ label, value, unit, sub, warn, className = '' }: { label: string
   );
 }
 
-const WHO: Record<RadioLine['who'], { tag: string; color: string }> = {
+export const WHO: Record<RadioLine['who'], { tag: string; color: string }> = {
   CAPCOM: { tag: 'MISSION CTRL', color: '#67e8f9' },
   SURFACE: { tag: 'SHACKLETON', color: '#fbbf24' },
   'NAV-AI': { tag: 'NAV-AI', color: '#c4b5fd' },
 };
 
-function clock(sec: number) {
+export function clock(sec: number) {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `T+${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
@@ -229,7 +229,7 @@ function Radio({ log, t, linkLost }: { log: RadioLine[]; t: number; linkLost: bo
   );
 }
 
-function objective(hud: DroneHud): { title: string; status: string; fill: number } {
+export function objective(hud: DroneHud): { title: string; status: string; fill: number } {
   const lapPct = Math.round(hud.orbit * 100);
   switch (hud.stage) {
     case 'acquire':

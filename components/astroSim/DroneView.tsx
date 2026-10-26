@@ -1,9 +1,11 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { SkipForward } from 'lucide-react';
+import CanopyHud from './CanopyHud';
 import CockpitHud from './CockpitHud';
+import SiteHeader from './SiteHeader';
 import type { DroneHud, DroneInputs } from './DroneScene';
 import { missionStep, newMission } from '@/lib/astroSim/droneMission';
 import type { RadioLine } from '@/lib/astroSim/droneMission';
@@ -11,7 +13,19 @@ import { playTargetLock, unlockAudio } from '@/lib/astroSim/audio';
 
 const DroneScene = dynamic(() => import('./DroneScene'), { ssr: false });
 
+// The canopy cockpit is laid out for wide screens; narrower ones keep the
+// compact cockpit until it gets its own responsive pass.
+const WIDE = '(min-width: 900px)';
+const subscribeWide = (cb: () => void) => {
+  const m = window.matchMedia(WIDE);
+  m.addEventListener('change', cb);
+  return () => m.removeEventListener('change', cb);
+};
+const snapshotWide = () => window.matchMedia(WIDE).matches;
+const serverWide = () => false;
+
 export default function DroneView() {
+  const wide = useSyncExternalStore(subscribeWide, snapshotWide, serverWide);
   const [phase, setPhase] = useState<'pad' | 'flight'>('pad');
   const [label, setLabel] = useState('T-3');
   const [cover, setCover] = useState(false);
@@ -21,7 +35,7 @@ export default function DroneView() {
   const mission = useRef(newMission());
   const [hud, setHud] = useState<DroneHud>({
     speed: 0, throttle: 0, pitchDeg: 0, rollDeg: 0, headingDeg: 0, sunGlow: 0, t: 0, stage: 'acquire', orbit: 0, facingDeg: 0, lock: 0, assisting: false,
-    altKm: 1900, velKms: 0, rangeKm: 3637, tempC: -18, pressureBar: 3e-15, gLoad: 0, localG: 0.9, radUsv: 0.5, linkDb: 36, linkLost: false,
+    altKm: 1900, velKms: 0, velDelta: 0, rangeKm: 3637, tempC: -18, pressureBar: 3e-15, gLoad: 0, localG: 0.9, radUsv: 0.5, linkDb: 36, linkLost: false,
   });
   const inputs = useRef<DroneInputs>({ lx: 0, ly: 0, rx: 0, ry: 0 });
 
@@ -77,7 +91,14 @@ export default function DroneView() {
     setRun((n) => n + 1);
   };
 
+  const Hud = wide ? CanopyHud : CockpitHud;
+  const canopy = wide && phase === 'flight';
+
   return (
+    <>
+      {!canopy && (
+        <SiteHeader eyebrow="Space Drone" title="Shuttle-class flight" mode="SIM" modeNote="Simulated vehicle and flight, Moon not to scale. The Moon surface is NASA imagery." sub />
+      )}
     <div className="relative flex-1 min-h-0 touch-none select-none">
       <DroneScene key={`${phase}-${run}`} phase={phase} inputs={inputs} onLabel={setLabel} onLaunchDone={toFlight} onHud={onHud} />
 
@@ -97,8 +118,9 @@ export default function DroneView() {
           </button>
         </>
       ) : (
-        <CockpitHud hud={hud} assist={assist} log={log} onLeft={onLeft} onRight={onRight} onReplay={replay} onFaceMoon={faceMoon} onToggleAssist={toggleAssist} onRestart={restartMission} />
+        <Hud hud={hud} assist={assist} log={log} onLeft={onLeft} onRight={onRight} onReplay={replay} onFaceMoon={faceMoon} onToggleAssist={toggleAssist} onRestart={restartMission} />
       )}
     </div>
+    </>
   );
 }
