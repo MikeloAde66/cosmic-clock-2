@@ -283,7 +283,7 @@
       { id: 'bangkok', name: 'Bangkok, Thailand', country: 'TH', lat: 13.7563, lng: 100.5018, alt: 120, heading: 120, range: 650, tz: 'Asia/Bangkok', lang: 'th', airport: 'Suvarnabhumi Airport BKK Bangkok', airbnb: 'Bangkok--Thailand', aliases: ['bangkok', 'thailand'] },
       { id: 'paris', name: 'Paris, France', country: 'FR', lat: 48.8584, lng: 2.2945, alt: 150, heading: 60, range: 600, tz: 'Europe/Paris', lang: 'fr', airport: 'Charles de Gaulle Airport CDG Paris', airbnb: 'Paris--France', aliases: ['paris', 'france'] },
       { id: 'lagos', name: 'Lagos, Nigeria', country: 'NG', lat: 6.4541, lng: 3.3947, alt: 120, heading: 45, range: 650, tz: 'Africa/Lagos', lang: 'en', airport: 'Murtala Muhammed International Airport LOS Lagos', airbnb: 'Lagos--Nigeria', aliases: ['lagos', 'nigeria'] },
-      { id: 'johannesburg', name: 'Johannesburg, South Africa', country: 'ZA', lat: -26.2041, lng: 28.0473, alt: 150, heading: 20, range: 650, tz: 'Africa/Johannesburg', lang: 'en', airport: 'O. R. Tambo International Airport JNB Johannesburg', airbnb: 'Johannesburg--South-Africa', aliases: ['johannesburg', 'joburg', 'jozi', 'south africa'] },
+      { id: 'johannesburg', name: 'Johannesburg, South Africa', country: 'ZA', lat: -26.2041, lng: 28.0473, alt: 200, heading: 20, range: 900, tz: 'Africa/Johannesburg', lang: 'en', airport: 'O. R. Tambo International Airport JNB Johannesburg', airbnb: 'Johannesburg--South-Africa', aliases: ['johannesburg', 'joburg', 'jozi', 'south africa'] },
     ];
 
     // Travel categories per destination; `q` builds the Google Places text query.
@@ -433,19 +433,30 @@
     // Arrive at a place. Cinematic mode: a 2.5 s glide over to it, then a
     // long, slow push-in toward the subject with a gentle drift in heading,
     // the slow dolly move film-makers use for reveals. Any flight key cancels it.
+    // Framing for a place inside a city. Charleston's 3D coverage is sharp enough
+    // for the close, near-level push-in it always had. Elsewhere the tiles smear
+    // into blur when the camera gets that close, so stay further out and look
+    // down more, at roughly the distance where the city arrival looks good.
+    function placeFraming() {
+      const d = currentDest;
+      if (!d || d.id === 'charleston') return { range: 160, alt: 15, tilt: 72 };
+      return { range: Math.max(340, Math.round(d.range * 0.6)), alt: 30, tilt: 60 };
+    }
+
     function flyToPlace(pLat, pLng, label, opts = {}) {
       cancelCinematic();
       document.getElementById('hud-env').innerText = label;
       placeMarker(pLat, pLng, label);
-      const endRange = opts.range || 160;
-      const endAlt = opts.alt || 15;
+      const f = placeFraming();
+      const endRange = opts.range || f.range;
+      const endAlt = opts.alt || f.alt;
       if (!cinematicOn) {
-        lat = pLat; lng = pLng; alt = endAlt; tilt = 72; range = endRange;
+        lat = pLat; lng = pLng; alt = endAlt; tilt = f.tilt; range = endRange;
         updateMapCamera();
         return;
       }
-      tweenCamera({ lat: pLat, lng: pLng, alt: endAlt, tilt: 62, range: endRange * 4 }, 2500, () => {
-        tweenCamera({ range: endRange, tilt: 72, heading: heading + 14 }, 11000);
+      tweenCamera({ lat: pLat, lng: pLng, alt: endAlt, tilt: f.tilt - 10, range: endRange * 4 }, 2500, () => {
+        tweenCamera({ range: endRange, tilt: f.tilt, heading: heading + 14 }, 11000);
       });
     }
 
