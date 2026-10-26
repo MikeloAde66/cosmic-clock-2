@@ -13,9 +13,15 @@ export interface RadioLine {
   at: number;
 }
 
-/** The slice of telemetry the script reacts to. */
-export interface MissionFacts {
+/** What every mission's script needs to know. */
+export interface BaseFacts {
   t: number;
+  stage: string;
+  linkLost: boolean;
+}
+
+/** The slice of Mission 01 telemetry the script reacts to. */
+export interface MissionFacts extends BaseFacts {
   stage: Stage;
   /** 0..1 of the single lap */
   orbit: number;
@@ -38,11 +44,19 @@ export function newMission(): MissionState {
   return { sent: new Set(), nextId: 1, lastLineAt: -99, ambient: 0, offTargetSince: null, lastOffTargetNag: -99 };
 }
 
-interface Beat {
+export interface Beat<F extends BaseFacts = MissionFacts> {
   key: string;
   who: Speaker;
   text: string;
-  when: (f: MissionFacts) => boolean;
+  when: (f: F) => boolean;
+}
+
+/** A mission's radio: story beats that fire once, plus small talk for quiet stretches. */
+export interface Script<F extends BaseFacts> {
+  beats: Beat<F>[];
+  ambient: { who: Speaker; text: string }[];
+  /** stages in which the small talk stays off */
+  quietStages: string[];
 }
 
 const BEATS: Beat[] = [
@@ -154,8 +168,16 @@ const AMBIENT: { who: Speaker; text: string }[] = [
   { who: 'SURFACE', text: 'We are keeping a light on in the window for you, Drone.' },
 ];
 
-/** At most one beat per call, with a small gap, so the radio never talks over itself. */
-export function missionStep(m: MissionState, f: MissionFacts): RadioLine[] {
+/**
+ * At most one line per call, with a small gap, so the radio never talks over
+ * itself. `between` lets a mission add its own nag; it returns true if it spoke.
+ */
+export function runScript<F extends BaseFacts>(
+  m: MissionState,
+  f: F,
+  script: Script<F>,
+  between?: (push: (who: Speaker, text: string) => void, gap: number) => boolean,
+): RadioLine[] {
   const out: RadioLine[] = [];
   const gap = f.t - m.lastLineAt;
   const push = (who: Speaker, text: string) => {
@@ -167,7 +189,7 @@ export function missionStep(m: MissionState, f: MissionFacts): RadioLine[] {
   if (f.linkLost) return out;
 
   if (gap >= 5.5) {
-    const beat = BEATS.find((b) => !m.sent.has(b.key) && b.when(f));
+    const beat = script.beats.find((b) => !m.sent.has(b.key) && b.when(f));
     if (beat) {
       m.sent.add(beat.key);
       push(beat.who, beat.text);
@@ -175,23 +197,31 @@ export function missionStep(m: MissionState, f: MissionFacts): RadioLine[] {
     }
   }
 
-  // Lost sight of the Moon mid-lap.
-  if (f.stage === 'orbit') {
+  if (between?.(push, gap)) return out;
+
+  if (gap >= 32 && m.sent.size > 0 && !script.quietStages.includes(f.stage) && m.ambient < script.ambient.length) {
+    const a = script.ambient[m.ambient++];
+    push(a.who, a.text);
+  }
+  return out;
+}
+
+const MISSION_01: Script<MissionFacts> = { beats: BEATS, ambient: AMBIENT, quietStages: ['done'] };
+
+export function missionStep(m: MissionState, f: MissionFacts): RadioLine[] {
+  return runScript(m, f, MISSION_01, (push, gap) => {
+    // Lost sight of the Moon mid-lap.
+    if (f.stage !== 'orbit') return false;
     if (f.facingDeg > 60) {
       m.offTargetSince ??= f.t;
       if (f.t - m.offTargetSince > 3 && f.t - m.lastOffTargetNag > 25 && gap >= 5.5) {
         m.lastOffTargetNag = f.t;
         push('NAV-AI', 'The Moon has left the window. Turn back toward it or this lap does not count.');
-        return out;
+        return true;
       }
     } else {
       m.offTargetSince = null;
     }
-  }
-
-  if (gap >= 32 && m.sent.size > 0 && f.stage !== 'done' && m.ambient < AMBIENT.length) {
-    const a = AMBIENT[m.ambient++];
-    push(a.who, a.text);
-  }
-  return out;
+    return false;
+  });
 }
