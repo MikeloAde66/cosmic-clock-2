@@ -114,6 +114,16 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
 
   if (!recording || scenes.length === 0) return null;
 
+  // one picture shared by every scene: the camera moves over it instead of cutting between pictures
+  const panorama = scenes.every((s) => s.src && s.src === scenes[0].src);
+  const panTransform = (i: number) => {
+    const v = scenes[i].view;
+    if (!v || v.zoom <= 1) return 'none';
+    const tx = Math.min(0, Math.max(1 - v.zoom, 0.5 - v.x * v.zoom));
+    const ty = Math.min(0, Math.max(1 - v.zoom, 0.5 - v.y * v.zoom));
+    return `translate(${tx * 100}%, ${ty * 100}%) scale(${v.zoom})`;
+  };
+
   const idx = lineAt(lines, fraction);
   const line = lines[idx];
   const ended = started && !playing && fraction >= 0.995;
@@ -123,19 +133,24 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
 
   return (
     <figure className={styles.visual} aria-label={`Illustrated explainer: ${d.headline}`}>
-      <div className={styles.visualStage}>
-        {scenes.map((s, i) => {
-          const on = i === shown.scene ? styles.visualImgOn : '';
-          const Chart = s.chart ? CHARTS[s.chart] : undefined;
-          return Chart ? (
-            <div key={s.chart} role="img" aria-label={s.alt} className={`${styles.visualImg} ${on}`}>
-              <Chart />
-            </div>
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={s.src} src={s.src} alt={s.alt} className={`${styles.visualImg} ${on}`} />
-          );
-        })}
+      <div className={styles.visualStage} style={d.visual?.aspect ? { aspectRatio: d.visual.aspect } : undefined}>
+        {panorama ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={scenes[0].src} alt={scenes[0].alt} className={styles.visualPan} style={{ transform: panTransform(shown.scene) }} />
+        ) : (
+          scenes.map((s, i) => {
+            const on = i === shown.scene ? styles.visualImgOn : '';
+            const Chart = s.chart ? CHARTS[s.chart] : undefined;
+            return Chart ? (
+              <div key={s.chart} role="img" aria-label={s.alt} className={`${styles.visualImg} ${on}`}>
+                <Chart />
+              </div>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={s.src} src={s.src} alt={s.alt} className={`${styles.visualImg} ${on}`} />
+            );
+          })
+        )}
         {!playing && (
           <button type="button" className={styles.visualPlay} onClick={ended ? replay : play} aria-label={ended ? 'Replay the illustrated explainer' : started ? 'Resume' : 'Play the illustrated explainer'}>
             {ended ? <RotateCcw aria-hidden="true" /> : <Play aria-hidden="true" />}
