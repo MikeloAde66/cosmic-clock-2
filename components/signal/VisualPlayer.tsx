@@ -147,7 +147,7 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
               </div>
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={s.src} src={s.src} alt={s.alt} className={`${styles.visualImg} ${on}`} />
+              <img key={`${i}-${s.src}`} src={s.src} alt={s.alt} className={`${styles.visualImg} ${on}`} style={d.visual?.aspect ? { objectFit: 'cover', objectPosition: s.pos } : undefined} />
             );
           })
         )}
@@ -186,7 +186,7 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
           <Captions aria-hidden="true" />
         </button>
       </div>
-      <p className={styles.visualNote}>{scenes.some((s) => s.chart) ? 'DIAGRAM · DRAWN IN CODE' : 'ILLUSTRATION · AI-GENERATED'} · {sample ? 'ILLUSTRATIVE FIGURES' : 'NO LIVE DATA'}{failed ? ' · AUDIO COULD NOT BE PLAYED' : ''}</p>
+      <p className={styles.visualNote}>{d.visual?.note ?? `${scenes.some((s) => s.chart) ? 'DIAGRAM · DRAWN IN CODE' : 'ILLUSTRATION · AI-GENERATED'} · ${sample ? 'ILLUSTRATIVE FIGURES' : 'NO LIVE DATA'}`}{failed ? ' · AUDIO COULD NOT BE PLAYED' : ''}</p>
       <audio
         ref={audio}
         src={recording.src}

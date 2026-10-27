@@ -29,6 +29,8 @@ export interface Dispatch {
 export interface Visual {
   /** CSS aspect-ratio of the frame when it is not the default wide strip, e.g. '1376 / 768' */
   aspect?: string;
+  /** replaces the default picture label when the pictures are not AI illustrations */
+  note?: string;
   scenes: {
     /** a picture file, or a chart drawn in code (see components/signal/ChartScenes) */
     src?: string;
@@ -36,6 +38,8 @@ export interface Visual {
     alt: string;
     /** one picture shared by every scene: the camera moves to this spot (0..1 of the picture) and zoom */
     view?: { x: number; y: number; zoom: number };
+    /** CSS object-position when the picture is cropped to the frame, e.g. '50% 30%' */
+    pos?: string;
     /** the part of the script this scene opens on (see scriptParts): head, body:N, callout ... */
     from: string;
   }[];
@@ -111,12 +115,13 @@ export const DISPATCHES: Dispatch[] = [
     kind: 'explainer',
     visual: {
       aspect: '1376 / 768',
+      note: 'ILLUSTRATIVE IMAGES · NOT FROM A SPECIFIC EVENT · NO LIVE DATA',
       scenes: [
-        { src: '/signal-visuals/data-centers.webp', alt: 'The whole picture: data center campus, transmission lines, substation and a home with its meter.', from: 'head' },
-        { src: '/signal-visuals/data-centers.webp', alt: 'Close on the data center campus and its power equipment.', from: 'body:0', view: { x: 0.22, y: 0.62, zoom: 1.9 } },
-        { src: '/signal-visuals/data-centers.webp', alt: 'Close on the transmission towers and the local utility substation.', from: 'body:1', view: { x: 0.6, y: 0.45, zoom: 1.9 } },
-        { src: '/signal-visuals/data-centers.webp', alt: 'Close on the suburban home, its electric meter and the bill.', from: 'body:2', view: { x: 0.86, y: 0.62, zoom: 1.9 } },
-        { src: '/signal-visuals/data-centers.webp', alt: 'The whole picture again.', from: 'callout' },
+        { src: '/signal-visuals/data-centers.webp', alt: 'An illustration: a data center campus, transmission lines, a substation, and a home with its meter and bill.', from: 'head' },
+        { src: '/signal-visuals/dc-aerial.webp', alt: 'An aerial view of two large data center buildings on flat farmland, with roads, ponds and a parking lot.', from: 'body:0', pos: '50% 55%' },
+        { src: '/signal-visuals/dc-aisle.webp', alt: 'A long aisle of server racks with blue lights and no people in it.', from: 'body:1' },
+        { src: '/signal-visuals/dc-people.webp', alt: 'Two people smiling on a city street as one hands the other some papers.', from: 'body:2', pos: '50% 30%' },
+        { src: '/signal-visuals/data-centers.webp', alt: 'The illustration again: campus, transmission lines, substation, and a home with its bill.', from: 'callout' },
       ],
     },
   },
