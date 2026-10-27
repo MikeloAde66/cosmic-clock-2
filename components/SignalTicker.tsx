@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useReducer, useState, useSyncExternalStore } from 'react';
 import { tickerLines } from '@/lib/signal/ticker';
 import { signalBody } from '@/components/signal/fonts';
+import FooterSmoke from '@/components/FooterSmoke';
 
 // A slim strip on the hub that types out Signal's tagline and dispatches, one
 // line at a time, slowly enough to read. Tapping it opens the Signal page. It
@@ -64,6 +65,7 @@ export default function SignalTicker() {
 
   return (
     <div className={`${signalBody.variable} relative z-10 w-full px-4 pt-2 pb-3 shrink-0`}>
+      <FooterSmoke />
       <Link
         href="/signal"
         aria-label="Signal, the digital magazine. Open the dispatches."
@@ -71,7 +73,7 @@ export default function SignalTicker() {
         onMouseLeave={release}
         onFocus={hold}
         onBlur={release}
-        className="flex items-center max-w-5xl gap-3 px-3 py-2 mx-auto transition-colors border rounded-lg group border-slate-800/80 bg-[#0a0f16] hover:border-teal-400/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400"
+        className="relative flex items-center max-w-5xl gap-3 px-3 py-2 mx-auto transition-colors border rounded-lg group border-slate-800/80 bg-[#0a0f16] hover:border-teal-400/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400"
       >
         <span className="flex items-center gap-2 shrink-0">
           <span
