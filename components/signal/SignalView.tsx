@@ -190,7 +190,7 @@ export default function SignalView() {
                   <h2>{d.headline}</h2>
                   <p>{d.dek}</p>
                   <KindLabel kind={d.kind} />
-                  {d.visual && <span className={styles.cardVisual}>&#9654; ILLUSTRATED + CAPTIONS</span>}
+                  {d.visual && <span className={styles.cardVisual}>&#9654; VISUAL + CAPTIONS</span>}
                   <div className={styles.cardFoot}>{d.byline.join(' · ')}</div>
                 </button>
               ))}

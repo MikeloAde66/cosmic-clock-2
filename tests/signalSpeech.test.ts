@@ -110,3 +110,24 @@ test('captions cover the whole script in order, with scenes that only move forwa
   assert.ok(lines.find((l) => l.scene === 2)!.text.startsWith('What to watch'));
   assert.match(lines.find((l) => l.scene === 1)!.text, /tariff is a tax/i);
 });
+
+test('every visual scene opens on real narration, in order, and each gets some captions', async () => {
+  const { captionTimeline } = await import('../lib/signal/captions.ts');
+  const { scriptParts } = await import('../lib/signal/speech.ts');
+  const withVisual = DISPATCHES.filter((d) => d.visual);
+  assert.ok(withVisual.length >= 4);
+  for (const d of withVisual) {
+    const keys = scriptParts(d).map((p) => p.key);
+    const scenes = d.visual!.scenes;
+    assert.equal(scenes[0].from, 'head', d.id);
+    let last = -1;
+    for (const s of scenes) {
+      assert.ok(Boolean(s.src) !== Boolean(s.chart), `${d.id}: each scene is a picture or a chart`);
+      const at = keys.indexOf(s.from);
+      assert.ok(at > last, `${d.id}: ${s.from} missing or out of order`);
+      last = at;
+    }
+    const used = new Set(captionTimeline(d).map((l) => l.scene));
+    assert.equal(used.size, scenes.length, d.id);
+  }
+});

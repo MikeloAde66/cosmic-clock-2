@@ -6,6 +6,7 @@ import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 import { captionTimeline, lineAt } from '@/lib/signal/captions';
 import type { Dispatch } from '@/lib/signal/dispatches';
 import { formatSeconds } from '@/lib/signal/speech';
+import { CHARTS } from './ChartScenes';
 import styles from './signal.module.css';
 import { audioFor } from './audioManifest';
 
@@ -123,10 +124,18 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
   return (
     <figure className={styles.visual} aria-label={`Illustrated explainer: ${d.headline}`}>
       <div className={styles.visualStage}>
-        {scenes.map((s, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={s.src} src={s.src} alt={s.alt} className={`${styles.visualImg} ${i === shown.scene ? styles.visualImgOn : ''}`} />
-        ))}
+        {scenes.map((s, i) => {
+          const on = i === shown.scene ? styles.visualImgOn : '';
+          const Chart = s.chart ? CHARTS[s.chart] : undefined;
+          return Chart ? (
+            <div key={s.chart} role="img" aria-label={s.alt} className={`${styles.visualImg} ${on}`}>
+              <Chart />
+            </div>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={s.src} src={s.src} alt={s.alt} className={`${styles.visualImg} ${on}`} />
+          );
+        })}
         {!playing && (
           <button type="button" className={styles.visualPlay} onClick={ended ? replay : play} aria-label={ended ? 'Replay the illustrated explainer' : started ? 'Resume' : 'Play the illustrated explainer'}>
             {ended ? <RotateCcw aria-hidden="true" /> : <Play aria-hidden="true" />}
@@ -162,7 +171,7 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
           <Captions aria-hidden="true" />
         </button>
       </div>
-      <p className={styles.visualNote}>ILLUSTRATION · AI-GENERATED · {sample ? 'ILLUSTRATIVE FIGURES' : 'NO LIVE DATA'}{failed ? ' · AUDIO COULD NOT BE PLAYED' : ''}</p>
+      <p className={styles.visualNote}>{scenes.some((s) => s.chart) ? 'DIAGRAM · DRAWN IN CODE' : 'ILLUSTRATION · AI-GENERATED'} · {sample ? 'ILLUSTRATIVE FIGURES' : 'NO LIVE DATA'}{failed ? ' · AUDIO COULD NOT BE PLAYED' : ''}</p>
       <audio
         ref={audio}
         src={recording.src}

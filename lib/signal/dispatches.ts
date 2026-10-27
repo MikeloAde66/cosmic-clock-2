@@ -28,7 +28,9 @@ export interface Dispatch {
 /** Scene pictures must be free of baked-in captions; the caption band is drawn separately. */
 export interface Visual {
   scenes: {
-    src: string;
+    /** a picture file, or a chart drawn in code (see components/signal/ChartScenes) */
+    src?: string;
+    chart?: string;
     alt: string;
     /** the part of the script this scene opens on (see scriptParts): head, body:N, callout ... */
     from: string;
@@ -78,6 +80,13 @@ export const DISPATCHES: Dispatch[] = [
       text: 'Growth stocks, whose cash flows sit furthest in the future, are mathematically the most sensitive to rate changes — which is why they tend to move hardest on Fed days.',
     },
     kind: 'explainer',
+    visual: {
+      scenes: [
+        { chart: 'fed-pv', alt: 'Paired bars showing the same future payments worth less today at a 5 percent rate than at 3 percent.', from: 'head' },
+        { chart: 'fed-day', alt: 'A rising savings line that dips on the day of a Fed press conference, though nothing about the plan changed.', from: 'body:1' },
+        { chart: 'fed-duration', alt: 'Two bars: a payment in year 3 loses about 3 percent of its value when rates rise one point, one in year 20 loses about 18 percent.', from: 'callout' },
+      ],
+    },
   },
   {
     id: 'data-center-bills',
@@ -126,6 +135,14 @@ export const DISPATCHES: Dispatch[] = [
       },
     ],
     kind: 'sample',
+    visual: {
+      scenes: [
+        { chart: 'earn-intro', alt: 'Three tiles: cloud infrastructure, regional retail and industrial supply, each with its one-line finding.', from: 'head' },
+        { chart: 'earn-cloud', alt: 'Two bars, original and updated guidance, with the updated one two points lower.', from: 'brief:0' },
+        { chart: 'earn-retail', alt: 'Same-store sales bars falling for a second quarter while gross margin bars rise.', from: 'brief:1' },
+        { chart: 'earn-industrial', alt: 'Revenue bar short of the estimate line, next to an order backlog bar that has grown by double digits.', from: 'brief:2' },
+      ],
+    },
   },
   {
     id: 'supply-chain-watch',
@@ -155,6 +172,14 @@ export const DISPATCHES: Dispatch[] = [
       },
     ],
     kind: 'sample',
+    visual: {
+      scenes: [
+        { chart: 'sc-legend', alt: 'Three status tiles: elevated means getting worse, stable means holding, easing means getting better.', from: 'head' },
+        { chart: 'sc-ports', alt: 'A line of port dwell times that has risen above the seasonal norm band for the last three weeks.', from: 'ticker:0' },
+        { chart: 'sc-chips', alt: 'A flat line for mature-node chip lead times, and a note to watch leading-edge capacity.', from: 'ticker:1' },
+        { chart: 'sc-freight', alt: 'A line of ocean freight spot rates drifting down from an earlier peak.', from: 'ticker:2' },
+      ],
+    },
   },
   {
     id: 'filing-nobody-read',
