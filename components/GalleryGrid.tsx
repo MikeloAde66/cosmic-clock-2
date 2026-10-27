@@ -398,11 +398,17 @@ function FlightSchoolCardImage() {
 }
 
 // Astro Simulator: a still picture of a spacecraft cockpit looking down on
-// Earth. Decorative illustration, not a live view.
+// Earth, slowly panning. Decorative illustration, not a live view.
 function AstroSimCardImage() {
   return (
     <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
-      <img src="/media/astro-cockpit.jpg" alt="" className="absolute inset-0 object-cover w-full h-full" />
+      <img src="/media/astro-cockpit.jpg" alt="" className="absolute inset-0 object-cover w-full h-full astro-cockpit-drift" />
+      {/* instrument-panel glow, a soft amber wash over the lower middle */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-[22%] bottom-0 h-1/2 pointer-events-none astro-cockpit-glow"
+        style={{ background: 'radial-gradient(ellipse at 50% 80%, rgba(255,179,71,0.6), transparent 70%)', mixBlendMode: 'screen' }}
+      />
     </div>
   );
 }

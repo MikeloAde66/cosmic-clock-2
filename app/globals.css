@@ -670,3 +670,19 @@ body {
     animation: star-tracker-fade-out 120ms linear both;
   }
 }
+
+/* Astro Simulator card: a slow drift across the cockpit window and a soft
+   pulse on the instrument lights. Still under reduced motion. */
+@keyframes astro-cockpit-drift {
+  0%, 100% { transform: scale(1.12) translateX(-2.5%); }
+  50% { transform: scale(1.12) translateX(2.5%); }
+}
+@keyframes astro-cockpit-glow {
+  0%, 100% { opacity: 0.12; }
+  50% { opacity: 0.42; }
+}
+.astro-cockpit-drift { animation: astro-cockpit-drift 18s ease-in-out infinite; }
+.astro-cockpit-glow { animation: astro-cockpit-glow 3.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .astro-cockpit-drift, .astro-cockpit-glow { animation: none; }
+}
