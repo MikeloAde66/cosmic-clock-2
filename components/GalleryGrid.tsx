@@ -397,31 +397,12 @@ function FlightSchoolCardImage() {
   return <LoopVideoCardImage name="flight-drone" />;
 }
 
-// Astro Simulator: a lat/lon-gridded moon with a targeting reticle. Static
-// SVG (no video asset), so it is a decorative preview, not imagery.
+// Astro Simulator: a still picture of a spacecraft cockpit looking down on
+// Earth. Decorative illustration, not a live view.
 function AstroSimCardImage() {
   return (
     <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
-      <svg viewBox="0 0 200 96" className="absolute inset-0 w-full h-full" aria-hidden="true">
-        <defs>
-          <radialGradient id="astro-moon" cx="38%" cy="35%" r="75%">
-            <stop offset="0" stopColor="#d4d4d8" />
-            <stop offset="1" stopColor="#3f3f46" />
-          </radialGradient>
-        </defs>
-        <circle cx="100" cy="48" r="38" fill="url(#astro-moon)" />
-        <g fill="none" stroke="#5ff0ff" strokeOpacity="0.55" strokeWidth="0.6">
-          <ellipse cx="100" cy="48" rx="38" ry="12" />
-          <ellipse cx="100" cy="48" rx="14" ry="38" />
-          <path d="M62 48h76M100 10v76" />
-        </g>
-        <g fill="none" stroke="#ffb347" strokeWidth="1">
-          <circle cx="118" cy="36" r="8">
-            <animate attributeName="r" values="10;7;10" dur="2.4s" repeatCount="indefinite" />
-          </circle>
-          <path d="M118 24v4M118 44v4M106 36h4M126 36h4" />
-        </g>
-      </svg>
+      <img src="/media/astro-cockpit.jpg" alt="" className="absolute inset-0 object-cover w-full h-full" />
     </div>
   );
 }
