@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 import { createAudioReader, createReader, speechSupported } from '@/lib/signal/reader';
 import type { ReaderState } from '@/lib/signal/reader';
+import { MEDIA_EVENT } from './VisualPlayer';
 
 const RATES = [1, 1.25, 1.5];
 const IDLE: ReaderState = { status: 'idle', index: 0, total: 0 };
@@ -58,6 +59,7 @@ export function useReadAloud() {
       speech.current?.stop();
       recording.current?.destroy();
       recording.current = null;
+      window.dispatchEvent(new CustomEvent(MEDIA_EVENT, { detail: 'listen' }));
       const now = radioRef.current;
       if (now.status === 'playing') {
         resumeRadio.current = true;
@@ -85,6 +87,18 @@ export function useReadAloud() {
     },
     [handBack],
   );
+
+  // the illustrated player starting means this reader should step aside
+  useEffect(() => {
+    const onMedia = (e: Event) => {
+      if ((e as CustomEvent).detail === 'visual') {
+        speech.current?.stop();
+        recording.current?.stop();
+      }
+    };
+    window.addEventListener(MEDIA_EVENT, onMedia);
+    return () => window.removeEventListener(MEDIA_EVENT, onMedia);
+  }, []);
 
   const active = () => (recording.current ?? speech.current) as Controls | null;
   const pause = useCallback(() => active()?.pause(), []);

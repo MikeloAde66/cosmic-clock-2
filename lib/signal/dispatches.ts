@@ -21,6 +21,18 @@ export interface Dispatch {
   brief?: { num: string; h: string; p: string }[];
   /** status rows for the supply chain tracker */
   ticker?: { status: 'elevated' | 'stable' | 'easing'; h: string; p: string }[];
+  /** illustrated scenes, shown one at a time with captions that follow the recording */
+  visual?: Visual;
+}
+
+/** Scene pictures must be free of baked-in captions; the caption band is drawn separately. */
+export interface Visual {
+  scenes: {
+    src: string;
+    alt: string;
+    /** the part of the script this scene opens on (see scriptParts): head, body:N, callout ... */
+    from: string;
+  }[];
 }
 
 export const DISPATCHES: Dispatch[] = [
@@ -41,6 +53,13 @@ export const DISPATCHES: Dispatch[] = [
       text: "Earnings-call language is an early tell. When a CFO says 'pricing actions' instead of 'price increases,' that's usually a tariff pass-through in progress.",
     },
     kind: 'explainer',
+    visual: {
+      scenes: [
+        { src: '/signal-visuals/tariff-tax-1.webp', alt: 'A shopping cart with a receipt and a percent tag, and the words "price floor".', from: 'head' },
+        { src: '/signal-visuals/tariff-tax-2.webp', alt: 'A diagram: a ship at the border, an importer choosing to eat the cost, pass it down or split it, and a clock showing the months before shelf prices rise.', from: 'body:0' },
+        { src: '/signal-visuals/tariff-tax-3.webp', alt: 'A boardroom with a rising chart: a CFO saying "pricing actions" translates to a tariff pass-through in progress.', from: 'callout' },
+      ],
+    },
   },
   {
     id: 'fed-401k',

@@ -7,6 +7,7 @@ import type { Dispatch } from '@/lib/signal/dispatches';
 import { dispatchScript, issueScript } from '@/lib/signal/speech';
 import { signalBody, signalDisplay, signalMono } from './fonts';
 import ListenBar from './ListenBar';
+import VisualPlayer from './VisualPlayer';
 import styles from './signal.module.css';
 
 // Signal, the digital magazine. A grid of dispatches that swaps, through a
@@ -83,6 +84,7 @@ function Reader({ d }: { d: Dispatch }) {
           </>
         )}
       </p>
+      {d.visual && <VisualPlayer d={d} />}
       <ListenBar id={d.id} chunks={script} label="LISTEN" />
       <div className={styles.artBody}>
         {d.body.map((p) => (
@@ -188,6 +190,7 @@ export default function SignalView() {
                   <h2>{d.headline}</h2>
                   <p>{d.dek}</p>
                   <KindLabel kind={d.kind} />
+                  {d.visual && <span className={styles.cardVisual}>&#9654; ILLUSTRATED + CAPTIONS</span>}
                   <div className={styles.cardFoot}>{d.byline.join(' · ')}</div>
                 </button>
               ))}

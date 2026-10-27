@@ -86,3 +86,27 @@ test('the hub ticker types the tagline then every dispatch, in lines short enoug
   for (const l of lines) assert.ok(l.length > 0 && l.length <= 110, `${l.length}: ${l}`);
   assert.ok(lines.some((l) => l.startsWith('The Hidden Tariff Tax — ')));
 });
+
+test('captions cover the whole script in order, with scenes that only move forward', async () => {
+  const { captionTimeline, lineAt } = await import('../lib/signal/captions.ts');
+  const { scriptParts } = await import('../lib/signal/speech.ts');
+  const d = DISPATCHES.find((x) => x.id === 'tariff-tax')!;
+  assert.equal(d.visual?.scenes.length, 3);
+  const lines = captionTimeline(d);
+  assert.equal(lines[0].at, 0);
+  assert.equal(lines[0].scene, 0);
+  for (let i = 1; i < lines.length; i++) {
+    assert.ok(lines[i].at > lines[i - 1].at);
+    assert.ok(lines[i].scene >= lines[i - 1].scene);
+    assert.ok(lines[i].text.length <= 100, lines[i].text);
+  }
+  assert.ok(lines[lines.length - 1].at < 1);
+  assert.deepEqual([...new Set(lines.map((l) => l.scene))], [0, 1, 2]);
+  const spoken = scriptParts(d).map((p) => p.text).join(' ');
+  assert.equal(lines.map((l) => l.text).join(' ').replace(/\s+/g, ' '), speakable(spoken));
+  assert.equal(lineAt(lines, 0), 0);
+  assert.equal(lineAt(lines, 0.999), lines.length - 1);
+  // the scenes open on the narration they illustrate
+  assert.ok(lines.find((l) => l.scene === 2)!.text.startsWith('What to watch'));
+  assert.match(lines.find((l) => l.scene === 1)!.text, /tariff is a tax/i);
+});

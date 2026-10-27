@@ -54,26 +54,40 @@ const sentenceCase = (s: string) => {
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 };
 
-/** The spoken script for one dispatch, labelled honestly up front. */
-export function dispatchScript(d: Dispatch): string[] {
-  const parts: string[] = [d.headline + '.', d.dek];
-  parts.push(
-    d.kind === 'sample'
-      ? 'This is a sample dispatch. The companies and figures are illustrative, not real reporting.'
-      : 'This is an explainer: general background, not a news report.',
-  );
-  parts.push(...d.body);
+export interface ScriptPart {
+  /** where the text comes from: head, dek, kind, body:N, brief:N, ticker:N, callout */
+  key: string;
+  text: string;
+}
+
+/** The spoken script for one dispatch as labelled parts, so captions and scenes can follow along. */
+export function scriptParts(d: Dispatch): ScriptPart[] {
+  const parts: ScriptPart[] = [
+    { key: 'head', text: d.headline + '.' },
+    { key: 'dek', text: d.dek },
+    {
+      key: 'kind',
+      text:
+        d.kind === 'sample'
+          ? 'This is a sample dispatch. The companies and figures are illustrative, not real reporting.'
+          : 'This is an explainer: general background, not a news report.',
+    },
+  ];
+  d.body.forEach((p, i) => parts.push({ key: `body:${i}`, text: p }));
   if (d.brief) {
     d.brief.forEach((b, i) => {
       const label = b.num.split('·')[1]?.trim() ?? '';
-      parts.push(`Number ${i + 1}${label ? ', ' + sentenceCase(label) : ''}. ${b.h}. ${b.p}`);
+      parts.push({ key: `brief:${i}`, text: `Number ${i + 1}${label ? ', ' + sentenceCase(label) : ''}. ${b.h}. ${b.p}` });
     });
   }
-  if (d.ticker) {
-    for (const t of d.ticker) parts.push(`${t.h}: ${t.status}. ${t.p}`);
-  }
-  if (d.callout) parts.push(`${sentenceCase(d.callout.k)}. ${d.callout.text}`);
-  return parts.flatMap((p) => chunk(p));
+  if (d.ticker) d.ticker.forEach((t, i) => parts.push({ key: `ticker:${i}`, text: `${t.h}: ${t.status}. ${t.p}` }));
+  if (d.callout) parts.push({ key: 'callout', text: `${sentenceCase(d.callout.k)}. ${d.callout.text}` });
+  return parts;
+}
+
+/** The spoken script for one dispatch, labelled honestly up front. */
+export function dispatchScript(d: Dispatch): string[] {
+  return scriptParts(d).flatMap((p) => chunk(p.text));
 }
 
 /** A short spoken briefing of the whole issue: each headline and its one-line summary. */
