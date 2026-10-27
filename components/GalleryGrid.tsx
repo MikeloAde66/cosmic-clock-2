@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { Radio as RadioIcon, ArrowUpRight, Lock } from 'lucide-react';
 import { useNoaaSnapshot } from '@/lib/useNoaaSnapshot';
 import WeatherForecastOverlay from './WeatherForecastOverlay';
@@ -397,21 +398,12 @@ function FlightSchoolCardImage() {
   return <LoopVideoCardImage name="flight-drone" />;
 }
 
-// Astro Simulator: a still picture of a spacecraft cockpit looking down on
-// Earth, slowly panning. Decorative illustration, not a live view.
-function AstroSimCardImage() {
-  return (
-    <div className="relative w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 overflow-hidden shrink-0 bg-[#020617]">
-      <img src="/media/astro-cockpit.jpg" alt="" className="absolute inset-0 object-cover w-full h-full astro-cockpit-drift" />
-      {/* instrument-panel glow, a soft amber wash over the lower middle */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-[22%] bottom-0 h-1/2 pointer-events-none astro-cockpit-glow"
-        style={{ background: 'radial-gradient(ellipse at 50% 80%, rgba(255,179,71,0.6), transparent 70%)', mixBlendMode: 'screen' }}
-      />
-    </div>
-  );
-}
+// Astro Simulator: a live view from inside a spacecraft, drawn in code (see
+// CockpitCard). Decorative preview, not a live view of anything.
+const AstroSimCardImage = dynamic(() => import('@/components/astroSim/CockpitCard'), {
+  ssr: false,
+  loading: () => <div className="w-[calc(100%+2.5rem)] h-24 mb-3 -mx-5 -mt-5 shrink-0 bg-[#01030a]" />,
+});
 
 // Top row of a card: just the "open" arrow in the corner (shown on hover).
 // The weather card's arrow stays visible and turns green while its live
