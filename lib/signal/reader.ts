@@ -104,3 +104,78 @@ export function createReader(onChange: (s: ReaderState) => void, onFinished: () 
     },
   };
 }
+
+/**
+ * The same controls for a pre-recorded mp3. Progress is reported out of 1000.
+ * If the file cannot be played, `onFail` is called so the caller can fall back
+ * to the browser's own voice.
+ */
+export function createAudioReader(src: string, onChange: (s: ReaderState) => void, onFinished: () => void, onFail: () => void) {
+  const el = new Audio(src);
+  el.preload = 'auto';
+  let rate = 1;
+  let closed = false;
+  let state: ReaderState = { status: 'idle', index: 0, total: 1000 };
+
+  const set = (patch: Partial<ReaderState>) => {
+    state = { ...state, ...patch };
+    onChange(state);
+  };
+  const close = () => {
+    closed = true;
+    el.pause();
+    el.removeAttribute('src');
+    el.load();
+  };
+  const fail = () => {
+    if (closed) return;
+    close();
+    set({ status: 'idle', index: 0 });
+    onFail();
+  };
+
+  el.addEventListener('timeupdate', () => {
+    if (!closed && el.duration) set({ index: Math.round((1000 * el.currentTime) / el.duration) });
+  });
+  el.addEventListener('ended', () => {
+    if (closed) return;
+    close();
+    set({ status: 'idle', index: 0 });
+    onFinished();
+  });
+  el.addEventListener('error', fail);
+
+  return {
+    start() {
+      el.playbackRate = rate;
+      set({ status: 'speaking', index: 0 });
+      el.play().catch((e: unknown) => {
+        if (e instanceof DOMException && e.name === 'AbortError') return;
+        fail();
+      });
+    },
+    pause() {
+      if (state.status !== 'speaking') return;
+      el.pause();
+      set({ status: 'paused' });
+    },
+    resume() {
+      if (state.status !== 'paused') return;
+      set({ status: 'speaking' });
+      void el.play().catch(fail);
+    },
+    stop() {
+      if (closed) return;
+      close();
+      set({ status: 'idle', index: 0 });
+      onFinished();
+    },
+    setRate(r: number) {
+      rate = r;
+      el.playbackRate = r; // a recording can change speed straight away
+    },
+    destroy() {
+      close();
+    },
+  };
+}

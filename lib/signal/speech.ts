@@ -90,3 +90,21 @@ export function listenMinutes(chunks: string[]): number {
   const words = chunks.join(' ').split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(words / 150));
 }
+
+export interface AudioManifestEntry {
+  bytes: number;
+  /** e.g. mp3_44100_64: the number at the end is the bitrate in kbps */
+  format: string;
+}
+
+/** Where a pre-generated recording lives and how long it runs, worked out from its size and bitrate. */
+export function audioFrom(manifest: Record<string, AudioManifestEntry>, id: string): { src: string; seconds: number } | undefined {
+  const m = manifest[id];
+  if (!m) return undefined;
+  const kbps = Number(/_(\d+)$/.exec(m.format)?.[1] ?? 64);
+  return { src: `/signal-audio/${id}.mp3`, seconds: Math.max(1, Math.round((m.bytes * 8) / (kbps * 1000))) };
+}
+
+export function formatSeconds(total: number): string {
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}

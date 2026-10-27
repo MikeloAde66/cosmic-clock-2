@@ -67,3 +67,13 @@ test('listening time is at least a minute and scales with length', () => {
   const long = Array.from({ length: 5 }, () => Array.from({ length: 300 }, () => 'w').join(' '));
   assert.equal(listenMinutes(long), 10);
 });
+
+test('a recording\'s length is worked out from its size and bitrate', async () => {
+  const { audioFrom, formatSeconds } = await import('../lib/signal/speech.ts');
+  const manifest = { a: { bytes: 678599, format: 'mp3_44100_64' }, b: { bytes: 960000, format: 'mp3_44100_128' } };
+  assert.deepEqual(audioFrom(manifest, 'a'), { src: '/signal-audio/a.mp3', seconds: 85 });
+  assert.equal(audioFrom(manifest, 'b')?.seconds, 60);
+  assert.equal(audioFrom(manifest, 'missing'), undefined);
+  assert.equal(formatSeconds(85), '1:25');
+  assert.equal(formatSeconds(45), '0:45');
+});

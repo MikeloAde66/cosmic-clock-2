@@ -83,7 +83,7 @@ function Reader({ d }: { d: Dispatch }) {
           </>
         )}
       </p>
-      <ListenBar chunks={script} label="LISTEN" />
+      <ListenBar id={d.id} chunks={script} label="LISTEN" />
       <div className={styles.artBody}>
         {d.body.map((p) => (
           <p key={p.slice(0, 40)}>{p}</p>
@@ -175,7 +175,7 @@ export default function SignalView() {
               </p>
             </div>
             <div className={styles.briefingRow}>
-              <ListenBar chunks={briefing} label="PLAY THE BRIEFING" />
+              <ListenBar id="briefing" chunks={briefing} label="PLAY THE BRIEFING" />
             </div>
             <div className={styles.issueMeta}>SAMPLE ISSUE · {DISPATCHES.length} DISPATCHES · EVERGREEN EXPLAINERS, NOT LIVE NEWS</div>
             <div className={styles.grid}>
