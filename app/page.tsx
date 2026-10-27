@@ -8,6 +8,7 @@ import AuthModal from '@/components/AuthModal';
 import LeftNav from '@/components/LeftNav';
 import type { LayoutMode } from '@/components/LayoutModeToggle';
 import GalleryGrid from '@/components/GalleryGrid';
+import SignalTicker from '@/components/SignalTicker';
 import KaliOracleView from '@/components/KaliOracleView';
 import ProductsSection from '@/components/ProductsSection';
 import TenForwardSection from '@/components/TenForwardSection';
@@ -498,6 +499,9 @@ useContextMenuShare();
               />
             </div>
           )}
+
+          {/* A slim Signal ticker between the hub cards and the footer row. */}
+          {layoutMode === 'gallery' && !hideBottomChrome && <SignalTicker />}
 
           {/* Continuous Stack (Layout 1) — Home/Radio/Pods/Products/Kali
               mounted together as sibling sections in one scrollable

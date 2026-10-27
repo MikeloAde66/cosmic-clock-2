@@ -77,3 +77,12 @@ test('a recording\'s length is worked out from its size and bitrate', async () =
   assert.equal(formatSeconds(85), '1:25');
   assert.equal(formatSeconds(45), '0:45');
 });
+
+test('the hub ticker types the tagline then every dispatch, in lines short enough for one row', async () => {
+  const { tickerLines, TAGLINE } = await import('../lib/signal/ticker.ts');
+  const lines = tickerLines();
+  assert.equal(lines.length, TAGLINE.length + DISPATCHES.length);
+  assert.equal(TAGLINE.join(' ').replace(/ —/, ' —'), "The numbers behind the news — where the money actually moves, who actually pays, and what's buried on page 47.");
+  for (const l of lines) assert.ok(l.length > 0 && l.length <= 110, `${l.length}: ${l}`);
+  assert.ok(lines.some((l) => l.startsWith('The Hidden Tariff Tax — ')));
+});
