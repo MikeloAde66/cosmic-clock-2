@@ -330,6 +330,131 @@ function FedDuration() {
   );
 }
 
+/* ---------- The Filing Nobody Read ---------- */
+
+const Page = ({ x, y, n, tone }: { x: number; y: number; n: number; tone?: 'teal' | 'amber' }) => {
+  const c = tone === 'teal' ? TEAL : tone === 'amber' ? AMBER : FAINT;
+  return (
+    <g>
+      <rect x={x} y={y} width="52" height="78" rx="3" fill={tone ? 'rgba(233,238,243,0.08)' : 'rgba(233,238,243,0.04)'} stroke={tone ? c : GRID} strokeWidth={tone ? 2 : 1} />
+      {[14, 26, 38, 50].map((dy) => (
+        <line key={dy} x1={x + 8} x2={x + 44} y1={y + dy} y2={y + dy} stroke={c} strokeOpacity={tone ? 0.7 : 0.35} strokeWidth="2.5" strokeLinecap="round" />
+      ))}
+      {tone === 'amber' && <rect x={x + 6} y={y + 33} width="40" height="10" rx="2" fill={AMBER} opacity="0.55" />}
+      <text x={x + 26} y={y + 98} textAnchor="middle" className={styles.chLabel} fill={tone ? c : DIM}>
+        {n}
+      </text>
+    </g>
+  );
+};
+
+function FilingPages() {
+  const first = [1, 2, 3, 4, 5];
+  const later = [45, 46, 47, 48, 49];
+  return (
+    <Frame title="THE FILING NOBODY READ" sub="ONE PARAGRAPH, BURIED ON PAGE 47">
+      {first.map((n, i) => (
+        <Page key={n} x={50 + i * 64} y={130} n={n} tone={n === 3 ? 'teal' : undefined} />
+      ))}
+      {later.map((n, i) => (
+        <Page key={n} x={500 + i * 64} y={130} n={n} tone={n === 47 ? 'amber' : undefined} />
+      ))}
+      <text x="436" y="178" textAnchor="middle" className={styles.chBig} fill={FAINT}>
+        ···
+      </text>
+      <text x={50 + 2 * 64 + 26} y="262" textAnchor="middle" className={styles.chLabel} fill={TEAL}>
+        HEADLINE NUMBERS
+      </text>
+      <text x={500 + 2 * 64 + 26} y="262" textAnchor="middle" className={styles.chLabel} fill={AMBER}>
+        RISK FACTORS
+      </text>
+      <path d="M180 112 v-10 h300 v10" stroke={DIM} strokeWidth="1.5" fill="none" />
+      <text x="330" y="94" textAnchor="middle" className={styles.chLabel} fill={DIM}>
+        FORTY PAGES LATER
+      </text>
+      <Note x={50} y={316} lines={['The sentence that explains the risk sits where almost nobody reads.']} />
+    </Frame>
+  );
+}
+
+function FilingConcentration() {
+  const x0 = 60;
+  const w = 773;
+  const q = w / 4;
+  return (
+    <Frame title="CUSTOMER CONCENTRATION" sub="RECORD REVENUE, AND ONE QUIET SENTENCE">
+      <Chip x={60} y={104} text="RECORD REVENUE" color={TEAL} />
+      <rect className={styles.chBar} x={x0} y={156} width={w - q} height="64" rx="4" fill="rgba(143,161,179,0.45)" />
+      <rect className={styles.chBar} x={x0 + w - q} y={156} width={q} height="64" rx="4" fill={AMBER} style={{ animationDelay: '0.3s' }} />
+      <text x={x0 + (w - q) / 2} y={194} textAnchor="middle" className={styles.chLabel} fill={FG}>
+        EVERYONE ELSE
+      </text>
+      <text x={x0 + w - q / 2} y={188} textAnchor="middle" className={styles.chLabel} fill="#1a1204">
+        ONE CUSTOMER
+      </text>
+      <text x={x0 + w - q / 2} y={204} textAnchor="middle" className={styles.chLabel} fill="#1a1204">
+        A QUARTER OF SALES
+      </text>
+      <rect x={x0} y={256} width={w - q} height="40" rx="4" fill="rgba(143,161,179,0.45)" />
+      <rect x={x0 + w - q} y={256} width={q} height="40" rx="4" fill="none" stroke={AMBER} strokeDasharray="6 5" />
+      <text x={x0 + w - q / 2} y={281} textAnchor="middle" className={styles.chLabel} fill={AMBER}>
+        IF THAT CONTRACT GOES
+      </text>
+      <Note x={60} y={334} lines={['One lost contract away from a very different year.']} />
+    </Frame>
+  );
+}
+
+function FilingSections() {
+  const tiles = [
+    { n: '1', k: ['RISK FACTORS'] },
+    { n: '2', k: ['RELATED-PARTY', 'TRANSACTIONS'] },
+    { n: '3', k: ['FOOTNOTES TO THE', 'REVENUE LINE'] },
+  ];
+  return (
+    <Frame title="READ THREE SECTIONS, NOT ALL OF IT" sub="WHAT MANAGEMENT WOULD RATHER YOU SKIM PAST">
+      {tiles.map((t, i) => (
+        <g key={t.n} transform={`translate(${40 + i * 280} 108)`}>
+          <rect width="253" height="150" rx="6" fill="rgba(233,238,243,0.04)" stroke={AMBER} strokeOpacity="0.5" />
+          <text x="20" y="62" className={styles.chBig} fill={AMBER}>
+            {t.n}
+          </text>
+          {t.k.map((line, j) => (
+            <text key={line} x="20" y={98 + j * 18} className={styles.chLabel} fill={FG}>
+              {line}
+            </text>
+          ))}
+        </g>
+      ))}
+      <rect x="40" y="282" width="813" height="34" rx="4" fill="none" stroke={GRID} strokeDasharray="5 5" />
+      <text x="446" y="304" textAnchor="middle" className={styles.chLabel} fill={DIM}>
+        EVERYTHING ELSE: MOSTLY RESTATES THE PRESS RELEASE
+      </text>
+    </Frame>
+  );
+}
+
+function FilingSearch() {
+  return (
+    <Frame title="WHERE TO LOOK" sub="THE MOST COMMON HEDGE WORD FOR A CONCENTRATION RISK">
+      <rect x="120" y="112" width="653" height="56" rx="8" fill="rgba(233,238,243,0.05)" stroke={TEAL} strokeOpacity="0.7" />
+      <circle cx="152" cy="138" r="9" fill="none" stroke={TEAL} strokeWidth="2.5" />
+      <path d="M159 145 l9 9" stroke={TEAL} strokeWidth="2.5" strokeLinecap="round" />
+      <text x="186" y="147" className={styles.chLabel} fill={FG} style={{ fontSize: 22, letterSpacing: '0.06em' }}>
+        substantially all
+      </text>
+      {[0, 1, 2, 3].map((i) => (
+        <rect key={i} x="120" y={204 + i * 24} width={i === 2 ? 300 : 520 - i * 40} height="9" rx="4" fill="rgba(143,161,179,0.3)" />
+      ))}
+      <rect x="440" y="252" width="150" height="14" rx="3" fill={AMBER} opacity="0.75" />
+      <text x="606" y="263" className={styles.chLabel} fill={AMBER}>
+        ← THE HEDGE
+      </text>
+      <Note x={120} y={332} lines={['The company would rather not spell it out in plain numbers.']} />
+    </Frame>
+  );
+}
+
 export const CHARTS: Record<string, () => ReactNode> = {
   'earn-intro': EarnIntro,
   'earn-cloud': EarnCloud,
@@ -342,4 +467,8 @@ export const CHARTS: Record<string, () => ReactNode> = {
   'fed-pv': FedPv,
   'fed-day': FedDay,
   'fed-duration': FedDuration,
+  'filing-pages': FilingPages,
+  'filing-concentration': FilingConcentration,
+  'filing-sections': FilingSections,
+  'filing-search': FilingSearch,
 };

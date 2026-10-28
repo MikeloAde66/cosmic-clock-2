@@ -216,6 +216,14 @@ export const DISPATCHES: Dispatch[] = [
       text: "Search any filing for the phrase 'substantially all' — it's the most common hedge word for a concentration risk the company would rather not spell out in plain numbers.",
     },
     kind: 'explainer',
+    visual: {
+      scenes: [
+        { chart: 'filing-pages', alt: 'A row of filing pages: headline numbers on page 3, then forty pages later the risk factors on page 47 highlighted.', from: 'head' },
+        { chart: 'filing-concentration', alt: 'A revenue bar where one customer is a quarter of sales, and the same bar with that quarter missing if the contract goes.', from: 'body:1' },
+        { chart: 'filing-sections', alt: 'Three sections to read: risk factors, related-party transactions, and footnotes to the revenue line.', from: 'body:2' },
+        { chart: 'filing-search', alt: 'A search box with the phrase substantially all, and one highlighted line in a block of text.', from: 'callout' },
+      ],
+    },
   },
 ];
 
