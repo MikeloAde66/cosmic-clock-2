@@ -487,14 +487,239 @@ function describeProviderError(err: unknown): { httpStatus: number; message: str
   };
 }
 
+// ---------- Gemini provider (free-tier alternative to Anthropic) ----------
+// Selected when GEMINI_API_KEY is set (or KALI_PROVIDER=gemini); remove the key
+// (or set KALI_PROVIDER=anthropic) to go back to Anthropic. Plain REST, no SDK.
+// Same system prompt, same three tools, same plain-text streaming contract as
+// the Anthropic path, so the frontend does not change.
+type Provider = 'anthropic' | 'gemini';
+
+function resolveProvider(): Provider {
+  const forced = process.env.KALI_PROVIDER?.trim().toLowerCase();
+  if (forced === 'anthropic' || forced === 'gemini') return forced;
+  return process.env.GEMINI_API_KEY ? 'gemini' : 'anthropic';
+}
+
+interface GeminiPart {
+  text?: string;
+  inlineData?: { mimeType: string; data: string };
+  functionCall?: { name: string; args?: Record<string, unknown>; id?: string };
+  functionResponse?: { name: string; id?: string; response: Record<string, unknown> };
+  thoughtSignature?: string;
+  thought?: boolean;
+}
+interface GeminiContent {
+  role: 'user' | 'model';
+  parts: GeminiPart[];
+}
+
+// Gemini's schema enums are upper-case (OBJECT, STRING, NUMBER); the tool
+// definitions above are standard JSON Schema, so convert rather than keep two copies.
+function toGeminiSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(toGeminiSchema);
+  if (schema && typeof schema === 'object') {
+    return Object.fromEntries(
+      Object.entries(schema as Record<string, unknown>).map(([k, v]) => [k, k === 'type' && typeof v === 'string' ? v.toUpperCase() : toGeminiSchema(v)])
+    );
+  }
+  return schema;
+}
+
+function geminiTools() {
+  return [
+    {
+      functionDeclarations: [QUANTUM_TOOL, SKY_COORDINATES_TOOL, WEATHER_TOOL].map((t) => ({
+        name: t.name,
+        description: t.description,
+        parameters: toGeminiSchema(t.input_schema),
+      })),
+    },
+  ];
+}
+
+function toGeminiContents(messages: ChatMessage[]): GeminiContent[] {
+  return messages.map((m) => ({
+    role: m.role === 'assistant' ? ('model' as const) : ('user' as const),
+    parts:
+      typeof m.content === 'string'
+        ? [{ text: m.content }]
+        : m.content.map((b): GeminiPart => (b.type === 'image' ? { inlineData: { mimeType: b.source.media_type, data: b.source.data } } : { text: b.text })),
+  }));
+}
+
+async function runTool(name: string, input: Record<string, unknown>): Promise<string> {
+  if (name === 'run_quantum_circuit') return runQuantumCircuit(String(input.circuit_code ?? ''));
+  if (name === 'get_live_sky_coordinates') {
+    return getSkyCoordinates(String(input.target_name ?? ''), input.latitude as number | undefined, input.longitude as number | undefined);
+  }
+  if (name === 'get_noaa_atmospheric_conditions') return getLiveWeather(input.latitude as number | undefined, input.longitude as number | undefined);
+  return JSON.stringify({ status: 'error', message: `Unknown tool: ${name}` });
+}
+
+function toolResultObject(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : { result: parsed };
+  } catch {
+    return { result: raw };
+  }
+}
+
+class GeminiHttpError extends Error {
+  constructor(
+    public status: number,
+    public body: string
+  ) {
+    super(`Gemini request failed (${status})`);
+  }
+}
+
+async function openGeminiStream(systemPrompt: string, contents: GeminiContent[]): Promise<Response> {
+  const model = process.env.GEMINI_MODEL?.trim() || 'gemini-flash-latest';
+  const base = (process.env.GEMINI_API_BASE?.trim() || 'https://generativelanguage.googleapis.com').replace(/\/+$/, '');
+  const thinkingBudget = process.env.GEMINI_THINKING_BUDGET?.trim();
+  const res = await fetch(`${base}/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY ?? '' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents,
+      tools: geminiTools(),
+      generationConfig: {
+        maxOutputTokens: 4096,
+        ...(thinkingBudget && Number.isFinite(Number(thinkingBudget)) ? { thinkingConfig: { thinkingBudget: Number(thinkingBudget) } } : {}),
+      },
+    }),
+  });
+  if (!res.ok || !res.body) throw new GeminiHttpError(res.status, await res.text().catch(() => ''));
+  return res;
+}
+
+interface GeminiChunk {
+  candidates?: { content?: { parts?: GeminiPart[] }; finishReason?: string }[];
+  promptFeedback?: { blockReason?: string };
+}
+
+// Server-sent events: blocks separated by a blank line, each "data: {json}".
+async function* readGeminiEvents(res: Response): AsyncGenerator<GeminiChunk> {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+    let end: number;
+    while ((end = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, end);
+      buffer = buffer.slice(end + 2);
+      const data = block
+        .split('\n')
+        .filter((l) => l.startsWith('data:'))
+        .map((l) => l.slice(5).trim())
+        .join('');
+      if (!data || data === '[DONE]') continue;
+      try {
+        yield JSON.parse(data) as GeminiChunk;
+      } catch {
+        /* a partial or non-JSON block: skip it */
+      }
+    }
+  }
+}
+
+async function geminiChatResponse(systemPrompt: string, messages: ChatMessage[], verified: boolean): Promise<Response> {
+  const encoder = new TextEncoder();
+  const contents = toGeminiContents(messages);
+  const MAX_TOOL_ITERATIONS = 4;
+
+  // Open the first call before committing to a streaming response, so a bad
+  // key, an unknown model or a rate limit comes back as a clean JSON error.
+  let first: Response;
+  try {
+    first = await openGeminiStream(systemPrompt, contents);
+  } catch (err) {
+    if (err instanceof GeminiHttpError) {
+      console.error('Kali (Gemini) request failed before any text was sent:', err.status, err.body.slice(0, 500));
+      const status = err.status === 429 ? 429 : err.status >= 400 && err.status < 500 ? err.status : 500;
+      return Response.json(
+        { error: err.status === 429 ? 'Kali is busy right now (free-tier limit). Try again in a minute.' : 'The AI provider request failed.', details: err.message, providerError: err.body.slice(0, 500) },
+        { status }
+      );
+    }
+    console.error('Kali (Gemini) request failed:', err);
+    return Response.json({ error: 'The AI provider request failed.', details: err instanceof Error ? err.message : String(err) }, { status: 500 });
+  }
+
+  let sentAnyText = false;
+  const body = new ReadableStream({
+    async start(controller) {
+      try {
+        let res = first;
+        for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+          if (i > 0) res = await openGeminiStream(systemPrompt, contents);
+
+          // The model's turn is kept verbatim (including any thought signatures)
+          // so it can be sent back unchanged alongside the tool results.
+          const modelParts: GeminiPart[] = [];
+          let blocked = '';
+          for await (const chunk of readGeminiEvents(res)) {
+            if (chunk.promptFeedback?.blockReason) blocked = chunk.promptFeedback.blockReason;
+            for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+              if (part.thought) continue;
+              const last = modelParts[modelParts.length - 1];
+              if (typeof part.text === 'string' && !part.functionCall) {
+                if (part.text) {
+                  sentAnyText = true;
+                  controller.enqueue(encoder.encode(part.text));
+                }
+                if (last && typeof last.text === 'string' && !last.functionCall && !part.thoughtSignature) last.text += part.text;
+                else modelParts.push({ ...part });
+              } else {
+                modelParts.push({ ...part });
+              }
+            }
+          }
+
+          const calls = modelParts.filter((p) => p.functionCall);
+          if (calls.length === 0) {
+            if (!sentAnyText && blocked) controller.enqueue(encoder.encode("I can't answer that one. Try rephrasing the question."));
+            break;
+          }
+
+          contents.push({ role: 'model', parts: modelParts });
+          const responses: GeminiPart[] = [];
+          for (const p of calls) {
+            const call = p.functionCall!;
+            const raw = await runTool(call.name, (call.args ?? {}) as Record<string, unknown>);
+            responses.push({ functionResponse: { name: call.name, ...(call.id ? { id: call.id } : {}), response: toolResultObject(raw) } });
+          }
+          contents.push({ role: 'user', parts: responses });
+        }
+
+        if (!sentAnyText) controller.enqueue(encoder.encode("I didn't generate a usable response there — try rephrasing the question."));
+        controller.close();
+      } catch (err) {
+        console.error('Kali (Gemini) stream error (after headers were sent):', err);
+        controller.error(err);
+      }
+    },
+  });
+
+  return new Response(body, {
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Kali-Star-Tracker-Verified': verified ? 'true' : 'false' },
+  });
+}
+
 export async function POST(request: Request) {
+  const provider = resolveProvider();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   // Model name now comes from the environment (falls back to the previous
   // hardcoded value) so it can be swapped per-environment without a
   // redeploy, same as the API key already was.
   const modelName = process.env.ANTHROPIC_MODEL?.trim() || 'claude-opus-5';
 
-  if (!apiKey) {
+  if (provider === 'anthropic' && !apiKey) {
     return Response.json({ error: 'Ai One is not connected yet — ANTHROPIC_API_KEY is not configured.' }, { status: 500 });
   }
 
@@ -561,7 +786,9 @@ export async function POST(request: Request) {
       ? `\n\nLanguage preference: ${LANGUAGE_NAMES[language]}. Respond entirely in ${LANGUAGE_NAMES[language]}, regardless of what language the user's message is written in. Keep product and brand names exactly as given in English (e.g. "Ai One", "Kali AI", "Star Tracker") — don't translate those.`
       : '');
 
-  const client = new Anthropic({ apiKey });
+  if (provider === 'gemini') return geminiChatResponse(systemPrompt, messages, ephemerisContext !== '');
+
+  const client = new Anthropic({ apiKey: apiKey ?? '' });
 
   const workingMessages: Anthropic.MessageParam[] = messages.map((m) => ({
     role: m.role,
