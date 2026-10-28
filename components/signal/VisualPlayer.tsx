@@ -27,6 +27,7 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
   const [captionsOn, setCaptionsOn] = useState(true);
   const [failed, setFailed] = useState(false);
   const audio = useRef<HTMLAudioElement | null>(null);
+  const video = useRef<HTMLVideoElement | null>(null);
   const radio = useRadioPlayer();
   const radioRef = useRef(radio);
   const resumeRadio = useRef(false);
@@ -41,6 +42,15 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
       radioRef.current.togglePlayPause();
     }
   }, []);
+
+  // a video scene plays and pauses with the narration (it loops if the narration runs longer)
+  const videoScene = scenes.find((s) => s.video);
+  useEffect(() => {
+    const el = video.current;
+    if (!el) return;
+    if (playing && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) el.play().catch(() => undefined);
+    else el.pause();
+  }, [playing, videoScene]);
 
   // follow the recording while it plays
   useEffect(() => {
@@ -81,6 +91,7 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
   const replay = useCallback(() => {
     const el = audio.current;
     if (el) el.currentTime = 0;
+    if (video.current) video.current.currentTime = 0;
     setFraction(0);
     play();
   }, [play]);
@@ -134,7 +145,20 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
   return (
     <figure className={styles.visual} aria-label={`Illustrated explainer: ${d.headline}`}>
       <div className={styles.visualStage} style={d.visual?.aspect ? { aspectRatio: d.visual.aspect } : undefined}>
-        {panorama ? (
+        {videoScene ? (
+          <video
+            ref={video}
+            src={videoScene.video}
+            poster={videoScene.poster}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-label={videoScene.alt}
+            className={`${styles.visualImg} ${styles.visualImgOn}`}
+            style={{ objectFit: 'cover' }}
+          />
+        ) : panorama ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={scenes[0].src} alt={scenes[0].alt} className={styles.visualPan} style={{ transform: panTransform(shown.scene) }} />
         ) : (
@@ -147,7 +171,7 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
               </div>
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={s.src} src={s.src} alt={s.alt} className={`${styles.visualImg} ${on}`} />
+              <img key={`${i}-${s.src}`} src={s.src} alt={s.alt} className={`${styles.visualImg} ${on}`} style={d.visual?.aspect ? { objectFit: 'cover' } : undefined} />
             );
           })
         )}
@@ -156,9 +180,11 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
             {ended ? <RotateCcw aria-hidden="true" /> : <Play aria-hidden="true" />}
           </button>
         )}
-        <span className={styles.visualCount}>
-          {shown.scene + 1} / {scenes.length}
-        </span>
+        {scenes.length > 1 && (
+          <span className={styles.visualCount}>
+            {shown.scene + 1} / {scenes.length}
+          </span>
+        )}
       </div>
       {captionsOn && (
         <figcaption className={styles.visualCaption} aria-live="off">
@@ -171,7 +197,7 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
         <button type="button" className={styles.listenBtn} onClick={playing ? pause : ended ? replay : play}>
           {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />} {playing ? 'PAUSE' : started && !ended ? 'RESUME' : ended ? 'REPLAY' : 'PLAY'}
         </button>
-        <div className={styles.visualDots} role="group" aria-label="Scenes">
+        <div className={styles.visualDots} role="group" aria-label="Scenes" hidden={scenes.length < 2}>
           {scenes.map((_, i) => (
             <button key={i} type="button" className={`${styles.visualDot} ${i === shown.scene ? styles.visualDotOn : ''}`} onClick={() => seekToScene(i)} aria-label={`Scene ${i + 1}`} aria-current={i === shown.scene} />
           ))}
@@ -186,7 +212,7 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
           <Captions aria-hidden="true" />
         </button>
       </div>
-      <p className={styles.visualNote}>{scenes.some((s) => s.chart) ? 'DIAGRAM · DRAWN IN CODE' : 'ILLUSTRATION · AI-GENERATED'} · {sample ? 'ILLUSTRATIVE FIGURES' : 'NO LIVE DATA'}{failed ? ' · AUDIO COULD NOT BE PLAYED' : ''}</p>
+      <p className={styles.visualNote}>{scenes.some((s) => s.chart) ? 'DIAGRAM · DRAWN IN CODE' : scenes.some((s) => s.video) ? 'VIDEO' : 'ILLUSTRATION · AI-GENERATED'} · {sample ? 'ILLUSTRATIVE FIGURES' : 'NO LIVE DATA'}{failed ? ' · AUDIO COULD NOT BE PLAYED' : ''}</p>
       <audio
         ref={audio}
         src={recording.src}

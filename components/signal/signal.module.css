@@ -231,3 +231,4 @@
 @media (prefers-reduced-motion: reduce) { .visualImgOn .chBar, .visualImgOn .chLine { animation: none; stroke-dashoffset: 0; } }
 
 .visualPan { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform-origin: 0 0; transition: transform 1.6s cubic-bezier(0.45, 0, 0.2, 1); will-change: transform; }
+.visualDots[hidden] { display: none; }

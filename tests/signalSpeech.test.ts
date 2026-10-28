@@ -122,7 +122,7 @@ test('every visual scene opens on real narration, in order, and each gets some c
     assert.equal(scenes[0].from, 'head', d.id);
     let last = -1;
     for (const s of scenes) {
-      assert.ok(Boolean(s.src) !== Boolean(s.chart), `${d.id}: each scene is a picture or a chart`);
+      assert.equal([s.src, s.chart, s.video].filter(Boolean).length, 1, `${d.id}: each scene is a picture, a chart or a video`);
       const at = keys.indexOf(s.from);
       assert.ok(at > last, `${d.id}: ${s.from} missing or out of order`);
       last = at;

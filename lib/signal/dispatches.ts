@@ -32,6 +32,9 @@ export interface Visual {
   scenes: {
     /** a picture file, or a chart drawn in code (see components/signal/ChartScenes) */
     src?: string;
+    /** a muted video that plays, and loops, along with the narration */
+    video?: string;
+    poster?: string;
     chart?: string;
     alt: string;
     /** one picture shared by every scene: the camera moves to this spot (0..1 of the picture) and zoom */
@@ -110,13 +113,14 @@ export const DISPATCHES: Dispatch[] = [
     },
     kind: 'explainer',
     visual: {
-      aspect: '1376 / 768',
+      aspect: '16 / 9',
       scenes: [
-        { src: '/signal-visuals/data-centers.webp', alt: 'The whole picture: data center campus, transmission lines, substation and a home with its meter.', from: 'head' },
-        { src: '/signal-visuals/data-centers.webp', alt: 'Close on the data center campus and its power equipment.', from: 'body:0', view: { x: 0.22, y: 0.62, zoom: 1.9 } },
-        { src: '/signal-visuals/data-centers.webp', alt: 'Close on the transmission towers and the local utility substation.', from: 'body:1', view: { x: 0.6, y: 0.45, zoom: 1.9 } },
-        { src: '/signal-visuals/data-centers.webp', alt: 'Close on the suburban home, its electric meter and the bill.', from: 'body:2', view: { x: 0.86, y: 0.62, zoom: 1.9 } },
-        { src: '/signal-visuals/data-centers.webp', alt: 'The whole picture again.', from: 'callout' },
+        {
+          video: '/signal-visuals/data-centers.mp4',
+          poster: '/signal-visuals/data-centers-poster.jpg',
+          alt: 'Footage of a large data center campus from the air, server aisles, and a technician walking between racks.',
+          from: 'head',
+        },
       ],
     },
   },
