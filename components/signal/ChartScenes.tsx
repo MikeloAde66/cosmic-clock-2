@@ -8,9 +8,9 @@ import styles from './signal.module.css';
 
 const TEAL = '#3fd0c9';
 const AMBER = '#e3a53e';
-const FAINT = '#5c6e7f';
-const DIM = '#8fa1b3';
-const FG = '#e9eef3';
+const FAINT = '#a3b3c2';
+const DIM = '#c8d4df';
+const FG = '#f4f7fa';
 const GRID = 'rgba(233,238,243,0.12)';
 const BASE = 330;
 

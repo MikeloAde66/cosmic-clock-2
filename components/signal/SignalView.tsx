@@ -71,19 +71,12 @@ function Reader({ d }: { d: Dispatch }) {
           <span key={b}>{b}</span>
         ))}
       </div>
-      <p className={`${styles.kindNote} ${sample ? styles.kindNoteSample : ''}`}>
-        {sample ? (
-          <>
-            <b>SAMPLE</b>
-            The companies and figures below are illustrative, written to show the format. They are not real reporting.
-          </>
-        ) : (
-          <>
-            <b>EXPLAINER</b>
-            General background, written without live data or cited sources. Not a news report.
-          </>
-        )}
-      </p>
+      {!sample && (
+        <p className={styles.kindNote}>
+          <b>EXPLAINER</b>
+          General background, written without live data or cited sources. Not a news report.
+        </p>
+      )}
       {d.visual && <VisualPlayer d={d} />}
       <ListenBar id={d.id} chunks={script} label="LISTEN" />
       <div className={styles.artBody}>
@@ -171,15 +164,11 @@ export default function SignalView() {
                 S<em>I</em>GNAL
               </h1>
               <p className={styles.sub}>The numbers behind the news — where the money actually moves, who actually pays, and what&apos;s buried on page 47.</p>
-              <p className={styles.notice} role="note">
-                <b>PREVIEW</b>
-                <span>Signal is a design preview. The explainers are general background, not breaking news, and the sample dispatches use illustrative figures, not live data.</span>
-              </p>
             </div>
             <div className={styles.briefingRow}>
               <ListenBar id="briefing" chunks={briefing} label="PLAY THE BRIEFING" />
             </div>
-            <div className={styles.issueMeta}>SAMPLE ISSUE · {DISPATCHES.length} DISPATCHES · EVERGREEN EXPLAINERS, NOT LIVE NEWS</div>
+            <div className={styles.issueMeta}>EVERGREEN EXPLAINERS</div>
             <div className={styles.grid}>
               {DISPATCHES.map((d) => (
                 <button key={d.id} type="button" className={styles.card} onClick={() => openDispatch(d.id)}>

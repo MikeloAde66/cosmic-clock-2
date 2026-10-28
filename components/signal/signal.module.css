@@ -4,9 +4,9 @@
 .root {
   --bg: #0a0f16;
   --bg-elev: #121b26;
-  --fg: #e9eef3;
-  --fg-dim: #8fa1b3;
-  --fg-faint: #5c6e7f;
+  --fg: #f4f7fa;
+  --fg-dim: #c8d4df;
+  --fg-faint: #a3b3c2;
   --accent: #3fd0c9;
   --accent-soft: rgba(63, 208, 201, 0.14);
   --warn: #e3a53e;
