@@ -7,6 +7,8 @@ import type { Dispatch } from '@/lib/signal/dispatches';
 import { dispatchScript, issueScript } from '@/lib/signal/speech';
 import { signalBody, signalDisplay, signalMono } from './fonts';
 import ListenBar from './ListenBar';
+import ListeningPanel from './ListeningPanel';
+import SocialRow from './SocialRow';
 import VisualPlayer from './VisualPlayer';
 import styles from './signal.module.css';
 
@@ -159,8 +161,10 @@ export default function SignalView() {
                 </button>
               ))}
             </div>
+            <ListeningPanel />
           </div>
         )}
+        <SocialRow />
       </div>
     </div>
   );
