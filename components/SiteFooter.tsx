@@ -147,7 +147,7 @@ export default function SiteFooter({
         }
       `}</style>
 
-      <div className="flex items-center gap-4 text-white">
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-white lg:gap-x-4">
         {SOCIALS.map((s) => (
           <a
             key={s.name}
@@ -155,13 +155,13 @@ export default function SiteFooter({
             target="_blank"
             rel="noopener noreferrer"
             aria-label={s.name}
-            className="grid h-7 w-7 place-items-center rounded-full border border-white/15 text-slate-200 transition-all duration-200 hover:scale-110 hover:border-teal-300"
+            className="grid h-9 w-9 place-items-center rounded-full border border-white/15 lg:h-7 lg:w-7 text-slate-200 transition-all duration-200 hover:scale-110 hover:border-teal-300"
           >
             {s.img ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={s.img} alt="" className="block h-4 w-auto" />
+              <img src={s.img} alt="" className="block h-5 w-auto lg:h-4" />
             ) : (
-              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 lg:h-4 lg:w-4" aria-hidden="true">
                 {s.icon}
               </svg>
             )}
@@ -174,9 +174,9 @@ export default function SiteFooter({
             target="_blank"
             rel="noopener noreferrer"
             aria-label={s.name}
-            className="transition-all duration-200 drop-shadow-[0_0_4px_rgba(255,255,255,0.45)] hover:scale-110 hover:drop-shadow-[0_0_9px_rgba(255,255,255,0.9)]"
+            className="grid h-9 w-9 place-items-center transition-all duration-200 drop-shadow-[0_0_4px_rgba(255,255,255,0.45)] lg:h-auto lg:w-auto hover:scale-110 hover:drop-shadow-[0_0_9px_rgba(255,255,255,0.9)]"
           >
-            <s.icon size={16} />
+            <s.icon size={18} />
           </a>
         ))}
       </div>
