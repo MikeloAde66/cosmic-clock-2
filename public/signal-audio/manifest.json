@@ -1,56 +1,56 @@
 {
   "briefing": {
-    "hash": "da0f93c8ff7e5421",
-    "chars": 648,
-    "bytes": 362831,
+    "hash": "57639a0e9cd7ae15",
+    "chars": 548,
+    "bytes": 312886,
     "voice": "SAz9YHcvj6GT2YYXdXww",
     "model": "eleven_turbo_v2_5",
     "format": "mp3_44100_64"
   },
   "tariff-tax": {
-    "hash": "b24a79244393cc5f",
-    "chars": 1363,
-    "bytes": 654776,
+    "hash": "c41ccb18b39f5dcb",
+    "chars": 1302,
+    "bytes": 624266,
     "voice": "SAz9YHcvj6GT2YYXdXww",
     "model": "eleven_turbo_v2_5",
     "format": "mp3_44100_64"
   },
   "fed-401k": {
-    "hash": "3443a182097313fc",
-    "chars": 1239,
-    "bytes": 578916,
+    "hash": "666ad56b696c280b",
+    "chars": 1178,
+    "bytes": 549033,
     "voice": "SAz9YHcvj6GT2YYXdXww",
     "model": "eleven_turbo_v2_5",
     "format": "mp3_44100_64"
   },
   "data-center-bills": {
-    "hash": "c3a4c5444361c3c4",
-    "chars": 1371,
-    "bytes": 678599,
+    "hash": "2fccbf7fb9a13802",
+    "chars": 1310,
+    "bytes": 647253,
     "voice": "SAz9YHcvj6GT2YYXdXww",
     "model": "eleven_turbo_v2_5",
     "format": "mp3_44100_64"
   },
   "earnings-brief": {
-    "hash": "a3395b598b29a3a7",
-    "chars": 1227,
-    "bytes": 619040,
+    "hash": "962e2b325d831939",
+    "chars": 1136,
+    "bytes": 576200,
     "voice": "SAz9YHcvj6GT2YYXdXww",
     "model": "eleven_turbo_v2_5",
     "format": "mp3_44100_64"
   },
   "supply-chain-watch": {
-    "hash": "806cf6c996713123",
-    "chars": 878,
-    "bytes": 463768,
+    "hash": "adb3dbd5438b9d60",
+    "chars": 787,
+    "bytes": 419675,
     "voice": "SAz9YHcvj6GT2YYXdXww",
     "model": "eleven_turbo_v2_5",
     "format": "mp3_44100_64"
   },
   "filing-nobody-read": {
-    "hash": "d73b75fcd9aa2118",
-    "chars": 1353,
-    "bytes": 658119,
+    "hash": "125d75a5b9cfd9df",
+    "chars": 1292,
+    "bytes": 626982,
     "voice": "SAz9YHcvj6GT2YYXdXww",
     "model": "eleven_turbo_v2_5",
     "format": "mp3_44100_64"

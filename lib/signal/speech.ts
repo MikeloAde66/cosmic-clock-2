@@ -55,7 +55,7 @@ const sentenceCase = (s: string) => {
 };
 
 export interface ScriptPart {
-  /** where the text comes from: head, dek, kind, body:N, brief:N, ticker:N, callout */
+  /** where the text comes from: head, dek, body:N, brief:N, ticker:N, callout */
   key: string;
   text: string;
 }
@@ -65,13 +65,6 @@ export function scriptParts(d: Dispatch): ScriptPart[] {
   const parts: ScriptPart[] = [
     { key: 'head', text: d.headline + '.' },
     { key: 'dek', text: d.dek },
-    {
-      key: 'kind',
-      text:
-        d.kind === 'sample'
-          ? 'This is a sample dispatch. The companies and figures are illustrative, not real reporting.'
-          : 'This is an explainer: general background, not a news report.',
-    },
   ];
   d.body.forEach((p, i) => parts.push({ key: `body:${i}`, text: p }));
   if (d.brief) {
@@ -85,7 +78,7 @@ export function scriptParts(d: Dispatch): ScriptPart[] {
   return parts;
 }
 
-/** The spoken script for one dispatch, labelled honestly up front. */
+/** The spoken script for one dispatch. */
 export function dispatchScript(d: Dispatch): string[] {
   return scriptParts(d).flatMap((p) => chunk(p.text));
 }
@@ -93,7 +86,7 @@ export function dispatchScript(d: Dispatch): string[] {
 /** A short spoken briefing of the whole issue: each headline and its one-line summary. */
 export function issueScript(list: Dispatch[]): string[] {
   const parts = [
-    `Signal. A sample issue with ${list.length} dispatches. These are evergreen explainers and sample formats, not live news.`,
+    'Signal.',
     ...list.map((d, i) => `${i + 1}. ${d.headline}. ${d.dek}`),
   ];
   return parts.flatMap((p) => chunk(p));
