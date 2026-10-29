@@ -10,7 +10,7 @@ import { useReadAloud } from './useReadAloud';
 // aloud, with pause, stop and a speed toggle. It plays a recording in an
 // AI-generated voice when one exists, and the browser's own voice otherwise.
 export default function ListenBar({ id, chunks, label }: { id: string; chunks: string[]; label: string }) {
-  const { speechSupport, state, rate, usingRecording, start, pause, resume, stop, cycleRate } = useReadAloud();
+  const { speechSupport, state, rate, start, pause, resume, stop, cycleRate } = useReadAloud();
   const recording = audioFor(id);
 
   if (!recording) {
@@ -50,8 +50,6 @@ export default function ListenBar({ id, chunks, label }: { id: string; chunks: s
           <Play aria-hidden="true" /> {label} · {length}
         </button>
       )}
-      {recording && usingRecording && active && <span className={styles.listenNote}>AI-generated voice</span>}
-      {recording && !active && <span className={styles.listenNote}>AI voice</span>}
       <span className={styles.srOnly} aria-live="polite">
         {state.status === 'speaking' ? 'Reading aloud' : state.status === 'paused' ? 'Paused' : ''}
       </span>

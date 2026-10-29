@@ -140,7 +140,6 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
   const ended = started && !playing && fraction >= 0.995;
   const shown = started ? line : lines[0];
   const elapsed = Math.round(fraction * recording.seconds);
-  const sample = d.kind === 'sample';
 
   return (
     <figure className={styles.visual} aria-label={`Illustrated explainer: ${d.headline}`}>
@@ -212,7 +211,7 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
           <Captions aria-hidden="true" />
         </button>
       </div>
-      <p className={styles.visualNote}>{scenes.some((s) => s.chart) ? 'DIAGRAM · DRAWN IN CODE' : scenes.some((s) => s.video) ? 'VIDEO' : 'ILLUSTRATION · AI-GENERATED'} · {sample ? 'ILLUSTRATIVE FIGURES' : 'NO LIVE DATA'}{failed ? ' · AUDIO COULD NOT BE PLAYED' : ''}</p>
+      {failed && <p className={styles.visualNote}>AUDIO COULD NOT BE PLAYED</p>}
       <audio
         ref={audio}
         src={recording.src}
