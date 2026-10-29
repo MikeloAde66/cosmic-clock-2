@@ -61,10 +61,10 @@ export const EMPTY_MARS_HUD: MarsHud = {
 const SUN_DIR = new THREE.Vector3(-0.35, 0.62, -0.5).normalize();
 const SKY_LOW = new THREE.Color('#c58a62');
 const SKY_HIGH = new THREE.Color('#00020a');
-const TILE = 3000;
+export const TILE = 3000;
 const CAP = 120000; // m half-width of the landing patch
 
-function prng(seed: number) {
+export function prng(seed: number) {
   return () => {
     seed = (seed + 0x6d2b79f5) | 0;
     let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
@@ -109,7 +109,7 @@ function planetTexture() {
 }
 
 /** A 1024px tile of rusty ground with soft craters, seamless when repeated. */
-function groundTexture() {
+export function groundTexture() {
   const S = 1024;
   const c = canvas(S, S);
   const g = c.getContext('2d')!;
@@ -154,7 +154,7 @@ function groundTexture() {
 }
 
 /** Fine grain: smooth multi-scale noise that tiles. */
-function detailTexture() {
+export function detailTexture() {
   const S = 256;
   const rnd = prng(7);
   const oct = [
@@ -236,7 +236,7 @@ function Planet({ shell }: { shell: React.RefObject<THREE.Mesh | null> }) {
 }
 
 /** The landing patch: a cap of the same sphere, with planar texture coordinates. */
-function Ground() {
+export function Ground() {
   const { geo, albedo, detail } = useMemo(() => {
     const g = new THREE.SphereGeometry(R_MARS, 96, 96, 0, Math.PI * 2, 0, CAP / R_MARS);
     g.translate(0, -R_MARS, 0);

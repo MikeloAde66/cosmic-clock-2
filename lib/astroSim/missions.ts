@@ -56,9 +56,9 @@ export const MISSIONS: MissionInfo[] = [
     id: 'm05',
     number: '05',
     title: 'First Rover Drive',
-    blurb: 'Land, deploy, drive, and explore another world.',
-    basis: 'Rover unstow, traverse to science targets, and a data relay home.',
-    playable: false,
+    blurb: 'Unstow rover Wren, drive across the landing patch around boulders, sand and a crater, sample three science targets, then uplink the data home before the battery runs out.',
+    basis: 'Rover operations on Mars: unstow, careful driving around hazards, sampling while stationary, and an orbiter relay pass to send the data home.',
+    playable: true,
     wideOnly: true,
   },
 ];
