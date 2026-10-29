@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Apple, Music2, Music3, Music4, Smartphone } from 'lucide-react';
 import { FORECAST_STREAM_MS } from '@/lib/useWeatherLocation';
+import { SOCIALS } from '@/components/signal/SocialRow';
 
 function useLiveClock() {
   const [label, setLabel] = useState('');
@@ -23,16 +24,13 @@ function useLiveClock() {
   return label;
 }
 
-// Facebook, Reddit, and YouTube are still placeholders — swap for the real
-// profile URLs once they exist. Instagram, X, and TikTok were dropped in
-// favor of the real music profiles below.
+// The real music profiles. The main social logos (Instagram, YouTube, TikTok,
+// Facebook, Reddit, Tumblr, LinkedIn) come from the shared SOCIALS list so this
+// footer matches the Signal page.
 const SOCIAL_LINKS = [
-  { name: 'Facebook', glyph: 'FB', href: 'https://facebook.com/your-page' },
   { name: 'SoundClick', icon: Music2, href: 'https://soundclick.com/song/15361676' },
-  { name: 'Reddit', glyph: 'r/', href: 'https://reddit.com/r/your-subreddit' },
   { name: 'SoundCloud', icon: Music4, href: 'https://soundcloud.com/michael-bradley-307688752' },
   { name: 'ReverbNation', icon: Music3, href: 'https://reverbnation.com/beatbrokers526' },
-  { name: 'YouTube', glyph: 'YT', href: 'https://youtube.com/@your-channel' },
 ];
 
 interface SiteFooterProps {
@@ -150,6 +148,25 @@ export default function SiteFooter({
       `}</style>
 
       <div className="flex items-center gap-4 text-white">
+        {SOCIALS.map((s) => (
+          <a
+            key={s.name}
+            href={s.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={s.name}
+            className="grid h-7 w-7 place-items-center rounded-full border border-white/15 text-slate-200 transition-all duration-200 hover:scale-110 hover:border-teal-300"
+          >
+            {s.img ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={s.img} alt="" className="block h-4 w-auto" />
+            ) : (
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                {s.icon}
+              </svg>
+            )}
+          </a>
+        ))}
         {SOCIAL_LINKS.map((s) => (
           <a
             key={s.name}
@@ -159,7 +176,7 @@ export default function SiteFooter({
             aria-label={s.name}
             className="transition-all duration-200 drop-shadow-[0_0_4px_rgba(255,255,255,0.45)] hover:scale-110 hover:drop-shadow-[0_0_9px_rgba(255,255,255,0.9)]"
           >
-            {s.icon ? <s.icon size={16} /> : <span className="font-bold text-sm">{s.glyph}</span>}
+            <s.icon size={16} />
           </a>
         ))}
       </div>
