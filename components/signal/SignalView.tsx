@@ -8,6 +8,7 @@ import { dispatchScript, issueScript } from '@/lib/signal/speech';
 import { signalBody, signalDisplay, signalMono } from './fonts';
 import ListenBar from './ListenBar';
 import ListeningPanel from './ListeningPanel';
+import ShareButton from './ShareButton';
 import SocialRow from './SocialRow';
 import VisualPlayer from './VisualPlayer';
 import styles from './signal.module.css';
@@ -59,7 +60,10 @@ function Reader({ d }: { d: Dispatch }) {
       <h1 className={styles.artTitle}>{d.headline}</h1>
       <p className={styles.artDek}>{d.dek}</p>
       {d.visual && <VisualPlayer d={d} />}
-      <ListenBar id={d.id} chunks={script} label="LISTEN" />
+      <div className={styles.artActions}>
+        <ListenBar id={d.id} chunks={script} label="LISTEN" />
+        <ShareButton d={d} />
+      </div>
       <div className={styles.artBody}>
         {d.body.map((p) => (
           <p key={p.slice(0, 40)}>{p}</p>
