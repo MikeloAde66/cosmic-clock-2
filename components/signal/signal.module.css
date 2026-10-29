@@ -246,3 +246,4 @@
 .transLine { display: block; width: 100%; text-align: left; padding: 6px 0; font-family: var(--serif); font-size: 18px; line-height: 1.45; color: var(--fg-dim); }
 .transLineOn { color: #fff; box-shadow: -10px 0 0 -8px var(--accent); }
 .transLine:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.socialImg { height: 24px; width: auto; display: block; }
