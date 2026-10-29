@@ -487,6 +487,19 @@ function describeProviderError(err: unknown): { httpStatus: number; message: str
   };
 }
 
+// Second cache breakpoint: the conversation so far. Each turn re-sends the
+// whole history, so marking its last block lets the next turn read everything
+// up to here from the cache instead of paying full price again.
+function withHistoryBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+  const last = messages[messages.length - 1];
+  if (!last) return messages;
+  const blocks: Anthropic.ContentBlockParam[] = typeof last.content === 'string' ? [{ type: 'text', text: last.content }] : [...last.content];
+  const tail = blocks[blocks.length - 1];
+  if (!tail || tail.type === 'thinking' || tail.type === 'redacted_thinking') return messages;
+  blocks[blocks.length - 1] = { ...tail, cache_control: { type: 'ephemeral' } } as Anthropic.ContentBlockParam;
+  return [...messages.slice(0, -1), { ...last, content: blocks }];
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   // Model name now comes from the environment (falls back to the previous
@@ -542,11 +555,16 @@ export async function POST(request: Request) {
   const latestUserQuery = latestUserText(messages);
   const retrievedContext = await retrieveContext(latestUserQuery, resolvedMode);
   const ephemerisContext = buildEphemerisContext(latestUserQuery);
-  const systemPrompt =
+  // Split in two so prompt caching can work: the first part is the same on
+  // every request for a given mode (the long persona and tool instructions),
+  // the second changes per message (live ephemeris, retrieved excerpts,
+  // language) and is deliberately left out of the cached prefix.
+  const stableSystem =
     BASE_SYSTEM_PROMPT +
     MODE_ADDENDA[resolvedMode] +
     (voiceMode === true ? VOICE_MODE_ADDENDUM : '') +
-    (groundSchool === true ? GROUND_SCHOOL_ADDENDUM : '') +
+    (groundSchool === true ? GROUND_SCHOOL_ADDENDUM : '');
+  const dynamicSystem =
     ephemerisContext +
     (retrievedContext
       ? `\n\nRelevant excerpts from ingested primary sources — draw on these where genuinely relevant, cite the source naturally, and ignore any that aren't a good fit for this question:\n\n${retrievedContext}`
@@ -560,6 +578,10 @@ export async function POST(request: Request) {
     (isLanguageCode(language) && language !== 'en'
       ? `\n\nLanguage preference: ${LANGUAGE_NAMES[language]}. Respond entirely in ${LANGUAGE_NAMES[language]}, regardless of what language the user's message is written in. Keep product and brand names exactly as given in English (e.g. "Ai One", "Kali AI", "Star Tracker") — don't translate those.`
       : '');
+  const systemBlocks: Anthropic.TextBlockParam[] = [
+    { type: 'text', text: stableSystem, cache_control: { type: 'ephemeral' } },
+    ...(dynamicSystem ? [{ type: 'text' as const, text: dynamicSystem }] : []),
+  ];
 
   const client = new Anthropic({ apiKey });
 
@@ -603,9 +625,9 @@ export async function POST(request: Request) {
       model: modelName,
       max_tokens: 2048,
       thinking: { type: 'disabled' },
-      system: systemPrompt,
+      system: systemBlocks,
       tools: [QUANTUM_TOOL, SKY_COORDINATES_TOOL, WEATHER_TOOL],
-      messages: workingMessages,
+      messages: withHistoryBreakpoint(workingMessages),
     });
   }
 
