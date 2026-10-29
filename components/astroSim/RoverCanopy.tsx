@@ -104,7 +104,7 @@ export default function RoverCanopy({
       fill: hud.activity === 'sample' ? (got + hud.actFrac) / 3 : got / 3,
     };
     speedCell = { label: 'GROUND SPEED', value: speed.toFixed(1), sub: `M/S · BATTERY ${num(hud.battery)}%`, tone: hud.tilt > TILT_WARN || health < 40 ? 'bad' : hud.inPit || health < 70 || hud.battery <= 30 ? 'warn' : 'ok' };
-    controls = { caption: hud.inRange ? 'STOP, THEN SPACE SAMPLES · HOLD STILL UNTIL DONE' : 'W/S DRIVE · A/D STEER · BOULDERS HURT, SAND SLOWS', left: 'Drive', right: 'Steer' };
+    controls = { caption: hud.inRange ? 'STOP, THEN SPACE SAMPLES · HOLD STILL' : 'W/S DRIVE · A/D STEER · AVOID BOULDERS', left: 'Drive', right: 'Steer' };
   } else if (ph === 'driving') {
     objective = {
       title: 'OBJECTIVE 3 · RELAY · SEND THE DATA HOME',
@@ -112,7 +112,7 @@ export default function RoverCanopy({
       fill: hud.activity === 'uplink' ? hud.actFrac : hud.inRange ? 0.05 : 0,
     };
     speedCell = { label: 'GROUND SPEED', value: speed.toFixed(1), sub: `M/S · BATTERY ${num(hud.battery)}%`, tone: hud.tilt > TILT_WARN || health < 40 ? 'bad' : hud.inPit || health < 70 || hud.battery <= 30 ? 'warn' : 'ok' };
-    controls = { caption: hud.inRange ? 'STOP, THEN SPACE UPLINKS · HOLD STILL UNTIL DONE' : 'DRIVE TO THE CYAN RELAY POINT · AVOID THE SAND', left: 'Drive', right: 'Steer' };
+    controls = { caption: hud.inRange ? 'STOP, THEN SPACE UPLINKS · HOLD STILL' : 'DRIVE TO THE RELAY POINT · AVOID THE SAND', left: 'Drive', right: 'Steer' };
   } else {
     objective = { title: ph === 'complete' ? 'MISSION 05 COMPLETE' : 'MISSION 05 FAILED', status: ph === 'complete' ? 'DATA IS HOME' : 'WREN IS LOST', fill: ph === 'complete' ? 1 : got / 3 };
     speedCell = { label: 'RESULT', value: ph === 'complete' ? 'HOME' : 'LOST', sub: ph === 'complete' ? 'SAMPLES SENT TO EARTH' : 'ROVER NOT RECOVERED', tone: ph === 'complete' ? 'ok' : 'bad' };
