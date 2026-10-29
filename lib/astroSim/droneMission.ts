@@ -2,7 +2,7 @@
 // Pure functions only, so the story can be tested without a browser. Everything
 // here is fiction; the flight numbers come from the simulated flight model.
 
-export type Speaker = 'CAPCOM' | 'SURFACE' | 'NAV-AI';
+export type Speaker = 'CAPCOM' | 'SURFACE' | 'NAV-AI' | 'STATION';
 export type Stage = 'acquire' | 'burn' | 'orbit' | 'done';
 
 export interface RadioLine {

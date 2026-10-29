@@ -186,6 +186,7 @@ export const WHO: Record<RadioLine['who'], { tag: string; color: string }> = {
   CAPCOM: { tag: 'MISSION CTRL', color: '#67e8f9' },
   SURFACE: { tag: 'SHACKLETON', color: '#fbbf24' },
   'NAV-AI': { tag: 'NAV-AI', color: '#c4b5fd' },
+  STATION: { tag: 'HALCYON', color: '#86efac' },
 };
 
 export function clock(sec: number) {

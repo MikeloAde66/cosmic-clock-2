@@ -5,14 +5,18 @@ import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { ListChecks, SkipForward } from 'lucide-react';
 import CanopyHud from './CanopyHud';
 import CockpitHud from './CockpitHud';
+import DockingCanopy from './DockingCanopy';
 import LandingCanopy from './LandingCanopy';
 import MissionSelect from './MissionSelect';
 import SiteHeader from './SiteHeader';
 import type { DroneHud, DroneInputs } from './DroneScene';
+import { EMPTY_DOCK_HUD } from './DockingScene';
+import type { DockHud } from './DockingScene';
 import { EMPTY_LANDING_HUD } from './LandingScene';
 import type { LandingHud } from './LandingScene';
 import { missionStep, newMission, runScript } from '@/lib/astroSim/droneMission';
 import type { RadioLine } from '@/lib/astroSim/droneMission';
+import { dockingStep } from '@/lib/astroSim/dockingScript';
 import { TOUCHDOWN_SCRIPT } from '@/lib/astroSim/touchdownScript';
 import type { MissionId } from '@/lib/astroSim/missions';
 import { markComplete, parseProgress, readProgressRaw, subscribeProgress } from '@/lib/astroSim/progress';
@@ -20,6 +24,7 @@ import { playTargetLock, unlockAudio } from '@/lib/astroSim/audio';
 
 const DroneScene = dynamic(() => import('./DroneScene'), { ssr: false });
 const LandingScene = dynamic(() => import('./LandingScene'), { ssr: false });
+const DockingScene = dynamic(() => import('./DockingScene'), { ssr: false });
 
 // The canopy cockpit is laid out for wide screens; narrower ones keep the
 // compact cockpit until it gets its own responsive pass.
@@ -51,6 +56,7 @@ export default function DroneView() {
     altKm: 1900, velKms: 0, velDelta: 0, rangeKm: 3637, tempC: -18, pressureBar: 3e-15, gLoad: 0, localG: 0.9, radUsv: 0.5, linkDb: 36, linkLost: false,
   });
   const [landing, setLanding] = useState<LandingHud>(EMPTY_LANDING_HUD);
+  const [dock, setDock] = useState<DockHud>(EMPTY_DOCK_HUD);
   const inputs = useRef<DroneInputs>({ lx: 0, ly: 0, rx: 0, ry: 0 });
 
   const onHud = useCallback((h: DroneHud) => {
@@ -83,6 +89,30 @@ export default function DroneView() {
     }
   }, []);
 
+  const onDocking = useCallback((h: DockHud) => {
+    setDock(h);
+    const lines = dockingStep(mission.current, {
+      t: h.t,
+      stage: h.phase,
+      linkLost: false,
+      range: h.range,
+      closing: h.closing,
+      allowed: h.allowed,
+      offset: h.offset,
+      fuel: h.fuel,
+      rating: h.result?.rating ?? null,
+      reason: h.result?.reason ?? null,
+    });
+    if (lines.length) {
+      setLog((l) => [...l, ...lines].slice(-8));
+      playTargetLock();
+    }
+    if (h.phase === 'docked' && !recorded.current) {
+      recorded.current = true;
+      markComplete('m03');
+    }
+  }, []);
+
   const resetRun = useCallback(() => {
     mission.current = newMission();
     recorded.current = false;
@@ -111,6 +141,7 @@ export default function DroneView() {
         setLabel('T-3');
         setPhase(id === 'm01' ? 'pad' : 'flight');
         setLanding(EMPTY_LANDING_HUD);
+        setDock(EMPTY_DOCK_HUD);
         setRun((n) => n + 1);
         setCover(false);
       }, 450);
@@ -144,6 +175,7 @@ export default function DroneView() {
   }, [resetRun]);
 
   const retryLanding = useCallback(() => startMission('m02'), [startMission]);
+  const retryDocking = useCallback(() => startMission('m03'), [startMission]);
 
   const replay = () => {
     setLabel('T-3');
@@ -155,15 +187,18 @@ export default function DroneView() {
   const closeMissions = useCallback(() => setSelectOpen(false), []);
 
   const m02 = missionId === 'm02';
+  const m03 = missionId === 'm03';
   const canopy = wide && phase === 'flight';
 
   return (
     <>
       {!canopy && (
-        <SiteHeader eyebrow="Space Drone" title={m02 ? 'Lunar touchdown' : 'Shuttle-class flight'} mode="SIM" modeNote="Simulated vehicle and flight, Moon not to scale. The Moon surface is NASA imagery." sub />
+        <SiteHeader eyebrow="Space Drone" title={m03 ? 'Deep space docking' : m02 ? 'Lunar touchdown' : 'Shuttle-class flight'} mode="SIM" modeNote="Simulated vehicle and flight, Moon not to scale. The Moon surface is NASA imagery." sub />
       )}
       <div className="relative flex-1 min-h-0 touch-none select-none">
-        {m02 ? (
+        {m03 ? (
+          <DockingScene key={`m03-${run}`} inputs={inputs} onHud={onDocking} />
+        ) : m02 ? (
           <LandingScene key={`m02-${run}`} inputs={inputs} onHud={onLanding} />
         ) : (
           <DroneScene key={`${phase}-${run}`} phase={phase} inputs={inputs} onLabel={setLabel} onLaunchDone={toFlight} onHud={onHud} />
@@ -172,7 +207,13 @@ export default function DroneView() {
         {/* fade between scenes */}
         <div className={`absolute inset-0 bg-black pointer-events-none transition-opacity duration-500 ${cover ? 'opacity-100' : 'opacity-0'}`} />
 
-        {m02 ? (
+        {m03 ? (
+          wide ? (
+            <DockingCanopy hud={dock} assist={assist} log={log} onLeft={onLeft} onRight={onRight} onRetry={retryDocking} onToggleAssist={toggleAssist} onMissions={openMissions} />
+          ) : (
+            <p className="absolute inset-x-6 text-center text-[12px] text-amber-300/90 top-1/3">Deep Space Docking needs a wider window (900px or more) for now.</p>
+          )
+        ) : m02 ? (
           wide ? (
             <LandingCanopy hud={landing} assist={assist} log={log} onLeft={onLeft} onRight={onRight} onRetry={retryLanding} onToggleAssist={toggleAssist} onMissions={openMissions} />
           ) : (

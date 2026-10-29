@@ -38,9 +38,9 @@ export const MISSIONS: MissionInfo[] = [
     id: 'm03',
     number: '03',
     title: 'Deep Space Docking',
-    blurb: 'A slow, white-knuckle approach where closing too fast is the real enemy.',
-    basis: 'Rendezvous phasing, proximity operations and a final closure of centimetres per second.',
-    playable: false,
+    blurb: 'Bring the replacement transponder to Halcyon Station: close the range, line up the port, and touch down at a crawl. Closing too fast is the real enemy.',
+    basis: 'Rendezvous and proximity operations: a speed corridor that tightens with range, then a final closure of centimetres per second.',
+    playable: true,
     wideOnly: true,
   },
   {
