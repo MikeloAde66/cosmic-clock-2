@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Captions, Pause, Play, RotateCcw } from 'lucide-react';
+import { Captions, Pause, Play, RotateCcw, ScrollText } from 'lucide-react';
 import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 import { captionTimeline, lineAt } from '@/lib/signal/captions';
 import type { Dispatch } from '@/lib/signal/dispatches';
@@ -26,6 +26,9 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
   const [fraction, setFraction] = useState(0);
   const [captionsOn, setCaptionsOn] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [reading, setReading] = useState(false);
+  const scroller = useRef<HTMLDivElement | null>(null);
+  const lastTouch = useRef(0);
   const audio = useRef<HTMLAudioElement | null>(null);
   const video = useRef<HTMLVideoElement | null>(null);
   const radio = useRadioPlayer();
@@ -109,6 +112,26 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
     [lines, playing, play, recording],
   );
 
+  const seekToLine = useCallback(
+    (at: number) => {
+      const el = audio.current;
+      if (!el) return;
+      el.currentTime = at * (el.duration || recording?.seconds || 0);
+      setFraction(at);
+      if (!playing) play();
+    },
+    [playing, play, recording],
+  );
+
+  // in read mode the current line stays in view, unless the reader is scrolling themselves
+  const currentLine = lineAt(lines, fraction);
+  useEffect(() => {
+    const box = scroller.current;
+    if (!reading || !playing || !box || Date.now() - lastTouch.current < 4000) return;
+    const row = box.querySelector<HTMLElement>('[aria-current="true"]');
+    if (row) box.scrollTo({ top: row.offsetTop - box.clientHeight / 2 + row.clientHeight / 2, behavior: 'smooth' });
+  }, [reading, playing, currentLine]);
+
   // Stop when something else on the page starts talking, and on the way out.
   useEffect(() => {
     const el = audio.current;
@@ -185,7 +208,24 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
           </span>
         )}
       </div>
-      {captionsOn && (
+      {reading && (
+        <div
+          ref={scroller}
+          className={styles.visualTranscript}
+          role="region"
+          aria-label="Full text"
+          tabIndex={0}
+          onPointerDown={() => (lastTouch.current = Date.now())}
+          onWheel={() => (lastTouch.current = Date.now())}
+        >
+          {lines.map((l, i) => (
+            <button key={i} type="button" className={`${styles.transLine} ${started && i === currentLine ? styles.transLineOn : ''}`} aria-current={started && i === currentLine} onClick={() => seekToLine(l.at)}>
+              {l.text}
+            </button>
+          ))}
+        </div>
+      )}
+      {captionsOn && !reading && (
         <figcaption className={styles.visualCaption} aria-live="off">
           <span key={idx} className={styles.visualCaptionText}>
             {started ? shown.text : 'Press play: the captions follow the voice.'}
@@ -209,6 +249,9 @@ export default function VisualPlayer({ d }: { d: Dispatch }) {
         </span>
         <button type="button" className={`${styles.listenRate} ${captionsOn ? styles.visualCcOn : ''}`} onClick={() => setCaptionsOn((c) => !c)} aria-pressed={captionsOn} aria-label="Captions">
           <Captions aria-hidden="true" />
+        </button>
+        <button type="button" className={`${styles.listenRate} ${reading ? styles.visualCcOn : ''}`} onClick={() => setReading((r) => !r)} aria-pressed={reading} aria-label="Read the full text">
+          <ScrollText aria-hidden="true" />
         </button>
       </div>
       {failed && <p className={styles.visualNote}>AUDIO COULD NOT BE PLAYED</p>}
