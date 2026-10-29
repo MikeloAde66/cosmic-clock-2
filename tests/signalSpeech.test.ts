@@ -32,13 +32,14 @@ test('a very long sentence is split at punctuation, not mid-word', () => {
   assert.equal(parts.join(' '), long);
 });
 
-test('every dispatch opens with its headline and is honest about what it is', () => {
+test('every dispatch opens with its headline, then its dek, then straight into the story', () => {
   for (const d of DISPATCHES) {
     const script = dispatchScript(d);
     assert.ok(script[0].startsWith(d.headline.replace(/ vs\. /, ' versus ')), script[0]);
     const all = script.join(' ');
-    if (d.kind === 'sample') assert.match(all, /sample dispatch.*illustrative/);
-    else assert.match(all, /explainer: general background, not a news report/);
+    assert.ok(all.includes(d.dek), 'the dek is read');
+    // the disclaimer line was taken out of the spoken script on purpose: it broke the flow
+    assert.doesNotMatch(all, /This is an explainer|This is a sample dispatch/);
   }
 });
 
@@ -56,10 +57,11 @@ test('callouts are read last', () => {
   assert.match(script[script.length - 1] + script[script.length - 2], /What to watch\./);
 });
 
-test('the issue briefing names every headline and says it is not live news', () => {
+test('the issue briefing opens with the name and names every headline', () => {
   const all = issueScript(DISPATCHES).join(' ');
+  assert.ok(all.startsWith('Signal.'));
   for (const d of DISPATCHES) assert.ok(all.includes(d.headline.replace(/ vs\. /, ' versus ')), d.headline);
-  assert.match(all, /not live news/);
+  assert.doesNotMatch(all, /not live news/);
 });
 
 test('listening time is at least a minute and scales with length', () => {
