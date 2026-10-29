@@ -47,36 +47,15 @@ function openDispatch(id: string) {
   window.scrollTo(0, 0);
 }
 
-function KindLabel({ kind }: { kind: Dispatch['kind'] }) {
-  return kind === 'sample' ? (
-    <span className={`${styles.cardKind} ${styles.cardKindSample}`}>SAMPLE · ILLUSTRATIVE FIGURES</span>
-  ) : (
-    <span className={styles.cardKind}>EXPLAINER · NO LIVE DATA</span>
-  );
-}
-
 function Reader({ d }: { d: Dispatch }) {
-  const sample = d.kind === 'sample';
   const script = useMemo(() => dispatchScript(d), [d]);
   return (
     <div className={styles.article}>
       <div className={styles.artTagRow}>
         <span className={`${styles.tag} ${d.live ? styles.tagLive : ''}`}>{d.tag}</span>
-        <span className={styles.readTime}>{d.readTime}</span>
       </div>
       <h1 className={styles.artTitle}>{d.headline}</h1>
       <p className={styles.artDek}>{d.dek}</p>
-      <div className={styles.byline}>
-        {d.byline.map((b) => (
-          <span key={b}>{b}</span>
-        ))}
-      </div>
-      {!sample && (
-        <p className={styles.kindNote}>
-          <b>EXPLAINER</b>
-          General background, written without live data or cited sources. Not a news report.
-        </p>
-      )}
       {d.visual && <VisualPlayer d={d} />}
       <ListenBar id={d.id} chunks={script} label="LISTEN" />
       <div className={styles.artBody}>
@@ -174,13 +153,9 @@ export default function SignalView() {
                 <button key={d.id} type="button" className={styles.card} onClick={() => openDispatch(d.id)}>
                   <div className={styles.cardTop}>
                     <span className={`${styles.tag} ${d.live ? styles.tagLive : ''}`}>{d.tag}</span>
-                    <span className={styles.readTime}>{d.readTime}</span>
                   </div>
                   <h2>{d.headline}</h2>
                   <p>{d.dek}</p>
-                  <KindLabel kind={d.kind} />
-                  {d.visual && <span className={styles.cardVisual}>&#9654; VISUAL + CAPTIONS</span>}
-                  <div className={styles.cardFoot}>{d.byline.join(' · ')}</div>
                 </button>
               ))}
             </div>
