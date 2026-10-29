@@ -19,6 +19,8 @@ export interface DroneInputs {
   assist?: boolean;
   /** Set to a new timestamp to restart the mission. */
   resetMission?: number;
+  /** Set to a new timestamp to press the mission's action button (Mars: separate, cut the cords). */
+  action?: number;
 }
 
 export interface DroneHud {

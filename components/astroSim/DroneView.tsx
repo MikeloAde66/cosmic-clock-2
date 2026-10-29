@@ -7,16 +7,20 @@ import CanopyHud from './CanopyHud';
 import CockpitHud from './CockpitHud';
 import DockingCanopy from './DockingCanopy';
 import LandingCanopy from './LandingCanopy';
+import MarsCanopy from './MarsCanopy';
 import MissionSelect from './MissionSelect';
 import SiteHeader from './SiteHeader';
 import type { DroneHud, DroneInputs } from './DroneScene';
 import { EMPTY_DOCK_HUD } from './DockingScene';
 import type { DockHud } from './DockingScene';
 import { EMPTY_LANDING_HUD } from './LandingScene';
+import { EMPTY_MARS_HUD } from './MarsScene';
+import type { MarsHud } from './MarsScene';
 import type { LandingHud } from './LandingScene';
 import { missionStep, newMission, runScript } from '@/lib/astroSim/droneMission';
 import type { RadioLine } from '@/lib/astroSim/droneMission';
 import { dockingStep } from '@/lib/astroSim/dockingScript';
+import { marsStep } from '@/lib/astroSim/marsScript';
 import { TOUCHDOWN_SCRIPT } from '@/lib/astroSim/touchdownScript';
 import type { MissionId } from '@/lib/astroSim/missions';
 import { markComplete, parseProgress, readProgressRaw, subscribeProgress } from '@/lib/astroSim/progress';
@@ -25,6 +29,7 @@ import { playTargetLock, unlockAudio } from '@/lib/astroSim/audio';
 const DroneScene = dynamic(() => import('./DroneScene'), { ssr: false });
 const LandingScene = dynamic(() => import('./LandingScene'), { ssr: false });
 const DockingScene = dynamic(() => import('./DockingScene'), { ssr: false });
+const MarsScene = dynamic(() => import('./MarsScene'), { ssr: false });
 
 // The canopy cockpit is laid out for wide screens; narrower ones keep the
 // compact cockpit until it gets its own responsive pass.
@@ -57,6 +62,7 @@ export default function DroneView() {
   });
   const [landing, setLanding] = useState<LandingHud>(EMPTY_LANDING_HUD);
   const [dock, setDock] = useState<DockHud>(EMPTY_DOCK_HUD);
+  const [mars, setMars] = useState<MarsHud>(EMPTY_MARS_HUD);
   const inputs = useRef<DroneInputs>({ lx: 0, ly: 0, rx: 0, ry: 0 });
 
   const onHud = useCallback((h: DroneHud) => {
@@ -113,6 +119,30 @@ export default function DroneView() {
     }
   }, []);
 
+  const onMars = useCallback((h: MarsHud) => {
+    setMars(h);
+    const lines = marsStep(mission.current, {
+      t: h.t,
+      stage: h.phase,
+      linkLost: false,
+      alt: h.alt,
+      g: h.g,
+      rangeErr: h.rangeErr,
+      fuel: h.fuel,
+      down: h.down,
+      rating: h.result?.rating ?? null,
+      reason: h.result?.reason ?? null,
+    });
+    if (lines.length) {
+      setLog((l) => [...l, ...lines].slice(-8));
+      playTargetLock();
+    }
+    if (h.phase === 'landed' && !recorded.current) {
+      recorded.current = true;
+      markComplete('m04');
+    }
+  }, []);
+
   const resetRun = useCallback(() => {
     mission.current = newMission();
     recorded.current = false;
@@ -134,7 +164,7 @@ export default function DroneView() {
       unlockAudio();
       setSelectOpen(false);
       resetRun();
-      Object.assign(inputs.current, { lx: 0, ly: 0, rx: 0, ry: 0, recenter: undefined, resetMission: undefined });
+      Object.assign(inputs.current, { lx: 0, ly: 0, rx: 0, ry: 0, recenter: undefined, resetMission: undefined, action: undefined });
       setCover(true);
       window.setTimeout(() => {
         setMissionId(id);
@@ -142,6 +172,7 @@ export default function DroneView() {
         setPhase(id === 'm01' ? 'pad' : 'flight');
         setLanding(EMPTY_LANDING_HUD);
         setDock(EMPTY_DOCK_HUD);
+        setMars(EMPTY_MARS_HUD);
         setRun((n) => n + 1);
         setCover(false);
       }, 450);
@@ -176,6 +207,10 @@ export default function DroneView() {
 
   const retryLanding = useCallback(() => startMission('m02'), [startMission]);
   const retryDocking = useCallback(() => startMission('m03'), [startMission]);
+  const retryMars = useCallback(() => startMission('m04'), [startMission]);
+  const pressAction = useCallback(() => {
+    inputs.current.action = Date.now();
+  }, []);
 
   const replay = () => {
     setLabel('T-3');
@@ -188,15 +223,18 @@ export default function DroneView() {
 
   const m02 = missionId === 'm02';
   const m03 = missionId === 'm03';
+  const m04 = missionId === 'm04';
   const canopy = wide && phase === 'flight';
 
   return (
     <>
       {!canopy && (
-        <SiteHeader eyebrow="Space Drone" title={m03 ? 'Deep space docking' : m02 ? 'Lunar touchdown' : 'Shuttle-class flight'} mode="SIM" modeNote="Simulated vehicle and flight, Moon not to scale. The Moon surface is NASA imagery." sub />
+        <SiteHeader eyebrow="Space Drone" title={m04 ? 'Mars sky-crane landing' : m03 ? 'Deep space docking' : m02 ? 'Lunar touchdown' : 'Shuttle-class flight'} mode="SIM" modeNote="Simulated vehicle and flight, Moon not to scale. The Moon surface is NASA imagery." sub />
       )}
       <div className="relative flex-1 min-h-0 touch-none select-none">
-        {m03 ? (
+        {m04 ? (
+          <MarsScene key={`m04-${run}`} inputs={inputs} onHud={onMars} />
+        ) : m03 ? (
           <DockingScene key={`m03-${run}`} inputs={inputs} onHud={onDocking} />
         ) : m02 ? (
           <LandingScene key={`m02-${run}`} inputs={inputs} onHud={onLanding} />
@@ -207,7 +245,13 @@ export default function DroneView() {
         {/* fade between scenes */}
         <div className={`absolute inset-0 bg-black pointer-events-none transition-opacity duration-500 ${cover ? 'opacity-100' : 'opacity-0'}`} />
 
-        {m03 ? (
+        {m04 ? (
+          wide ? (
+            <MarsCanopy hud={mars} assist={assist} log={log} onLeft={onLeft} onRight={onRight} onAction={pressAction} onRetry={retryMars} onToggleAssist={toggleAssist} onMissions={openMissions} />
+          ) : (
+            <p className="absolute inset-x-6 text-center text-[12px] text-amber-300/90 top-1/3">Mars Sky-Crane Landing needs a wider window (900px or more) for now.</p>
+          )
+        ) : m03 ? (
           wide ? (
             <DockingCanopy hud={dock} assist={assist} log={log} onLeft={onLeft} onRight={onRight} onRetry={retryDocking} onToggleAssist={toggleAssist} onMissions={openMissions} />
           ) : (

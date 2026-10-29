@@ -47,9 +47,9 @@ export const MISSIONS: MissionInfo[] = [
     id: 'm04',
     number: '04',
     title: 'Mars Sky-Crane Landing',
-    blurb: 'Atmospheric entry, supersonic parachute, then a rocket-powered crane lowering the craft on tethers.',
-    basis: 'The Perseverance entry, descent and landing sequence.',
-    playable: false,
+    blurb: 'Steer the entry onto the target, open the parachute, separate the backshell, then hover on rockets and lower rover Wren on cables.',
+    basis: 'The Curiosity and Perseverance entry, descent and landing sequence: lift-steered entry, supersonic parachute, powered descent and the sky crane.',
+    playable: true,
     wideOnly: true,
   },
   {
