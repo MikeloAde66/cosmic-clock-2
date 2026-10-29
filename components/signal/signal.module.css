@@ -234,14 +234,9 @@
 .visualDots[hidden] { display: none; }
 
 /* ---------- listening panel + social row ---------- */
-.listenPanel { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 40px 0 8px; padding: 28px 0 22px; border-radius: 10px; background: radial-gradient(ellipse at 50% 55%, rgba(40, 80, 170, 0.28), transparent 70%); }
-.micBtn { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; color: var(--fg); background: rgba(10, 15, 22, 0.6); border: 2px solid var(--accent); box-shadow: 0 0 18px rgba(63, 208, 201, 0.45); cursor: pointer; transition: box-shadow 0.2s, transform 0.2s; }
-.micBtn:hover { box-shadow: 0 0 26px rgba(63, 208, 201, 0.7); }
-.micOn { animation: micPulse 1.6s ease-in-out infinite; }
-@keyframes micPulse { 50% { box-shadow: 0 0 30px rgba(63, 208, 201, 0.85); transform: scale(1.05); } }
+.listenPanel { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 40px 0 8px; padding: 24px 0 22px; border-radius: 10px; background: radial-gradient(ellipse at 50% 55%, rgba(40, 80, 170, 0.28), transparent 70%); }
 .wave { width: 100%; height: 130px; display: block; }
 .listenLabel { margin: 0; font-family: var(--serif); font-size: 20px; color: var(--fg); letter-spacing: 0.02em; }
 .socialRow { display: flex; justify-content: center; gap: 12px; margin: 28px 0 36px; }
 .socialBtn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; color: var(--fg-dim); border: 1px solid var(--line-strong); transition: color 0.15s, border-color 0.15s; }
 .socialBtn:hover { color: var(--accent); border-color: var(--accent); }
-@media (prefers-reduced-motion: reduce) { .micOn { animation: none; } }

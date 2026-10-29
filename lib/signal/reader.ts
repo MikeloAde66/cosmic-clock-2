@@ -1,3 +1,4 @@
+import { attachLevel, detachLevel } from './level';
 // A small controller around the browser's speech synthesis. It reads a list of
 // short chunks one after another, so long text is never cut off, and keeps
 // the bookkeeping (which chunk, paused or not) out of the React components.
@@ -123,6 +124,7 @@ export function createAudioReader(src: string, onChange: (s: ReaderState) => voi
   };
   const close = () => {
     closed = true;
+    detachLevel();
     el.pause();
     el.removeAttribute('src');
     el.load();
@@ -148,6 +150,7 @@ export function createAudioReader(src: string, onChange: (s: ReaderState) => voi
   return {
     start() {
       el.playbackRate = rate;
+      attachLevel(el);
       set({ status: 'speaking', index: 0 });
       el.play().catch((e: unknown) => {
         if (e instanceof DOMException && e.name === 'AbortError') return;
