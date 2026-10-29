@@ -202,6 +202,8 @@ export default function DroneView() {
       Object.assign(inputs.current, { lx: 0, ly: 0, rx: 0, ry: 0, recenter: undefined, resetMission: undefined, action: undefined });
       setCover(true);
       window.setTimeout(() => {
+        // the old scene keeps reporting during the fade: wipe whatever it said before the new one starts
+        resetRun();
         setMissionId(id);
         setLabel('T-3');
         setPhase(id === 'm01' ? 'pad' : 'flight');
