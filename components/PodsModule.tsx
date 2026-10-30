@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Camera, Trash2, Home } from 'lucide-react';
+import { Camera, Trash2, Home, ExternalLink } from 'lucide-react';
 import CosmicVisualizer from './CosmicVisualizer';
 import StudioOneConsole from './StudioOneConsole';
 import EqOrb from './EqOrb';
 import { useRadioPlayer } from './radio/RadioPlayerContext';
-import { extractIdentifier, buildArchiveEmbedUrl } from '@/lib/archiveOrg';
+import { extractIdentifier, buildArchiveEmbedUrl, fetchArchiveItemInfo } from '@/lib/archiveOrg';
 // Shared with StarTrackerView's own YT.Player mount (Sky Fest's Space
 // Media tab) — see that file for why this lives in one place.
 import type { YouTubePlayer, YouTubePlayerEvent } from '@/lib/youtubeIframeApi';
@@ -1323,13 +1323,48 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     setShowCreateModal(false);
   };
 
-  // Parse a pasted YouTube video/playlist URL (or direct media link) into a new Playlist track,
-  // fetching the real title via YouTube's public oEmbed endpoint (no API key required).
+  // Parse a pasted YouTube video/playlist URL, Internet Archive item (an
+  // archive.org link or a bare item id) or direct media link into a new
+  // Playlist track. YouTube titles come from its public oEmbed endpoint
+  // (no API key); Archive titles from the Archive metadata API.
   const handleImportPlaylistUrl = async (e: React.FormEvent) => {
     e.preventDefault();
     const url = addPlaylistUrl.trim();
     if (!url) return;
     setIsImportingPlaylist(true);
+
+    // Same Internet Archive detection as loadMedia above: a real archive.org
+    // URL, or a bare id (no "/" or ":").
+    const archiveId = extractIdentifier(url);
+    if (archiveId && (/archive\.org/i.test(url) || !/[/:]/.test(url))) {
+      let title = archiveId;
+      let description = 'Internet Archive';
+      try {
+        const info = await fetchArchiveItemInfo(archiveId);
+        title = info.title;
+        if (info.creator) description = info.creator;
+      } catch {
+        // Metadata lookup failed — the embed player can still try the id.
+      }
+      const archiveTrack: Track = {
+        id: `playlist-${Date.now()}`,
+        title,
+        frequency: 'Internet Archive',
+        description,
+        src: '',
+        embedUrl: buildArchiveEmbedUrl(archiveId),
+        watchUrl: `https://archive.org/details/${encodeURIComponent(archiveId)}`,
+        playlistId: 'main-playlist',
+        contentToRead: `### ${title}\n\nImported from: https://archive.org/details/${archiveId}`,
+      };
+      setTracks((prev) => [archiveTrack, ...prev]);
+      setActivePlaylistId('main-playlist');
+      selectTrack(archiveTrack);
+      setAddPlaylistUrl('');
+      setIsImportingPlaylist(false);
+      setShowAddPlaylistModal(false);
+      return;
+    }
 
     const { embedUrl, isPlaylistOnly } = parseYouTubeUrl(url);
 
@@ -2195,11 +2230,23 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
       {showAddPlaylistModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <form onSubmit={handleImportPlaylistUrl} className="w-full max-w-md p-6 space-y-4 border shadow-2xl bg-slate-900 border-neutral-700 rounded-xl">
-            <h3 className="text-lg font-bold text-white">Add Media / YouTube Playlist</h3>
-            <p className="text-xs text-slate-400">Paste a YouTube video or playlist link to add it to your Playlist.</p>
+            <h3 className="text-lg font-bold text-white">Add Media / YouTube Playlist / Internet Archive</h3>
+            <p className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span>Paste a YouTube video or playlist link, or an Internet Archive item ID or link, to add it to your Playlist.</span>
+              <a
+                href="https://archive.org"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open Internet Archive"
+                aria-label="Open Internet Archive in a new tab"
+                className="shrink-0 text-slate-500 hover:text-cyan-300 transition"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </p>
             <input
-              type="url"
-              placeholder="Paste YouTube video or playlist URL..."
+              type="text"
+              placeholder="YouTube URL, or Internet Archive ID / URL (e.g. rosen)..."
               value={addPlaylistUrl}
               onChange={(e) => setAddPlaylistUrl(e.target.value)}
               className="w-full p-3 font-mono text-sm border rounded-lg bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-white/50"
