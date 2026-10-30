@@ -72,3 +72,29 @@ export async function fetchArchiveAudioFiles(identifier: string): Promise<{ info
     })),
   };
 }
+
+// Archive's own format labels for browser-playable video derivatives, best
+// first. Originals can be huge or in formats a <video> element can't play,
+// so the h.264 derivative is preferred over the source file.
+const VIDEO_FORMAT_PRIORITY = ['h.264', 'h.264 ia', 'mpeg4', '512kb mpeg4'];
+
+// A directly playable .mp4/.webm file for the item, or null when it has
+// none (audio-only items, text, etc.) — callers fall back to Archive's
+// embed player. Playing the file itself (rather than the embed) is what
+// lets Studio One route its sound through the EQ and level meters.
+export async function fetchArchiveVideo(identifier: string): Promise<{ info: ArchiveItemInfo; url: string | null }> {
+  const { info, files } = await fetchArchiveMetadata(identifier);
+  const playable = files.filter((f) => /\.(mp4|webm)$/i.test(f.name));
+  const rank = (f: { name: string; format?: string }) => {
+    const i = VIDEO_FORMAT_PRIORITY.indexOf((f.format || '').toLowerCase());
+    if (i !== -1) return i;
+    return /\.mp4$/i.test(f.name) ? VIDEO_FORMAT_PRIORITY.length : VIDEO_FORMAT_PRIORITY.length + 1;
+  };
+  const best = [...playable].sort((a, b) => rank(a) - rank(b))[0];
+  return {
+    info,
+    url: best
+      ? `https://archive.org/download/${encodeURIComponent(identifier)}/${best.name.split('/').map(encodeURIComponent).join('/')}`
+      : null,
+  };
+}
