@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AudioLines, Headphones, Play, Pause, Plus, Radio as RadioIcon, Search, Upload, Volume2, X } from 'lucide-react';
+import { AudioLines, ExternalLink, Headphones, Loader2, Play, Pause, Plus, Radio as RadioIcon, Search, Upload, Volume2, X } from 'lucide-react';
 import { useRadioPlayer } from './RadioPlayerContext';
 import PlayerSpectrum from './PlayerSpectrum';
 import { supabase } from '@/lib/supabase';
@@ -14,19 +14,15 @@ import {
   type RadioStation,
 } from '@/lib/radioStations';
 import { isBannedTrackTitle } from '@/lib/bannedTracks';
+import { extractIdentifier, fetchArchiveAudioFiles, type ArchiveAudioFile } from '@/lib/archiveOrg';
 import styles from './RadioCentralConsoleView.module.css';
 
-// The Daily Queue's lineup: every currently available Supabase catalog
-// audio item (catalogStations — video items never reach this list, see
-// mapCatalogItemToStation's own video exclusion), each followed by a
-// fixed BBC News block. Built dynamically rather than matching a specific
-// title, so it stays correct as more audio items get ingested later
-// rather than staying pinned to whichever one existed when this was
-// written. Each audio item has no durationMs — it plays to its own real
-// 'ended' event rather than being cut off by a timer; only the BBC block
-// (a continuous stream with no natural end) uses one.
-const DAILY_QUEUE_BBC_BLOCK_MS = 35 * 60 * 1000;
-const DAILY_BBC_STATION_ID = 'bbc-world';
+// The Daily Queue's lineup: the 432Hz Cosmic Instrumental Stream, a
+// continuous stream with no natural end, so it plays until the queue is
+// turned off. Pinned to that station on purpose rather than built from the
+// Supabase media catalog — catalog items stay reachable from the channel
+// list, they just no longer take over the queue.
+const DAILY_QUEUE_STATION_ID = 'vault-432hz';
 
 interface MediaCatalogItem {
   id?: string;
@@ -257,6 +253,36 @@ export default function RadioCentralConsoleView() {
     loadCustomStation(url, url.split('/').pop() || 'Custom Stream');
   };
 
+  // Internet Archive loader — looks an item up, lists its playable audio
+  // files, and tunes whichever one is picked through the same
+  // loadCustomStation as the file/link paths above.
+  const [archiveInput, setArchiveInput] = useState('');
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiveError, setArchiveError] = useState('');
+  const [archiveTitle, setArchiveTitle] = useState('');
+  const [archiveFiles, setArchiveFiles] = useState<ArchiveAudioFile[]>([]);
+
+  const handleArchiveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setArchiveError('');
+    setArchiveFiles([]);
+    const identifier = extractIdentifier(archiveInput);
+    if (!identifier) {
+      setArchiveError('Enter a valid Internet Archive item ID or URL.');
+      return;
+    }
+    setArchiveLoading(true);
+    try {
+      const { info, files } = await fetchArchiveAudioFiles(identifier);
+      setArchiveTitle(info.title);
+      setArchiveFiles(files);
+    } catch (err) {
+      setArchiveError(err instanceof Error ? err.message : 'Failed to load that item.');
+    } finally {
+      setArchiveLoading(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     fetch('/api/admin/radio-stations')
@@ -302,19 +328,12 @@ export default function RadioCentralConsoleView() {
     return matchesCategory && matchesSearch && matchesGenre;
   });
 
-  // Resolves the Daily Queue from whatever's currently loaded — null
-  // until there's at least one audio catalog item and BBC is available,
-  // so the toggle button below can disable itself rather than start a
-  // broken, empty queue. Interleaves a 35-minute BBC News block after
-  // every audio item, cycling indefinitely (advanceDailyQueue in
-  // RadioPlayerContext.tsx loops the whole array, not just this pass).
+  // Resolves the Daily Queue — null only if the 432Hz station is somehow
+  // missing, so the toggle button below can disable itself rather than
+  // start an empty queue.
   const dailyQueueItems = (() => {
-    const bbc = allStations.find((s) => s.id === DAILY_BBC_STATION_ID);
-    if (!bbc || catalogStations.length === 0) return null;
-    return catalogStations.flatMap((audioItem) => [
-      { station: audioItem }, // plays to its own real end, no timer
-      { station: bbc, durationMs: DAILY_QUEUE_BBC_BLOCK_MS },
-    ]);
+    const station = allStations.find((s) => s.id === DAILY_QUEUE_STATION_ID);
+    return station ? [{ station }] : null;
   })();
 
   const handleToggleDailyQueue = () => {
@@ -483,9 +502,8 @@ export default function RadioCentralConsoleView() {
             {/* Same "explicit toggle, never auto-starts" contract as
                 Program Manager above — mutually exclusive with it (see
                 startDailyQueue/startProgramManager in
-                RadioPlayerContext.tsx). Disabled until at least one audio
-                catalog item and BBC World Service are available, so it
-                can't kick off an empty sequence. */}
+                RadioPlayerContext.tsx). Plays the 432Hz Cosmic Instrumental
+                Stream. */}
             <button
               onClick={handleToggleDailyQueue}
               disabled={!dailyQueueEnabled && !dailyQueueItems}
@@ -493,8 +511,8 @@ export default function RadioCentralConsoleView() {
                 dailyQueueEnabled
                   ? 'Turn off the Daily Queue'
                   : dailyQueueItems
-                    ? 'Turn on the Daily Queue (catalog audio → 35min BBC News → next catalog audio → …)'
-                    : 'Daily Queue unavailable — waiting on an audio item in the catalog'
+                    ? 'Turn on the Daily Queue (432Hz Cosmic Instrumental Stream)'
+                    : 'Daily Queue unavailable — the 432Hz station is missing'
               }
               className={`${dailyQueueEnabled ? GLASS_ACTIVE_GREEN : GLASS_IDLE} px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full disabled:opacity-40`}
             >
@@ -811,7 +829,7 @@ export default function RadioCentralConsoleView() {
           style={{ background: 'rgba(2,4,8,0.7)' }}
           onClick={() => setShowUploadModal(false)}
         >
-          <div className="w-full max-w-sm p-5 space-y-4 rounded-xl" style={cardStyle} onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md p-5 space-y-4 overflow-y-auto rounded-xl max-h-[90vh]" style={cardStyle} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold tracking-wide text-white uppercase">Upload Audio</h2>
               <button onClick={() => setShowUploadModal(false)} aria-label="Close" className="text-slate-400 hover:text-white">
@@ -858,6 +876,63 @@ export default function RadioCentralConsoleView() {
                 Load Link
               </button>
             </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
+              <span className="text-[10px] uppercase tracking-widest text-slate-500">Or</span>
+              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
+            </div>
+
+            <form onSubmit={handleArchiveSubmit} className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-white/70">Load from Internet Archive</span>
+                <a
+                  href="https://archive.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open Internet Archive"
+                  aria-label="Open Internet Archive in a new tab"
+                  className="text-slate-500 hover:text-cyan-300 transition"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <input
+                type="text"
+                value={archiveInput}
+                onChange={(e) => setArchiveInput(e.target.value)}
+                placeholder="Item ID or URL — e.g. rosen or https://archive.org/details/rosen"
+                className="w-full px-3 py-2 text-xs rounded-lg outline-none"
+                style={{ ...subpanelStyle, color: '#e2e8f0' }}
+              />
+              <button
+                type="submit"
+                disabled={archiveLoading || !archiveInput.trim()}
+                className={`${GLASS_IDLE} flex items-center justify-center w-full gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide rounded-lg disabled:opacity-40`}
+              >
+                {archiveLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {archiveLoading ? 'Loading…' : 'Find Audio'}
+              </button>
+              {archiveError && <p className="text-[11px] text-red-400">{archiveError}</p>}
+              {archiveFiles.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] uppercase tracking-widest text-slate-400 truncate">{archiveTitle}</p>
+                  <div className="space-y-1 overflow-y-auto max-h-48">
+                    {archiveFiles.map((f) => (
+                      <button
+                        key={f.name}
+                        type="button"
+                        onClick={() => loadCustomStation(f.url, f.title)}
+                        className={`${GLASS_IDLE} flex items-center w-full gap-2 px-3 py-1.5 text-left text-xs rounded-lg`}
+                      >
+                        <Play className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{f.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </form>
           </div>
         </div>
       )}
