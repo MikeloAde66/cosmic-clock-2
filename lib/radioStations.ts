@@ -99,7 +99,7 @@ export interface OutkastComingSoon {
 export const OUTKAST_LINKS: OutkastLink[] = [
   { label: 'Discord', href: 'https://discord.com/channels/@me', icon: '/icons/discord.svg' },
   { label: 'WhatsApp', href: 'https://web.whatsapp.com/', icon: '/icons/whatsapp.png' },
-  { label: 'Spotify', href: 'https://open.spotify.com/your-profile', icon: '/icons/spotify.svg' },
+  { label: 'Spotify', href: 'https://open.spotify.com/', icon: '/icons/spotify.svg' },
   { label: 'iTunes', href: 'https://www.apple.com/', icon: '/icons/apple.svg' },
   { label: 'SoundCloud', href: 'https://soundcloud.com/michael-bradley-307688752', icon: '/icons/soundcloud.svg' },
   { label: 'ReverbNation', href: 'https://www.reverbnation.com/beatbrokers526', icon: '/icons/reverbnation.svg' },
