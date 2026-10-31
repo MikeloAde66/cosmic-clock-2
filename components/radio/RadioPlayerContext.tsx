@@ -242,15 +242,16 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   const [activeDailyQueueLabel, setActiveDailyQueueLabel] = useState<string | null>(null);
 
   // Primes a station into the persistent bottom bar on load, so it's shown/
-  // queued the instant the app opens. Checks for an admin-saved default
-  // station first (ChannelFolderManager.tsx's "Save session" — see
-  // /api/admin/radio-session), falling back to the 432Hz Cosmic
-  // Instrumental Stream (vault-432hz) if nothing's been saved, the saved
-  // station no longer exists (e.g. its folder was deleted), or the lookup
-  // itself fails. /api/radio/queue already resolves ANY station kind
-  // (vault, live, admin-, channel-) and echoes back a full station object,
-  // so the same fetch-and-prime logic works unmodified for a saved
-  // channel-folder id, not just the hardcoded vault default.
+  // queued the instant the app opens. Tries, in order: (1) an admin-saved
+  // default station (ChannelFolderManager.tsx's "Save session" — see
+  // /api/admin/radio-session) — this is how the owner changes the default
+  // going forward without a code change; (2) the "Dope Beatz" channel
+  // folder, the current baseline default (set per owner request); (3) the
+  // 432Hz Cosmic Instrumental Stream (vault-432hz) as the last-resort
+  // safety net if even that fails (e.g. the folder was deleted/renamed).
+  // /api/radio/queue already resolves ANY station kind (vault, live,
+  // admin-, channel-) and echoes back a full station object, so the same
+  // fetch-and-prime logic works unmodified at every step.
   // Deliberately does NOT call .play() here: real autoplay-with-sound
   // with no prior user gesture is blocked by every major browser, and
   // forcing it would either silently fail or surface as a false "error"
@@ -258,6 +259,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   // comment above for the same user-gesture constraint. A real Play
   // click (already wired in GlobalPlayerBar) starts it for real.
   useEffect(() => {
+    const BASELINE_DEFAULT_STATION_ID = 'channel-6ae57ddf743924e7c4044426'; // "Dope Beatz"
     const primeStation = async (id: string): Promise<boolean> => {
       try {
         const res = await fetch(`/api/radio/queue?station=${id}`);
@@ -297,6 +299,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
       }
 
       if (savedStationId && (await primeStation(savedStationId))) return;
+      if (await primeStation(BASELINE_DEFAULT_STATION_ID)) return;
       await primeStation('vault-432hz');
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
