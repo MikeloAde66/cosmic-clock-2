@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AudioLines, Headphones, Play, Pause, Plus, Radio as RadioIcon, Search, Volume2, X } from 'lucide-react';
+import { AudioLines, Headphones, Lock, Play, Pause, Plus, Radio as RadioIcon, Search, Volume2, X } from 'lucide-react';
 import { useRadioPlayer } from './RadioPlayerContext';
 import PlayerSpectrum from './PlayerSpectrum';
 import ChannelFolderManager from './ChannelFolderManager';
@@ -230,6 +230,22 @@ export default function RadioCentralConsoleView() {
   // components/radio/ChannelFolderManager.tsx + app/api/admin/radio-channels).
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [channelFolders, setChannelFolders] = useState<ChannelFolderRadioStation[]>([]);
+
+  // Soft passkey gate on the lock icon — same "3045", same client-side-only
+  // pattern as the Digital Magazine card's MediaFlowPasskeyGate
+  // (components/GalleryGrid.tsx), at the owner's explicit request: a lock
+  // next to "+" that opens a code prompt, rather than requiring a real
+  // Supabase login just to reveal this UI. It only gates *visibility* of
+  // the folder manager, same as that other gate — the actual
+  // create/rename/upload/delete calls still go through requireAdmin()
+  // server-side regardless (see app/api/admin/radio-channels/*), so this
+  // doesn't weaken real write security, only how the UI is reached. Not
+  // persisted — resets on reload, matching the Digital Magazine gate.
+  const RADIO_CHANNEL_PASSKEY = '3045';
+  const [channelPasskeyUnlocked, setChannelPasskeyUnlocked] = useState(false);
+  const [showChannelPasskeyGate, setShowChannelPasskeyGate] = useState(false);
+  const [channelPasskeyValue, setChannelPasskeyValue] = useState('');
+  const [channelPasskeyInvalid, setChannelPasskeyInvalid] = useState(false);
 
   const loadChannelFolders = () => {
     fetch('/api/admin/radio-channels')
@@ -519,11 +535,12 @@ export default function RadioCentralConsoleView() {
               <AudioLines className="w-3.5 h-3.5" style={{ filter: `drop-shadow(0 0 6px rgba(47,217,255,0.6))` }} />
               432Hz
             </span>
-            {/* Admin-only channel-folder manager — per the owner's
-                explicit confirmation, folder create/rename/upload/delete
-                is admin-only, so the control itself is hidden from
-                everyone else rather than opening to a dead end. */}
-            {isAdmin && (
+            {/* Admin-only channel-folder manager. A real admin (signed in
+                with Supabase app_metadata.role === 'admin') gets the "+"
+                directly; everyone else sees a lock instead, which opens a
+                passkey prompt (see RADIO_CHANNEL_PASSKEY above) rather than
+                hiding the control entirely. */}
+            {isAdmin || channelPasskeyUnlocked ? (
               <button
                 onClick={() => setShowUploadModal(true)}
                 aria-label="Manage channel folders"
@@ -531,6 +548,19 @@ export default function RadioCentralConsoleView() {
                 className={`${GLASS_ACTIVE} flex items-center justify-center w-11 h-11 rounded-full shrink-0`}
               >
                 <Plus className="w-6 h-6" strokeWidth={3} />
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setShowChannelPasskeyGate(true);
+                  setChannelPasskeyInvalid(false);
+                  setChannelPasskeyValue('');
+                }}
+                aria-label="Admin access — channel folders"
+                title="Admin access — channel folders"
+                className={`${GLASS_IDLE} flex items-center justify-center w-11 h-11 rounded-full shrink-0`}
+              >
+                <Lock className="w-5 h-5" />
               </button>
             )}
           </div>
@@ -884,7 +914,7 @@ export default function RadioCentralConsoleView() {
         </div>
       </div>
 
-      {showUploadModal && isAdmin && (
+      {showUploadModal && (isAdmin || channelPasskeyUnlocked) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(2,4,8,0.7)' }}
@@ -904,6 +934,64 @@ export default function RadioCentralConsoleView() {
               onFoldersChanged={loadChannelFolders}
             />
           </div>
+        </div>
+      )}
+
+      {showChannelPasskeyGate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setShowChannelPasskeyGate(false)}
+        >
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (channelPasskeyValue === RADIO_CHANNEL_PASSKEY) {
+                setChannelPasskeyUnlocked(true);
+                setShowChannelPasskeyGate(false);
+                setShowUploadModal(true);
+              } else {
+                setChannelPasskeyInvalid(true);
+                setChannelPasskeyValue('');
+              }
+            }}
+            className="w-full max-w-xs p-5 border shadow-2xl rounded-2xl border-slate-800 bg-slate-950/95"
+          >
+            <div className="flex items-center gap-2 mb-3 text-sm font-bold text-white">
+              <Lock className="w-4 h-4 text-slate-400" />
+              Admin Access — Channel Folders
+            </div>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoFocus
+              value={channelPasskeyValue}
+              onChange={(e) => {
+                setChannelPasskeyValue(e.target.value);
+                setChannelPasskeyInvalid(false);
+              }}
+              placeholder="Enter passkey"
+              className={`w-full px-3 py-2 text-sm text-white bg-slate-900 border rounded-lg outline-none ${
+                channelPasskeyInvalid ? 'border-red-500' : 'border-slate-700 focus:border-slate-500'
+              }`}
+            />
+            {channelPasskeyInvalid && <p className="mt-1.5 text-xs text-red-400">Invalid Passkey</p>}
+            <div className="flex gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowChannelPasskeyGate(false)}
+                className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-700 text-slate-300 hover:border-slate-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white text-slate-950 hover:bg-slate-200"
+              >
+                Unlock
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

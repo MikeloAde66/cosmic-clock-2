@@ -39,12 +39,32 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
+  // Surfaces a failed create/rename/delete — in particular the case where
+  // the lock-icon passkey unlocked this screen but the browser has no real
+  // signed-in admin Supabase session: that passkey only reveals this UI
+  // (see RadioCentralConsoleView.tsx's own comment on it), it isn't itself
+  // credentials, so every write here still goes through requireAdmin()
+  // server-side and 401s without a real admin login.
+  const [actionError, setActionError] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const authHeaders = async () => {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
     return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  };
+
+  const reportIfFailed = async (res: Response) => {
+    if (res.ok) {
+      setActionError('');
+      return true;
+    }
+    if (res.status === 401 || res.status === 403) {
+      setActionError('This action needs your real admin sign-in, not just the passkey — log in with your admin account.');
+    } else {
+      setActionError((await res.text()) || `Failed (${res.status}).`);
+    }
+    return false;
   };
 
   const loadFolders = () => {
@@ -72,7 +92,7 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
         headers: await authHeaders(),
         body: JSON.stringify({ name }),
       });
-      if (res.ok) {
+      if (await reportIfFailed(res)) {
         setNewFolderName('');
         loadFolders();
         onFoldersChanged();
@@ -94,7 +114,7 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
       body: JSON.stringify({ id: folderId, name }),
     });
     setRenamingId(null);
-    if (res.ok) {
+    if (await reportIfFailed(res)) {
       loadFolders();
       onFoldersChanged();
     }
@@ -106,7 +126,7 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
       headers: await authHeaders(),
       body: JSON.stringify({ id: folderId }),
     });
-    if (res.ok) {
+    if (await reportIfFailed(res)) {
       if (openFolderId === folderId) setOpenFolderId(null);
       loadFolders();
       onFoldersChanged();
@@ -121,7 +141,7 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
         headers: await authHeaders(),
         body: JSON.stringify({ folderId, trackId }),
       });
-      if (res.ok) {
+      if (await reportIfFailed(res)) {
         loadFolders();
         onFoldersChanged();
       }
@@ -149,7 +169,11 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
         body: JSON.stringify({ folderId, files: files.map((f) => ({ filename: f.name, sizeBytes: f.size })) }),
       });
       if (!signRes.ok) {
-        setUploadError(await signRes.text());
+        setUploadError(
+          signRes.status === 401 || signRes.status === 403
+            ? 'This needs your real admin sign-in, not just the passkey — log in with your admin account.'
+            : await signRes.text()
+        );
         return;
       }
       const { bucket, uploads } = await signRes.json();
@@ -213,6 +237,7 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
           All Folders
         </button>
         <h3 className="text-sm font-bold text-white truncate">{openFolder.station.name}</h3>
+        {actionError && <p className="text-[11px] text-red-400">{actionError}</p>}
 
         <button
           onClick={() => fileInputRef.current?.click()}
@@ -262,6 +287,7 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
   // Folder list.
   return (
     <div className="space-y-3">
+      {actionError && <p className="text-[11px] text-red-400">{actionError}</p>}
       <div className="flex gap-2">
         <input
           type="text"
