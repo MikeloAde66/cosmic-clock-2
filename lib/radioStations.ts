@@ -101,7 +101,7 @@ export const OUTKAST_LINKS: OutkastLink[] = [
   { label: 'WhatsApp', href: 'https://web.whatsapp.com/', icon: '/icons/whatsapp.png' },
   { label: 'Spotify', href: 'https://open.spotify.com/', icon: '/icons/spotify.svg' },
   { label: 'iTunes', href: 'https://www.apple.com/', icon: '/icons/apple.svg' },
-  { label: 'SoundCloud', href: 'https://soundcloud.com/michael-bradley-307688752', icon: '/icons/soundcloud.svg' },
+  { label: 'SoundCloud', href: 'https://soundcloud.com/discover', icon: '/icons/soundcloud.svg' },
   { label: 'ReverbNation', href: 'https://www.reverbnation.com/beatbrokers526', icon: '/icons/reverbnation.svg' },
 ];
 
