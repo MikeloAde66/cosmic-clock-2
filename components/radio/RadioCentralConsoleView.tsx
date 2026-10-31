@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AudioLines, Headphones, Lock, Play, Pause, Plus, Radio as RadioIcon, Search, Volume2, X } from 'lucide-react';
+import { Apple, AudioLines, Headphones, Lock, MessageSquare, Music2, Phone, Play, Pause, Plus, Radio as RadioIcon, Search, Volume2, X } from 'lucide-react';
 import { useRadioPlayer } from './RadioPlayerContext';
 import PlayerSpectrum from './PlayerSpectrum';
 import ChannelFolderManager from './ChannelFolderManager';
@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase';
 import {
   CATEGORIES,
   CATEGORY_LABELS,
-  MEDIA_GENRE_FILTERS,
+  OUTKAST_LINKS,
   RADIO_STATIONS,
   type ChannelFolderRadioStation,
   type LiveRadioStation,
@@ -153,7 +153,6 @@ export default function RadioCentralConsoleView() {
   } = useRadioPlayer();
 
   const [activeCategory, setActiveCategory] = useState('COSMIC CHILL');
-  const [activeGenreFilter, setActiveGenreFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [adminStations, setAdminStations] = useState<LiveRadioStation[]>([]);
   const [catalogStations, setCatalogStations] = useState<LiveRadioStation[]>([]);
@@ -301,13 +300,11 @@ export default function RadioCentralConsoleView() {
 
   const allStations = [...RADIO_STATIONS, ...adminStations, ...catalogStations, ...channelFolders];
   const query = searchQuery.trim().toLowerCase();
-  const activeGenreKeywords = MEDIA_GENRE_FILTERS.find((g) => g.label === activeGenreFilter)?.keywords ?? null;
   const filteredStations = allStations.filter((s) => {
     if (hiddenStationIds.has(s.id)) return false;
     const matchesCategory = activeCategory === 'ALL CHANNELS' ? s.category !== 'NEWS' : s.category === activeCategory;
     const matchesSearch = !query || s.name.toLowerCase().includes(query) || s.tagline.toLowerCase().includes(query);
-    const matchesGenre = !activeGenreKeywords || activeGenreKeywords.some((k) => s.genre.toLowerCase().includes(k));
-    return matchesCategory && matchesSearch && matchesGenre;
+    return matchesCategory && matchesSearch;
   });
 
   // Resolves the Daily Queue — null only if the 432Hz station is somehow
@@ -642,22 +639,29 @@ export default function RadioCentralConsoleView() {
           </div>
         </div>
 
-        {/* Mini-category sub-nav — a finer genre facet layered on top of
-            the CATEGORIES tabs above (see MEDIA_GENRE_FILTERS in
-            lib/radioStations.ts), aimed at narrative/archival catalog
-            content. Applied as an additional AND filter, not a
-            replacement for the active category tab. */}
+        {/* Social links — replaces the old Genre filter row. Reuses the
+            same OUTKAST_LINKS (Discord/WhatsApp/Spotify/iTunes) already
+            defined in lib/radioStations.ts and used by RadioStreams.tsx's
+            Community menu, just surfaced here as icon buttons instead. */}
         <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl" style={cardStyle}>
-          <span className="text-[10px] uppercase tracking-widest text-slate-500 shrink-0">Genre</span>
-          {MEDIA_GENRE_FILTERS.map((genreFilter) => (
-            <button
-              key={genreFilter.label}
-              onClick={() => setActiveGenreFilter((current) => (current === genreFilter.label ? null : genreFilter.label))}
-              className={`${activeGenreFilter === genreFilter.label ? GLASS_ACTIVE : GLASS_IDLE} px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wide`}
-            >
-              {genreFilter.label}
-            </button>
-          ))}
+          <span className="text-[10px] uppercase tracking-widest text-slate-500 shrink-0">Connect</span>
+          {OUTKAST_LINKS.map((link) => {
+            const Icon =
+              link.label === 'Discord' ? MessageSquare : link.label === 'WhatsApp' ? Phone : link.label === 'Spotify' ? Music2 : Apple;
+            return (
+              <a
+                key={link.label}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={link.label}
+                title={link.label}
+                className={`${GLASS_IDLE} flex items-center justify-center w-9 h-9 rounded-full shrink-0`}
+              >
+                <Icon className="w-4 h-4" />
+              </a>
+            );
+          })}
         </div>
 
         {/* Upper grid */}
