@@ -7,7 +7,7 @@
 // app/api/admin/radio-channels/* for the backing routes.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, FolderPlus, Loader2, Pencil, Trash2, Upload, X } from 'lucide-react';
+import { Bookmark, ChevronLeft, FolderPlus, Loader2, MoreVertical, Pencil, Trash2, Upload, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 interface FolderTrack {
@@ -47,6 +47,10 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
   // server-side and 401s without a real admin login.
   const [actionError, setActionError] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // The "..." overflow menu on each folder row, and a quick success note
+  // after "Save session" — see handleSaveSession below.
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [savedMessage, setSavedMessage] = useState('');
 
   const authHeaders = async () => {
     const { data } = await supabase.auth.getSession();
@@ -130,6 +134,23 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
       if (openFolderId === folderId) setOpenFolderId(null);
       loadFolders();
       onFoldersChanged();
+    }
+  };
+
+  // Sets this folder as the station Radio Central resumes with on the next
+  // fresh page load, for every visitor — see /api/admin/radio-session and
+  // RadioPlayerContext's priming effect. Separate from deleting the
+  // folder/station itself.
+  const handleSaveSession = async (folderId: string, name: string) => {
+    setMenuOpenId(null);
+    setSavedMessage('');
+    const res = await fetch('/api/admin/radio-session', {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ stationId: `channel-${folderId}` }),
+    });
+    if (await reportIfFailed(res)) {
+      setSavedMessage(`"${name}" saved as the default station.`);
     }
   };
 
@@ -288,6 +309,7 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
   return (
     <div className="space-y-3">
       {actionError && <p className="text-[11px] text-red-400">{actionError}</p>}
+      {savedMessage && <p className="text-[11px] text-emerald-400">{savedMessage}</p>}
       <div className="flex gap-2">
         <input
           type="text"
@@ -356,6 +378,44 @@ export default function ChannelFolderManager({ glassActive, glassIdle, subpanelS
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
+              <div className="relative shrink-0">
+                <button
+                  onClick={() => setMenuOpenId(menuOpenId === f.station.folderId ? null : f.station.folderId)}
+                  aria-label={`More options for ${f.station.name}`}
+                  title="More"
+                  className="flex items-center justify-center w-6 h-6 rounded-full text-slate-500 hover:text-cyan-300 hover:bg-cyan-500/10"
+                >
+                  <MoreVertical className="w-3.5 h-3.5" />
+                </button>
+                {menuOpenId === f.station.folderId && (
+                  <>
+                    {/* Click-outside backdrop — closes the menu without eating the row's own clicks. */}
+                    <div className="fixed inset-0 z-10" onClick={() => setMenuOpenId(null)} />
+                    <div
+                      className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg"
+                      style={{ ...subpanelStyle, background: 'rgba(15,23,42,0.95)' }}
+                    >
+                      <button
+                        onClick={() => handleSaveSession(f.station.folderId, f.station.name)}
+                        className="flex items-center w-full gap-2 px-3 py-2 text-left text-xs text-slate-200 hover:bg-cyan-500/10 hover:text-cyan-300"
+                      >
+                        <Bookmark className="w-3.5 h-3.5" />
+                        Save session
+                      </button>
+                      <button
+                        onClick={() => {
+                          setMenuOpenId(null);
+                          handleDeleteFolder(f.station.folderId);
+                        }}
+                        className="flex items-center w-full gap-2 px-3 py-2 text-left text-xs text-slate-200 hover:bg-red-500/10 hover:text-red-400"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete channel
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ))
         )}

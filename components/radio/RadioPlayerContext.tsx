@@ -241,12 +241,16 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   const [dailyQueueEnabled, setDailyQueueEnabled] = useState(false);
   const [activeDailyQueueLabel, setActiveDailyQueueLabel] = useState<string | null>(null);
 
-  // Primes the 432Hz Cosmic Instrumental Stream (vault-432hz) into the
-  // persistent bottom bar on load, so it's the station shown/queued the
-  // instant the app opens. This is a 'vault'-kind station, so priming it
-  // (unlike a 'live' station's direct streamUrl) needs the same async
-  // queue fetch playStation uses to get a real signed fileUrl for the
-  // first track.
+  // Primes a station into the persistent bottom bar on load, so it's shown/
+  // queued the instant the app opens. Checks for an admin-saved default
+  // station first (ChannelFolderManager.tsx's "Save session" — see
+  // /api/admin/radio-session), falling back to the 432Hz Cosmic
+  // Instrumental Stream (vault-432hz) if nothing's been saved, the saved
+  // station no longer exists (e.g. its folder was deleted), or the lookup
+  // itself fails. /api/radio/queue already resolves ANY station kind
+  // (vault, live, admin-, channel-) and echoes back a full station object,
+  // so the same fetch-and-prime logic works unmodified for a saved
+  // channel-folder id, not just the hardcoded vault default.
   // Deliberately does NOT call .play() here: real autoplay-with-sound
   // with no prior user gesture is blocked by every major browser, and
   // forcing it would either silently fail or surface as a false "error"
@@ -254,30 +258,46 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   // comment above for the same user-gesture constraint. A real Play
   // click (already wired in GlobalPlayerBar) starts it for real.
   useEffect(() => {
-    const defaultStation = RADIO_STATIONS.find((s) => s.id === 'vault-432hz');
-    if (!defaultStation) return;
-    setStation(defaultStation);
-
-    if (defaultStation.kind === 'live') {
-      setAudioSource(defaultStation.streamUrl);
-      return;
-    }
-
-    (async () => {
+    const primeStation = async (id: string): Promise<boolean> => {
       try {
-        const res = await fetch(`/api/radio/queue?station=${defaultStation.id}`);
-        if (!res.ok) return;
+        const res = await fetch(`/api/radio/queue?station=${id}`);
+        if (!res.ok) return false;
         const data = await res.json();
+        if (!data.station) return false;
+        setStation(data.station);
+
+        if (data.kind === 'live') {
+          setAudioSource(data.streamUrl);
+          return true;
+        }
+
         const tracks: QueueTrack[] = data.tracks ?? [];
-        if (tracks.length === 0) return;
+        if (tracks.length === 0) return false;
         queueRef.current = tracks;
         setQueue(tracks);
         currentIndexRef.current = 0;
         setCurrentIndex(0);
         setAudioSource(tracks[0].fileUrl);
+        return true;
       } catch {
-        // Priming failure is non-fatal — user can still manually select a station.
+        return false;
       }
+    };
+
+    (async () => {
+      let savedStationId: string | null = null;
+      try {
+        const res = await fetch('/api/admin/radio-session');
+        if (res.ok) {
+          const data = await res.json();
+          savedStationId = data.savedStationId ?? null;
+        }
+      } catch {
+        // Soft-fail — falls through to the hardcoded default below.
+      }
+
+      if (savedStationId && (await primeStation(savedStationId))) return;
+      await primeStation('vault-432hz');
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
