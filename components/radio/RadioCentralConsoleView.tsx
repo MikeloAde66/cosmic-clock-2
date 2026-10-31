@@ -375,6 +375,27 @@ export default function RadioCentralConsoleView() {
     }
   };
 
+  // Refs mirroring the latest local values the reconcile poll below needs
+  // to compare against — read inside reconcile() instead of closed-over
+  // directly, so the poll effect itself doesn't need these in its
+  // dependency array (see the effect's own comment for why that matters).
+  const programManagerEnabledRef = useRef(programManagerEnabled);
+  useEffect(() => {
+    programManagerEnabledRef.current = programManagerEnabled;
+  }, [programManagerEnabled]);
+  const dailyQueueEnabledRef = useRef(dailyQueueEnabled);
+  useEffect(() => {
+    dailyQueueEnabledRef.current = dailyQueueEnabled;
+  }, [dailyQueueEnabled]);
+  // dailyQueueItems above is a fresh array literal on every render (built
+  // from an inline IIFE), not a stable reference — this ref is what lets
+  // the poll effect read its latest value without that literal forcing a
+  // teardown/re-run of the effect below on every render.
+  const dailyQueueItemsRef = useRef(dailyQueueItems);
+  useEffect(() => {
+    dailyQueueItemsRef.current = dailyQueueItems;
+  });
+
   // Polls the backend's externally-controllable broadcast state
   // (routers/radio.py — an n8n workflow or any other automation can flip
   // it via POST /api/v1/radio/toggle) and applies it locally through the
@@ -387,6 +408,32 @@ export default function RadioCentralConsoleView() {
   // arms/loads the queue (the toggle shows On, a track is ready) without
   // attempting real playback; the user's own Play press is what actually
   // starts audio, same contract as a fresh page load.
+  //
+  // Deliberately mount-once (empty deps), reading current values through
+  // the refs above rather than depending on programManagerEnabled/
+  // dailyQueueEnabled/dailyQueueItems directly. Those used to be real
+  // dependencies, which combined with two things made this effect refire
+  // far more often than every 20s: (1) dailyQueueItems is a brand-new
+  // array literal every render, a dependency that's "different" on every
+  // single re-render even when its contents haven't changed, and (2) this
+  // whole component re-renders on every audio currentTime/duration tick
+  // (RadioPlayerContext's value object is a new reference each time any of
+  // its state changes, and React re-renders every context consumer on
+  // that, regardless of which fields it actually reads) — i.e. several
+  // times a second during playback. Each refire ran reconcile() again
+  // immediately, against the DB row as it stood at that instant. A manual
+  // channel pick flips programManagerEnabled off locally (via playStation
+  // -> stopProgramManager), which — while these were real deps — would
+  // itself retrigger the effect and call reconcile() before this
+  // component's own persistRadioState POST (below) had finished writing
+  // that change back to the DB, so reconcile would see the still-stale
+  // remote value and immediately call toggleProgramManager() again,
+  // snapping Program Manager back on (and, with Program Manager and the
+  // manual pick's tuneStation call colliding on the same <audio> element in
+  // the same instant, throwing a real playback error). Polling only on a
+  // genuine mount + 20s interval gives persistRadioState's fire-and-forget
+  // write — normally well under a second — ample time to land before the
+  // next real comparison.
   useEffect(() => {
     let cancelled = false;
     const reconcile = async () => {
@@ -395,13 +442,14 @@ export default function RadioCentralConsoleView() {
         if (!res.ok || cancelled) return;
         const remote: { daily_queue?: boolean; program_manager?: boolean } = await res.json();
 
-        if (remote.daily_queue && !dailyQueueEnabled && dailyQueueItems) {
-          startDailyQueue(dailyQueueItems, { autoplay: false });
-        } else if (remote.daily_queue === false && dailyQueueEnabled) {
+        const items = dailyQueueItemsRef.current;
+        if (remote.daily_queue && !dailyQueueEnabledRef.current && items) {
+          startDailyQueue(items, { autoplay: false });
+        } else if (remote.daily_queue === false && dailyQueueEnabledRef.current) {
           stopDailyQueue();
         }
 
-        if (typeof remote.program_manager === 'boolean' && remote.program_manager !== programManagerEnabled) {
+        if (typeof remote.program_manager === 'boolean' && remote.program_manager !== programManagerEnabledRef.current) {
           toggleProgramManager();
         }
       } catch {
@@ -414,7 +462,8 @@ export default function RadioCentralConsoleView() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [dailyQueueEnabled, programManagerEnabled, dailyQueueItems, startDailyQueue, stopDailyQueue, toggleProgramManager]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleTuneIn = (station: RadioStation) => {
     if (playingStation?.id === station.id) {
