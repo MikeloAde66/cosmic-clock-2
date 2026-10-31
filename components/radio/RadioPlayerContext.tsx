@@ -245,7 +245,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   // queued the instant the app opens. Tries, in order: (1) an admin-saved
   // default station (ChannelFolderManager.tsx's "Save session" — see
   // /api/admin/radio-session) — this is how the owner changes the default
-  // going forward without a code change; (2) the "Dope Beatz" channel
+  // going forward without a code change; (2) the "neosoul" channel
   // folder, the current baseline default (set per owner request); (3) the
   // 432Hz Cosmic Instrumental Stream (vault-432hz) as the last-resort
   // safety net if even that fails (e.g. the folder was deleted/renamed).
@@ -259,7 +259,7 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   // comment above for the same user-gesture constraint. A real Play
   // click (already wired in GlobalPlayerBar) starts it for real.
   useEffect(() => {
-    const BASELINE_DEFAULT_STATION_ID = 'channel-6ae57ddf743924e7c4044426'; // "Dope Beatz"
+    const BASELINE_DEFAULT_STATION_ID = 'channel-6ae570570749b6ce60619791'; // "neosoul"
     const primeStation = async (id: string): Promise<boolean> => {
       try {
         const res = await fetch(`/api/radio/queue?station=${id}`);
