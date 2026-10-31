@@ -336,12 +336,43 @@ export default function RadioCentralConsoleView() {
     return station ? [{ station }] : null;
   })();
 
+  // Persists a Program Manager / Daily Queue change to the shared
+  // `radio_state` row the 20s reconcile poll below reads as authoritative.
+  // Best-effort/fire-and-forget: the local toggle (via toggleProgramManager/
+  // startDailyQueue/stopDailyQueue, called by every caller below) has
+  // already applied immediately either way, so a network hiccup here just
+  // means the next poll resyncs from the still-stale DB row rather than
+  // losing the click outright.
+  const persistRadioState = (key: 'daily_queue' | 'program_manager', enabled: boolean) => {
+    fetch('/api/v1/radio/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, enabled }),
+    }).catch(() => {});
+  };
+
+  const handleToggleProgramManager = () => {
+    const next = !programManagerEnabled;
+    toggleProgramManager();
+    persistRadioState('program_manager', next);
+    // Mirrors the local mutual-exclusivity startProgramManager/
+    // startDailyQueue already enforce (see RadioPlayerContext.tsx) — turning
+    // Program Manager on stops a running Daily Queue, so reflect that in the
+    // shared state too, not just locally.
+    if (next && dailyQueueEnabled) persistRadioState('daily_queue', false);
+  };
+
   const handleToggleDailyQueue = () => {
     if (dailyQueueEnabled) {
       stopDailyQueue();
+      persistRadioState('daily_queue', false);
       return;
     }
-    if (dailyQueueItems) startDailyQueue(dailyQueueItems);
+    if (dailyQueueItems) {
+      startDailyQueue(dailyQueueItems);
+      persistRadioState('daily_queue', true);
+      if (programManagerEnabled) persistRadioState('program_manager', false);
+    }
   };
 
   // Polls the backend's externally-controllable broadcast state
@@ -390,6 +421,15 @@ export default function RadioCentralConsoleView() {
       togglePlayPause();
       return;
     }
+    // playStation() (RadioPlayerContext) already stops a running Program
+    // Manager/Daily Queue LOCALLY as a manual-override side effect — but
+    // without also persisting that here, the shared radio_state row stays
+    // stale and the next 20s reconcile poll turns it right back on,
+    // snapping playback back to Program Manager/the Daily Queue's 432Hz
+    // stream a few seconds after you picked something else. Persist both
+    // off so a manual channel pick actually sticks.
+    if (programManagerEnabled) persistRadioState('program_manager', false);
+    if (dailyQueueEnabled) persistRadioState('daily_queue', false);
     playStation(station);
   };
 
@@ -486,7 +526,7 @@ export default function RadioCentralConsoleView() {
                 comment on toggleProgramManager in RadioPlayerContext.tsx
                 for why that matters). */}
             <button
-              onClick={toggleProgramManager}
+              onClick={handleToggleProgramManager}
               title={programManagerEnabled ? 'Turn off Program Manager rotation' : 'Turn on Program Manager rotation'}
               className={`${programManagerEnabled ? GLASS_ACTIVE_GREEN : GLASS_IDLE} px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full`}
             >
