@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Apple, AudioLines, Headphones, Lock, MessageSquare, Music2, Phone, Play, Pause, Plus, Radio as RadioIcon, Search, Volume2, X } from 'lucide-react';
+import { AudioLines, Headphones, Lock, Play, Pause, Plus, Radio as RadioIcon, Search, Volume2, X } from 'lucide-react';
 import { useRadioPlayer } from './RadioPlayerContext';
 import PlayerSpectrum from './PlayerSpectrum';
 import ChannelFolderManager from './ChannelFolderManager';
@@ -640,28 +640,28 @@ export default function RadioCentralConsoleView() {
         </div>
 
         {/* Social links — replaces the old Genre filter row. Reuses the
-            same OUTKAST_LINKS (Discord/WhatsApp/Spotify/iTunes) already
-            defined in lib/radioStations.ts and used by RadioStreams.tsx's
-            Community menu, just surfaced here as icon buttons instead. */}
+            same OUTKAST_LINKS (Discord/WhatsApp/Spotify/iTunes/SoundCloud/
+            ReverbNation) already defined in lib/radioStations.ts and used by
+            RadioStreams.tsx's Community menu, just surfaced here as real
+            brand-logo icon buttons instead of a lucide stand-in. Each logo
+            sits on a white chip so Discord/Apple/SoundCloud/ReverbNation's
+            black artwork stays visible against the dark glass background. */}
         <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl" style={cardStyle}>
           <span className="text-[10px] uppercase tracking-widest text-slate-500 shrink-0">Connect</span>
-          {OUTKAST_LINKS.map((link) => {
-            const Icon =
-              link.label === 'Discord' ? MessageSquare : link.label === 'WhatsApp' ? Phone : link.label === 'Spotify' ? Music2 : Apple;
-            return (
-              <a
-                key={link.label}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={link.label}
-                title={link.label}
-                className={`${GLASS_IDLE} flex items-center justify-center w-9 h-9 rounded-full shrink-0`}
-              >
-                <Icon className="w-4 h-4" />
-              </a>
-            );
-          })}
+          {OUTKAST_LINKS.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={link.label}
+              title={link.label}
+              className="flex items-center justify-center w-9 h-9 rounded-full shrink-0 bg-white/95 shadow-[0_0_10px_rgba(0,0,0,0.25)] border border-white/60 hover:scale-105 transition-transform duration-200"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={link.icon} alt={link.label} className="w-[18px] h-[18px] object-contain" />
+            </a>
+          ))}
         </div>
 
         {/* Upper grid */}

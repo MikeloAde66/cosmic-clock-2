@@ -85,6 +85,9 @@ export interface OutkastLink {
   // Placeholder destinations — swap for the real URLs once they exist, same
   // convention as SiteFooter's SOCIAL_LINKS.
   href: string;
+  // Real brand logo, served from /public/icons — rendered via <img> so the
+  // original artwork/colors are preserved exactly, no hand-reconstructed SVGs.
+  icon: string;
 }
 
 export interface OutkastComingSoon {
@@ -94,10 +97,12 @@ export interface OutkastComingSoon {
 // OUTKAST isn't a station filter — it's a dropdown hub of community/social
 // action gates, rendered as its own button alongside the category filters.
 export const OUTKAST_LINKS: OutkastLink[] = [
-  { label: 'Discord', href: 'https://discord.gg/your-invite' },
-  { label: 'WhatsApp', href: 'https://wa.me/your-number' },
-  { label: 'Spotify', href: 'https://open.spotify.com/your-profile' },
-  { label: 'iTunes', href: 'https://music.apple.com/your-page' },
+  { label: 'Discord', href: 'https://discord.gg/your-invite', icon: '/icons/discord.svg' },
+  { label: 'WhatsApp', href: 'https://wa.me/your-number', icon: '/icons/whatsapp.png' },
+  { label: 'Spotify', href: 'https://open.spotify.com/your-profile', icon: '/icons/spotify.svg' },
+  { label: 'iTunes', href: 'https://music.apple.com/your-page', icon: '/icons/apple.svg' },
+  { label: 'SoundCloud', href: 'https://soundcloud.com/your-profile', icon: '/icons/soundcloud.svg' },
+  { label: 'ReverbNation', href: 'https://www.reverbnation.com/your-page', icon: '/icons/reverbnation.svg' },
 ];
 
 // No backend exists for any of these yet (no trivia UI, no scavenger/
