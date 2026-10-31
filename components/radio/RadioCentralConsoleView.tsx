@@ -1,20 +1,21 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AudioLines, ExternalLink, Headphones, Loader2, Play, Pause, Plus, Radio as RadioIcon, Search, Upload, Volume2, X } from 'lucide-react';
+import { AudioLines, Headphones, Play, Pause, Plus, Radio as RadioIcon, Search, Volume2, X } from 'lucide-react';
 import { useRadioPlayer } from './RadioPlayerContext';
 import PlayerSpectrum from './PlayerSpectrum';
+import ChannelFolderManager from './ChannelFolderManager';
 import { supabase } from '@/lib/supabase';
 import {
   CATEGORIES,
   CATEGORY_LABELS,
   MEDIA_GENRE_FILTERS,
   RADIO_STATIONS,
+  type ChannelFolderRadioStation,
   type LiveRadioStation,
   type RadioStation,
 } from '@/lib/radioStations';
 import { isBannedTrackTitle } from '@/lib/bannedTracks';
-import { extractIdentifier, fetchArchiveAudioFiles, type ArchiveAudioFile } from '@/lib/archiveOrg';
 import styles from './RadioCentralConsoleView.module.css';
 
 // The Daily Queue's lineup: the 432Hz Cosmic Instrumental Stream, a
@@ -182,6 +183,27 @@ export default function RadioCentralConsoleView() {
   }, []);
 
   const handleRemoveStation = async (station: RadioStation) => {
+    // Channel folders (the + button's folder manager) delete for real via
+    // their own API, same as admin-added live stations below — not just a
+    // per-tab hide — so the "X" in the channel list and the one inside the
+    // folder manager stay consistent with each other.
+    if (station.kind === 'channel-folder') {
+      setDeletingId(station.id);
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        const res = await fetch('/api/admin/radio-channels', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ id: station.folderId }),
+        });
+        if (res.ok) setChannelFolders((prev) => prev.filter((s) => s.id !== station.id));
+      } finally {
+        setDeletingId(null);
+      }
+      return;
+    }
+
     const isAdminStation = adminStations.some((s) => s.id === station.id);
     if (!isAdminStation) {
       setHiddenStationIds((prev) => new Set(prev).add(station.id));
@@ -202,85 +224,25 @@ export default function RadioCentralConsoleView() {
     }
   };
 
-  // Upload (+) — a custom user-supplied track (file or direct link), stored
-  // in local state as the active custom source and tuned in via the same
-  // playStation the rest of Radio Central uses, so it shows up in the
-  // bottom player bar exactly like any curated station.
+  // Admin-only channel-folder manager (+) — replaces the old ephemeral
+  // single-track "Upload Audio" modal entirely. Folders are persistent,
+  // custom-named, and playable as their own channel (see
+  // components/radio/ChannelFolderManager.tsx + app/api/admin/radio-channels).
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadLinkInput, setUploadLinkInput] = useState('');
-  const uploadFileInputRef = useRef<HTMLInputElement | null>(null);
-  // Tracks the current custom track's blob URL so it can be revoked when
-  // replaced or when this view unmounts — object URLs otherwise leak.
-  const customBlobUrlRef = useRef<string | null>(null);
+  const [channelFolders, setChannelFolders] = useState<ChannelFolderRadioStation[]>([]);
 
-  useEffect(() => {
-    return () => {
-      if (customBlobUrlRef.current) URL.revokeObjectURL(customBlobUrlRef.current);
-    };
-  }, []);
-
-  const loadCustomStation = (streamUrl: string, name: string) => {
-    const customStation: LiveRadioStation = {
-      kind: 'live',
-      id: `custom-upload-${Date.now()}`,
-      name,
-      network: 'Custom Upload',
-      tagline: 'Your uploaded track',
-      genre: 'Custom',
-      category: 'ALL CHANNELS',
-      streamUrl,
-      badge: '♪',
-      badgeColor: '#7c3aed',
-    };
-    playStation(customStation);
-    setShowUploadModal(false);
-    setUploadLinkInput('');
-  };
-
-  const handleUploadFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (customBlobUrlRef.current) URL.revokeObjectURL(customBlobUrlRef.current);
-    const url = URL.createObjectURL(file);
-    customBlobUrlRef.current = url;
-    loadCustomStation(url, file.name.replace(/\.[^/.]+$/, ''));
-  };
-
-  const handleUploadLinkSubmit = () => {
-    const url = uploadLinkInput.trim();
-    if (!url) return;
-    loadCustomStation(url, url.split('/').pop() || 'Custom Stream');
-  };
-
-  // Internet Archive loader — looks an item up, lists its playable audio
-  // files, and tunes whichever one is picked through the same
-  // loadCustomStation as the file/link paths above.
-  const [archiveInput, setArchiveInput] = useState('');
-  const [archiveLoading, setArchiveLoading] = useState(false);
-  const [archiveError, setArchiveError] = useState('');
-  const [archiveTitle, setArchiveTitle] = useState('');
-  const [archiveFiles, setArchiveFiles] = useState<ArchiveAudioFile[]>([]);
-
-  const handleArchiveSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setArchiveError('');
-    setArchiveFiles([]);
-    const identifier = extractIdentifier(archiveInput);
-    if (!identifier) {
-      setArchiveError('Enter a valid Internet Archive item ID or URL.');
-      return;
-    }
-    setArchiveLoading(true);
-    try {
-      const { info, files } = await fetchArchiveAudioFiles(identifier);
-      setArchiveTitle(info.title);
-      setArchiveFiles(files);
-    } catch (err) {
-      setArchiveError(err instanceof Error ? err.message : 'Failed to load that item.');
-    } finally {
-      setArchiveLoading(false);
-    }
+  const loadChannelFolders = () => {
+    fetch('/api/admin/radio-channels')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!Array.isArray(data.folders)) return;
+        setChannelFolders(
+          data.folders
+            .map((f: { station: ChannelFolderRadioStation }) => f.station)
+            .filter((s: ChannelFolderRadioStation) => !isBannedTrackTitle(s.name))
+        );
+      })
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -317,7 +279,11 @@ export default function RadioCentralConsoleView() {
     };
   }, []);
 
-  const allStations = [...RADIO_STATIONS, ...adminStations, ...catalogStations];
+  useEffect(() => {
+    loadChannelFolders();
+  }, []);
+
+  const allStations = [...RADIO_STATIONS, ...adminStations, ...catalogStations, ...channelFolders];
   const query = searchQuery.trim().toLowerCase();
   const activeGenreKeywords = MEDIA_GENRE_FILTERS.find((g) => g.label === activeGenreFilter)?.keywords ?? null;
   const filteredStations = allStations.filter((s) => {
@@ -553,14 +519,20 @@ export default function RadioCentralConsoleView() {
               <AudioLines className="w-3.5 h-3.5" style={{ filter: `drop-shadow(0 0 6px rgba(47,217,255,0.6))` }} />
               432Hz
             </span>
-            <button
-              onClick={() => setShowUploadModal(true)}
-              aria-label="Upload audio"
-              title="Upload audio"
-              className={`${GLASS_ACTIVE} flex items-center justify-center w-11 h-11 rounded-full shrink-0`}
-            >
-              <Plus className="w-6 h-6" strokeWidth={3} />
-            </button>
+            {/* Admin-only channel-folder manager — per the owner's
+                explicit confirmation, folder create/rename/upload/delete
+                is admin-only, so the control itself is hidden from
+                everyone else rather than opening to a dead end. */}
+            {isAdmin && (
+              <button
+                onClick={() => setShowUploadModal(true)}
+                aria-label="Manage channel folders"
+                title="Manage channel folders"
+                className={`${GLASS_ACTIVE} flex items-center justify-center w-11 h-11 rounded-full shrink-0`}
+              >
+                <Plus className="w-6 h-6" strokeWidth={3} />
+              </button>
+            )}
           </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-[0.2em] text-white">RADIO CENTRAL</h1>
@@ -912,7 +884,7 @@ export default function RadioCentralConsoleView() {
         </div>
       </div>
 
-      {showUploadModal && (
+      {showUploadModal && isAdmin && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(2,4,8,0.7)' }}
@@ -920,108 +892,17 @@ export default function RadioCentralConsoleView() {
         >
           <div className="w-full max-w-md p-5 space-y-4 overflow-y-auto rounded-xl max-h-[90vh]" style={cardStyle} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold tracking-wide text-white uppercase">Upload Audio</h2>
+              <h2 className="text-sm font-bold tracking-wide text-white uppercase">Channel Folders</h2>
               <button onClick={() => setShowUploadModal(false)} aria-label="Close" className="text-slate-400 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
             </div>
-
-            <button
-              onClick={() => uploadFileInputRef.current?.click()}
-              className={`${GLASS_ACTIVE} flex items-center justify-center w-full gap-2 py-3 text-xs font-bold uppercase tracking-wide rounded-lg`}
-            >
-              <Upload className="w-4 h-4" />
-              Choose Audio File
-            </button>
-            <input
-              ref={uploadFileInputRef}
-              type="file"
-              accept=".mp3,.wav,.m4a,audio/*"
-              className="hidden"
-              onChange={handleUploadFileSelect}
+            <ChannelFolderManager
+              glassActive={GLASS_ACTIVE}
+              glassIdle={GLASS_IDLE}
+              subpanelStyle={subpanelStyle}
+              onFoldersChanged={loadChannelFolders}
             />
-            <p className="text-[10px] text-center uppercase tracking-widest text-slate-500">MP3 · WAV · M4A</p>
-
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-              <span className="text-[10px] uppercase tracking-widest text-slate-500">Or</span>
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-            </div>
-
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={uploadLinkInput}
-                onChange={(e) => setUploadLinkInput(e.target.value)}
-                placeholder="Paste a direct audio link..."
-                className="w-full px-3 py-2 text-xs rounded-lg outline-none"
-                style={{ ...subpanelStyle, color: '#e2e8f0' }}
-              />
-              <button
-                onClick={handleUploadLinkSubmit}
-                disabled={!uploadLinkInput.trim()}
-                className={`${GLASS_IDLE} w-full py-2 text-[10px] font-bold uppercase tracking-wide rounded-lg disabled:opacity-40`}
-              >
-                Load Link
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-              <span className="text-[10px] uppercase tracking-widest text-slate-500">Or</span>
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-            </div>
-
-            <form onSubmit={handleArchiveSubmit} className="space-y-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-mono uppercase tracking-widest text-white/70">Load from Internet Archive</span>
-                <a
-                  href="https://archive.org"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Open Internet Archive"
-                  aria-label="Open Internet Archive in a new tab"
-                  className="text-slate-500 hover:text-cyan-300 transition"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-              <input
-                type="text"
-                value={archiveInput}
-                onChange={(e) => setArchiveInput(e.target.value)}
-                placeholder="Item ID or URL — e.g. rosen or https://archive.org/details/rosen"
-                className="w-full px-3 py-2 text-xs rounded-lg outline-none"
-                style={{ ...subpanelStyle, color: '#e2e8f0' }}
-              />
-              <button
-                type="submit"
-                disabled={archiveLoading || !archiveInput.trim()}
-                className={`${GLASS_IDLE} flex items-center justify-center w-full gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide rounded-lg disabled:opacity-40`}
-              >
-                {archiveLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {archiveLoading ? 'Loading…' : 'Find Audio'}
-              </button>
-              {archiveError && <p className="text-[11px] text-red-400">{archiveError}</p>}
-              {archiveFiles.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest text-slate-400 truncate">{archiveTitle}</p>
-                  <div className="space-y-1 overflow-y-auto max-h-48">
-                    {archiveFiles.map((f) => (
-                      <button
-                        key={f.name}
-                        type="button"
-                        onClick={() => loadCustomStation(f.url, f.title)}
-                        className={`${GLASS_IDLE} flex items-center w-full gap-2 px-3 py-1.5 text-left text-xs rounded-lg`}
-                      >
-                        <Play className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{f.title}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </form>
           </div>
         </div>
       )}

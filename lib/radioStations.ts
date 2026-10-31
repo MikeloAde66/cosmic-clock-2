@@ -23,7 +23,17 @@ export interface VaultRadioStation extends BaseStation {
   drawer: VaultDrawer;
 }
 
-export type RadioStation = LiveRadioStation | VaultRadioStation;
+// Admin-managed "channel folder" (see lib/models/RadioChannelFolder.ts) —
+// a custom-named, persistent bucket of uploaded tracks that plays as its
+// own channel. Dynamic/DB-backed, so (like admin-* live stations) it's
+// never part of the static RADIO_STATIONS list below; it's fetched and
+// merged client-side instead (see RadioCentralConsoleView.tsx).
+export interface ChannelFolderRadioStation extends BaseStation {
+  kind: 'channel-folder';
+  folderId: string;
+}
+
+export type RadioStation = LiveRadioStation | VaultRadioStation | ChannelFolderRadioStation;
 
 // News (BBC/NPR) gets its own dedicated NEWS tab, but ALL CHANNELS' default
 // view still deliberately excludes it — Radio Central opens on the
@@ -103,7 +113,13 @@ export const OUTKAST_COMING_SOON: OutkastComingSoon[] = [
 // Curated, not auto-generated: hand-mapped to whichever real Vault packs
 // currently hold this content. If a pack's sku changes (re-uploaded under a
 // new sku) or a new themed station is wanted, add/edit an entry here.
-export const RADIO_STATIONS: RadioStation[] = [
+// Typed narrower than the full RadioStation union on purpose: this static
+// list never contains a 'channel-folder' entry (those are DB-backed, see
+// ChannelFolderRadioStation's own comment) — keeping that out of this
+// array's type lets app/api/radio/queue/route.ts's station.kind === 'vault'
+// branch narrow to VaultRadioStation alone instead of also considering a
+// channel folder it can structurally never find here.
+export const RADIO_STATIONS: (LiveRadioStation | VaultRadioStation)[] = [
   {
     kind: 'live',
     id: 'bbc-world',

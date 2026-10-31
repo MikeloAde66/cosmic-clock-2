@@ -1,8 +1,9 @@
 import dbConnect from '@/lib/dbConnect';
 import VaultProduct, { type VaultTrackSub } from '@/lib/models/VaultProduct';
 import AdminRadioStation from '@/lib/models/AdminRadioStation';
-import { getSupabaseAdmin, VAULT_BUCKET } from '@/lib/supabaseAdmin';
-import { RADIO_STATIONS } from '@/lib/radioStations';
+import RadioChannelFolder, { type RadioChannelTrackSub } from '@/lib/models/RadioChannelFolder';
+import { getSupabaseAdmin, VAULT_BUCKET, RADIO_CHANNELS_BUCKET } from '@/lib/supabaseAdmin';
+import { RADIO_STATIONS, type ChannelFolderRadioStation } from '@/lib/radioStations';
 import { isBannedTrackTitle } from '@/lib/bannedTracks';
 
 export const dynamic = 'force-dynamic';
@@ -87,6 +88,55 @@ export async function GET(request: Request) {
         }
       } catch (err) {
         console.error('Admin radio station lookup error:', err);
+      }
+    }
+    // Admin channel folders (see /api/admin/radio-channels) — custom-named,
+    // persistent upload folders that play as their own channel. Resolved
+    // server-side from Mongo + signed Storage URLs, same integrity
+    // guarantee as the Vault-backed stations below.
+    if (stationId?.startsWith('channel-') && process.env.MONGODB_URI) {
+      try {
+        await dbConnect();
+        const folder = await RadioChannelFolder.findById(stationId.slice('channel-'.length)).lean();
+        if (folder) {
+          const bannedFilteredTracks = folder.tracks.filter((t: RadioChannelTrackSub) => !isBannedTrackTitle(t.filename));
+          const channelStation: ChannelFolderRadioStation = {
+            kind: 'channel-folder',
+            id: `channel-${folder._id}`,
+            folderId: folder._id.toString(),
+            name: folder.name,
+            network: 'My Channels',
+            tagline: `${bannedFilteredTracks.length} track${bannedFilteredTracks.length === 1 ? '' : 's'}`,
+            genre: 'Custom',
+            category: 'ALL CHANNELS',
+            badge: folder.badge,
+            badgeColor: folder.badgeColor,
+          };
+          if (bannedFilteredTracks.length === 0 || !process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
+            return Response.json({ station: channelStation, kind: 'channel-folder', tracks: [] });
+          }
+          const count = countParam ? Math.max(1, Math.min(500, parseInt(countParam, 10))) : bannedFilteredTracks.length;
+          const ordered = buildQueue(bannedFilteredTracks, count, (t: RadioChannelTrackSub) => t.weight ?? 1);
+          const admin = getSupabaseAdmin();
+          const tracks = await Promise.all(
+            ordered.map(async (t, i) => {
+              const { data: signed, error } = await admin.storage
+                .from(RADIO_CHANNELS_BUCKET)
+                .createSignedUrl(t.storagePath, 6 * 60 * 60);
+              return {
+                queueIndex: i,
+                filename: t.filename,
+                fileUrl: error ? '' : signed.signedUrl,
+                durationSeconds: t.durationSeconds,
+                weight: t.weight ?? 1,
+                isAd: false,
+              };
+            })
+          );
+          return Response.json({ station: channelStation, kind: 'channel-folder', tracks });
+        }
+      } catch (err) {
+        console.error('Radio channel folder lookup error:', err);
       }
     }
     if (stationId && fallbackStreamUrl) {
