@@ -438,7 +438,7 @@ export default function RadioCentralConsoleView() {
     let cancelled = false;
     const reconcile = async () => {
       try {
-        const res = await fetch('/api/v1/radio/state');
+        const res = await fetch('/api/v1/radio/state', { cache: 'no-store' });
         if (!res.ok || cancelled) return;
         const remote: { daily_queue?: boolean; program_manager?: boolean } = await res.json();
 
