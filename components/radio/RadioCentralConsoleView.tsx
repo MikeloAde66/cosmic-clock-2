@@ -1,20 +1,21 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AudioLines, ExternalLink, Headphones, Loader2, Play, Pause, Plus, Radio as RadioIcon, Search, Upload, Volume2, X } from 'lucide-react';
+import { AudioLines, Headphones, Lock, Play, Pause, Plus, Radio as RadioIcon, Search, Volume2, X } from 'lucide-react';
 import { useRadioPlayer } from './RadioPlayerContext';
 import PlayerSpectrum from './PlayerSpectrum';
+import ChannelFolderManager from './ChannelFolderManager';
 import { supabase } from '@/lib/supabase';
 import {
   CATEGORIES,
   CATEGORY_LABELS,
-  MEDIA_GENRE_FILTERS,
+  OUTKAST_LINKS,
   RADIO_STATIONS,
+  type ChannelFolderRadioStation,
   type LiveRadioStation,
   type RadioStation,
 } from '@/lib/radioStations';
 import { isBannedTrackTitle } from '@/lib/bannedTracks';
-import { extractIdentifier, fetchArchiveAudioFiles, type ArchiveAudioFile } from '@/lib/archiveOrg';
 import styles from './RadioCentralConsoleView.module.css';
 
 // The Daily Queue's lineup: the 432Hz Cosmic Instrumental Stream, a
@@ -152,7 +153,6 @@ export default function RadioCentralConsoleView() {
   } = useRadioPlayer();
 
   const [activeCategory, setActiveCategory] = useState('COSMIC CHILL');
-  const [activeGenreFilter, setActiveGenreFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [adminStations, setAdminStations] = useState<LiveRadioStation[]>([]);
   const [catalogStations, setCatalogStations] = useState<LiveRadioStation[]>([]);
@@ -182,6 +182,27 @@ export default function RadioCentralConsoleView() {
   }, []);
 
   const handleRemoveStation = async (station: RadioStation) => {
+    // Channel folders (the + button's folder manager) delete for real via
+    // their own API, same as admin-added live stations below — not just a
+    // per-tab hide — so the "X" in the channel list and the one inside the
+    // folder manager stay consistent with each other.
+    if (station.kind === 'channel-folder') {
+      setDeletingId(station.id);
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        const res = await fetch('/api/admin/radio-channels', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ id: station.folderId }),
+        });
+        if (res.ok) setChannelFolders((prev) => prev.filter((s) => s.id !== station.id));
+      } finally {
+        setDeletingId(null);
+      }
+      return;
+    }
+
     const isAdminStation = adminStations.some((s) => s.id === station.id);
     if (!isAdminStation) {
       setHiddenStationIds((prev) => new Set(prev).add(station.id));
@@ -202,85 +223,41 @@ export default function RadioCentralConsoleView() {
     }
   };
 
-  // Upload (+) — a custom user-supplied track (file or direct link), stored
-  // in local state as the active custom source and tuned in via the same
-  // playStation the rest of Radio Central uses, so it shows up in the
-  // bottom player bar exactly like any curated station.
+  // Admin-only channel-folder manager (+) — replaces the old ephemeral
+  // single-track "Upload Audio" modal entirely. Folders are persistent,
+  // custom-named, and playable as their own channel (see
+  // components/radio/ChannelFolderManager.tsx + app/api/admin/radio-channels).
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadLinkInput, setUploadLinkInput] = useState('');
-  const uploadFileInputRef = useRef<HTMLInputElement | null>(null);
-  // Tracks the current custom track's blob URL so it can be revoked when
-  // replaced or when this view unmounts — object URLs otherwise leak.
-  const customBlobUrlRef = useRef<string | null>(null);
+  const [channelFolders, setChannelFolders] = useState<ChannelFolderRadioStation[]>([]);
 
-  useEffect(() => {
-    return () => {
-      if (customBlobUrlRef.current) URL.revokeObjectURL(customBlobUrlRef.current);
-    };
-  }, []);
+  // Soft passkey gate on the lock icon — same "3045", same client-side-only
+  // pattern as the Digital Magazine card's MediaFlowPasskeyGate
+  // (components/GalleryGrid.tsx), at the owner's explicit request: a lock
+  // next to "+" that opens a code prompt, rather than requiring a real
+  // Supabase login just to reveal this UI. It only gates *visibility* of
+  // the folder manager, same as that other gate — the actual
+  // create/rename/upload/delete calls still go through requireAdmin()
+  // server-side regardless (see app/api/admin/radio-channels/*), so this
+  // doesn't weaken real write security, only how the UI is reached. Not
+  // persisted — resets on reload, matching the Digital Magazine gate.
+  const RADIO_CHANNEL_PASSKEY = '3045';
+  const [channelPasskeyUnlocked, setChannelPasskeyUnlocked] = useState(false);
+  const [showChannelPasskeyGate, setShowChannelPasskeyGate] = useState(false);
+  const [channelPasskeyValue, setChannelPasskeyValue] = useState('');
+  const [channelPasskeyInvalid, setChannelPasskeyInvalid] = useState(false);
 
-  const loadCustomStation = (streamUrl: string, name: string) => {
-    const customStation: LiveRadioStation = {
-      kind: 'live',
-      id: `custom-upload-${Date.now()}`,
-      name,
-      network: 'Custom Upload',
-      tagline: 'Your uploaded track',
-      genre: 'Custom',
-      category: 'ALL CHANNELS',
-      streamUrl,
-      badge: '♪',
-      badgeColor: '#7c3aed',
-    };
-    playStation(customStation);
-    setShowUploadModal(false);
-    setUploadLinkInput('');
-  };
-
-  const handleUploadFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (customBlobUrlRef.current) URL.revokeObjectURL(customBlobUrlRef.current);
-    const url = URL.createObjectURL(file);
-    customBlobUrlRef.current = url;
-    loadCustomStation(url, file.name.replace(/\.[^/.]+$/, ''));
-  };
-
-  const handleUploadLinkSubmit = () => {
-    const url = uploadLinkInput.trim();
-    if (!url) return;
-    loadCustomStation(url, url.split('/').pop() || 'Custom Stream');
-  };
-
-  // Internet Archive loader — looks an item up, lists its playable audio
-  // files, and tunes whichever one is picked through the same
-  // loadCustomStation as the file/link paths above.
-  const [archiveInput, setArchiveInput] = useState('');
-  const [archiveLoading, setArchiveLoading] = useState(false);
-  const [archiveError, setArchiveError] = useState('');
-  const [archiveTitle, setArchiveTitle] = useState('');
-  const [archiveFiles, setArchiveFiles] = useState<ArchiveAudioFile[]>([]);
-
-  const handleArchiveSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setArchiveError('');
-    setArchiveFiles([]);
-    const identifier = extractIdentifier(archiveInput);
-    if (!identifier) {
-      setArchiveError('Enter a valid Internet Archive item ID or URL.');
-      return;
-    }
-    setArchiveLoading(true);
-    try {
-      const { info, files } = await fetchArchiveAudioFiles(identifier);
-      setArchiveTitle(info.title);
-      setArchiveFiles(files);
-    } catch (err) {
-      setArchiveError(err instanceof Error ? err.message : 'Failed to load that item.');
-    } finally {
-      setArchiveLoading(false);
-    }
+  const loadChannelFolders = () => {
+    fetch('/api/admin/radio-channels')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!Array.isArray(data.folders)) return;
+        setChannelFolders(
+          data.folders
+            .map((f: { station: ChannelFolderRadioStation }) => f.station)
+            .filter((s: ChannelFolderRadioStation) => !isBannedTrackTitle(s.name))
+        );
+      })
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -317,15 +294,17 @@ export default function RadioCentralConsoleView() {
     };
   }, []);
 
-  const allStations = [...RADIO_STATIONS, ...adminStations, ...catalogStations];
+  useEffect(() => {
+    loadChannelFolders();
+  }, []);
+
+  const allStations = [...RADIO_STATIONS, ...adminStations, ...catalogStations, ...channelFolders];
   const query = searchQuery.trim().toLowerCase();
-  const activeGenreKeywords = MEDIA_GENRE_FILTERS.find((g) => g.label === activeGenreFilter)?.keywords ?? null;
   const filteredStations = allStations.filter((s) => {
     if (hiddenStationIds.has(s.id)) return false;
     const matchesCategory = activeCategory === 'ALL CHANNELS' ? s.category !== 'NEWS' : s.category === activeCategory;
     const matchesSearch = !query || s.name.toLowerCase().includes(query) || s.tagline.toLowerCase().includes(query);
-    const matchesGenre = !activeGenreKeywords || activeGenreKeywords.some((k) => s.genre.toLowerCase().includes(k));
-    return matchesCategory && matchesSearch && matchesGenre;
+    return matchesCategory && matchesSearch;
   });
 
   // Resolves the Daily Queue — null only if the 432Hz station is somehow
@@ -336,13 +315,65 @@ export default function RadioCentralConsoleView() {
     return station ? [{ station }] : null;
   })();
 
+  // Persists a Program Manager / Daily Queue change to the shared
+  // `radio_state` row the 20s reconcile poll below reads as authoritative.
+  // Best-effort/fire-and-forget: the local toggle (via toggleProgramManager/
+  // startDailyQueue/stopDailyQueue, called by every caller below) has
+  // already applied immediately either way, so a network hiccup here just
+  // means the next poll resyncs from the still-stale DB row rather than
+  // losing the click outright.
+  const persistRadioState = (key: 'daily_queue' | 'program_manager', enabled: boolean) => {
+    fetch('/api/v1/radio/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, enabled }),
+    }).catch(() => {});
+  };
+
+  const handleToggleProgramManager = () => {
+    const next = !programManagerEnabled;
+    toggleProgramManager();
+    persistRadioState('program_manager', next);
+    // Mirrors the local mutual-exclusivity startProgramManager/
+    // startDailyQueue already enforce (see RadioPlayerContext.tsx) — turning
+    // Program Manager on stops a running Daily Queue, so reflect that in the
+    // shared state too, not just locally.
+    if (next && dailyQueueEnabled) persistRadioState('daily_queue', false);
+  };
+
   const handleToggleDailyQueue = () => {
     if (dailyQueueEnabled) {
       stopDailyQueue();
+      persistRadioState('daily_queue', false);
       return;
     }
-    if (dailyQueueItems) startDailyQueue(dailyQueueItems);
+    if (dailyQueueItems) {
+      startDailyQueue(dailyQueueItems);
+      persistRadioState('daily_queue', true);
+      if (programManagerEnabled) persistRadioState('program_manager', false);
+    }
   };
+
+  // Refs mirroring the latest local values the reconcile poll below needs
+  // to compare against — read inside reconcile() instead of closed-over
+  // directly, so the poll effect itself doesn't need these in its
+  // dependency array (see the effect's own comment for why that matters).
+  const programManagerEnabledRef = useRef(programManagerEnabled);
+  useEffect(() => {
+    programManagerEnabledRef.current = programManagerEnabled;
+  }, [programManagerEnabled]);
+  const dailyQueueEnabledRef = useRef(dailyQueueEnabled);
+  useEffect(() => {
+    dailyQueueEnabledRef.current = dailyQueueEnabled;
+  }, [dailyQueueEnabled]);
+  // dailyQueueItems above is a fresh array literal on every render (built
+  // from an inline IIFE), not a stable reference — this ref is what lets
+  // the poll effect read its latest value without that literal forcing a
+  // teardown/re-run of the effect below on every render.
+  const dailyQueueItemsRef = useRef(dailyQueueItems);
+  useEffect(() => {
+    dailyQueueItemsRef.current = dailyQueueItems;
+  });
 
   // Polls the backend's externally-controllable broadcast state
   // (routers/radio.py — an n8n workflow or any other automation can flip
@@ -356,21 +387,48 @@ export default function RadioCentralConsoleView() {
   // arms/loads the queue (the toggle shows On, a track is ready) without
   // attempting real playback; the user's own Play press is what actually
   // starts audio, same contract as a fresh page load.
+  //
+  // Deliberately mount-once (empty deps), reading current values through
+  // the refs above rather than depending on programManagerEnabled/
+  // dailyQueueEnabled/dailyQueueItems directly. Those used to be real
+  // dependencies, which combined with two things made this effect refire
+  // far more often than every 20s: (1) dailyQueueItems is a brand-new
+  // array literal every render, a dependency that's "different" on every
+  // single re-render even when its contents haven't changed, and (2) this
+  // whole component re-renders on every audio currentTime/duration tick
+  // (RadioPlayerContext's value object is a new reference each time any of
+  // its state changes, and React re-renders every context consumer on
+  // that, regardless of which fields it actually reads) — i.e. several
+  // times a second during playback. Each refire ran reconcile() again
+  // immediately, against the DB row as it stood at that instant. A manual
+  // channel pick flips programManagerEnabled off locally (via playStation
+  // -> stopProgramManager), which — while these were real deps — would
+  // itself retrigger the effect and call reconcile() before this
+  // component's own persistRadioState POST (below) had finished writing
+  // that change back to the DB, so reconcile would see the still-stale
+  // remote value and immediately call toggleProgramManager() again,
+  // snapping Program Manager back on (and, with Program Manager and the
+  // manual pick's tuneStation call colliding on the same <audio> element in
+  // the same instant, throwing a real playback error). Polling only on a
+  // genuine mount + 20s interval gives persistRadioState's fire-and-forget
+  // write — normally well under a second — ample time to land before the
+  // next real comparison.
   useEffect(() => {
     let cancelled = false;
     const reconcile = async () => {
       try {
-        const res = await fetch('/api/v1/radio/state');
+        const res = await fetch('/api/v1/radio/state', { cache: 'no-store' });
         if (!res.ok || cancelled) return;
         const remote: { daily_queue?: boolean; program_manager?: boolean } = await res.json();
 
-        if (remote.daily_queue && !dailyQueueEnabled && dailyQueueItems) {
-          startDailyQueue(dailyQueueItems, { autoplay: false });
-        } else if (remote.daily_queue === false && dailyQueueEnabled) {
+        const items = dailyQueueItemsRef.current;
+        if (remote.daily_queue && !dailyQueueEnabledRef.current && items) {
+          startDailyQueue(items, { autoplay: false });
+        } else if (remote.daily_queue === false && dailyQueueEnabledRef.current) {
           stopDailyQueue();
         }
 
-        if (typeof remote.program_manager === 'boolean' && remote.program_manager !== programManagerEnabled) {
+        if (typeof remote.program_manager === 'boolean' && remote.program_manager !== programManagerEnabledRef.current) {
           toggleProgramManager();
         }
       } catch {
@@ -383,13 +441,23 @@ export default function RadioCentralConsoleView() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [dailyQueueEnabled, programManagerEnabled, dailyQueueItems, startDailyQueue, stopDailyQueue, toggleProgramManager]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleTuneIn = (station: RadioStation) => {
     if (playingStation?.id === station.id) {
       togglePlayPause();
       return;
     }
+    // playStation() (RadioPlayerContext) already stops a running Program
+    // Manager/Daily Queue LOCALLY as a manual-override side effect — but
+    // without also persisting that here, the shared radio_state row stays
+    // stale and the next 20s reconcile poll turns it right back on,
+    // snapping playback back to Program Manager/the Daily Queue's 432Hz
+    // stream a few seconds after you picked something else. Persist both
+    // off so a manual channel pick actually sticks.
+    if (programManagerEnabled) persistRadioState('program_manager', false);
+    if (dailyQueueEnabled) persistRadioState('daily_queue', false);
     playStation(station);
   };
 
@@ -464,14 +532,34 @@ export default function RadioCentralConsoleView() {
               <AudioLines className="w-3.5 h-3.5" style={{ filter: `drop-shadow(0 0 6px rgba(47,217,255,0.6))` }} />
               432Hz
             </span>
-            <button
-              onClick={() => setShowUploadModal(true)}
-              aria-label="Upload audio"
-              title="Upload audio"
-              className={`${GLASS_ACTIVE} flex items-center justify-center w-11 h-11 rounded-full shrink-0`}
-            >
-              <Plus className="w-6 h-6" strokeWidth={3} />
-            </button>
+            {/* Admin-only channel-folder manager. A real admin (signed in
+                with Supabase app_metadata.role === 'admin') gets the "+"
+                directly; everyone else sees a lock instead, which opens a
+                passkey prompt (see RADIO_CHANNEL_PASSKEY above) rather than
+                hiding the control entirely. */}
+            {isAdmin || channelPasskeyUnlocked ? (
+              <button
+                onClick={() => setShowUploadModal(true)}
+                aria-label="Manage channel folders"
+                title="Manage channel folders"
+                className={`${GLASS_ACTIVE} flex items-center justify-center w-11 h-11 rounded-full shrink-0`}
+              >
+                <Plus className="w-6 h-6" strokeWidth={3} />
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setShowChannelPasskeyGate(true);
+                  setChannelPasskeyInvalid(false);
+                  setChannelPasskeyValue('');
+                }}
+                aria-label="Admin access — channel folders"
+                title="Admin access — channel folders"
+                className={`${GLASS_IDLE} flex items-center justify-center w-11 h-11 rounded-full shrink-0`}
+              >
+                <Lock className="w-5 h-5" />
+              </button>
+            )}
           </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-[0.2em] text-white">RADIO CENTRAL</h1>
@@ -486,7 +574,7 @@ export default function RadioCentralConsoleView() {
                 comment on toggleProgramManager in RadioPlayerContext.tsx
                 for why that matters). */}
             <button
-              onClick={toggleProgramManager}
+              onClick={handleToggleProgramManager}
               title={programManagerEnabled ? 'Turn off Program Manager rotation' : 'Turn on Program Manager rotation'}
               className={`${programManagerEnabled ? GLASS_ACTIVE_GREEN : GLASS_IDLE} px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full`}
             >
@@ -551,21 +639,28 @@ export default function RadioCentralConsoleView() {
           </div>
         </div>
 
-        {/* Mini-category sub-nav — a finer genre facet layered on top of
-            the CATEGORIES tabs above (see MEDIA_GENRE_FILTERS in
-            lib/radioStations.ts), aimed at narrative/archival catalog
-            content. Applied as an additional AND filter, not a
-            replacement for the active category tab. */}
+        {/* Social links — replaces the old Genre filter row. Reuses the
+            same OUTKAST_LINKS (Discord/WhatsApp/Spotify/iTunes/SoundCloud/
+            ReverbNation) already defined in lib/radioStations.ts and used by
+            RadioStreams.tsx's Community menu, just surfaced here as real
+            brand-logo icon buttons instead of a lucide stand-in. Each logo
+            sits on a white chip so Discord/Apple/SoundCloud/ReverbNation's
+            black artwork stays visible against the dark glass background. */}
         <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl" style={cardStyle}>
-          <span className="text-[10px] uppercase tracking-widest text-slate-500 shrink-0">Genre</span>
-          {MEDIA_GENRE_FILTERS.map((genreFilter) => (
-            <button
-              key={genreFilter.label}
-              onClick={() => setActiveGenreFilter((current) => (current === genreFilter.label ? null : genreFilter.label))}
-              className={`${activeGenreFilter === genreFilter.label ? GLASS_ACTIVE : GLASS_IDLE} px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wide`}
+          <span className="text-[10px] uppercase tracking-widest text-slate-500 shrink-0">Connect</span>
+          {OUTKAST_LINKS.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={link.label}
+              title={link.label}
+              className="flex items-center justify-center w-9 h-9 rounded-full shrink-0 bg-white/95 shadow-[0_0_10px_rgba(0,0,0,0.25)] border border-white/60 hover:scale-105 transition-transform duration-200"
             >
-              {genreFilter.label}
-            </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={link.icon} alt={link.label} className="w-[18px] h-[18px] object-contain" />
+            </a>
           ))}
         </div>
 
@@ -823,7 +918,7 @@ export default function RadioCentralConsoleView() {
         </div>
       </div>
 
-      {showUploadModal && (
+      {showUploadModal && (isAdmin || channelPasskeyUnlocked) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(2,4,8,0.7)' }}
@@ -831,109 +926,76 @@ export default function RadioCentralConsoleView() {
         >
           <div className="w-full max-w-md p-5 space-y-4 overflow-y-auto rounded-xl max-h-[90vh]" style={cardStyle} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold tracking-wide text-white uppercase">Upload Audio</h2>
+              <h2 className="text-sm font-bold tracking-wide text-white uppercase">Channel Folders</h2>
               <button onClick={() => setShowUploadModal(false)} aria-label="Close" className="text-slate-400 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
             </div>
-
-            <button
-              onClick={() => uploadFileInputRef.current?.click()}
-              className={`${GLASS_ACTIVE} flex items-center justify-center w-full gap-2 py-3 text-xs font-bold uppercase tracking-wide rounded-lg`}
-            >
-              <Upload className="w-4 h-4" />
-              Choose Audio File
-            </button>
-            <input
-              ref={uploadFileInputRef}
-              type="file"
-              accept=".mp3,.wav,.m4a,audio/*"
-              className="hidden"
-              onChange={handleUploadFileSelect}
+            <ChannelFolderManager
+              glassActive={GLASS_ACTIVE}
+              glassIdle={GLASS_IDLE}
+              subpanelStyle={subpanelStyle}
+              onFoldersChanged={loadChannelFolders}
             />
-            <p className="text-[10px] text-center uppercase tracking-widest text-slate-500">MP3 · WAV · M4A</p>
+          </div>
+        </div>
+      )}
 
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-              <span className="text-[10px] uppercase tracking-widest text-slate-500">Or</span>
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
+      {showChannelPasskeyGate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setShowChannelPasskeyGate(false)}
+        >
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (channelPasskeyValue === RADIO_CHANNEL_PASSKEY) {
+                setChannelPasskeyUnlocked(true);
+                setShowChannelPasskeyGate(false);
+                setShowUploadModal(true);
+              } else {
+                setChannelPasskeyInvalid(true);
+                setChannelPasskeyValue('');
+              }
+            }}
+            className="w-full max-w-xs p-5 border shadow-2xl rounded-2xl border-slate-800 bg-slate-950/95"
+          >
+            <div className="flex items-center gap-2 mb-3 text-sm font-bold text-white">
+              <Lock className="w-4 h-4 text-slate-400" />
+              Admin Access — Channel Folders
             </div>
-
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={uploadLinkInput}
-                onChange={(e) => setUploadLinkInput(e.target.value)}
-                placeholder="Paste a direct audio link..."
-                className="w-full px-3 py-2 text-xs rounded-lg outline-none"
-                style={{ ...subpanelStyle, color: '#e2e8f0' }}
-              />
+            <input
+              type="password"
+              inputMode="numeric"
+              autoFocus
+              value={channelPasskeyValue}
+              onChange={(e) => {
+                setChannelPasskeyValue(e.target.value);
+                setChannelPasskeyInvalid(false);
+              }}
+              placeholder="Enter passkey"
+              className={`w-full px-3 py-2 text-sm text-white bg-slate-900 border rounded-lg outline-none ${
+                channelPasskeyInvalid ? 'border-red-500' : 'border-slate-700 focus:border-slate-500'
+              }`}
+            />
+            {channelPasskeyInvalid && <p className="mt-1.5 text-xs text-red-400">Invalid Passkey</p>}
+            <div className="flex gap-2 mt-4">
               <button
-                onClick={handleUploadLinkSubmit}
-                disabled={!uploadLinkInput.trim()}
-                className={`${GLASS_IDLE} w-full py-2 text-[10px] font-bold uppercase tracking-wide rounded-lg disabled:opacity-40`}
+                type="button"
+                onClick={() => setShowChannelPasskeyGate(false)}
+                className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-700 text-slate-300 hover:border-slate-500"
               >
-                Load Link
+                Cancel
               </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-              <span className="text-[10px] uppercase tracking-widest text-slate-500">Or</span>
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-            </div>
-
-            <form onSubmit={handleArchiveSubmit} className="space-y-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-mono uppercase tracking-widest text-white/70">Load from Internet Archive</span>
-                <a
-                  href="https://archive.org"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Open Internet Archive"
-                  aria-label="Open Internet Archive in a new tab"
-                  className="text-slate-500 hover:text-cyan-300 transition"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-              <input
-                type="text"
-                value={archiveInput}
-                onChange={(e) => setArchiveInput(e.target.value)}
-                placeholder="Item ID or URL — e.g. rosen or https://archive.org/details/rosen"
-                className="w-full px-3 py-2 text-xs rounded-lg outline-none"
-                style={{ ...subpanelStyle, color: '#e2e8f0' }}
-              />
               <button
                 type="submit"
-                disabled={archiveLoading || !archiveInput.trim()}
-                className={`${GLASS_IDLE} flex items-center justify-center w-full gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide rounded-lg disabled:opacity-40`}
+                className="flex-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white text-slate-950 hover:bg-slate-200"
               >
-                {archiveLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {archiveLoading ? 'Loading…' : 'Find Audio'}
+                Unlock
               </button>
-              {archiveError && <p className="text-[11px] text-red-400">{archiveError}</p>}
-              {archiveFiles.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest text-slate-400 truncate">{archiveTitle}</p>
-                  <div className="space-y-1 overflow-y-auto max-h-48">
-                    {archiveFiles.map((f) => (
-                      <button
-                        key={f.name}
-                        type="button"
-                        onClick={() => loadCustomStation(f.url, f.title)}
-                        className={`${GLASS_IDLE} flex items-center w-full gap-2 px-3 py-1.5 text-left text-xs rounded-lg`}
-                      >
-                        <Play className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{f.title}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </form>
-          </div>
+            </div>
+          </form>
         </div>
       )}
     </div>

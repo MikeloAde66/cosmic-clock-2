@@ -12,9 +12,10 @@ interface MediaFlowAudioCenterProps {
 // Vacant workspace slot, reserved for the first agentic flow. Deliberately
 // has no state, effects, network calls or media dependencies, and nothing
 // in it is interactive — build the next feature by replacing this body.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function MediaFlowAudioCenter(_props: MediaFlowAudioCenterProps) {
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full max-w-5xl mx-auto">
       <div
         inert
         aria-disabled="true"

@@ -23,7 +23,17 @@ export interface VaultRadioStation extends BaseStation {
   drawer: VaultDrawer;
 }
 
-export type RadioStation = LiveRadioStation | VaultRadioStation;
+// Admin-managed "channel folder" (see lib/models/RadioChannelFolder.ts) —
+// a custom-named, persistent bucket of uploaded tracks that plays as its
+// own channel. Dynamic/DB-backed, so (like admin-* live stations) it's
+// never part of the static RADIO_STATIONS list below; it's fetched and
+// merged client-side instead (see RadioCentralConsoleView.tsx).
+export interface ChannelFolderRadioStation extends BaseStation {
+  kind: 'channel-folder';
+  folderId: string;
+}
+
+export type RadioStation = LiveRadioStation | VaultRadioStation | ChannelFolderRadioStation;
 
 // News (BBC/NPR) gets its own dedicated NEWS tab, but ALL CHANNELS' default
 // view still deliberately excludes it — Radio Central opens on the
@@ -75,6 +85,9 @@ export interface OutkastLink {
   // Placeholder destinations — swap for the real URLs once they exist, same
   // convention as SiteFooter's SOCIAL_LINKS.
   href: string;
+  // Real brand logo, served from /public/icons — rendered via <img> so the
+  // original artwork/colors are preserved exactly, no hand-reconstructed SVGs.
+  icon: string;
 }
 
 export interface OutkastComingSoon {
@@ -84,10 +97,12 @@ export interface OutkastComingSoon {
 // OUTKAST isn't a station filter — it's a dropdown hub of community/social
 // action gates, rendered as its own button alongside the category filters.
 export const OUTKAST_LINKS: OutkastLink[] = [
-  { label: 'Discord', href: 'https://discord.gg/your-invite' },
-  { label: 'WhatsApp', href: 'https://wa.me/your-number' },
-  { label: 'Spotify', href: 'https://open.spotify.com/your-profile' },
-  { label: 'iTunes', href: 'https://music.apple.com/your-page' },
+  { label: 'Discord', href: 'https://discord.com/channels/@me', icon: '/icons/discord.svg' },
+  { label: 'WhatsApp', href: 'https://web.whatsapp.com/', icon: '/icons/whatsapp.png' },
+  { label: 'Spotify', href: 'https://open.spotify.com/', icon: '/icons/spotify.svg' },
+  { label: 'iTunes', href: 'https://www.apple.com/', icon: '/icons/apple.svg' },
+  { label: 'SoundCloud', href: 'https://soundcloud.com/discover', icon: '/icons/soundcloud.svg' },
+  { label: 'ReverbNation', href: 'https://www.reverbnation.com/beatbrokers526', icon: '/icons/reverbnation.svg' },
 ];
 
 // No backend exists for any of these yet (no trivia UI, no scavenger/
@@ -103,7 +118,13 @@ export const OUTKAST_COMING_SOON: OutkastComingSoon[] = [
 // Curated, not auto-generated: hand-mapped to whichever real Vault packs
 // currently hold this content. If a pack's sku changes (re-uploaded under a
 // new sku) or a new themed station is wanted, add/edit an entry here.
-export const RADIO_STATIONS: RadioStation[] = [
+// Typed narrower than the full RadioStation union on purpose: this static
+// list never contains a 'channel-folder' entry (those are DB-backed, see
+// ChannelFolderRadioStation's own comment) — keeping that out of this
+// array's type lets app/api/radio/queue/route.ts's station.kind === 'vault'
+// branch narrow to VaultRadioStation alone instead of also considering a
+// channel folder it can structurally never find here.
+export const RADIO_STATIONS: (LiveRadioStation | VaultRadioStation)[] = [
   {
     kind: 'live',
     id: 'bbc-world',

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Apple, Music2, Music3, Music4, Smartphone } from 'lucide-react';
+import { Apple, Music2, Smartphone } from 'lucide-react';
 import { FORECAST_STREAM_MS } from '@/lib/useWeatherLocation';
 import { SOCIALS } from '@/components/signal/SocialRow';
 
@@ -27,10 +27,33 @@ function useLiveClock() {
 // The real music profiles. The main social logos (Instagram, YouTube, TikTok,
 // Facebook, Reddit, Tumblr, LinkedIn) come from the shared SOCIALS list so this
 // footer matches the Signal page.
+// SoundCloud and ReverbNation use their real brand marks (same convention as
+// SOCIALS' inline <path> icons) — fill="currentColor" so they pick up the
+// row's white glow styling like the rest. SoundClick has no verified brand
+// SVG on hand yet, so it keeps the lucide note placeholder until one is
+// provided.
 const SOCIAL_LINKS = [
-  { name: 'SoundClick', icon: Music2, href: 'https://soundclick.com/song/15361676' },
-  { name: 'SoundCloud', icon: Music4, href: 'https://soundcloud.com/michael-bradley-307688752' },
-  { name: 'ReverbNation', icon: Music3, href: 'https://reverbnation.com/beatbrokers526' },
+  { name: 'SoundClick', Icon: Music2, href: 'https://soundclick.com/song/15361676' },
+  {
+    name: 'SoundCloud',
+    href: 'https://soundcloud.com/discover',
+    icon: (
+      <path
+        fill="currentColor"
+        d="M23.999 14.165c-.052 1.796-1.612 3.169-3.4 3.169h-8.18a.68.68 0 0 1-.675-.683V7.862a.747.747 0 0 1 .452-.724s.75-.513 2.333-.513a5.364 5.364 0 0 1 2.763.755 5.433 5.433 0 0 1 2.57 3.54c.282-.08.574-.121.868-.12.884 0 1.73.358 2.347.992s.948 1.49.922 2.373ZM10.721 8.421c.247 2.98.427 5.697 0 8.672a.264.264 0 0 1-.53 0c-.395-2.946-.22-5.718 0-8.672a.264.264 0 0 1 .53 0ZM9.072 9.448c.285 2.659.37 4.986-.006 7.655a.277.277 0 0 1-.55 0c-.331-2.63-.256-5.02 0-7.655a.277.277 0 0 1 .556 0Zm-1.663-.257c.27 2.726.39 5.171 0 7.904a.266.266 0 0 1-.532 0c-.38-2.69-.257-5.21 0-7.904a.266.266 0 0 1 .532 0Zm-1.647.77a26.108 26.108 0 0 1-.008 7.147.272.272 0 0 1-.542 0 27.955 27.955 0 0 1 0-7.147.275.275 0 0 1 .55 0Zm-1.67 1.769c.421 1.865.228 3.5-.029 5.388a.257.257 0 0 1-.514 0c-.21-1.858-.398-3.549 0-5.389a.272.272 0 0 1 .543 0Zm-1.655-.273c.388 1.897.26 3.508-.01 5.412-.026.28-.514.283-.54 0-.244-1.878-.347-3.54-.01-5.412a.283.283 0 0 1 .56 0Zm-1.668.911c.4 1.268.257 2.292-.026 3.572a.257.257 0 0 1-.514 0c-.241-1.262-.354-2.312-.023-3.572a.283.283 0 0 1 .563 0Z"
+      />
+    ),
+  },
+  {
+    name: 'ReverbNation',
+    href: 'https://www.reverbnation.com/beatbrokers526',
+    icon: (
+      <path
+        fill="currentColor"
+        d="M24 9.324l-9.143-.03L11.971.57 9.143 9.294 0 9.324h.031l7.367 5.355-2.855 8.749h.029l7.459-5.386 7.396 5.386-2.855-8.73L24 9.315"
+      />
+    ),
+  },
 ];
 
 interface SiteFooterProps {
@@ -176,7 +199,13 @@ export default function SiteFooter({
             aria-label={s.name}
             className="grid h-9 w-9 place-items-center transition-all duration-200 drop-shadow-[0_0_4px_rgba(255,255,255,0.45)] lg:h-auto lg:w-auto hover:scale-110 hover:drop-shadow-[0_0_9px_rgba(255,255,255,0.9)]"
           >
-            <s.icon size={18} />
+            {s.icon ? (
+              <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+                {s.icon}
+              </svg>
+            ) : (
+              s.Icon && <s.Icon size={18} />
+            )}
           </a>
         ))}
       </div>

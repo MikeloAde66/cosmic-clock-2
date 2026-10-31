@@ -6,7 +6,7 @@ import CosmicVisualizer from './CosmicVisualizer';
 import StudioOneConsole from './StudioOneConsole';
 import EqOrb from './EqOrb';
 import { useRadioPlayer } from './radio/RadioPlayerContext';
-import { extractIdentifier, buildArchiveEmbedUrl, fetchArchiveItemInfo } from '@/lib/archiveOrg';
+import { extractIdentifier, buildArchiveEmbedUrl, fetchArchiveVideo } from '@/lib/archiveOrg';
 // Shared with StarTrackerView's own YT.Player mount (Sky Fest's Space
 // Media tab) — see that file for why this lives in one place.
 import type { YouTubePlayer, YouTubePlayerEvent } from '@/lib/youtubeIframeApi';
@@ -558,6 +558,26 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
       vuSplitter.connect(rightAnalyser, 1);
       rightAnalyserRef.current = rightAnalyser;
     }
+  };
+
+  // Routes a <video> element's sound through the same EQ/compressor/panner/
+  // VU-meter chain the <audio> element uses. Only used for Internet Archive
+  // video played from its direct file: that file is served with CORS
+  // headers, so (with crossOrigin="anonymous" on the element) Web Audio is
+  // allowed to read it. createMediaElementSource may only be called once per
+  // element and reroutes its sound entirely through the graph, so each
+  // element is wired once and the context is resumed on every play.
+  const wiredVideosRef = useRef<WeakSet<HTMLVideoElement>>(new WeakSet());
+  const connectVideoToChain = (video: HTMLVideoElement) => {
+    initAudioContext();
+    const ctx = audioCtxRef.current;
+    const firstFilter = filtersRef.current['60'];
+    if (!ctx || !firstFilter) return;
+    if (!wiredVideosRef.current.has(video)) {
+      ctx.createMediaElementSource(video).connect(firstFilter);
+      wiredVideosRef.current.add(video);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
   };
 
   // Live Mic Input — enumerateDevices() only returns real device labels
@@ -1339,10 +1359,15 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
     if (archiveId && (/archive\.org/i.test(url) || !/[/:]/.test(url))) {
       let title = archiveId;
       let description = 'Internet Archive';
+      // Prefer the item's real video file (plays in the Broadcast Monitor's
+      // own <video>, so the EQ and meters apply); fall back to Archive's
+      // embed player when there's no playable file or the lookup fails.
+      let directVideoUrl: string | null = null;
       try {
-        const info = await fetchArchiveItemInfo(archiveId);
+        const { info, url: videoUrl } = await fetchArchiveVideo(archiveId);
         title = info.title;
         if (info.creator) description = info.creator;
+        directVideoUrl = videoUrl;
       } catch {
         // Metadata lookup failed — the embed player can still try the id.
       }
@@ -1352,7 +1377,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
         frequency: 'Internet Archive',
         description,
         src: '',
-        embedUrl: buildArchiveEmbedUrl(archiveId),
+        embedUrl: directVideoUrl ?? buildArchiveEmbedUrl(archiveId),
         watchUrl: `https://archive.org/details/${encodeURIComponent(archiveId)}`,
         playlistId: 'main-playlist',
         contentToRead: `### ${title}\n\nImported from: https://archive.org/details/${archiveId}`,
@@ -2146,11 +2171,28 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
                     // alongside the .mp4/.webm direct-media-link case.
                     activeEmbedUrl.endsWith('.mp4') || activeEmbedUrl.endsWith('.webm') || activeEmbedUrl.startsWith('blob:') ? (
                       <video
+                        // An Internet Archive direct file needs crossOrigin
+                        // set before its src loads and the EQ/meter wiring
+                        // below, so it gets its own element per file (key).
+                        // If the file can't be loaded that way, fall back to
+                        // Archive's embed player so playback still works
+                        // (just without the EQ).
+                        key={activeEmbedUrl.includes('archive.org/download/') ? activeEmbedUrl : 'broadcast-video'}
                         ref={broadcastVideoRef}
                         src={activeEmbedUrl}
+                        crossOrigin={activeEmbedUrl.includes('archive.org/download/') ? 'anonymous' : undefined}
+                        onError={() => {
+                          const archiveId = extractIdentifier(activeEmbedUrl);
+                          if (activeEmbedUrl.includes('archive.org/download/') && archiveId) {
+                            setActiveEmbedUrl(buildArchiveEmbedUrl(decodeURIComponent(archiveId)));
+                          }
+                        }}
                         controls
                         className="object-cover w-full h-full"
-                        onPlay={() => setIsPlaying(true)}
+                        onPlay={(e) => {
+                          if (activeEmbedUrl.includes('archive.org/download/')) connectVideoToChain(e.currentTarget);
+                          setIsPlaying(true);
+                        }}
                         onPause={() => setIsPlaying(false)}
                         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
