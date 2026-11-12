@@ -23,7 +23,6 @@ import { useTelescopeConnection } from '@/lib/useTelescopeConnection';
 import TelescopeConnectPanel from './telescope/TelescopeConnectPanel';
 import InfoTooltip from './InfoTooltip';
 import { useSpeechToText } from './useSpeechToText';
-import Starfield from './Starfield';
 import { TelemetryGauges } from './hud/TelemetryGauges';
 import { SystemMetricsGauges } from './hud/SystemMetricsGauges';
 import { TargetAlignmentDiagnostics } from './hud/TargetAlignmentDiagnostics';
@@ -1578,14 +1577,11 @@ onReady: (event: any) => {            event.target.setVolume(71);
               round viewport — was rounded-[9px] (square-ish), which let the
               square content's corners show past a merely-decorative ring. */}
           <div className="relative p-4 overflow-hidden rounded-full bg-[#050810] backdrop-blur-md transition-[backdrop-filter] duration-300">
-          {/* Localized starfield specifically for the lens's own field of
-              view — the housing above is deliberately solid/opaque metal
-              (real brushed metal isn't see-through), so this is what
-              actually satisfies "stars visible through the lens": the
-              dome's circle fill is semi-transparent and sits directly on
-              top of this, not on top of the opaque housing several layers
-              back. */}
-          <Starfield contained starCount={140} />
+          {/* Background starfield removed on request — the lens now shows
+              only real tracked objects (stars from the sky-map dataset
+              when a sky-map mode is on, Sun/Moon/planets, Messier
+              objects, ISS) against a plain dark field, nothing decorative
+              filling empty sky. */}
           {/* Every real object placed in this dome (stars, planets,
               Messier objects, ISS/satellites) is positioned from `now` —
               real wall-clock time, continuously drifting with real
@@ -1689,19 +1685,10 @@ onReady: (event: any) => {            event.target.setVolume(71);
                     </text>
                   );
                 })}
-                {/* Rotating highlight sweep — purely decorative motion, not
-                    tied to any real value, unlike the outer bezel ring. */}
-                <g className="animate-azimuth-sweep" style={{ transformOrigin: `${center}px ${center}px` }}>
-                  <circle
-                    cx={center}
-                    cy={center}
-                    r={azimuthRingR}
-                    fill="none"
-                    stroke="rgba(103,232,249,0.9)"
-                    strokeWidth={2}
-                    strokeDasharray={`${azimuthRingR * 0.15} ${azimuthRingR * 6.13}`}
-                  />
-                </g>
+                {/* Rotating highlight sweep removed on request — was purely
+                    decorative motion (not tied to any real value); the
+                    azimuth ring, tick marks and compass labels above it
+                    are untouched. */}
               </g>
               {skyFocusMode !== 'OFF' &&
                 stars
@@ -2279,13 +2266,6 @@ onReady: (event: any) => {            event.target.setVolume(71);
         }
         .animate-target-pulse {
           animation: target-pulse 1.4s ease-out infinite;
-        }
-        @keyframes azimuth-sweep {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .animate-azimuth-sweep {
-          animation: azimuth-sweep 8s linear infinite;
         }
         @keyframes glass-fade-in {
           from { opacity: 0; transform: translateY(6px) scale(0.98); }
