@@ -1380,12 +1380,10 @@ onReady: (event: any) => {            event.target.setVolume(71);
           className="relative p-3 border rounded-full border-[#15171a]"
           style={{ background: HOUSING_GRADIENT, boxShadow: HOUSING_SHADOW }}
         >
-          {/* Green-coated-optics edge glare — fades in from the bezel rim,
-              transparent at center so it doesn't wash out the reticle. */}
-          <div
-            className="absolute inset-0 pointer-events-none rounded-2xl"
-            style={{ background: 'radial-gradient(circle, transparent 55%, rgba(16,185,129,0.15) 85%, rgba(6,78,59,0.3) 100%)' }}
-          />
+          {/* Green-coated-optics edge glare removed on request -- it was
+              rounded-2xl (square corners) on a circular bezel, so its
+              glow showed as a green square around the round lens. Black
+              housing now, no tinted glare layer. */}
           <svg
             viewBox="0 0 100 100"
             className="absolute inset-0 w-full h-full transition-transform duration-300 ease-out pointer-events-none"
@@ -1407,7 +1405,20 @@ onReady: (event: any) => {            event.target.setVolume(71);
                 <stop offset="100%" stopColor="#1c1f24" />
               </linearGradient>
             </defs>
-            <circle cx={50} cy={50} r={48.5} fill="none" stroke="url(#bezelMetalGradient)" strokeWidth={2.5} />
+            {/* Thick dimensional bezel ring -- was a single 2.5px stroke,
+                which reads as a flat outline instead of a machined metal
+                band. Layered concentric strokes fake the bevel a real
+                photographed lens ring has: a dark machined edge at the
+                outer rim, a bright highlight catching the light just
+                inside it, the wide brushed-gunmetal band itself, then a
+                dark recessed shadow and a faint inner highlight where
+                the band meets the glass. Order matters -- later circles
+                paint on top, so this goes outer-dark to inner-light. */}
+            <circle cx={50} cy={50} r={49.4} fill="none" stroke="#05070a" strokeWidth={1} />
+            <circle cx={50} cy={50} r={48.4} fill="none" stroke="rgba(226,230,236,0.5)" strokeWidth={0.8} />
+            <circle cx={50} cy={50} r={46} fill="none" stroke="url(#bezelMetalGradient)" strokeWidth={4} />
+            <circle cx={50} cy={50} r={43.6} fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={1} />
+            <circle cx={50} cy={50} r={43} fill="none" stroke="rgba(226,230,236,0.3)" strokeWidth={0.6} />
             {/* Cardinal labels — letters only, no degree numbers (matches
                 the inner holographic azimuth ring's own N/E/S/W/NE/etc
                 convention, professional-instrument style rather than a
@@ -1978,9 +1989,11 @@ onReady: (event: any) => {            event.target.setVolume(71);
         </div>
 
 
-        {/* Detail panel for the selected body/satellite — inline, not a modal */}
+        {/* Detail panel for the selected body/satellite — inline, not a modal.
+            Border/background tried as stainless steel (was cyan) to preview
+            the look -- text stays cyan/white, only the frame changed. */}
         {selected && (
-          <div className="relative p-4 border rounded-lg border-cyan-500/40 bg-cyan-950/20 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_32px_-12px_rgba(0,0,0,0.6)] animate-glass-fade-in">
+          <div className="relative p-4 border rounded-lg border-slate-400/50 bg-slate-800/30 backdrop-blur-md shadow-[inset_0_1px_0_rgba(226,230,236,0.25),0_12px_32px_-12px_rgba(0,0,0,0.6)] animate-glass-fade-in">
             <button
               type="button"
               onClick={() => setSelected(null)}
