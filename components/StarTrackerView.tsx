@@ -46,18 +46,20 @@ const ISS_STREAM_URL = 'https://www.youtube.com/embed/awQzjn72bI0';
 // real recorded tour for Space Media's own default.
 const DEFAULT_SPACE_MEDIA_VIDEO_ID = 'XkM_04Ch76E';
 
-// Bronze/gold "Tactile Bronze/Gold and Green Lightwork" theme — the metal
+// Gunmetal "Tactile Industrial Metal and Cyan Lightwork" theme — the metal
 // housing gradient/shadow applied to every physical-instrument surface
-// (bezel, dome frame, Ask Kali bar frame), and the single green used for
+// (bezel, dome frame, Ask Kali bar frame), and the single cyan used for
 // every data-driven readout (cardinal points, tick marks, ZENITH, Venus/
 // Saturn labels, voice-bar input text) so the whole instrument reads as one
 // consistent metal-and-light object rather than a patchwork of accents.
+// Was a bronze/gold gradient — swapped for brushed gunmetal/steel so the
+// housing reads as a real machined optical instrument rather than jewelry.
 const HOUSING_GRADIENT =
-  'linear-gradient(135deg, #6b4f16 0%, #BF9B30 22%, #F0D68A 45%, #BF9B30 68%, #8a6a20 88%, #5c4412 100%)';
+  'linear-gradient(135deg, #2c2f35 0%, #6b7178 22%, #9aa0a8 45%, #6b7178 68%, #3a3f46 88%, #1c1f24 100%)';
 const HOUSING_SHADOW =
-  'inset 0 1px 1px rgba(255,241,199,0.5), inset 0 -3px 6px rgba(0,0,0,0.65), 0 10px 24px -8px rgba(0,0,0,0.8)';
+  'inset 0 1px 1px rgba(226,230,236,0.35), inset 0 -3px 6px rgba(0,0,0,0.7), 0 10px 24px -8px rgba(0,0,0,0.85)';
 const HOUSING_SHADOW_SM =
-  'inset 0 1px 1px rgba(255,241,199,0.45), inset 0 -2px 4px rgba(0,0,0,0.6), 0 6px 16px -6px rgba(0,0,0,0.75)';
+  'inset 0 1px 1px rgba(226,230,236,0.3), inset 0 -2px 4px rgba(0,0,0,0.65), 0 6px 16px -6px rgba(0,0,0,0.8)';
 const LIGHTWORK_GREEN = '#33CCCC';
 
 // Literal first-contact line — both the input's placeholder and the greeting
@@ -1373,7 +1375,7 @@ onReady: (event: any) => {            event.target.setVolume(71);
             the same real wheel-zoom already wired to the dome below), not
             purely decorative. */}
         <div
-          className="relative p-3 border rounded-2xl border-[#4a3610]"
+          className="relative p-3 border rounded-full border-[#15171a]"
           style={{ background: HOUSING_GRADIENT, boxShadow: HOUSING_SHADOW }}
         >
           {/* Green-coated-optics edge glare — fades in from the bezel rim,
@@ -1390,18 +1392,20 @@ onReady: (event: any) => {            event.target.setVolume(71);
           >
             {/* SVG stroke can't use a CSS gradient directly — a real
                 <linearGradient> def is the only way to get the brushed
-                gold look onto the bezel ring itself, not just its
-                container's background. */}
+                gunmetal look onto the bezel ring itself, not just its
+                container's background. Was bezelGoldGradient (bronze/gold
+                stops) — swapped to a gray steel ramp to match the
+                industrial housing above. */}
             <defs>
-              <linearGradient id="bezelGoldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#6b4f16" />
-                <stop offset="25%" stopColor="#F0D68A" />
-                <stop offset="50%" stopColor="#BF9B30" />
-                <stop offset="75%" stopColor="#F0D68A" />
-                <stop offset="100%" stopColor="#5c4412" />
+              <linearGradient id="bezelMetalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#2a2d32" />
+                <stop offset="25%" stopColor="#aab0b8" />
+                <stop offset="50%" stopColor="#6b7178" />
+                <stop offset="75%" stopColor="#aab0b8" />
+                <stop offset="100%" stopColor="#1c1f24" />
               </linearGradient>
             </defs>
-            <circle cx={50} cy={50} r={48.5} fill="none" stroke="url(#bezelGoldGradient)" strokeWidth={2.5} />
+            <circle cx={50} cy={50} r={48.5} fill="none" stroke="url(#bezelMetalGradient)" strokeWidth={2.5} />
             {/* Cardinal labels — letters only, no degree numbers (matches
                 the inner holographic azimuth ring's own N/E/S/W/NE/etc
                 convention, professional-instrument style rather than a
@@ -1464,15 +1468,20 @@ onReady: (event: any) => {            event.target.setVolume(71);
           {/* Target FOV = Base FOV / Zoom Ratio — Base FOV is 180°, the
               real full horizon-to-zenith-to-horizon sweep this dome
               projects at 1x. A real, derived value, not an arbitrary one. */}
-          <span className="absolute px-1.5 py-0.5 text-[8px] font-mono uppercase tracking-widest rounded top-1 right-1 text-cyan-300/70 bg-black/40">
+          {/* Nudged in from top-1/right-1 — the housing is now a true
+              circle (rounded-full), so a literal corner position sat
+              outside the visible ring/dome; top-4/right-4 keeps it
+              readable just inside the curve. */}
+          <span className="absolute px-1.5 py-0.5 text-[8px] font-mono uppercase tracking-widest rounded top-4 right-4 text-cyan-300/70 bg-black/40">
             {view.scale.toFixed(1)}× · FOV {(180 / view.scale).toFixed(0)}°
           </span>
 
           {/* On-canvas telemetry overlay — the selected target's key stats,
               directly over the lens rather than only in the panel below it.
               Only point-like selections have anything to show here. */}
+          {/* Same nudge as the FOV badge above, same reason. */}
           {selected && selected.kind !== 'constellation' && (
-            <div className="absolute z-10 max-w-[55%] px-2 py-1.5 space-y-0.5 border rounded top-1 left-1 border-cyan-500/30 bg-black/50 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] pointer-events-none animate-glass-fade-in">
+            <div className="absolute z-10 max-w-[55%] px-2 py-1.5 space-y-0.5 border rounded top-4 left-4 border-cyan-500/30 bg-black/50 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] pointer-events-none animate-glass-fade-in">
               {selected.kind === 'body' && (
                 <>
                   <div className="text-[9px] font-bold text-white font-mono">{selected.body.name}</div>
@@ -1561,10 +1570,14 @@ onReady: (event: any) => {            event.target.setVolume(71);
           </div>
 
           <div
-            className="p-[3px] rounded-lg"
+            className="p-[3px] rounded-full"
             style={{ background: HOUSING_GRADIENT, boxShadow: HOUSING_SHADOW }}
           >
-          <div className="relative p-4 overflow-hidden rounded-[9px] bg-[#050810] backdrop-blur-md transition-[backdrop-filter] duration-300">
+          {/* rounded-full + overflow-hidden here is what actually clips the
+              square aspect-square dome/Starfield content below into a true
+              round viewport — was rounded-[9px] (square-ish), which let the
+              square content's corners show past a merely-decorative ring. */}
+          <div className="relative p-4 overflow-hidden rounded-full bg-[#050810] backdrop-blur-md transition-[backdrop-filter] duration-300">
           {/* Localized starfield specifically for the lens's own field of
               view — the housing above is deliberately solid/opaque metal
               (real brushed metal isn't see-through), so this is what
