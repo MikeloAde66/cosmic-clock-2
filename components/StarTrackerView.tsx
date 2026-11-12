@@ -373,7 +373,10 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const [kp, setKp] = useState<KpReading | null>(null);
   const [kpError, setKpError] = useState(false);
 
-  const [skyFocusMode, setSkyFocusMode] = useState<SkyFocusMode>('MESSIER');
+  // Was 'MESSIER' by default -- changed to 'OFF' on request so the lens
+  // opens bare (no catalog stars, just real Sun/Moon/planets/ISS) until
+  // the person turns a sky-map mode on themselves.
+  const [skyFocusMode, setSkyFocusMode] = useState<SkyFocusMode>('OFF');
   const [skyMapsLoading, setSkyMapsLoading] = useState(false);
   const [skyMapsError, setSkyMapsError] = useState(false);
   const [constellationLines, setConstellationLines] = useState<ConstellationLine[] | null>(null);

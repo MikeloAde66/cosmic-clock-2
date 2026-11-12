@@ -32,7 +32,6 @@ import RadioCentralConsoleView from '@/components/radio/RadioCentralConsoleView'
 import SiteFooter from '@/components/SiteFooter';
 import ISSFeedModal from '@/components/ISSFeedModal';
 import StarTrackerView from '@/components/StarTrackerView';
-import StarTrackerProBackground from '@/components/starTrackerPro/StarTrackerProBackground';
 import VaultSearchModal from '@/components/VaultSearchModal';
 import { useRadioPlayer } from '@/components/radio/RadioPlayerContext';
 import { CartProvider } from '@/lib/cart';
@@ -621,22 +620,22 @@ useContextMenuShare();
 
       {/* ISS Stream Modal + Star Tracker — both moved here from TopHeader,
           now triggered from LeftNav instead. Star Tracker is a dedicated
-          full-screen view (fixed z-50), not a stacked modal. Reverted from
-          the Phase 1 WebGL/R3F StarTrackerProCanvas back to the legacy
-          StarTrackerView here — that's the actual dashboard (Messier dome,
-          telemetry header, Sky Fest) requested as the hub's default view.
-          StarTrackerView's own root is transparent/pointer-events-none by
-          design (see that component) — it's built to be a HUD layered
-          over StarTrackerProBackground's WebGL starfield, the same pairing
-          the standalone /star-tracker route already uses, not a
-          self-contained opaque view on its own; mounting it without that
-          background here would let the hub grid bleed through underneath.
-          onAskKali omitted, same as that standalone route — no real "hand
-          off to Kali chat" integration point exists at this call site yet. */}
+          full-screen view (fixed z-50), not a stacked modal.
+          StarTrackerProBackground (the invisible WebGL starfield this used
+          to be layered over) was removed on request: nothing should render
+          behind this view, and its OrbitControls (rotateEnabled, full-
+          screen, no pointer-events-none on its wrapper) was capturing
+          touch-drag gestures on iPad/iPhone before they ever reached the
+          actual HUD -- that's what "fighting the screen" was. StarTrackerView
+          itself stays transparent/pointer-events-none by design (see that
+          component), so this wrapper's own bg-black is now what's actually
+          behind it -- solid, no WebGL canvas, nothing to fight for touch
+          events. onAskKali omitted, same as the standalone /star-tracker
+          route — no real "hand off to Kali chat" integration point exists
+          at this call site yet. */}
       <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
       {isStarTrackerOpen && (
         <div className="fixed inset-0 z-50 w-full h-screen overflow-hidden bg-black">
-          <StarTrackerProBackground />
           <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} />
         </div>
       )}
