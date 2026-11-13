@@ -23,6 +23,26 @@ import Reveal from '@/components/Reveal';
 function scrollToStackSection(tab: string) {
   document.getElementById(`stack-section-${tab}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+// Fixed (not Math.random()-per-render) sparkle layout for the Star Tracker
+// background -- see the .star-tracker-sparkle-layer comment in globals.css.
+// Hand-picked scatter of position/size/duration/delay so the dots read as
+// independent, slow, randomly-timed twinkles rather than one uniform pulse,
+// without reshuffling on every re-render.
+const STAR_TRACKER_SPARKLES = [
+  { top: '8%', left: '14%', size: 2, dur: 7, delay: 0, peak: 0.9 },
+  { top: '22%', left: '68%', size: 1.5, dur: 9, delay: 1.5, peak: 0.7 },
+  { top: '15%', left: '42%', size: 1.5, dur: 8, delay: 3, peak: 0.8 },
+  { top: '35%', left: '85%', size: 2, dur: 10, delay: 0.8, peak: 0.85 },
+  { top: '48%', left: '6%', size: 1.5, dur: 7.5, delay: 4, peak: 0.75 },
+  { top: '58%', left: '30%', size: 2, dur: 11, delay: 2, peak: 0.9 },
+  { top: '65%', left: '78%', size: 1.5, dur: 8.5, delay: 5, peak: 0.7 },
+  { top: '78%', left: '18%', size: 2, dur: 9.5, delay: 1, peak: 0.85 },
+  { top: '82%', left: '55%', size: 1.5, dur: 7, delay: 3.5, peak: 0.8 },
+  { top: '12%', left: '92%', size: 1.5, dur: 10.5, delay: 2.5, peak: 0.75 },
+  { top: '40%', left: '58%', size: 1.5, dur: 8, delay: 6, peak: 0.7 },
+  { top: '70%', left: '40%', size: 2, dur: 9, delay: 0.4, peak: 0.9 },
+] as const;
 import Starfield from '@/components/Starfield';
 import FactChecker from '@/components/FactChecker';
 import PodsModule, { type StudioOneHandoffTrack } from '@/components/PodsModule';
@@ -638,13 +658,41 @@ useContextMenuShare();
           stretched to cover a large screen; swap in a higher-res version
           at the same path if that matters. onAskKali omitted, same as the
           standalone /star-tracker route — no real "hand off to Kali chat"
-          integration point exists at this call site yet. */}
+          integration point exists at this call site yet.
+
+          Two CSS-only motion layers sit between the photo and
+          StarTrackerView: .star-tracker-drift-layer (a tiled star field
+          panned slowly via background-position) and
+          .star-tracker-sparkle-layer (a handful of individually-timed
+          twinkling dots, positions in STAR_TRACKER_SPARKLES above). Both
+          are pointer-events-none and purely CSS (see globals.css) -- no
+          canvas/WebGL, so neither can reintroduce the old touch-drag bug
+          described above. */}
       <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
       {isStarTrackerOpen && (
         <div
           className="fixed inset-0 z-50 w-full h-screen overflow-hidden bg-black bg-cover bg-center"
           style={{ backgroundImage: 'url(/star-tracker/night-sky-background.png)' }}
         >
+          <div className="star-tracker-drift-layer" />
+          <div className="star-tracker-sparkle-layer">
+            {STAR_TRACKER_SPARKLES.map((s, i) => (
+              <span
+                key={i}
+                className="star-tracker-sparkle"
+                style={
+                  {
+                    top: s.top,
+                    left: s.left,
+                    '--size': `${s.size}px`,
+                    '--dur': `${s.dur}s`,
+                    '--delay': `${s.delay}s`,
+                    '--peak': s.peak,
+                  } as React.CSSProperties
+                }
+              />
+            ))}
+          </div>
           <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} />
         </div>
       )}
