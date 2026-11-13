@@ -367,16 +367,18 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const [voiceQuery, setVoiceQuery] = useState('');
   const narrativeAbortRef = useRef<AbortController | null>(null);
 
-  const [issLayerOn, setIssLayerOn] = useState(false);
+  // No setter -- the ISS toggle button is disabled on request, so this
+  // can no longer change; left as real state (not a hardcoded constant)
+  // so every `issLayerOn &&` gate below still reads correctly and the
+  // button just needs `disabled` removed later to re-enable it properly.
+  const [issLayerOn] = useState(false);
 
   const [spaceWeatherOn, setSpaceWeatherOn] = useState(false);
   const [kp, setKp] = useState<KpReading | null>(null);
   const [kpError, setKpError] = useState(false);
 
-  // Was 'MESSIER' by default -- changed to 'OFF' on request so the lens
-  // opens bare (no catalog stars, just real Sun/Moon/planets/ISS) until
-  // the person turns a sky-map mode on themselves.
-  const [skyFocusMode, setSkyFocusMode] = useState<SkyFocusMode>('OFF');
+  // Back to 'MESSIER' by default on request (was briefly changed to 'OFF').
+  const [skyFocusMode, setSkyFocusMode] = useState<SkyFocusMode>('MESSIER');
   const [skyMapsLoading, setSkyMapsLoading] = useState(false);
   const [skyMapsError, setSkyMapsError] = useState(false);
   const [constellationLines, setConstellationLines] = useState<ConstellationLine[] | null>(null);
@@ -387,7 +389,9 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   // Media panel popping open unprompted, and no background quantum-service
   // /pro-core network activity starting until the user actually clicks
   // Sky Fest — see the gating effect below).
-  const [skyFestOpen, setSkyFestOpen] = useState(false);
+  // No setter -- same reasoning as issLayerOn above: the Sky Fest button
+  // is disabled on request, so this stays false until it's re-enabled.
+  const [skyFestOpen] = useState(false);
   const telescope = useTelescopeConnection();
   const [skyFestTab, setSkyFestTab] = useState<'dsn' | 'deepsky' | 'media'>('media');
   // Real local UI preference (Phase 4 HUD controls) — directly sets this
@@ -645,7 +649,6 @@ onReady: (event: any) => {            event.target.setVolume(71);
   );
   const sky = useMemo(() => computeSky(observer, now), [observer, now]);
   const visible = sky.filter((b) => b.altitude > 0);
-  const belowHorizon = sky.filter((b) => b.altitude <= 0);
 
   // Auto-select a default target once real location is known — waits on
   // `status` leaving 'requesting' so this doesn't fire against the
@@ -826,7 +829,21 @@ onReady: (event: any) => {            event.target.setVolume(71);
         body: JSON.stringify({ messages: [{ role: 'user', content: query }], mode: 'synthesis', language: 'en', voiceMode: true }),
         signal: controller.signal,
       });
-      if (!res.ok || !res.body) throw new Error('Kali did not respond.');
+      if (!res.ok || !res.body) {
+        // The API route returns a real, specific reason on failure (e.g.
+        // "ANTHROPIC_API_KEY is not configured") as JSON -- surface that
+        // instead of a generic "did not respond" so a config problem is
+        // actually diagnosable from the card instead of a dead end.
+        let detail = '';
+        try {
+          const body = await res.json();
+          if (typeof body?.error === 'string') detail = body.error;
+        } catch {
+          // response wasn't JSON (e.g. a network-level failure) -- fall
+          // through to the generic message below
+        }
+        throw new Error(detail || 'Kali did not respond.');
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -1056,12 +1073,15 @@ onReady: (event: any) => {            event.target.setVolume(71);
             instead of a tight cluster, more breathing room on wide
             viewports while still wrapping cleanly on narrow ones. */}
         <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+          {/* ISS disabled on request -- "for now", not removed: button
+              stays visible (so the layout/row doesn't shift) but is
+              non-interactive and dimmed, same pattern as Sky Fest below. */}
           <button
             type="button"
-            onClick={() => setIssLayerOn((v) => !v)}
-            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition ${
-              issLayerOn ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300' : 'border-slate-700 text-slate-400 hover:border-slate-500'
-            }`}
+            disabled
+            aria-disabled="true"
+            title="ISS tracking is temporarily disabled"
+            className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border border-slate-800 text-slate-600 cursor-not-allowed opacity-50"
           >
             <Satellite className="w-3 h-3" />
             ISS
@@ -1096,12 +1116,16 @@ onReady: (event: any) => {            event.target.setVolume(71);
               <option value="ALL">All Constellations</option>
             </select>
           </div>
+          {/* Sky Fest disabled on request -- "for now", not removed: same
+              dim/non-interactive treatment as ISS above. skyFestOpen stays
+              false since the toggle can no longer be flipped, so the panel
+              below it (gated on skyFestOpen) simply never renders. */}
           <button
             type="button"
-            onClick={() => setSkyFestOpen((v) => !v)}
-            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition ${
-              skyFestOpen ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300' : 'border-slate-700 text-slate-400 hover:border-slate-500'
-            }`}
+            disabled
+            aria-disabled="true"
+            title="Sky Fest is temporarily disabled"
+            className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border border-slate-800 text-slate-600 cursor-not-allowed opacity-50"
           >
             <CalendarClock className="w-3 h-3" />
             Sky Fest
@@ -2142,52 +2166,10 @@ onReady: (event: any) => {            event.target.setVolume(71);
           </div>
         )}
 
-        <div className="space-y-2">
-          <h3 className="text-[10px] font-mono uppercase tracking-widest text-cyan-500/70">
-            Visible now ({visible.length})
-          </h3>
-          {visible.length === 0 && <p className="text-xs text-slate-500">Nothing tracked is above the horizon right now.</p>}
-          {visible.map((b) => (
-            <button
-              type="button"
-              key={b.name}
-              onClick={() => setSelected({ kind: 'body', body: b })}
-              className="flex items-center justify-between w-full px-3 py-2 text-left transition border rounded border-slate-800 bg-slate-900/40 hover:border-cyan-500/40"
-            >
-              <div>
-                <span className="text-sm font-bold text-white">{b.name}</span>
-                <span className="ml-2 font-mono text-[11px] text-slate-400">
-                  {compassDirection(b.azimuth)} · alt {b.altitude.toFixed(0)}°
-                  {b.magnitude !== null && ` · mag ${b.magnitude.toFixed(1)}`}
-                </span>
-              </div>
-              {b.nextSet && (
-                <span className="font-mono text-[10px] text-slate-500">sets {b.nextSet.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {belowHorizon.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-[10px] font-mono uppercase tracking-widest text-slate-600">Below the horizon</h3>
-            {belowHorizon.map((b) => (
-              <button
-                type="button"
-                key={b.name}
-                onClick={() => setSelected({ kind: 'body', body: b })}
-                className="flex items-center justify-between w-full px-3 py-2 text-left transition border rounded border-slate-900 bg-slate-950/40 hover:border-slate-700"
-              >
-                <span className="text-sm text-slate-500">{b.name}</span>
-                {b.nextRise && (
-                  <span className="font-mono text-[10px] text-slate-600">
-                    rises {b.nextRise.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* "Visible now" / "Below the horizon" lists removed on request.
+            `visible` is still computed above and still used elsewhere
+            (the dome markers) -- `belowHorizon` had no other use, so it
+            was removed along with this list rather than left dead. */}
       </div>
 
       {/* Quick Start tour overlay — a spotlight cutout over the real target
