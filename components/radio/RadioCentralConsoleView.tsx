@@ -587,12 +587,21 @@ export default function RadioCentralConsoleView() {
               }}
             >
               <div className="flex items-center min-w-0 gap-3">
-                <div
-                  className="flex items-center justify-center w-12 h-12 text-xs font-bold rounded shrink-0"
-                  style={{ backgroundColor: playingStation?.badgeColor ?? '#3a3a3a' }}
-                >
-                  {playingStation?.badge ?? '—'}
-                </div>
+                {playingStation?.thumb ? (
+                  <img
+                    src={playingStation.thumb}
+                    alt=""
+                    className="object-cover w-12 h-12 rounded shrink-0"
+                    style={{ border: '1px solid rgba(255,255,255,0.1)' }}
+                  />
+                ) : (
+                  <div
+                    className="flex items-center justify-center w-12 h-12 text-xs font-bold rounded shrink-0"
+                    style={{ backgroundColor: playingStation?.badgeColor ?? '#3a3a3a' }}
+                  >
+                    {playingStation?.badge ?? '—'}
+                  </div>
+                )}
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold truncate text-white">{playingStation?.name ?? 'No station selected'}</h3>
                   <p className="text-xs truncate text-slate-400">{playingStation?.tagline ?? 'Pick a station below to begin'}</p>
@@ -690,12 +699,21 @@ export default function RadioCentralConsoleView() {
                   }}
                   className={`${isActive ? GLASS_ACTIVE : GLASS_IDLE} ${styles.chanTile} flex items-center w-full gap-3 p-2.5 rounded-lg text-left cursor-pointer`}
                 >
-                  <div
-                    className="flex items-center justify-center w-9 h-9 text-[10px] font-bold rounded shrink-0"
-                    style={{ backgroundColor: s.badgeColor }}
-                  >
-                    {s.badge}
-                  </div>
+                  {s.thumb ? (
+                    <img
+                      src={s.thumb}
+                      alt=""
+                      className="object-cover w-9 h-9 rounded shrink-0"
+                      style={{ border: '1px solid rgba(255,255,255,0.1)' }}
+                    />
+                  ) : (
+                    <div
+                      className="flex items-center justify-center w-9 h-9 text-[10px] font-bold rounded shrink-0"
+                      style={{ backgroundColor: s.badgeColor }}
+                    >
+                      {s.badge}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold truncate text-white">{s.name}</p>
                     <p className="text-[10px] truncate text-slate-500">{s.tagline}</p>

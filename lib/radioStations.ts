@@ -9,6 +9,11 @@ interface BaseStation {
   category: string;
   badge: string;
   badgeColor: string;
+  // Optional small thumbnail image (station logo/photo) shown instead of
+  // the plain badge box. Lives under public/radio/. Stations without one
+  // keep using the badge/badgeColor fallback — nothing breaks if this is
+  // left unset.
+  thumb?: string;
 }
 
 export interface LiveRadioStation extends BaseStation {
@@ -115,6 +120,7 @@ export const RADIO_STATIONS: RadioStation[] = [
     streamUrl: 'https://stream.live.vc.bbcmedia.co.uk/bbc_world_service',
     badge: 'BBC',
     badgeColor: '#bb1919',
+    thumb: '/radio/bbc-world.png',
   },
   {
     kind: 'live',
@@ -127,6 +133,7 @@ export const RADIO_STATIONS: RadioStation[] = [
     streamUrl: 'https://npr-ice.streamguys1.com/live.mp3',
     badge: 'NPR',
     badgeColor: '#1b3668',
+    thumb: '/radio/npr-news.png',
   },
   // Replaces an earlier old-time-radio pick — that was a real, working
   // station, but a small independent streaming server with genuine intermittent
@@ -146,6 +153,7 @@ export const RADIO_STATIONS: RadioStation[] = [
     streamUrl: 'http://26433.live.streamtheworld.com/977_COMEDY_SC',
     badge: '977',
     badgeColor: '#7c4a1e',
+    thumb: '/radio/comedy.png',
   },
   // Same StreamTheWorld network as .977 Comedy above — same
   // Access-Control-Allow-Origin: * headers, same verified-via-real-
@@ -161,6 +169,7 @@ export const RADIO_STATIONS: RadioStation[] = [
     streamUrl: 'http://14543.live.streamtheworld.com/977_SMOOJAZZ_SC',
     badge: '977',
     badgeColor: '#7c4a1e',
+    thumb: '/radio/smoothjazz.png',
   },
   // Hosted on Radiojar (an established streaming platform, not a small
   // indie server) — genuine history programming, a direct thematic fit
@@ -176,6 +185,7 @@ export const RADIO_STATIONS: RadioStation[] = [
     streamUrl: 'http://stream.radiojar.com/6bmecgg3wd5tv',
     badge: 'HST',
     badgeColor: '#5c4a2e',
+    thumb: '/radio/history.png',
   },
   {
     kind: 'vault',
@@ -189,6 +199,7 @@ export const RADIO_STATIONS: RadioStation[] = [
     drawer: 'MUSIC',
     badge: '432',
     badgeColor: '#3a3a3a',
+    thumb: '/radio/432hz.png',
   },
   {
     kind: 'vault',
