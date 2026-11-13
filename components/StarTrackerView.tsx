@@ -830,14 +830,22 @@ onReady: (event: any) => {            event.target.setVolume(71);
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {
-        // The API route returns a real, specific reason on failure (e.g.
-        // "ANTHROPIC_API_KEY is not configured") as JSON -- surface that
-        // instead of a generic "did not respond" so a config problem is
-        // actually diagnosable from the card instead of a dead end.
+        // The API route returns a real, specific reason on failure as JSON
+        // -- surface that instead of a generic "did not respond" so a
+        // config problem (or an actual provider error) is diagnosable from
+        // the card instead of a dead end. Two shapes exist: a flat
+        // top-level `error` string (e.g. "ANTHROPIC_API_KEY is not
+        // configured"), or `error` + a separate `details` string carrying
+        // the underlying provider error message (e.g. a 401/429 from
+        // Anthropic itself) -- when both are present, append details so
+        // the actual cause (not just "the request failed") shows up.
         let detail = '';
         try {
           const body = await res.json();
           if (typeof body?.error === 'string') detail = body.error;
+          if (typeof body?.details === 'string' && body.details && body.details !== detail) {
+            detail = detail ? `${detail} (${body.details})` : body.details;
+          }
         } catch {
           // response wasn't JSON (e.g. a network-level failure) -- fall
           // through to the generic message below
