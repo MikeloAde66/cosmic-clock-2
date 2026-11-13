@@ -367,18 +367,16 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   const [voiceQuery, setVoiceQuery] = useState('');
   const narrativeAbortRef = useRef<AbortController | null>(null);
 
-  // No setter -- the ISS toggle button is disabled on request, so this
-  // can no longer change; left as real state (not a hardcoded constant)
-  // so every `issLayerOn &&` gate below still reads correctly and the
-  // button just needs `disabled` removed later to re-enable it properly.
-  const [issLayerOn] = useState(false);
+  const [issLayerOn, setIssLayerOn] = useState(false);
 
   const [spaceWeatherOn, setSpaceWeatherOn] = useState(false);
   const [kp, setKp] = useState<KpReading | null>(null);
   const [kpError, setKpError] = useState(false);
 
-  // Back to 'MESSIER' by default on request (was briefly changed to 'OFF').
-  const [skyFocusMode, setSkyFocusMode] = useState<SkyFocusMode>('MESSIER');
+  // Sky Maps default to 'OFF' on request -- the lens opens bare (no
+  // catalog stars, just real Sun/Moon/planets/ISS) until the person
+  // turns a sky-map mode on themselves.
+  const [skyFocusMode, setSkyFocusMode] = useState<SkyFocusMode>('OFF');
   const [skyMapsLoading, setSkyMapsLoading] = useState(false);
   const [skyMapsError, setSkyMapsError] = useState(false);
   const [constellationLines, setConstellationLines] = useState<ConstellationLine[] | null>(null);
@@ -389,9 +387,7 @@ export default function StarTrackerView({ onBack, onAskKali }: StarTrackerViewPr
   // Media panel popping open unprompted, and no background quantum-service
   // /pro-core network activity starting until the user actually clicks
   // Sky Fest — see the gating effect below).
-  // No setter -- same reasoning as issLayerOn above: the Sky Fest button
-  // is disabled on request, so this stays false until it's re-enabled.
-  const [skyFestOpen] = useState(false);
+  const [skyFestOpen, setSkyFestOpen] = useState(false);
   const telescope = useTelescopeConnection();
   const [skyFestTab, setSkyFestTab] = useState<'dsn' | 'deepsky' | 'media'>('media');
   // Real local UI preference (Phase 4 HUD controls) — directly sets this
@@ -1081,15 +1077,12 @@ onReady: (event: any) => {            event.target.setVolume(71);
             instead of a tight cluster, more breathing room on wide
             viewports while still wrapping cleanly on narrow ones. */}
         <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
-          {/* ISS disabled on request -- "for now", not removed: button
-              stays visible (so the layout/row doesn't shift) but is
-              non-interactive and dimmed, same pattern as Sky Fest below. */}
           <button
             type="button"
-            disabled
-            aria-disabled="true"
-            title="ISS tracking is temporarily disabled"
-            className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border border-slate-800 text-slate-600 cursor-not-allowed opacity-50"
+            onClick={() => setIssLayerOn((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition ${
+              issLayerOn ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300' : 'border-slate-700 text-slate-400 hover:border-slate-500'
+            }`}
           >
             <Satellite className="w-3 h-3" />
             ISS
@@ -1124,16 +1117,12 @@ onReady: (event: any) => {            event.target.setVolume(71);
               <option value="ALL">All Constellations</option>
             </select>
           </div>
-          {/* Sky Fest disabled on request -- "for now", not removed: same
-              dim/non-interactive treatment as ISS above. skyFestOpen stays
-              false since the toggle can no longer be flipped, so the panel
-              below it (gated on skyFestOpen) simply never renders. */}
           <button
             type="button"
-            disabled
-            aria-disabled="true"
-            title="Sky Fest is temporarily disabled"
-            className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border border-slate-800 text-slate-600 cursor-not-allowed opacity-50"
+            onClick={() => setSkyFestOpen((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono uppercase tracking-wide rounded-full border transition ${
+              skyFestOpen ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300' : 'border-slate-700 text-slate-400 hover:border-slate-500'
+            }`}
           >
             <CalendarClock className="w-3 h-3" />
             Sky Fest
