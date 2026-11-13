@@ -622,20 +622,29 @@ useContextMenuShare();
           now triggered from LeftNav instead. Star Tracker is a dedicated
           full-screen view (fixed z-50), not a stacked modal.
           StarTrackerProBackground (the invisible WebGL starfield this used
-          to be layered over) was removed on request: nothing should render
-          behind this view, and its OrbitControls (rotateEnabled, full-
-          screen, no pointer-events-none on its wrapper) was capturing
-          touch-drag gestures on iPad/iPhone before they ever reached the
-          actual HUD -- that's what "fighting the screen" was. StarTrackerView
-          itself stays transparent/pointer-events-none by design (see that
-          component), so this wrapper's own bg-black is now what's actually
-          behind it -- solid, no WebGL canvas, nothing to fight for touch
-          events. onAskKali omitted, same as the standalone /star-tracker
-          route — no real "hand off to Kali chat" integration point exists
-          at this call site yet. */}
+          to be layered over) was removed on request earlier: its
+          OrbitControls (rotateEnabled, full-screen, no pointer-events-none
+          on its wrapper) was capturing touch-drag gestures on iPad/iPhone
+          before they ever reached the actual HUD -- that's what "fighting
+          the screen" was. The background behind this view is now a plain,
+          static CSS background-image (the provided night-sky photo,
+          public/star-tracker/night-sky-background.png) on this wrapper div
+          -- not a canvas, not interactive, nothing that can capture a
+          touch event, so the original touch-bug fix still holds.
+          StarTrackerView itself stays transparent/pointer-events-none by
+          design (see that component), so everything in it -- bezel, HUD,
+          panels -- sits visually on top of this image. Source photo is
+          474x316, well under viewport resolution, so it'll look soft when
+          stretched to cover a large screen; swap in a higher-res version
+          at the same path if that matters. onAskKali omitted, same as the
+          standalone /star-tracker route — no real "hand off to Kali chat"
+          integration point exists at this call site yet. */}
       <ISSFeedModal isOpen={isIssOpen} onClose={() => setIsIssOpen(false)} />
       {isStarTrackerOpen && (
-        <div className="fixed inset-0 z-50 w-full h-screen overflow-hidden bg-black">
+        <div
+          className="fixed inset-0 z-50 w-full h-screen overflow-hidden bg-black bg-cover bg-center"
+          style={{ backgroundImage: 'url(/star-tracker/night-sky-background.png)' }}
+        >
           <StarTrackerView onBack={() => setIsStarTrackerOpen(false)} />
         </div>
       )}
