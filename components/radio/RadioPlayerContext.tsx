@@ -241,20 +241,22 @@ export function RadioPlayerProvider({ children }: { children: React.ReactNode })
   const [dailyQueueEnabled, setDailyQueueEnabled] = useState(false);
   const [activeDailyQueueLabel, setActiveDailyQueueLabel] = useState<string | null>(null);
 
-  // Primes the 432Hz Cosmic Instrumental Stream (vault-432hz) into the
-  // persistent bottom bar on load, so it's the station shown/queued the
-  // instant the app opens. This is a 'vault'-kind station, so priming it
-  // (unlike a 'live' station's direct streamUrl) needs the same async
-  // queue fetch playStation uses to get a real signed fileUrl for the
-  // first track.
+  // Primes BBC World Service (bbc-world) into the persistent bottom bar on
+  // load, so it's the station shown/queued the instant the app opens — news
+  // over music on the theory that everyone's at least a little familiar
+  // with the news, where a music pick might not suit every listener's
+  // taste. This is a 'live'-kind station, so priming it is just setting the
+  // direct streamUrl (no async queue fetch needed, unlike a 'vault' station
+  // such as the old 432Hz default).
   // Deliberately does NOT call .play() here: real autoplay-with-sound
   // with no prior user gesture is blocked by every major browser, and
   // forcing it would either silently fail or surface as a false "error"
   // badge on a station that's actually fine — see ensureAnalyser's own
   // comment above for the same user-gesture constraint. A real Play
-  // click (already wired in GlobalPlayerBar) starts it for real.
+  // click (already wired in GlobalPlayerBar) starts it for real — the
+  // listener decides when anything actually plays.
   useEffect(() => {
-    const defaultStation = RADIO_STATIONS.find((s) => s.id === 'vault-432hz');
+    const defaultStation = RADIO_STATIONS.find((s) => s.id === 'bbc-world');
     if (!defaultStation) return;
     setStation(defaultStation);
 
