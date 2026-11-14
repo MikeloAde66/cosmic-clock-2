@@ -259,6 +259,23 @@
     </div>
   </div>
 
+  <!-- Tour Q&A Panel: shown only while a guided tour is paused at a stop,
+       inviting a question before moving on. -->
+  <div id="tour-panel" class="hidden absolute z-20 w-full max-w-xl px-4 -translate-x-1/2 bottom-24 left-1/2">
+    <div class="p-3 text-xs hud-glass rounded-xl font-mono-code text-slate-200">
+      <div class="flex items-center justify-between pb-1.5 mb-2 border-b border-purple-500/30">
+        <span class="flex items-center gap-1.5 font-bold text-purple-300"><i data-lucide="sparkles" class="w-4 h-4"></i> <span id="tour-stop-label">Tour</span></span>
+        <span id="tour-countdown" class="text-[10px] text-slate-500"></span>
+      </div>
+      <div id="tour-answer" class="hidden mb-2 text-[11px] leading-relaxed text-slate-300"></div>
+      <div class="flex gap-1.5">
+        <input type="text" id="tour-question" placeholder="Ask about this stop (food, history, nightlife)..." onkeydown="if(event.key==='Enter')askTourQuestion()" class="flex-1 min-w-0 px-2 py-1.5 text-[11px] border rounded bg-slate-950/80 border-slate-700 text-cyan-200 placeholder-slate-500 focus:outline-none focus:border-purple-400">
+        <button onclick="askTourQuestion()" class="shrink-0 px-2.5 py-1.5 text-[11px] font-bold text-white bg-purple-600 rounded hover:bg-purple-500">Ask</button>
+        <button onclick="continueTour()" class="shrink-0 px-2.5 py-1.5 text-[11px] font-bold text-white rounded bg-slate-700 hover:bg-slate-600">Continue</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Bottom Command Bar -->
   <div class="absolute z-20 w-full max-w-xl px-4 -translate-x-1/2 bottom-6 left-1/2">
     <div class="flex items-center gap-2 p-2 hud-glass rounded-xl">
@@ -781,12 +798,201 @@
     }
 
     /* ---------------- tour city with kali ----------------
-       An auto-generated cinematic loop for whichever city is active:
-       anchor (the destination's own landmark/arrival point) -> 2-3 spread-out
-       stops pulled from live Places results -> back to the anchor, narrated
-       by Kali at each arrival. Works on every DESTINATIONS entry, not just
-       Charleston, because the stops come from a live search rather than a
-       hand-built list. */
+       A narrated, INTERACTIVE guided tour. Each destination below has a
+       hand-written script: real history, named landmarks, and a short
+       deep-dive note per stop. At every stop Kali pauses and genuinely
+       invites a question (typed in the panel, or spoken through the mic);
+       food/nightlife/hotel questions are answered with a live Places
+       lookup right near that stop rather than a guess, so "try this" points
+       somewhere real. No answer within a few seconds and she just moves on.
+       A destination without a script yet (there shouldn't be one) falls
+       back to an auto-generated tour built from live Places results. */
+
+    const CITY_SCRIPTS = {
+      charleston: {
+        intro: "Welcome to Charleston — the heart of South Carolina's Lowcountry, settled by English colonists in 1670 and one of the best-preserved cities in America. Much of that beauty was built on rice and indigo, grown and harvested by enslaved West Africans whose Gullah Geechee descendants still hand-coil the sweetgrass baskets you'll see at the City Market today. I'll fly you past Rainbow Row's pastel houses, out to Fort Sumter where the Civil War's first shots were fired, and down to Kiawah Island and Daniel Island. Ask me anything as we go — food, history, where locals hang out — and if you've got nothing yet, just say the word and we'll get flying.",
+        outro: "And we're back downtown. That's the quick version of Charleston — rice, Gullah heritage, a war that started in its harbor, and a city that still parties at the City Market every weekend. Try 167 Raw or The Ordinary if you want to eat like a local.",
+        stops: [
+          { name: 'Charleston City Market', lat: 32.7817, lng: -79.9280,
+            say: "This is the Charleston City Market, running since 1804 — four blocks of vendor stalls where Gullah artisans hand-coil sweetgrass baskets using techniques that trace straight back to West African rice farming. King Street, just a block over, is the city's main shopping and dining strip.",
+            historyNote: "The market sits on land donated by the Pinckney family in the early 1800s. Sweetgrass basket weaving here is recognized as one of the oldest African American art forms still practiced in the U.S." },
+          { name: 'Rainbow Row & The Battery', lat: 32.7715, lng: -79.9280,
+            say: "Those pastel houses are Rainbow Row — thirteen colorful Georgian rowhouses along East Bay Street, among the most photographed blocks in America. Just south, The Battery's waterfront mansions and White Point Garden look straight out over the harbor.",
+            historyNote: "The colors date to a 1930s–40s restoration; before that the row had fallen into disrepair as a dockside slum, and painting the houses pastel was part of bringing them back." },
+          { name: 'Fort Sumter', lat: 32.7523, lng: -79.8748,
+            say: "Out in the harbor sits Fort Sumter — the first shots of the Civil War were fired here on April 12th, 1861, and the fort held out under siege for nearly four years after that.",
+            historyNote: "It's a national monument now, reachable only by boat. You can still see shell damage from the war pocked into the brickwork." },
+          { name: 'Kiawah Island', lat: 32.6151, lng: -80.0875,
+            say: "This is Kiawah Island — barrier-island beaches, maritime forest, and the Ocean Course, which hosted the 2021 PGA Championship and the 1991 Ryder Cup.",
+            historyNote: "Pete Dye designed the Ocean Course right along the Atlantic in the late 1980s; it's routinely ranked among the toughest courses in the country." },
+          { name: 'Daniel Island', lat: 32.8604, lng: -79.9023,
+            say: "And here's Daniel Island, home to Credit One Stadium, which hosts the WTA's Credit One Charleston Open every April — the largest women's-only tennis tournament in North America.",
+            historyNote: "The tournament's been running since 1973, making it one of the longest-standing stops on the women's tennis calendar." },
+        ],
+      },
+      nyc: {
+        intro: "Welcome to New York City — Dutch traders settled Manhattan as New Amsterdam in 1624, and the English renamed it New York forty years later. Five boroughs, eight million people, one of the most recognizable skylines on Earth. I'll fly you past Lady Liberty, through Central Park, over the Brooklyn Bridge, and out to Flushing Meadows. Ask me anything, or just say the word.",
+        outro: "That's a quick loop of New York. Ask me for restaurant, nightlife, or hotel picks near any of these any time you like.",
+        stops: [
+          { name: 'Statue of Liberty', lat: 40.6892, lng: -74.0445,
+            say: "That's the Statue of Liberty — a gift from France in 1886, standing at the entrance to New York Harbor. Ellis Island, right next to it, processed over twelve million immigrants between 1892 and 1954.",
+            historyNote: "Her full name is 'Liberty Enlightening the World.' The tablet in her hand is inscribed with the date of American independence, July 4th, 1776." },
+          { name: 'Central Park', lat: 40.7829, lng: -73.9654,
+            say: "This is Central Park — 843 acres carved out of Manhattan starting in the 1850s, designed by Frederick Law Olmsted and Calvert Vaux.",
+            historyNote: "It was one of the first landscaped public parks in the U.S. — workers moved more earth to build it than was moved to dig the Suez Canal." },
+          { name: 'Brooklyn Bridge', lat: 40.7061, lng: -73.9969,
+            say: "The Brooklyn Bridge opened in 1883, linking Manhattan and Brooklyn across the East River — the longest suspension bridge in the world at the time.",
+            historyNote: "Its chief engineer, John Roebling, died from an injury surveying the site; his son Washington finished it, directing construction from his sickbed by telescope." },
+          { name: 'Flushing Meadows', lat: 40.7498, lng: -73.8459,
+            say: "And out in Queens, Flushing Meadows is home to the USTA National Tennis Center, where the US Open is played every August and September.",
+            historyNote: "The park also hosted two World's Fairs, in 1939 and 1964 — that's the giant steel Unisphere globe down below." },
+        ],
+      },
+      tokyo: {
+        intro: "Welcome to Tokyo — founded as the fishing village of Edo, it became the seat of the shogunate in 1603 and was renamed Tokyo, 'Eastern Capital,' when the emperor moved here in 1868. I'll take you from Asakusa's oldest temple, through Shibuya's famous crossing, to the Skytree, and out to the fish market at Toyosu. Ask away, or say the word.",
+        outro: "That's Tokyo in miniature. Ask me about ramen, izakayas, or where locals actually drink, any time.",
+        stops: [
+          { name: 'Senso-ji Temple, Asakusa', lat: 35.7148, lng: 139.7967,
+            say: "This is Senso-ji — Tokyo's oldest temple, founded in 645 AD after two fishermen reportedly pulled a statue of the goddess Kannon from the Sumida River.",
+            historyNote: "The approach, Nakamise-dori, has sold souvenirs and snacks to pilgrims for centuries." },
+          { name: 'Shibuya Crossing', lat: 35.6595, lng: 139.7005,
+            say: "Below us is Shibuya Crossing — up to 3,000 people cross at once when the lights change, making it one of the busiest intersections on Earth.",
+            historyNote: "The area's been a trading hub since the Edo period, long before it grew into the dense entertainment and shopping district it is today." },
+          { name: 'Tokyo Skytree', lat: 35.7101, lng: 139.8107,
+            say: "That's Tokyo Skytree — at 634 meters, the tallest structure in Japan, built to broadcast digital TV once the city's skyscrapers started blocking the old Tokyo Tower's signal.",
+            historyNote: "It opened in 2012. Its height, 634, is a play on the old regional name 'Musashi' — read the same way in Japanese." },
+          { name: 'Toyosu Market', lat: 35.6454, lng: 139.7735,
+            say: "This is Toyosu Market, which took over Tokyo's legendary fish trade from the old Tsukiji site in 2018 — still home to the famous pre-dawn tuna auctions.",
+            historyNote: "Tsukiji ran for 83 years before the move; its outer market streets are still packed with sushi counters today." },
+        ],
+      },
+      rio: {
+        intro: "Welcome to Rio de Janeiro — founded by the Portuguese in 1565 and once the capital of Brazil for nearly two centuries. I'll fly you past Christ the Redeemer, over Sugarloaf Mountain, along Copacabana and Ipanema, and into Maracanã Stadium. Ask away, or say the word and we'll start.",
+        outro: "That's Rio. Ask me about churrasco, caipirinhas, or the best spot for sunset, any time.",
+        stops: [
+          { name: 'Christ the Redeemer', lat: -22.9519, lng: -43.2105,
+            say: "That's Christ the Redeemer, 38 meters tall atop Corcovado Mountain — completed in 1931 and now one of the New Seven Wonders of the World.",
+            historyNote: "It was funded largely by donations from Brazilian Catholics; the art-deco design came from French sculptor Paul Landowski." },
+          { name: 'Sugarloaf Mountain', lat: -22.9492, lng: -43.1545,
+            say: "This is Sugarloaf Mountain — a granite peak you reach by cable car, with some of the best views of Guanabara Bay in the city.",
+            historyNote: "The cable car's been running since 1912, one of the oldest in the world." },
+          { name: 'Copacabana & Ipanema', lat: -22.9800, lng: -43.1950,
+            say: "Below us: Copacabana and Ipanema, Rio's most famous beaches — four kilometers of white sand, beach volleyball, and the start of Carnival season every February.",
+            historyNote: "Ipanema gave its name to 'The Girl from Ipanema,' the bossa nova classic written at a bar just off the beach." },
+          { name: 'Maracanã Stadium', lat: -22.9122, lng: -43.2302,
+            say: "And that's Maracanã — once the largest football stadium in the world, built for the 1950 World Cup and still Rio's cathedral of soccer.",
+            historyNote: "It hosted World Cup finals in both 1950 and 2014, plus the opening and closing ceremonies of the 2016 Olympics." },
+        ],
+      },
+      kingston: {
+        intro: "Welcome to Kingston, Jamaica — founded in 1692 after an earthquake sank the pirate stronghold of Port Royal across the harbor. This is the birthplace of reggae. I'll fly you past the Bob Marley Museum, over Port Royal's sunken ruins, and up into the Blue Mountains. Ask away, or say the word.",
+        outro: "That's Kingston. Ask me about jerk chicken, reggae bars, or the best beach nearby, any time.",
+        stops: [
+          { name: 'Bob Marley Museum', lat: 18.0186, lng: -76.7836,
+            say: "This is the Bob Marley Museum — his former home on Hope Road, where he lived and recorded through much of the 1970s, including surviving an assassination attempt here in 1976.",
+            historyNote: "The house still shows bullet holes from that night, and his old studio, Tuff Gong, is preserved inside." },
+          { name: 'Port Royal', lat: 17.9386, lng: -76.8413,
+            say: "Out across the harbor is Port Royal — once called 'the wickedest city on Earth,' a pirate haven until a massive earthquake sank two-thirds of it into the sea in 1692.",
+            historyNote: "Much of the sunken town is still an active underwater archaeological site today." },
+          { name: 'Blue Mountains', lat: 18.0747, lng: -76.6436,
+            say: "Up ahead, the Blue Mountains — home to some of the world's most prized coffee, grown on steep slopes above 3,000 feet.",
+            historyNote: "Blue Mountain coffee's reputation goes back to British colonial plantations in the 1700s and remains one of Jamaica's signature exports." },
+          { name: 'Devon House', lat: 18.0152, lng: -76.7881,
+            say: "This is Devon House, built in 1881 by George Stiebel, Jamaica's first Black millionaire — now a heritage site known as much for its ice cream as its history.",
+            historyNote: "Stiebel made his fortune in gold mining in Venezuela before returning home to build this estate." },
+        ],
+      },
+      manila: {
+        intro: "Welcome to Manila — founded by Spanish conquistador Miguel López de Legazpi in 1571 on top of an existing settlement, and capital of the Philippines ever since. I'll fly you through the old walled city of Intramuros, past Rizal Park, along Manila Bay, and into Binondo, the oldest Chinatown in the world. Ask away, or say the word.",
+        outro: "That's Manila. Ask me about adobo, lechon, or the best rooftop bar in Makati, any time.",
+        stops: [
+          { name: 'Intramuros', lat: 14.5955, lng: 120.9710,
+            say: "This is Intramuros — the old walled city the Spanish began building in 1571, with stone forts, cobblestone streets, and churches that survived centuries of earthquakes, typhoons, and war.",
+            historyNote: "Much of it was destroyed in the 1945 Battle of Manila and has been painstakingly restored since." },
+          { name: 'Rizal Park', lat: 14.5832, lng: 120.9794,
+            say: "This is Rizal Park, named for national hero José Rizal, who was executed by Spanish authorities here in 1896 for his writing against colonial rule.",
+            historyNote: "Rizal's execution further galvanized the revolution already underway against Spanish rule that same year." },
+          { name: 'Manila Bay', lat: 14.5739, lng: 120.9816,
+            say: "Below us is Manila Bay — famous for its sunsets along the Baywalk, and the site of a decisive 1898 naval battle between the US and Spain.",
+            historyNote: "That battle effectively ended Spanish rule in the Philippines, which stretched back over 300 years." },
+          { name: 'Binondo', lat: 14.6003, lng: 120.9742,
+            say: "This is Binondo — established in 1594, it's recognized as the oldest Chinatown in the world, still packed with family-run restaurants and gold shops.",
+            historyNote: "The Spanish set it up specifically for Chinese traders who had converted to Catholicism, just outside Intramuros's walls." },
+        ],
+      },
+      bangkok: {
+        intro: "Welcome to Bangkok — made capital of Siam in 1782 by King Rama I, founder of the dynasty that still reigns in Thailand today. I'll fly you over the Grand Palace, past the temples along the Chao Phraya River, and out to the weekend markets. Ask away, or say the word.",
+        outro: "That's Bangkok. Ask me about pad thai, rooftop bars, or where to catch a Muay Thai fight, any time.",
+        stops: [
+          { name: 'Grand Palace', lat: 13.7500, lng: 100.4913,
+            say: "This is the Grand Palace — official residence of the Kings of Siam since 1782, and home to the Emerald Buddha, Thailand's most sacred image.",
+            historyNote: "The Emerald Buddha is actually carved from jade, not emerald, and its seasonal robes are changed personally by the King three times a year." },
+          { name: 'Wat Arun & Wat Pho', lat: 13.7450, lng: 100.4910,
+            say: "Across the river, Wat Arun's spires glow at sunset — the 'Temple of Dawn.' Nearby, Wat Pho houses a 46-meter gold reclining Buddha and is considered the birthplace of traditional Thai massage.",
+            historyNote: "Wat Pho opened one of Thailand's first public education centers in the 1830s, with its teachings literally carved into the temple walls." },
+          { name: 'Chao Phraya River', lat: 13.7300, lng: 100.4950,
+            say: "This river has been Bangkok's main artery for centuries — long-tail boats, floating markets, and riverside temples all still run along it today.",
+            historyNote: "Before modern roads, the river and its canals served as the city's main streets — Bangkok used to be called 'the Venice of the East.'" },
+          { name: 'Chatuchak Weekend Market', lat: 13.7999, lng: 100.5500,
+            say: "And this is Chatuchak — one of the largest weekend markets in the world, with thousands of stalls selling everything from street food to antiques.",
+            historyNote: "It's been running since 1942, when the government consolidated several smaller markets into one site." },
+        ],
+      },
+      paris: {
+        intro: "Welcome to Paris — settled by the Celtic Parisii tribe over 2,000 years ago, later the Roman city of Lutetia. I'll fly you past the Eiffel Tower, along the Seine to Notre-Dame and the Louvre, and up to Montmartre. Ask away, or say the word.",
+        outro: "That's Paris. Ask me about bistros, wine bars, or the best café for people-watching, any time.",
+        stops: [
+          { name: 'Eiffel Tower', lat: 48.8584, lng: 2.2945,
+            say: "The Eiffel Tower — built for the 1889 World's Fair by Gustave Eiffel, and meant to be torn down after twenty years. Parisians hated it at first.",
+            historyNote: "It was saved because it proved useful as a radio transmission tower — a role it's technically still played ever since." },
+          { name: 'Notre-Dame & the Louvre', lat: 48.8568, lng: 2.3438,
+            say: "Notre-Dame Cathedral dates to 1163, and the Louvre began as a 12th-century fortress before becoming the world's largest art museum, home to the Mona Lisa.",
+            historyNote: "Notre-Dame suffered a major fire in 2019 and reopened to the public in December 2024 after a five-year restoration." },
+          { name: 'Montmartre', lat: 48.8867, lng: 2.3431,
+            say: "Up here is Montmartre, the hilltop neighborhood that was home to Picasso, Van Gogh, and Toulouse-Lautrec — the Sacré-Cœur basilica crowns the top.",
+            historyNote: "It was its own independent village, known for cheap rent and cheaper wine, until Paris annexed it in 1860." },
+          { name: 'Champs-Élysées & Arc de Triomphe', lat: 48.8738, lng: 2.2950,
+            say: "And this is the Champs-Élysées, running straight to the Arc de Triomphe, which Napoleon commissioned in 1806 to honor his army — though he didn't live to see it finished.",
+            historyNote: "Twelve avenues radiate out from the Arc in a star pattern; the square itself is officially named Place Charles de Gaulle." },
+        ],
+      },
+      lagos: {
+        intro: "Welcome to Lagos — originally a Yoruba fishing settlement called Eko, later a major Atlantic port, and now Africa's largest city, home to well over 15 million people. I'll fly you over Lagos Island's old markets, out to the beaches, and through a site at the heart of the city's music history. Ask away, or say the word.",
+        outro: "That's Lagos. Ask me about Afrobeats spots, suya stands, or the best beach club, any time.",
+        stops: [
+          { name: 'Balogun Market, Lagos Island', lat: 6.4541, lng: 3.3947,
+            say: "This is Balogun Market — one of West Africa's largest open-air markets, with thousands of stalls selling textiles, electronics, and everything in between.",
+            historyNote: "Lagos Island has been a trading hub since at least the 15th century, when it was a Yoruba fishing and farming settlement." },
+          { name: 'National Museum Lagos', lat: 6.4512, lng: 3.3953,
+            say: "The National Museum here traces Nigeria's history from the Nok terracottas — some of West Africa's oldest sculptures — through independence in 1960.",
+            historyNote: "It also holds royal regalia connected to the historic Benin Kingdom, one of West Africa's great pre-colonial powers." },
+          { name: 'Freedom Park', lat: 6.4507, lng: 3.3958,
+            say: "This is Freedom Park — once Her Majesty's Broad Street Prison under British colonial rule, redeveloped into a cultural park and live-music venue after independence.",
+            historyNote: "It opened in its current form in 2010 and now hosts concerts and festivals on the very ground where the old colonial prison once stood." },
+          { name: 'Tarkwa Bay Beach', lat: 6.4005, lng: 3.3652,
+            say: "Out here is Tarkwa Bay — a calm, boat-access-only beach that's become one of Lagos's favorite weekend escapes.",
+            historyNote: "It sits right by a harbor breakwater built in the early 1900s, which is part of why its waters stay so much calmer than the open Atlantic beaches nearby." },
+        ],
+      },
+      hcmc: {
+        intro: "Welcome to Ho Chi Minh City — once a small settlement called Prey Nokor, it became the French colonial capital Saigon, and was renamed Ho Chi Minh City in 1976 after reunification. I'll fly you past the old French quarter, through Ben Thanh Market, and out to the Cu Chi Tunnels. Ask away, or say the word.",
+        outro: "That's Ho Chi Minh City. Ask me about pho, banh mi, or the best rooftop bar downtown, any time.",
+        stops: [
+          { name: 'Notre-Dame Cathedral & Central Post Office', lat: 10.7798, lng: 106.6990,
+            say: "This is Saigon's French quarter — a Notre-Dame Cathedral built in the 1880s with materials shipped over from France, and the Central Post Office from the same era, still in daily use.",
+            historyNote: "Both buildings date to French colonial rule, which lasted here from the 1860s until Vietnam's independence in the 1950s." },
+          { name: 'War Remnants Museum', lat: 10.7797, lng: 106.6919,
+            say: "The War Remnants Museum documents the Vietnam War from the Vietnamese side — tanks, aircraft, and photography from decades of conflict.",
+            historyNote: "It first opened in 1975, the same year the war ended, and remains one of the most visited museums in the country." },
+          { name: 'Ben Thanh Market', lat: 10.7725, lng: 106.6980,
+            say: "This is Ben Thanh Market — the clock tower entrance has marked this spot since 1914, and it's still the city's most famous place for street food and souvenirs.",
+            historyNote: "The surrounding market area dates back even further, to street vendors trading near the old citadel in the 1800s." },
+          { name: 'Cu Chi Tunnels', lat: 11.1402, lng: 106.4542,
+            say: "Out here, northwest of the city, are the Cu Chi Tunnels — over 120 kilometers of underground passages used by Viet Cong fighters during the war.",
+            historyNote: "Some sections have been widened for visitors to crawl through; the originals were built narrow enough to slow down larger pursuers." },
+        ],
+      },
+    };
 
     function haversineMeters(aLat, aLng, bLat, bLng) {
       const R = 6371000;
@@ -797,10 +1003,11 @@
       return 2 * R * Math.asin(Math.sqrt(s));
     }
 
-    // Greedy farthest-point sampling: starting from the anchor, repeatedly
-    // pick whichever remaining candidate is farthest from everything chosen
-    // so far. Spreads the tour across the area (downtown + outlying spots)
-    // instead of clumping on three restaurants next door to each other.
+    // Greedy farthest-point sampling, used only by the auto-tour fallback
+    // below: starting from the anchor, repeatedly pick whichever remaining
+    // candidate is farthest from everything chosen so far, so the loop
+    // spreads across the area instead of clumping on three spots next door
+    // to each other.
     function pickSpreadStops(anchor, pool, count) {
       const seen = new Set();
       const candidates = pool.filter((p) => {
@@ -826,11 +1033,9 @@
       return chosen;
     }
 
-    // Builds a tour for any destination from two live Places searches: the
-    // city's own headline landmarks, plus notable nearby towns/beaches/
-    // neighborhoods — which is how "Charleston -> Mount Pleasant -> Isle of
-    // Palms -> back downtown" falls out naturally without hand-authoring it.
-    async function buildCityTour(d) {
+    // Fallback for any destination with no hand-written CITY_SCRIPTS entry:
+    // builds a tour from two live Places searches instead.
+    async function buildAutoTour(d) {
       const anchor = { name: d.name, lat: d.lat, lng: d.lng };
       const [landmarks, nearby] = await Promise.all([
         searchPlaces(`top landmarks and attractions in ${d.name}`, d, 8).catch(() => []),
@@ -859,28 +1064,53 @@
 
     // Narration that always speaks aloud (unlike speak(), which only speaks
     // after a voice command) — a guided tour is meant to be heard regardless
-    // of how it was started.
-    function speakTour(text) {
+    // of how it was started. Calls `onend` once speech actually finishes,
+    // with a generous timed fallback in case the browser's onend never
+    // fires (it occasionally doesn't).
+    function speakTour(text, onend) {
       setKali(text);
-      if (!window.speechSynthesis) return;
+      const clean = text.replace(/^Kali AI:\s*/, '');
+      if (!window.speechSynthesis) {
+        if (onend) setTimeout(onend, Math.min(8000, 1200 + clean.length * 40));
+        return;
+      }
       window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text.replace(/^Kali AI:\s*/, ''));
-      u.volume = 0.6;
-      u.rate = 1;
+      const u = makeUtterance(clean);
+      let done = false;
+      const finish = () => { if (done) return; done = true; onend && onend(); };
+      u.onend = finish;
+      u.onerror = finish;
       window.speechSynthesis.speak(u);
+      setTimeout(finish, Math.min(20000, 2000 + clean.length * 90));
     }
 
     async function toggleCityTour() {
       if (tourState) { cancelCityTour(); return; }
-      // Mark as loading immediately so a second click (or a manual fly-to)
-      // during the search cancels the tour instead of racing a duplicate one.
       tourState = { loading: true };
       updateTourButton();
       if (!cinematicOn) toggleCinematic();
+
+      const script = CITY_SCRIPTS[currentDest.id];
+      if (script) {
+        tourState = {
+          anchor: { name: currentDest.name, lat: currentDest.lat, lng: currentDest.lng },
+          stops: script.stops,
+          outro: script.outro,
+          index: -1,
+        };
+        updateTourButton();
+        speakTour(`Kali AI: ${script.intro}`, () => {
+          if (tourState) tourState.timer = setTimeout(runNextTourStop, 400);
+        });
+        return;
+      }
+
+      // No hand-written script for this destination — fall back to a live
+      // Places-built tour so the feature still works everywhere.
       setKali(`Kali AI: Scouting a tour of ${currentDest.name}...`);
       let tour = null;
       try {
-        tour = await buildCityTour(currentDest);
+        tour = await buildAutoTour(currentDest);
       } catch (err) {
         console.error('Tour build failed:', err);
       }
@@ -894,14 +1124,18 @@
       tourState = { anchor: tour.anchor, stops: tour.stops, index: -1 };
       updateTourButton();
       const n = tour.stops.length;
-      speakTour(`Kali AI: Let's tour ${currentDest.name}. I'll show you ${n} stop${n > 1 ? 's' : ''} around the area, then bring us back to ${tour.anchor.name}.`);
-      tourState.timer = setTimeout(runNextTourStop, 4500);
+      speakTour(`Kali AI: Let's tour ${currentDest.name}. I'll show you ${n} stop${n > 1 ? 's' : ''} around the area, then bring us back to ${tour.anchor.name}.`, () => {
+        if (tourState) tourState.timer = setTimeout(runNextTourStop, 400);
+      });
     }
 
     function cancelCityTour(opts = {}) {
       if (!tourState) return;
       if (tourState.timer) clearTimeout(tourState.timer);
+      if (tourState.qaTimer) clearTimeout(tourState.qaTimer);
       tourState = null;
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      closeTourPanel();
       updateTourButton();
       if (!opts.quiet) setKali('Kali AI: Tour stopped.');
     }
@@ -912,14 +1146,16 @@
       const { stops, anchor, index } = tourState;
 
       if (index >= stops.length) {
-        speakTour(`Kali AI: Heading back to ${anchor.name} to wrap up the tour.`);
+        speakTour(`Kali AI: Heading back to ${anchor.name} to wrap up the tour.`, () => {});
         flyToPlace(anchor.lat, anchor.lng, anchor.name, {
           fromTour: true,
           onArrive: () => {
             if (!tourState) return;
-            speakTour(`Kali AI: Tour complete — back at ${anchor.name}.`);
-            tourState = null;
-            updateTourButton();
+            const outro = tourState.outro || `Tour complete — back at ${anchor.name}.`;
+            speakTour(`Kali AI: ${outro}`, () => {
+              tourState = null;
+              updateTourButton();
+            });
           },
         });
         return;
@@ -930,13 +1166,123 @@
         fromTour: true,
         onArrive: () => {
           if (!tourState) return;
-          const bits = [`Stop ${index + 1} of ${stops.length}: ${stop.name}.`];
-          if (stop.address) bits.push(`${stop.address}.`);
-          if (stop.rating) bits.push(`Rated ${stop.rating} stars.`);
-          speakTour(`Kali AI: ${bits.join(' ')}`);
-          tourState.timer = setTimeout(runNextTourStop, 6500);
+          tourState.currentStop = stop;
+          let line = stop.say;
+          if (!line) {
+            const bits = [`Stop ${index + 1} of ${stops.length}: ${stop.name}.`];
+            if (stop.address) bits.push(`${stop.address}.`);
+            if (stop.rating) bits.push(`Rated ${stop.rating} stars.`);
+            line = bits.join(' ');
+          }
+          speakTour(`Kali AI: ${line}`, () => {
+            if (tourState) openTourQA(stop);
+          });
         },
       });
+    }
+
+    /* ---- the interactive Q&A pause at each stop ---- */
+
+    function closeTourPanel() {
+      const panel = document.getElementById('tour-panel');
+      if (panel) panel.classList.add('hidden');
+      if (tourState) tourState.awaitingQA = false;
+    }
+
+    // Counts down in the tour panel while awaiting a question; auto-advances
+    // the tour when it reaches zero, same as a real guide moving on when
+    // nobody speaks up.
+    function startTourCountdown(seconds) {
+      if (!tourState) return;
+      const countdown = document.getElementById('tour-countdown');
+      let secondsLeft = seconds;
+      const tick = () => {
+        if (!tourState || !tourState.awaitingQA) return;
+        if (secondsLeft <= 0) { continueTour(); return; }
+        countdown.innerText = `Continuing in ${secondsLeft}s...`;
+        secondsLeft--;
+        tourState.qaTimer = setTimeout(tick, 1000);
+      };
+      tick();
+    }
+
+    function openTourQA(stop) {
+      if (!tourState) return;
+      const panel = document.getElementById('tour-panel');
+      document.getElementById('tour-stop-label').innerText = stop.name;
+      const answerEl = document.getElementById('tour-answer');
+      answerEl.classList.add('hidden');
+      answerEl.innerText = '';
+      document.getElementById('tour-question').value = '';
+      panel.classList.remove('hidden');
+      tourState.awaitingQA = true;
+      setKali(`Kali AI: Any questions about ${stop.name}? Ask away, or say the word and we'll keep moving.`);
+      startTourCountdown(10);
+    }
+
+    function continueTour() {
+      if (!tourState) return;
+      if (tourState.qaTimer) clearTimeout(tourState.qaTimer);
+      tourState.awaitingQA = false;
+      closeTourPanel();
+      tourState.timer = setTimeout(runNextTourStop, 400);
+    }
+
+    // Food/nightlife/hotel questions get answered from live Places data
+    // near the current stop, rather than a made-up recommendation — so
+    // "try this" actually points at something real.
+    const TOUR_QA_ROUTES = [
+      { keywords: ['food', 'eat', 'restaurant', 'hungry', 'dinner', 'lunch', 'bite', 'breakfast'], verb: 'restaurant', query: (stop, d) => `best restaurants near ${stop.name}, ${d.name}` },
+      { keywords: ['bar', 'drink', 'nightlife', 'hangout', 'hang out', 'wet bar', 'club', 'party'], verb: 'hangout', query: (stop, d) => `bars and nightlife near ${stop.name}, ${d.name}` },
+      { keywords: ['hotel', 'stay', 'sleep', 'room'], verb: 'hotel', query: (stop, d) => `hotels near ${stop.name}, ${d.name}` },
+    ];
+
+    async function askTourQuestion() {
+      if (!tourState || !tourState.currentStop) return;
+      const input = document.getElementById('tour-question');
+      const val = input.value.trim();
+      if (!val) return;
+      const lower = val.toLowerCase();
+      if (tourState.qaTimer) clearTimeout(tourState.qaTimer);
+      input.value = '';
+
+      if (/\b(continue|next|move on|that'?s it|nothing|no questions|i'?m good|go ahead)\b/.test(lower)) {
+        continueTour();
+        return;
+      }
+
+      const stop = tourState.currentStop;
+      const answerEl = document.getElementById('tour-answer');
+      const countdown = document.getElementById('tour-countdown');
+      const route = TOUR_QA_ROUTES.find((r) => r.keywords.some((k) => lower.includes(k)));
+      let answer;
+
+      if (route) {
+        answerEl.classList.remove('hidden');
+        answerEl.innerText = 'Checking nearby...';
+        countdown.innerText = '';
+        try {
+          const places = await searchPlaces(route.query(stop, currentDest), currentDest, 1);
+          answer = places.length
+            ? `Right near here: ${places[0].name}${places[0].rating ? `, rated ${places[0].rating}★` : ''}. Worth a stop.`
+            : `I couldn't pull up a live ${route.verb} near here right now — try asking in the main Kali bar for "${route.verb}s in ${currentDest.name}."`;
+        } catch (err) {
+          console.error('Tour Q&A search failed:', err);
+          answer = `Couldn't reach live places data just now — try asking again in a moment.`;
+        }
+      } else if (!tourState) {
+        return; // cancelled mid-lookup
+      } else if (stop.historyNote) {
+        answer = stop.historyNote;
+      } else {
+        answer = `${stop.name} is one of the highlights around here — ask in the main Kali bar for more specific picks nearby.`;
+      }
+
+      if (!tourState) return; // tour was stopped while we were answering
+      answerEl.classList.remove('hidden');
+      answerEl.innerText = answer;
+      speakTour(`Kali AI: ${answer}`, () => {});
+      startTourCountdown(10);
     }
 
     /* ---------------- weather ---------------- */
@@ -1101,6 +1447,49 @@
     // Browser speech recognition (Chrome, Edge, Safari). The mic button only
     // appears where it's supported; Kali's spoken reply is a short, quiet
     // confirmation and only follows a voice command.
+    // Picks the most natural-sounding voice available in THIS visitor's
+    // browser/OS for Kali to speak with. Every device ships a different set
+    // of Web Speech API voices — this just scores what's actually on offer
+    // and prefers cloud/neural ones over the default robotic local ones,
+    // rather than hard-coding a single voice name that may not exist here.
+    let kaliVoice = null;
+    const PREFERRED_VOICE_NAMES = [
+      // Known high-quality natural voices, roughly best-first, across
+      // Chrome/Edge/Safari on desktop, mobile and ChromeOS/Linux.
+      'Google US English', 'Microsoft Aria Online (Natural)', 'Microsoft Jenny Online (Natural)',
+      'Microsoft Ava Online (Natural)', 'Samantha', 'Microsoft Zira Desktop', 'Victoria',
+      'Google UK English Female', 'Karen', 'Moira', 'Tessa',
+    ];
+    function pickKaliVoice() {
+      if (!window.speechSynthesis) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return;
+      const score = (v) => {
+        let s = 0;
+        const i = PREFERRED_VOICE_NAMES.findIndex((n) => v.name.includes(n));
+        if (i !== -1) s += (PREFERRED_VOICE_NAMES.length - i) * 10; // named-match beats everything
+        if (!v.localService) s += 5; // cloud voices are almost always more natural than on-device ones
+        if (/natural|neural|enhanced|premium/i.test(v.name)) s += 4;
+        if (/^en/i.test(v.lang)) s += 2;
+        if (/female|aria|jenny|ava|samantha|zira|victoria|karen|moira|tessa|salli|joanna/i.test(v.name)) s += 1;
+        return s;
+      };
+      kaliVoice = voices.reduce((best, v) => (score(v) > score(best || voices[0]) ? v : best), null) || voices[0];
+    }
+    if (window.speechSynthesis) {
+      pickKaliVoice();
+      window.speechSynthesis.onvoiceschanged = pickKaliVoice; // most browsers load voices asynchronously
+    }
+
+    function makeUtterance(text) {
+      const u = new SpeechSynthesisUtterance(text);
+      if (kaliVoice) u.voice = kaliVoice;
+      u.volume = 0.7;
+      u.rate = 0.98; // a hair slower than default reads as calmer, less clipped/robotic
+      u.pitch = 1.03;
+      return u;
+    }
+
     let lastWasVoice = false;
     function setupVoice() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1112,7 +1501,16 @@
       const input = document.getElementById('cmd-input');
       recognition.onresult = (e) => {
         const r = e.results[e.results.length - 1];
-        input.value = r[0].transcript;
+        const text = r[0].transcript;
+        // Mid-tour, a spoken question goes to the tour Q&A panel instead of
+        // the main command bar.
+        if (tourState && tourState.awaitingQA) {
+          const qInput = document.getElementById('tour-question');
+          qInput.value = text;
+          if (r.isFinal) askTourQuestion();
+          return;
+        }
+        input.value = text;
         if (r.isFinal) {
           lastWasVoice = true;
           sendCommand();
@@ -1144,11 +1542,8 @@
     function speak(text) {
       if (!lastWasVoice || !window.speechSynthesis) return;
       lastWasVoice = false;
-      const u = new SpeechSynthesisUtterance(text);
-      u.volume = 0.6;
-      u.rate = 1;
       window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
+      window.speechSynthesis.speak(makeUtterance(text));
     }
 
     /* ---------------- traffic ---------------- */
