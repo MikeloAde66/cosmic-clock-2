@@ -154,22 +154,24 @@
   <!-- Top Right: live weather for the current destination (Open-Meteo,
        which serves NOAA's GFS/HRRR models over the US and national
        weather-service models elsewhere). -->
-  <div class="absolute z-20 hidden p-3 text-xs top-4 right-4 hud-glass-top rounded-xl w-72 font-mono-code text-slate-200 sm:block">
-    <div class="flex justify-between items-center pb-1.5 border-b border-slate-700/60">
-      <span class="font-bold text-amber-400 flex items-center gap-1.5">
+  <div id="wx-panel" class="absolute z-20 hidden p-3 text-xs top-4 right-4 hud-glass-top rounded-xl w-72 font-mono-code text-slate-200 sm:block">
+    <div class="flex justify-between items-center">
+      <span id="wx-title" class="hidden font-bold text-amber-400 items-center gap-1.5 pb-1.5 border-b border-slate-700/60 w-full">
         <i data-lucide="cloud-lightning" class="w-4 h-4 text-amber-400"></i> LIVE FLIGHT WEATHER
       </span>
-      <span id="wx-status" class="px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-300 text-[10px]">LOADING</span>
     </div>
-    <div class="mt-2 space-y-1 text-[11px] text-slate-300">
-      <div class="flex justify-between"><span>Wind:</span><strong class="text-white" id="wx-wind">—</strong></div>
-      <div class="flex justify-between"><span>Gusts:</span><strong class="text-white" id="wx-gusts">—</strong></div>
-      <div class="flex justify-between"><span>Visibility:</span><strong class="text-white" id="wx-vis">—</strong></div>
-      <div class="flex justify-between"><span>Cloud cover:</span><strong class="text-white" id="wx-cloud">—</strong></div>
-      <div class="flex justify-between"><span>Temperature:</span><strong class="text-white" id="wx-temp">—</strong></div>
-      <div class="flex justify-between"><span>Airspace:</span><strong class="text-amber-300" id="wx-airspace">—</strong></div>
+    <button type="button" id="wx-status" onclick="toggleWeatherPanel()" aria-expanded="false" aria-controls="wx-body" title="Show live flight weather" class="w-full text-right px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-300 text-[10px] cursor-pointer hover:bg-slate-600/60">LOADING</button>
+    <div id="wx-body" class="hidden">
+      <div class="mt-2 space-y-1 text-[11px] text-slate-300">
+        <div class="flex justify-between"><span>Wind:</span><strong class="text-white" id="wx-wind">—</strong></div>
+        <div class="flex justify-between"><span>Gusts:</span><strong class="text-white" id="wx-gusts">—</strong></div>
+        <div class="flex justify-between"><span>Visibility:</span><strong class="text-white" id="wx-vis">—</strong></div>
+        <div class="flex justify-between"><span>Cloud cover:</span><strong class="text-white" id="wx-cloud">—</strong></div>
+        <div class="flex justify-between"><span>Temperature:</span><strong class="text-white" id="wx-temp">—</strong></div>
+        <div class="flex justify-between"><span>Airspace:</span><strong class="text-amber-300" id="wx-airspace">—</strong></div>
+      </div>
+      <div class="mt-2 text-[10px] text-slate-500">Source: Open-Meteo (NOAA models in the US)</div>
     </div>
-    <div class="mt-2 text-[10px] text-slate-500">Source: Open-Meteo (NOAA models in the US)</div>
   </div>
 
   <!-- Collapsible Left Navigation Drawer -->
@@ -771,10 +773,12 @@
       return dirs[Math.round(deg / 22.5) % 16];
     }
 
+    const WX_STATUS_BASE = 'w-full text-right px-1.5 py-0.5 rounded text-[10px] cursor-pointer hover:brightness-110';
+
     async function fetchWeather(d) {
       const status = document.getElementById('wx-status');
       status.innerText = 'LOADING';
-      status.className = 'px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-300 text-[10px]';
+      status.className = `${WX_STATUS_BASE} bg-slate-700/60 text-slate-300`;
       document.getElementById('wx-airspace').innerText = d.country === 'US' ? 'Check B4UFLY (FAA)' : 'Check local aviation rules';
       try {
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${d.lat}&longitude=${d.lng}` +
@@ -795,15 +799,27 @@
           : `${Math.round(c.temperature_2m)}°C`;
         const windy = c.wind_gusts_10m >= 20;
         status.innerText = windy ? 'GUSTY' : 'LIVE';
-        status.className = `px-1.5 py-0.5 rounded text-[10px] ${windy ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-400'}`;
+        status.className = `${WX_STATUS_BASE} ${windy ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-400'}`;
       } catch (err) {
         console.error('Weather fetch failed:', err);
         status.innerText = 'OFFLINE';
-        status.className = 'px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px]';
+        status.className = `${WX_STATUS_BASE} bg-rose-500/20 text-rose-300`;
       }
     }
 
     /* ---------------- drawer, keys, commands ---------------- */
+
+    function toggleWeatherPanel() {
+      const body = document.getElementById('wx-body');
+      const title = document.getElementById('wx-title');
+      const status = document.getElementById('wx-status');
+      const open = body.classList.contains('hidden');
+      body.classList.toggle('hidden', !open);
+      title.classList.toggle('hidden', !open);
+      title.classList.toggle('flex', open);
+      status.setAttribute('aria-expanded', String(open));
+      status.title = open ? 'Hide live flight weather' : 'Show live flight weather';
+    }
 
     function toggleSidebar() {
       const drawer = document.getElementById('left-drawer');
