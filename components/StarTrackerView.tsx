@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, CalendarClock, HelpCircle, Mic, Satellite, Sparkles, Sun as SunIcon, Volume2, X } from 'lucide-react';
+import { ArrowLeft, CalendarClock, HelpCircle, Lock, Mic, Satellite, Sparkles, Sun as SunIcon, Volume2, X } from 'lucide-react';
 import { Body as AstroBody, Equator, Horizon, Illumination, Observer, SearchRiseSet } from 'astronomy-engine';
 import { localSiderealTime } from '@/lib/siderealTime';
 import { useIssTracker } from '@/lib/useIssTracker';
@@ -27,8 +27,6 @@ import { TelemetryGauges } from './hud/TelemetryGauges';
 import { SystemMetricsGauges } from './hud/SystemMetricsGauges';
 import { TargetAlignmentDiagnostics } from './hud/TargetAlignmentDiagnostics';
 import { HudControlPanel } from './hud/HudControlPanel';
-import DsnTelemetryPanel from './hud/DsnTelemetryPanel';
-import DeepSkySpectrumPanel from './hud/DeepSkySpectrumPanel';
 import { useProCoreConnection } from '@/lib/useProCoreConnection';
 
 // The same real NASA ISS live feed already used by ISSFeedModal (the
@@ -75,6 +73,18 @@ const TRACKED_BODIES: AstroBody[] = [
   AstroBody.Jupiter,
   AstroBody.Saturn,
 ];
+
+// Free-tier teaser set — per the owner's packaging note, the ISS feed plus
+// the Sun, Mars, and Moon stay open and interactive (Kali included) so a
+// visitor gets a real taste of the app; everything else tracked here
+// (Mercury, Venus, Jupiter, Saturn), plus the DSN Telemetry / Deep Sky
+// Spectrum tabs and the telescope-connect panel below, show a locked
+// "Upgrade" teaser instead. This is a visual gate only — no payment is
+// wired up, and packaging/pricing is still undecided, so nothing here
+// should be read as the real paywall. Signing up for a free account is a
+// separate, later gate and does NOT lift this lock (that's a paid upgrade
+// at its own price) — don't wire account state into FREE_BODY_NAMES.
+const FREE_BODY_NAMES = new Set<string>(['Sun', 'Mars', 'Moon']);
 
 const AU_IN_KM = 149_597_870;
 
@@ -204,6 +214,17 @@ function selectionKey(item: SelectedItem): string | null {
   if (item.kind === 'messier') return `messier:${item.object.id}`;
   if (item.kind === 'constellation') return `constellation:${item.id}`;
   return 'iss';
+}
+
+// Free-tier teaser selections: ISS and the three open bodies (Sun, Mars,
+// Moon — see FREE_BODY_NAMES). Everything else (locked bodies, Messier
+// deep-sky objects, constellations) is part of the locked "Upgrade" tier —
+// Kali's auto-narration and the real detail panel are gated on this.
+function isFreeTeaserSelection(item: SelectedItem): boolean {
+  if (!item) return false;
+  if (item.kind === 'iss') return true;
+  if (item.kind === 'body') return FREE_BODY_NAMES.has(item.body.name);
+  return false;
 }
 
 // Fixed background stars/constellations have real RA/Dec already (unlike
@@ -927,6 +948,10 @@ onReady: (event: any) => {            event.target.setVolume(71);
   const selKey = selectionKey(selected);
   useEffect(() => {
     if (!selected) return;
+    // Kali only speaks up for the free teaser set (ISS, Sun, Mars, Moon) —
+    // locked bodies/Messier objects stay silent along with the rest of the
+    // locked content; see FREE_BODY_NAMES.
+    if (!isFreeTeaserSelection(selected)) return;
 
     const query = describeSelectedForKali(selected);
     if (query) askKaliInline(query, false);
@@ -1145,8 +1170,24 @@ onReady: (event: any) => {            event.target.setVolume(71);
           </div>
         </div>
 
-        <div ref={telescopeConnectRef}>
-          <TelescopeConnectPanel connection={telescope} />
+        {/* Real telescope hardware connect (USB/BLE/simulator) is part of
+            the locked tier — shown dimmed with an Upgrade overlay rather
+            than removed, so a visitor can see the capability exists. No
+            payment wired up; packaging/pricing is still undecided. */}
+        <div ref={telescopeConnectRef} className="relative">
+          <div className="pointer-events-none opacity-40 blur-[1px]">
+            <TelescopeConnectPanel connection={telescope} />
+          </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-black/40">
+            <Lock className="w-5 h-5 text-amber-300" />
+            <p className="px-4 text-xs text-center text-amber-200/90">Connecting a real telescope is part of the Upgrade tier.</p>
+            <button
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-amber-400 text-black hover:bg-amber-300"
+            >
+              <Lock className="w-3 h-3" /> Upgrade
+            </button>
+          </div>
         </div>
 
         {skyFestOpen && (
@@ -1228,15 +1269,51 @@ onReady: (event: any) => {            event.target.setVolume(71);
                     skyFestTab === tab ? 'bg-cyan-500/10 text-cyan-300' : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
-                  {tab === 'dsn' ? '📡 DSN Telemetry' : tab === 'deepsky' ? '🌌 Deep Sky Spectrum' : '🛰️ Space Media'}
+                  {tab === 'dsn' ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> DSN Telemetry
+                    </span>
+                  ) : tab === 'deepsky' ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Deep Sky Spectrum
+                    </span>
+                  ) : (
+                    '🛰️ Space Media'
+                  )}
                 </button>
               ))}
             </div>
 
             <div className="p-3 space-y-2">
-              {skyFestTab === 'dsn' && <DsnTelemetryPanel active={skyFestTab === 'dsn'} />}
+              {/* DSN Telemetry and Deep Sky Spectrum are locked — the real
+                  panels are hidden behind an Upgrade teaser instead of being
+                  rendered, same visual gate as locked bodies/Messier
+                  objects in the detail panel above. No payment wired up. */}
+              {skyFestTab === 'dsn' && (
+                <div className="flex flex-col items-center gap-2 py-6 text-center">
+                  <Lock className="w-5 h-5 text-amber-300" />
+                  <p className="text-xs text-amber-200/90">Live DSN downlink/uplink telemetry is part of the Upgrade tier.</p>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-amber-400 text-black hover:bg-amber-300"
+                  >
+                    <Lock className="w-3 h-3" /> Upgrade
+                  </button>
+                </div>
+              )}
 
-              {skyFestTab === 'deepsky' && <DeepSkySpectrumPanel target={deepSkyTarget} />}
+              {skyFestTab === 'deepsky' && (
+                <div className="flex flex-col items-center gap-2 py-6 text-center">
+                  <Lock className="w-5 h-5 text-amber-300" />
+                  <p className="text-xs text-amber-200/90">Multi-wavelength Deep Sky Spectrum imagery is part of the Upgrade tier.</p>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-amber-400 text-black hover:bg-amber-300"
+                  >
+                    <Lock className="w-3 h-3" /> Upgrade
+                  </button>
+                </div>
+              )}
 
               {skyFestTab === 'media' && (
                 <div className="space-y-3">
@@ -1898,6 +1975,22 @@ onReady: (event: any) => {            event.target.setVolume(71);
                     >
                       {b.name}
                     </text>
+                    {/* Small lock glyph beside the label for the locked
+                        bodies (Mercury, Venus, Jupiter, Saturn) — a hint
+                        before the user even clicks that the real detail
+                        panel is behind the Upgrade tier. */}
+                    {!FREE_BODY_NAMES.has(b.name) && (
+                      <text
+                        x={(label?.needsLeaderLine ? x + 14 : x) + (b.name.length * 2.6 + 6)}
+                        y={labelY}
+                        textAnchor="start"
+                        className="pointer-events-none fill-amber-300/80"
+                        fontSize={8}
+                        fontFamily="monospace"
+                      >
+                        🔒
+                      </text>
+                    )}
                   </g>
                 );
               })}
@@ -2022,7 +2115,31 @@ onReady: (event: any) => {            event.target.setVolume(71);
             >
               <X className="w-3.5 h-3.5" />
             </button>
-            {selected.kind === 'body' ? (
+            {selected.kind === 'body' && !FREE_BODY_NAMES.has(selected.body.name) ? (
+              // Locked body — Mercury, Venus, Jupiter, Saturn. Visual teaser
+              // only (no real paywall wired yet); name/direction are shown
+              // (harmless) but the real facts, rise/set times, and Ask Kali
+              // are withheld behind the Upgrade CTA.
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-amber-300" />
+                  <h3 className="text-lg font-bold text-white">{selected.body.name}</h3>
+                </div>
+                <p className="font-mono text-xs text-slate-400">
+                  Look toward the {compassDirection(selected.body.azimuth)}
+                  {selected.body.altitude > 0 ? ', up in the sky right now.' : ' — currently below your horizon.'}
+                </p>
+                <p className="text-xs text-amber-200/90">
+                  Full details, live telemetry, and Kali&apos;s narration for {selected.body.name} are part of the Upgrade tier.
+                </p>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-amber-400 text-black hover:bg-amber-300"
+                >
+                  <Lock className="w-3 h-3" /> Upgrade
+                </button>
+              </div>
+            ) : selected.kind === 'body' ? (
               <>
                 {hudMode === 'casual' ? (
                   <div className="space-y-1.5">
@@ -2086,23 +2203,22 @@ onReady: (event: any) => {            event.target.setVolume(71);
                 </div>
               )
             ) : selected.kind === 'messier' ? (
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold text-white">
-                  {selected.object.id} · {selected.object.name}
-                </h3>
-                <p className="font-mono text-xs text-cyan-100">{selected.object.type}</p>
-                <p className="font-mono text-xs text-cyan-100">Distance {formatLightYears(selected.object.distanceLy)}</p>
-                {selected.object.magnitude !== null && (
-                  <p className="font-mono text-xs text-cyan-100">Magnitude {selected.object.magnitude.toFixed(2)}</p>
-                )}
-                <a
-                  href={messierArchiveUrl(selected.object.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block pt-1 text-[10px] text-purple-300 font-mono hover:underline hover:text-purple-200"
+              // Deep Sky (Messier) is part of the locked tier — same visual
+              // teaser treatment as a locked body above.
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-amber-300" />
+                  <h3 className="text-lg font-bold text-white">
+                    {selected.object.id} · {selected.object.name}
+                  </h3>
+                </div>
+                <p className="text-xs text-amber-200/90">Deep Sky Spectrum details are part of the Upgrade tier.</p>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-amber-400 text-black hover:bg-amber-300"
                 >
-                  View in Hubble Messier archive →
-                </a>
+                  <Lock className="w-3 h-3" /> Upgrade
+                </button>
               </div>
             ) : (
               constellationNames?.[selected.id] && (
@@ -2122,8 +2238,10 @@ onReady: (event: any) => {            event.target.setVolume(71);
                 speak itself — no autoplay on page load or on merely
                 clicking a marker. Hearing it aloud is always an explicit
                 action: the Speak button below, or a query submitted
-                through the Ask Kali bar. */}
-            {selected.kind !== 'constellation' && (
+                through the Ask Kali bar. Gated to the free teaser set
+                (ISS, Sun, Mars, Moon) — locked bodies and Deep Sky
+                objects already show their own Upgrade CTA above instead. */}
+            {isFreeTeaserSelection(selected) && (
               <div className="pt-2 mt-2 border-t border-slate-800">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Sparkles className="w-3 h-3 text-purple-300" />
