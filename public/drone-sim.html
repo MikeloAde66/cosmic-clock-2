@@ -29,6 +29,16 @@
       box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
     }
 
+    /* The two top HUD panels (telemetry + weather), a few shades lighter
+       than .hud-glass so they don't read as a heavy dark slab now that
+       the panel below them is transparent. */
+    .hud-glass-top {
+      background: rgba(51, 65, 85, 0.45);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+    }
+
     .target-reticle {
       position: absolute;
       top: 50%;
@@ -120,7 +130,7 @@
   </div>
 
   <!-- Top Left: Live HUD Telemetry -->
-  <div class="absolute z-20 p-4 text-xs top-4 left-4 hud-glass rounded-xl w-80 max-w-[calc(100vw-2rem)] font-mono-code text-slate-200">
+  <div class="absolute z-20 p-4 text-xs top-4 left-4 hud-glass-top rounded-xl w-80 max-w-[calc(100vw-2rem)] font-mono-code text-slate-200">
     <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-700/60">
       <span class="font-bold tracking-wider text-cyan-400">AiOne VIRTUAL DRONE HUD</span>
       <span id="hud-mode" class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">GOOGLE EARTH</span>
@@ -144,7 +154,7 @@
   <!-- Top Right: live weather for the current destination (Open-Meteo,
        which serves NOAA's GFS/HRRR models over the US and national
        weather-service models elsewhere). -->
-  <div class="absolute z-20 hidden p-3 text-xs top-4 right-4 hud-glass rounded-xl w-72 font-mono-code text-slate-200 sm:block">
+  <div class="absolute z-20 hidden p-3 text-xs top-4 right-4 hud-glass-top rounded-xl w-72 font-mono-code text-slate-200 sm:block">
     <div class="flex justify-between items-center pb-1.5 border-b border-slate-700/60">
       <span class="font-bold text-amber-400 flex items-center gap-1.5">
         <i data-lucide="cloud-lightning" class="w-4 h-4 text-amber-400"></i> LIVE FLIGHT WEATHER
