@@ -198,6 +198,9 @@
           <button id="cine-toggle" class="seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" aria-pressed="true" onclick="toggleCinematic()">Cinematic: ON</button>
           <button id="traffic-toggle" class="col-span-2 seg-btn px-2 py-1.5 rounded border border-slate-700 bg-slate-900/60 text-slate-300 hover:text-white" aria-pressed="false" onclick="toggleTraffic()">Live Traffic: OFF <span class="text-slate-500">(Vector Map)</span></button>
         </div>
+        <button id="tour-toggle" aria-pressed="false" onclick="toggleCityTour()" class="flex items-center justify-center gap-1.5 w-full px-2 py-1.5 mt-1.5 text-[11px] font-bold tracking-wide text-white transition rounded border border-purple-500/50 bg-purple-600/80 hover:bg-purple-500">
+          <i data-lucide="sparkles" class="w-4 h-4"></i> Tour City with Kali
+        </button>
         <label class="flex items-center justify-between gap-2 mt-2 text-[11px] text-slate-400">
           <span>Results language</span>
           <select id="lang-select" onchange="onLanguageChange()" class="px-2 py-1 border rounded bg-slate-900 border-slate-700 text-slate-200">
@@ -290,6 +293,7 @@
     let cineRAF = null;
     let clockTimer = null;
     let trafficLayer = null;
+    let tourState = null; // active "Tour City with Kali" run, or null when idle
     let trafficOn = false;
     let recognition = null;
     let listening = false;
@@ -469,6 +473,9 @@
 
     function flyToPlace(pLat, pLng, label, opts = {}) {
       cancelCinematic();
+      // A navigation that didn't come from the tour sequence itself (a manual
+      // fly-to, a Kali search, a destination switch) interrupts any running tour.
+      if (tourState && !opts.fromTour) cancelCityTour();
       document.getElementById('hud-env').innerText = label;
       placeMarker(pLat, pLng, label);
       const f = placeFraming();
@@ -477,10 +484,13 @@
       if (!cinematicOn) {
         lat = pLat; lng = pLng; alt = endAlt; tilt = f.tilt; range = endRange;
         updateMapCamera();
+        opts.onArrive && opts.onArrive();
         return;
       }
       tweenCamera({ lat: pLat, lng: pLng, alt: endAlt, tilt: f.tilt - 10, range: endRange * 4 }, 2500, () => {
-        tweenCamera({ range: endRange, tilt: f.tilt, heading: heading + 14 }, 11000);
+        tweenCamera({ range: endRange, tilt: f.tilt, heading: heading + 14 }, 11000, () => {
+          opts.onArrive && opts.onArrive();
+        });
       });
     }
 
@@ -566,7 +576,10 @@
       const btn = document.getElementById('cine-toggle');
       btn.setAttribute('aria-pressed', String(cinematicOn));
       btn.innerText = `Cinematic: ${cinematicOn ? 'ON' : 'OFF'}`;
-      if (!cinematicOn) cancelCinematic();
+      if (!cinematicOn) {
+        cancelCinematic();
+        if (tourState) cancelCityTour({ quiet: true });
+      }
     }
 
     /* ---------------- destinations + live travel lists ---------------- */
@@ -574,6 +587,7 @@
     function goToDestination(id, opts = {}) {
       const d = DESTINATIONS.find((x) => x.id === id);
       if (!d) return;
+      if (tourState && d.id !== currentDest.id) cancelCityTour();
       currentDest = d;
       cancelCinematic();
       document.getElementById('hud-env').innerText = d.name;
@@ -766,6 +780,165 @@
       }
     }
 
+    /* ---------------- tour city with kali ----------------
+       An auto-generated cinematic loop for whichever city is active:
+       anchor (the destination's own landmark/arrival point) -> 2-3 spread-out
+       stops pulled from live Places results -> back to the anchor, narrated
+       by Kali at each arrival. Works on every DESTINATIONS entry, not just
+       Charleston, because the stops come from a live search rather than a
+       hand-built list. */
+
+    function haversineMeters(aLat, aLng, bLat, bLng) {
+      const R = 6371000;
+      const toRad = (x) => (x * Math.PI) / 180;
+      const dLat = toRad(bLat - aLat);
+      const dLng = toRad(bLng - aLng);
+      const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(s));
+    }
+
+    // Greedy farthest-point sampling: starting from the anchor, repeatedly
+    // pick whichever remaining candidate is farthest from everything chosen
+    // so far. Spreads the tour across the area (downtown + outlying spots)
+    // instead of clumping on three restaurants next door to each other.
+    function pickSpreadStops(anchor, pool, count) {
+      const seen = new Set();
+      const candidates = pool.filter((p) => {
+        const key = p.name.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      const chosen = [];
+      const refPoints = [anchor];
+      const remaining = [...candidates];
+      while (chosen.length < count && remaining.length) {
+        let bestIdx = 0;
+        let bestScore = -1;
+        remaining.forEach((p, i) => {
+          const minDist = Math.min(...refPoints.map((r) => haversineMeters(r.lat, r.lng, p.lat, p.lng)));
+          if (minDist > bestScore) { bestScore = minDist; bestIdx = i; }
+        });
+        const [pick] = remaining.splice(bestIdx, 1);
+        chosen.push(pick);
+        refPoints.push(pick);
+      }
+      return chosen;
+    }
+
+    // Builds a tour for any destination from two live Places searches: the
+    // city's own headline landmarks, plus notable nearby towns/beaches/
+    // neighborhoods — which is how "Charleston -> Mount Pleasant -> Isle of
+    // Palms -> back downtown" falls out naturally without hand-authoring it.
+    async function buildCityTour(d) {
+      const anchor = { name: d.name, lat: d.lat, lng: d.lng };
+      const [landmarks, nearby] = await Promise.all([
+        searchPlaces(`top landmarks and attractions in ${d.name}`, d, 8).catch(() => []),
+        searchPlaces(`best nearby towns, beaches, and islands near ${d.name}`, d, 8).catch(() => []),
+      ]);
+      const pool = [...landmarks, ...nearby].filter((p) => p.lat && p.lng && p.name.toLowerCase() !== d.name.toLowerCase());
+      if (pool.length < 2) return null;
+      const n = pool.length >= 4 ? 3 : 2;
+      return { anchor, stops: pickSpreadStops(anchor, pool, n) };
+    }
+
+    function updateTourButton() {
+      const btn = document.getElementById('tour-toggle');
+      if (!btn) return;
+      const active = !!tourState;
+      btn.setAttribute('aria-pressed', String(active));
+      btn.classList.toggle('bg-purple-600/80', !active);
+      btn.classList.toggle('hover:bg-purple-500', !active);
+      btn.classList.toggle('bg-rose-600/80', active);
+      btn.classList.toggle('hover:bg-rose-500', active);
+      btn.innerHTML = active
+        ? '<i data-lucide="square" class="w-4 h-4"></i> Stop Tour'
+        : '<i data-lucide="sparkles" class="w-4 h-4"></i> Tour City with Kali';
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // Narration that always speaks aloud (unlike speak(), which only speaks
+    // after a voice command) — a guided tour is meant to be heard regardless
+    // of how it was started.
+    function speakTour(text) {
+      setKali(text);
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text.replace(/^Kali AI:\s*/, ''));
+      u.volume = 0.6;
+      u.rate = 1;
+      window.speechSynthesis.speak(u);
+    }
+
+    async function toggleCityTour() {
+      if (tourState) { cancelCityTour(); return; }
+      // Mark as loading immediately so a second click (or a manual fly-to)
+      // during the search cancels the tour instead of racing a duplicate one.
+      tourState = { loading: true };
+      updateTourButton();
+      if (!cinematicOn) toggleCinematic();
+      setKali(`Kali AI: Scouting a tour of ${currentDest.name}...`);
+      let tour = null;
+      try {
+        tour = await buildCityTour(currentDest);
+      } catch (err) {
+        console.error('Tour build failed:', err);
+      }
+      if (!tourState || !tourState.loading) return; // cancelled while the search was in flight
+      if (!tour) {
+        tourState = null;
+        updateTourButton();
+        setKali(`Kali AI: Couldn't find enough nearby landmarks to tour ${currentDest.name} right now.`);
+        return;
+      }
+      tourState = { anchor: tour.anchor, stops: tour.stops, index: -1 };
+      updateTourButton();
+      const n = tour.stops.length;
+      speakTour(`Kali AI: Let's tour ${currentDest.name}. I'll show you ${n} stop${n > 1 ? 's' : ''} around the area, then bring us back to ${tour.anchor.name}.`);
+      tourState.timer = setTimeout(runNextTourStop, 4500);
+    }
+
+    function cancelCityTour(opts = {}) {
+      if (!tourState) return;
+      if (tourState.timer) clearTimeout(tourState.timer);
+      tourState = null;
+      updateTourButton();
+      if (!opts.quiet) setKali('Kali AI: Tour stopped.');
+    }
+
+    function runNextTourStop() {
+      if (!tourState) return;
+      tourState.index++;
+      const { stops, anchor, index } = tourState;
+
+      if (index >= stops.length) {
+        speakTour(`Kali AI: Heading back to ${anchor.name} to wrap up the tour.`);
+        flyToPlace(anchor.lat, anchor.lng, anchor.name, {
+          fromTour: true,
+          onArrive: () => {
+            if (!tourState) return;
+            speakTour(`Kali AI: Tour complete — back at ${anchor.name}.`);
+            tourState = null;
+            updateTourButton();
+          },
+        });
+        return;
+      }
+
+      const stop = stops[index];
+      flyToPlace(stop.lat, stop.lng, stop.name, {
+        fromTour: true,
+        onArrive: () => {
+          if (!tourState) return;
+          const bits = [`Stop ${index + 1} of ${stops.length}: ${stop.name}.`];
+          if (stop.address) bits.push(`${stop.address}.`);
+          if (stop.rating) bits.push(`Rated ${stop.rating} stars.`);
+          speakTour(`Kali AI: ${bits.join(' ')}`);
+          tourState.timer = setTimeout(runNextTourStop, 6500);
+        },
+      });
+    }
+
     /* ---------------- weather ---------------- */
 
     function compass(deg) {
@@ -849,6 +1022,7 @@
 
       if (['w','s','a','d',' ','shift'].includes(key)) {
         cancelCinematic();
+        if (tourState) cancelCityTour();
         document.getElementById('hud-speed').innerText = '15 m/s';
         updateMapCamera();
       }
@@ -860,6 +1034,7 @@
 
     function plotRescueRoute() {
       cancelCinematic();
+      if (tourState) cancelCityTour();
       setKali(`Kali AI: Plotting emergency rescue route...`);
       range = 1200;
       tilt = 60;
@@ -1012,7 +1187,15 @@
       const cat = Object.keys(CATEGORY_WORDS).find((k) => CATEGORY_WORDS[k].some((w) => lower.includes(w)));
       const cuisine = CUISINE_KEYWORDS.find((c) => lower.includes(c));
 
-      if (lower.includes('route') || lower.includes('rescue')) {
+      const wantsTour = !venue && /\btour(s|ing)?\b/.test(lower) && !lower.includes('detour');
+
+      if (wantsTour && /\b(stop|cancel|end)\b/.test(lower)) {
+        cancelCityTour();
+      } else if (wantsTour) {
+        setKali(`Kali AI: Executing "${val}"`);
+        if (dest && dest.id !== currentDest.id) { goToDestination(dest.id, { quiet: true }); renderDestinations(); }
+        toggleCityTour();
+      } else if (lower.includes('route') || lower.includes('rescue')) {
         setKali(`Kali AI: Executing "${val}"`);
         plotRescueRoute();
       } else if (venue) {
