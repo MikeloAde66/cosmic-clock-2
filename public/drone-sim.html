@@ -56,6 +56,18 @@
       border-color: rgba(34, 211, 238, 0.6);
       color: #fff;
     }
+
+    /* The left drawer itself has no background now (see #left-drawer in
+       markup) so it reads over the live 3D map; this shadow keeps its
+       labels and icons legible without a backing panel. The Destinations
+       list keeps its own (very light) per-city background below, so it
+       isn't affected by this. */
+    #left-drawer {
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 1px 12px rgba(0, 0, 0, 0.6);
+    }
+    #left-drawer svg {
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85));
+    }
   </style>
 </head>
 <body class="relative w-screen h-screen select-none">
@@ -151,7 +163,7 @@
   </div>
 
   <!-- Collapsible Left Navigation Drawer -->
-  <div id="left-drawer" class="absolute left-0 z-30 flex flex-col justify-between p-4 border-l-0 sidebar-transition top-24 bottom-20 w-96 max-w-[88vw] hud-glass rounded-r-2xl">
+  <div id="left-drawer" class="absolute left-0 z-30 flex flex-col justify-between p-4 border-l-0 sidebar-transition top-24 bottom-20 w-96 max-w-[88vw] bg-transparent rounded-r-2xl">
 
     <!-- Drawer Toggle Button -->
     <button onclick="toggleSidebar()" aria-label="Toggle Settings" class="absolute -right-10 top-6 bg-slate-900 border border-slate-700 text-cyan-400 p-2.5 rounded-r-lg hover:bg-slate-800 shadow-lg">
@@ -589,7 +601,7 @@
       const list = document.getElementById('dest-list');
       list.textContent = '';
       for (const d of DESTINATIONS) {
-        const wrap = el('div', 'rounded border ' + (openDestId === d.id ? 'border-cyan-500/50 bg-slate-900/70' : 'border-slate-800 bg-slate-900/50'));
+        const wrap = el('div', 'rounded border backdrop-blur-sm ' + (openDestId === d.id ? 'border-cyan-500/40 bg-slate-900/25' : 'border-slate-700/60 bg-slate-900/15'));
         const head = el('button', 'w-full flex items-center justify-between px-3 py-1.5 text-left hover:text-white ' + (currentDest.id === d.id ? 'text-white font-semibold' : 'text-slate-300'));
         head.setAttribute('aria-expanded', String(openDestId === d.id));
         head.appendChild(el('span', '', `${currentDest.id === d.id ? '📍 ' : ''}${d.name}`));
@@ -611,7 +623,7 @@
     }
 
     function renderCategory(d, c) {
-      const box = el('details', 'rounded bg-slate-950/60 border border-slate-800');
+      const box = el('details', 'rounded bg-slate-950/25 backdrop-blur-sm border border-slate-700/60');
       box.dataset.cat = c.id;
       const sum = el('summary', 'cursor-pointer px-2.5 py-1.5 text-slate-200 hover:text-white select-none', c.label);
       box.appendChild(sum);
