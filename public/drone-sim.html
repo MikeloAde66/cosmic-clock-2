@@ -334,7 +334,7 @@
 
     // Travel categories per destination; `q` builds the Google Places text query.
     const CATEGORIES = [
-      { id: 'hotspots', label: '📍 Hot spots', q: (d) => `top tourist attractions in ${d.name}` },
+      { id: 'hotspots', label: '📍 Hot spots', q: (d) => `top tourist attractions in ${d.name}`, type: 'tourist_attraction' },
       { id: 'restaurants', label: '🍽️ Restaurants', q: (d) => `best restaurants in ${d.name}` },
       { id: 'nightlife', label: '🌙 Nightlife', q: (d) => `nightlife bars and clubs in ${d.name}` },
       { id: 'hotels', label: '🏨 Hotels', q: (d) => `hotels in ${d.name}` },
@@ -486,7 +486,14 @@
     function placeFraming() {
       const d = currentDest;
       if (!d || d.id === 'charleston') return { range: 160, alt: 15, tilt: 72 };
-      return { range: Math.max(340, Math.round(d.range * 0.6)), alt: 30, tilt: 60 };
+      // A low, close-in camera reads fine over a flat downtown, but several
+      // of this app's "hot spots" sit on hills or mountains surrounded by
+      // forest (Corcovado, Montmartre) — at 30m up the camera ends up in
+      // the canopy or the mountainside itself instead of seeing the actual
+      // landmark. Sit further back and higher, closer to how these places
+      // actually get photographed, so the subject reads against sky/city
+      // rather than bushes.
+      return { range: Math.max(420, Math.round(d.range * 0.75)), alt: 140, tilt: 68 };
     }
 
     function flyToPlace(pLat, pLng, label, opts = {}) {
@@ -702,7 +709,7 @@
       body.appendChild(status);
 
       try {
-        const places = await searchPlaces(query, d, c.max || 6);
+        const places = await searchPlaces(query, d, c.max || 6, c.type);
         status.remove();
         if (!places.length) {
           body.appendChild(el('div', 'px-2 py-1 text-[11px] text-slate-400', 'Nothing found.'));
@@ -740,22 +747,27 @@
     // Live Google Places (New) text search through the loaded JS SDK. Biased
     // to the destination, in the chosen results language. Requires
     // "Places API (New)" to be enabled on this key's Cloud project.
-    async function searchPlaces(query, d, max) {
+    async function searchPlaces(query, d, max, includedType) {
       const language = resultsLanguage();
-      const key = `${query}|${language}|${max}`;
+      const key = `${query}|${language}|${max}|${includedType || ''}`;
       if (placesCache.has(key)) return placesCache.get(key);
       if (!window.google?.maps?.places?.Place) throw new Error('Places library not loaded');
-      const { places } = await google.maps.places.Place.searchByText({
+      const request = {
         textQuery: query,
         fields: ['displayName', 'location', 'rating', 'userRatingCount', 'formattedAddress', 'googleMapsURI', 'priceLevel'],
         locationBias: { center: { lat: d.lat, lng: d.lng }, radius: 30000 },
         language,
-        maxResultCount: max,
-      });
+        // Ask for extra candidates when we're going to re-rank by popularity
+        // below, so a genuinely famous landmark that Google's raw text-search
+        // ranking buried a little can still surface in the top slots shown.
+        maxResultCount: includedType ? Math.min(20, Math.max(max, 10)) : max,
+      };
+      if (includedType) request.includedType = includedType;
+      const { places } = await google.maps.places.Place.searchByText(request);
       // Keep it a general-audience travel guide: drop adult venues that a
       // "nightlife" search can surface.
       const ADULT = /gentlem[ae]n'?’?s club|strip ?club|adult (club|entertainment)|cabaret show girls/i;
-      const out = (places || []).filter((p) => !ADULT.test(p.displayName || '')).map((p) => ({
+      let out = (places || []).filter((p) => !ADULT.test(p.displayName || '')).map((p) => ({
         name: p.displayName || 'Unnamed place',
         lat: p.location.lat(),
         lng: p.location.lng(),
@@ -765,6 +777,14 @@
         address: (p.formattedAddress || '').split(',').slice(0, 2).join(','),
         url: p.googleMapsURI || '',
       }));
+      // Hot spots especially should lead with what people actually flock
+      // to — a cathedral with 30,000 reviews over a side staircase with
+      // 75 — rather than whatever order the raw text search happened to
+      // return, so re-rank by review count (a solid proxy for "people care
+      // about this") and trim back down to what was actually asked for.
+      if (includedType) {
+        out = out.sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, max);
+      }
       placesCache.set(key, out);
       return out;
     }
