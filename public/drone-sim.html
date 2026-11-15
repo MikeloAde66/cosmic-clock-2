@@ -208,6 +208,7 @@
             <option value="local">Local language</option>
             <option value="es">Español</option>
             <option value="pt-BR">Português</option>
+            <option value="fr">Français</option>
             <option value="ja">日本語</option>
             <option value="th">ไทย</option>
             <option value="vi">Tiếng Việt</option>
@@ -849,39 +850,59 @@
         ],
       },
       tokyo: {
-        intro: "Welcome to Tokyo — founded as the fishing village of Edo, it became the seat of the shogunate in 1603 and was renamed Tokyo, 'Eastern Capital,' when the emperor moved here in 1868. I'll take you from Asakusa's oldest temple, through Shibuya's famous crossing, to the Skytree, and out to the fish market at Toyosu. Ask away, or say the word.",
-        outro: "That's Tokyo in miniature. Ask me about ramen, izakayas, or where locals actually drink, any time.",
+        intro: { en: "Welcome to Tokyo — founded as the fishing village of Edo, it became the seat of the shogunate in 1603 and was renamed Tokyo, 'Eastern Capital,' when the emperor moved here in 1868. I'll take you from Asakusa's oldest temple, through Shibuya's famous crossing, to the Skytree, and out to the fish market at Toyosu. Ask away, or say the word.",
+          ja: "東京へようこそ。かつては漁村の江戸と呼ばれ、1603年に幕府の所在地となり、1868年に天皇が移られた際に「東の都」を意味する東京と改名されました。浅草の最も古いお寺から、渋谷の有名なスクランブル交差点、スカイツリー、そして豊洲の魚市場まで、空からご案内します。質問があればいつでもどうぞ。なければ、そのまま出発しましょう。" },
+        outro: { en: "That's Tokyo in miniature. Ask me about ramen, izakayas, or where locals actually drink, any time.",
+          ja: "これが東京の縮図です。ラーメンや居酒屋、地元の人が実際に飲みに行く場所について、いつでも聞いてくださいね。" },
         stops: [
           { name: 'Senso-ji Temple, Asakusa', lat: 35.7148, lng: 139.7967,
-            say: "This is Senso-ji — Tokyo's oldest temple, founded in 645 AD after two fishermen reportedly pulled a statue of the goddess Kannon from the Sumida River.",
-            historyNote: "The approach, Nakamise-dori, has sold souvenirs and snacks to pilgrims for centuries." },
+            say: { en: "This is Senso-ji — Tokyo's oldest temple, founded in 645 AD after two fishermen reportedly pulled a statue of the goddess Kannon from the Sumida River.",
+              ja: "こちらは浅草寺、東京で最も古いお寺です。645年、二人の漁師が隅田川から観音様の像を引き上げたことがきっかけで建てられたと伝えられています。" },
+            historyNote: { en: "The approach, Nakamise-dori, has sold souvenirs and snacks to pilgrims for centuries.",
+              ja: "参道の仲見世通りは、何世紀にもわたって参拝客にお土産やお菓子を売ってきました。" } },
           { name: 'Shibuya Crossing', lat: 35.6595, lng: 139.7005,
-            say: "Below us is Shibuya Crossing — up to 3,000 people cross at once when the lights change, making it one of the busiest intersections on Earth.",
-            historyNote: "The area's been a trading hub since the Edo period, long before it grew into the dense entertainment and shopping district it is today." },
+            say: { en: "Below us is Shibuya Crossing — up to 3,000 people cross at once when the lights change, making it one of the busiest intersections on Earth.",
+              ja: "眼下に見えるのは渋谷スクランブル交差点です。信号が変わると一度に3000人もの人が渡ることもあり、世界で最も混雑する交差点の一つです。" },
+            historyNote: { en: "The area's been a trading hub since the Edo period, long before it grew into the dense entertainment and shopping district it is today.",
+              ja: "このエリアは江戸時代から交易の拠点であり、今日のような賑やかな娯楽・ショッピング街になるずっと前からの歴史があります。" } },
           { name: 'Tokyo Skytree', lat: 35.7101, lng: 139.8107,
-            say: "That's Tokyo Skytree — at 634 meters, the tallest structure in Japan, built to broadcast digital TV once the city's skyscrapers started blocking the old Tokyo Tower's signal.",
-            historyNote: "It opened in 2012. Its height, 634, is a play on the old regional name 'Musashi' — read the same way in Japanese." },
+            say: { en: "That's Tokyo Skytree — at 634 meters, the tallest structure in Japan, built to broadcast digital TV once the city's skyscrapers started blocking the old Tokyo Tower's signal.",
+              ja: "あちらは東京スカイツリーです。高さ634メートルで日本一高い建造物。街の高層ビルが東京タワーの電波を遮るようになったため、デジタル放送用に建てられました。" },
+            historyNote: { en: "It opened in 2012. Its height, 634, is a play on the old regional name 'Musashi' — read the same way in Japanese.",
+              ja: "2012年に開業しました。高さの634という数字は、この地域の古い呼び名「武蔵(むさし)」の語呂合わせになっています。" } },
           { name: 'Toyosu Market', lat: 35.6454, lng: 139.7735,
-            say: "This is Toyosu Market, which took over Tokyo's legendary fish trade from the old Tsukiji site in 2018 — still home to the famous pre-dawn tuna auctions.",
-            historyNote: "Tsukiji ran for 83 years before the move; its outer market streets are still packed with sushi counters today." },
+            say: { en: "This is Toyosu Market, which took over Tokyo's legendary fish trade from the old Tsukiji site in 2018 — still home to the famous pre-dawn tuna auctions.",
+              ja: "こちらは豊洲市場です。2018年に築地から東京の伝説的な魚市場の役割を引き継ぎました。今も夜明け前のマグロの競りで有名です。" },
+            historyNote: { en: "Tsukiji ran for 83 years before the move; its outer market streets are still packed with sushi counters today.",
+              ja: "築地市場は移転するまで83年間営業していました。その場外市場の通りには、今でも寿司店がひしめき合っています。" } },
         ],
       },
       rio: {
-        intro: "Welcome to Rio de Janeiro — founded by the Portuguese in 1565 and once the capital of Brazil for nearly two centuries. I'll fly you past Christ the Redeemer, over Sugarloaf Mountain, along Copacabana and Ipanema, and into Maracanã Stadium. Ask away, or say the word and we'll start.",
-        outro: "That's Rio. Ask me about churrasco, caipirinhas, or the best spot for sunset, any time.",
+        intro: { en: "Welcome to Rio de Janeiro — founded by the Portuguese in 1565 and once the capital of Brazil for nearly two centuries. I'll fly you past Christ the Redeemer, over Sugarloaf Mountain, along Copacabana and Ipanema, and into Maracanã Stadium. Ask away, or say the word and we'll start.",
+          'pt-BR': "Bem-vindo ao Rio de Janeiro — fundado pelos portugueses em 1565 e, por quase dois séculos, capital do Brasil. Vou te levar para sobrevoar o Cristo Redentor, o Pão de Açúcar, as praias de Copacabana e Ipanema, e o Estádio do Maracanã. Pode perguntar o que quiser, ou é só dizer que já começamos." },
+        outro: { en: "That's Rio. Ask me about churrasco, caipirinhas, or the best spot for sunset, any time.",
+          'pt-BR': "Esse é o Rio. Pergunte sobre churrasco, caipirinha, ou o melhor lugar para ver o pôr do sol, quando quiser." },
         stops: [
           { name: 'Christ the Redeemer', lat: -22.9519, lng: -43.2105,
-            say: "That's Christ the Redeemer, 38 meters tall atop Corcovado Mountain — completed in 1931 and now one of the New Seven Wonders of the World.",
-            historyNote: "It was funded largely by donations from Brazilian Catholics; the art-deco design came from French sculptor Paul Landowski." },
+            say: { en: "That's Christ the Redeemer, 38 meters tall atop Corcovado Mountain — completed in 1931 and now one of the New Seven Wonders of the World.",
+              'pt-BR': "Aquele é o Cristo Redentor, com 38 metros de altura no topo do Corcovado — concluído em 1931 e hoje uma das Novas Sete Maravilhas do Mundo." },
+            historyNote: { en: "It was funded largely by donations from Brazilian Catholics; the art-deco design came from French sculptor Paul Landowski.",
+              'pt-BR': "Foi financiado principalmente por doações de católicos brasileiros; o design art déco é do escultor francês Paul Landowski." } },
           { name: 'Sugarloaf Mountain', lat: -22.9492, lng: -43.1545,
-            say: "This is Sugarloaf Mountain — a granite peak you reach by cable car, with some of the best views of Guanabara Bay in the city.",
-            historyNote: "The cable car's been running since 1912, one of the oldest in the world." },
+            say: { en: "This is Sugarloaf Mountain — a granite peak you reach by cable car, with some of the best views of Guanabara Bay in the city.",
+              'pt-BR': "Este é o Pão de Açúcar — um pico de granito que se alcança de bondinho, com uma das melhores vistas da Baía de Guanabara." },
+            historyNote: { en: "The cable car's been running since 1912, one of the oldest in the world.",
+              'pt-BR': "O bondinho funciona desde 1912, um dos mais antigos do mundo." } },
           { name: 'Copacabana & Ipanema', lat: -22.9800, lng: -43.1950,
-            say: "Below us: Copacabana and Ipanema, Rio's most famous beaches — four kilometers of white sand, beach volleyball, and the start of Carnival season every February.",
-            historyNote: "Ipanema gave its name to 'The Girl from Ipanema,' the bossa nova classic written at a bar just off the beach." },
+            say: { en: "Below us: Copacabana and Ipanema, Rio's most famous beaches — four kilometers of white sand, beach volleyball, and the start of Carnival season every February.",
+              'pt-BR': "Abaixo de nós: Copacabana e Ipanema, as praias mais famosas do Rio — quatro quilômetros de areia branca, vôlei de praia, e o início do Carnaval todo mês de fevereiro." },
+            historyNote: { en: "Ipanema gave its name to 'The Girl from Ipanema,' the bossa nova classic written at a bar just off the beach.",
+              'pt-BR': "Ipanema deu nome a 'Garota de Ipanema', o clássico da bossa nova escrito num bar perto da praia." } },
           { name: 'Maracanã Stadium', lat: -22.9122, lng: -43.2302,
-            say: "And that's Maracanã — once the largest football stadium in the world, built for the 1950 World Cup and still Rio's cathedral of soccer.",
-            historyNote: "It hosted World Cup finals in both 1950 and 2014, plus the opening and closing ceremonies of the 2016 Olympics." },
+            say: { en: "And that's Maracanã — once the largest football stadium in the world, built for the 1950 World Cup and still Rio's cathedral of soccer.",
+              'pt-BR': "E aquele é o Maracanã — já foi o maior estádio de futebol do mundo, construído para a Copa de 1950 e ainda é a catedral do futebol carioca." },
+            historyNote: { en: "It hosted World Cup finals in both 1950 and 2014, plus the opening and closing ceremonies of the 2016 Olympics.",
+              'pt-BR': "Sediou finais de Copa do Mundo em 1950 e 2014, além das cerimônias de abertura e encerramento das Olimpíadas de 2016." } },
         ],
       },
       kingston: {
@@ -903,57 +924,87 @@
         ],
       },
       manila: {
-        intro: "Welcome to Manila — founded by Spanish conquistador Miguel López de Legazpi in 1571 on top of an existing settlement, and capital of the Philippines ever since. I'll fly you through the old walled city of Intramuros, past Rizal Park, along Manila Bay, and into Binondo, the oldest Chinatown in the world. Ask away, or say the word.",
-        outro: "That's Manila. Ask me about adobo, lechon, or the best rooftop bar in Makati, any time.",
+        intro: { en: "Welcome to Manila — founded by Spanish conquistador Miguel López de Legazpi in 1571 on top of an existing settlement, and capital of the Philippines ever since. I'll fly you through the old walled city of Intramuros, past Rizal Park, along Manila Bay, and into Binondo, the oldest Chinatown in the world. Ask away, or say the word.",
+          fil: "Maligayang pagdating sa Maynila — itinatag ng Kastilang mananakop na si Miguel López de Legazpi noong 1571 sa ibabaw ng dati nang pamayanan, at naging kabisera ng Pilipinas mula noon. Dadalhin kita sa lumang nakapaligid na lungsod ng Intramuros, sa Rizal Park, sa tabi ng Manila Bay, at sa Binondo, ang pinakamatandang Chinatown sa mundo. Magtanong ka lang, o sabihin mo na lang at magsisimula na tayo." },
+        outro: { en: "That's Manila. Ask me about adobo, lechon, or the best rooftop bar in Makati, any time.",
+          fil: "Iyan ang Maynila. Magtanong ka tungkol sa adobo, lechon, o sa pinakamagandang rooftop bar sa Makati, kahit kailan." },
         stops: [
           { name: 'Intramuros', lat: 14.5955, lng: 120.9710,
-            say: "This is Intramuros — the old walled city the Spanish began building in 1571, with stone forts, cobblestone streets, and churches that survived centuries of earthquakes, typhoons, and war.",
-            historyNote: "Much of it was destroyed in the 1945 Battle of Manila and has been painstakingly restored since." },
+            say: { en: "This is Intramuros — the old walled city the Spanish began building in 1571, with stone forts, cobblestone streets, and churches that survived centuries of earthquakes, typhoons, and war.",
+              fil: "Ito ang Intramuros — ang lumang nakapaligid na lungsod na sinimulang itayo ng mga Kastila noong 1571, may mga bató na kuta, kalyeng bato, at mga simbahang nakaligtas sa daan-daang taon ng lindol, bagyo, at digmaan." },
+            historyNote: { en: "Much of it was destroyed in the 1945 Battle of Manila and has been painstakingly restored since.",
+              fil: "Karamihan dito ay nasira noong Labanan sa Maynila noong 1945, at masusing isinauli ang dating anyo mula noon." } },
           { name: 'Rizal Park', lat: 14.5832, lng: 120.9794,
-            say: "This is Rizal Park, named for national hero José Rizal, who was executed by Spanish authorities here in 1896 for his writing against colonial rule.",
-            historyNote: "Rizal's execution further galvanized the revolution already underway against Spanish rule that same year." },
+            say: { en: "This is Rizal Park, named for national hero José Rizal, who was executed by Spanish authorities here in 1896 for his writing against colonial rule.",
+              fil: "Ito ang Rizal Park, pinangalanan sa bayaning si José Rizal, na pinatay ng mga Kastila dito noong 1896 dahil sa kanyang mga sinulat laban sa kolonyal na pamahalaan." },
+            historyNote: { en: "Rizal's execution further galvanized the revolution already underway against Spanish rule that same year.",
+              fil: "Ang pagpatay kay Rizal ay lalong nagpaalab sa himagsikang nagsisimula na laban sa mga Kastila noong taóng ding iyon." } },
           { name: 'Manila Bay', lat: 14.5739, lng: 120.9816,
-            say: "Below us is Manila Bay — famous for its sunsets along the Baywalk, and the site of a decisive 1898 naval battle between the US and Spain.",
-            historyNote: "That battle effectively ended Spanish rule in the Philippines, which stretched back over 300 years." },
+            say: { en: "Below us is Manila Bay — famous for its sunsets along the Baywalk, and the site of a decisive 1898 naval battle between the US and Spain.",
+              fil: "Sa ibaba natin ang Manila Bay — tanyag sa mga paglubog ng araw sa tabi ng Baywalk, at dito rin naganap ang mapagpasyang labanang pandagat noong 1898 sa pagitan ng Estados Unidos at Espanya." },
+            historyNote: { en: "That battle effectively ended Spanish rule in the Philippines, which stretched back over 300 years.",
+              fil: "Ang labanang iyon ang nagtapos sa paghahari ng mga Kastila sa Pilipinas, na umabot sa mahigit 300 taon." } },
           { name: 'Binondo', lat: 14.6003, lng: 120.9742,
-            say: "This is Binondo — established in 1594, it's recognized as the oldest Chinatown in the world, still packed with family-run restaurants and gold shops.",
-            historyNote: "The Spanish set it up specifically for Chinese traders who had converted to Catholicism, just outside Intramuros's walls." },
+            say: { en: "This is Binondo — established in 1594, it's recognized as the oldest Chinatown in the world, still packed with family-run restaurants and gold shops.",
+              fil: "Ito ang Binondo — itinatag noong 1594, kinikilala bilang pinakamatandang Chinatown sa mundo, puno pa rin ng mga restawran at tindahan ng ginto na pag-aari ng mga pamilya." },
+            historyNote: { en: "The Spanish set it up specifically for Chinese traders who had converted to Catholicism, just outside Intramuros's walls.",
+              fil: "Itinatag ito ng mga Kastila para sa mga Intsik na negosyanteng naging Katoliko, sa labas lang ng pader ng Intramuros." } },
         ],
       },
       bangkok: {
-        intro: "Welcome to Bangkok — made capital of Siam in 1782 by King Rama I, founder of the dynasty that still reigns in Thailand today. I'll fly you over the Grand Palace, past the temples along the Chao Phraya River, and out to the weekend markets. Ask away, or say the word.",
-        outro: "That's Bangkok. Ask me about pad thai, rooftop bars, or where to catch a Muay Thai fight, any time.",
+        intro: { en: "Welcome to Bangkok — made capital of Siam in 1782 by King Rama I, founder of the dynasty that still reigns in Thailand today. I'll fly you over the Grand Palace, past the temples along the Chao Phraya River, and out to the weekend markets. Ask away, or say the word.",
+          th: "ยินดีต้อนรับสู่กรุงเทพฯ เมืองหลวงของสยามตั้งแต่ปี พ.ศ. 2325 โดยพระบาทสมเด็จพระพุทธยอดฟ้าจุฬาโลกมหาราช รัชกาลที่ 1 ผู้ก่อตั้งราชวงศ์ที่ยังคงปกครองประเทศไทยมาจนถึงทุกวันนี้ ฉันจะพาคุณบินชมพระบรมมหาราชวัง วัดต่าง ๆ ริมแม่น้ำเจ้าพระยา และตลาดนัดสุดสัปดาห์ ถามอะไรก็ได้นะ หรือจะบอกให้เริ่มทัวร์เลยก็ได้" },
+        outro: { en: "That's Bangkok. Ask me about pad thai, rooftop bars, or where to catch a Muay Thai fight, any time.",
+          th: "นั่นคือกรุงเทพฯ ถามฉันได้เรื่องผัดไทย บาร์บนดาดฟ้า หรือจะดูมวยไทยที่ไหนดี ถามได้ตลอดเลย" },
         stops: [
           { name: 'Grand Palace', lat: 13.7500, lng: 100.4913,
-            say: "This is the Grand Palace — official residence of the Kings of Siam since 1782, and home to the Emerald Buddha, Thailand's most sacred image.",
-            historyNote: "The Emerald Buddha is actually carved from jade, not emerald, and its seasonal robes are changed personally by the King three times a year." },
+            say: { en: "This is the Grand Palace — official residence of the Kings of Siam since 1782, and home to the Emerald Buddha, Thailand's most sacred image.",
+              th: "นี่คือพระบรมมหาราชวัง ที่ประทับอย่างเป็นทางการของกษัตริย์สยามตั้งแต่ปี พ.ศ. 2325 และเป็นที่ประดิษฐานพระแก้วมรกต พระพุทธรูปศักดิ์สิทธิ์ที่สุดของไทย" },
+            historyNote: { en: "The Emerald Buddha is actually carved from jade, not emerald, and its seasonal robes are changed personally by the King three times a year.",
+              th: "พระแก้วมรกตจริง ๆ แล้วแกะสลักจากหยก ไม่ใช่มรกต และจะมีการเปลี่ยนเครื่องทรงตามฤดูกาลโดยพระมหากษัตริย์ปีละสามครั้ง" } },
           { name: 'Wat Arun & Wat Pho', lat: 13.7450, lng: 100.4910,
-            say: "Across the river, Wat Arun's spires glow at sunset — the 'Temple of Dawn.' Nearby, Wat Pho houses a 46-meter gold reclining Buddha and is considered the birthplace of traditional Thai massage.",
-            historyNote: "Wat Pho opened one of Thailand's first public education centers in the 1830s, with its teachings literally carved into the temple walls." },
+            say: { en: "Across the river, Wat Arun's spires glow at sunset — the 'Temple of Dawn.' Nearby, Wat Pho houses a 46-meter gold reclining Buddha and is considered the birthplace of traditional Thai massage.",
+              th: "ฝั่งตรงข้ามแม่น้ำ ยอดพระปรางค์วัดอรุณจะเปล่งประกายยามพระอาทิตย์ตก หรือที่รู้จักกันในชื่อ \"วัดแจ้ง\" ใกล้ ๆ กันคือวัดโพธิ์ ที่มีพระพุทธไสยาสน์ทองคำยาว 46 เมตร และถือเป็นต้นกำเนิดของการนวดแผนไทย" },
+            historyNote: { en: "Wat Pho opened one of Thailand's first public education centers in the 1830s, with its teachings literally carved into the temple walls.",
+              th: "วัดโพธิ์เปิดเป็นหนึ่งในศูนย์การศึกษาสาธารณะแห่งแรก ๆ ของไทยในช่วงทศวรรษ 1830 โดยมีการจารึกความรู้ไว้บนผนังวัดจริง ๆ" } },
           { name: 'Chao Phraya River', lat: 13.7300, lng: 100.4950,
-            say: "This river has been Bangkok's main artery for centuries — long-tail boats, floating markets, and riverside temples all still run along it today.",
-            historyNote: "Before modern roads, the river and its canals served as the city's main streets — Bangkok used to be called 'the Venice of the East.'" },
+            say: { en: "This river has been Bangkok's main artery for centuries — long-tail boats, floating markets, and riverside temples all still run along it today.",
+              th: "แม่น้ำสายนี้เป็นเส้นเลือดใหญ่ของกรุงเทพฯ มาหลายร้อยปี เรือหางยาว ตลาดน้ำ และวัดริมน้ำยังคงดำเนินอยู่ริมฝั่งแม่น้ำจนถึงทุกวันนี้" },
+            historyNote: { en: "Before modern roads, the river and its canals served as the city's main streets — Bangkok used to be called 'the Venice of the East.'",
+              th: "ก่อนจะมีถนนสมัยใหม่ แม่น้ำและคลองต่าง ๆ เคยเป็นเหมือนถนนหลักของเมือง กรุงเทพฯ จึงเคยถูกเรียกว่า \"เวนิสแห่งตะวันออก\"" } },
           { name: 'Chatuchak Weekend Market', lat: 13.7999, lng: 100.5500,
-            say: "And this is Chatuchak — one of the largest weekend markets in the world, with thousands of stalls selling everything from street food to antiques.",
-            historyNote: "It's been running since 1942, when the government consolidated several smaller markets into one site." },
+            say: { en: "And this is Chatuchak — one of the largest weekend markets in the world, with thousands of stalls selling everything from street food to antiques.",
+              th: "และนี่คือตลาดนัดจตุจักร หนึ่งในตลาดนัดสุดสัปดาห์ที่ใหญ่ที่สุดในโลก มีร้านค้านับพันที่ขายตั้งแต่อาหารริมทางไปจนถึงของเก่า" },
+            historyNote: { en: "It's been running since 1942, when the government consolidated several smaller markets into one site.",
+              th: "ตลาดแห่งนี้เปิดมาตั้งแต่ปี พ.ศ. 2485 เมื่อรัฐบาลรวมตลาดเล็ก ๆ หลายแห่งเข้าไว้ด้วยกันในที่เดียว" } },
         ],
       },
       paris: {
-        intro: "Welcome to Paris — settled by the Celtic Parisii tribe over 2,000 years ago, later the Roman city of Lutetia. I'll fly you past the Eiffel Tower, along the Seine to Notre-Dame and the Louvre, and up to Montmartre. Ask away, or say the word.",
-        outro: "That's Paris. Ask me about bistros, wine bars, or the best café for people-watching, any time.",
+        intro: { en: "Welcome to Paris — settled by the Celtic Parisii tribe over 2,000 years ago, later the Roman city of Lutetia. I'll fly you past the Eiffel Tower, along the Seine to Notre-Dame and the Louvre, and up to Montmartre. Ask away, or say the word.",
+          fr: "Bienvenue à Paris — habitée il y a plus de 2000 ans par la tribu celte des Parisii, puis devenue la ville romaine de Lutèce. Je vais vous faire survoler la tour Eiffel, longer la Seine jusqu'à Notre-Dame et au Louvre, puis monter jusqu'à Montmartre. Posez-moi vos questions, ou dites-le simplement et nous commençons." },
+        outro: { en: "That's Paris. Ask me about bistros, wine bars, or the best café for people-watching, any time.",
+          fr: "Voilà Paris. Demandez-moi un bistrot, un bar à vins, ou le meilleur café pour observer les passants, quand vous voulez." },
         stops: [
           { name: 'Eiffel Tower', lat: 48.8584, lng: 2.2945,
-            say: "The Eiffel Tower — built for the 1889 World's Fair by Gustave Eiffel, and meant to be torn down after twenty years. Parisians hated it at first.",
-            historyNote: "It was saved because it proved useful as a radio transmission tower — a role it's technically still played ever since." },
+            say: { en: "The Eiffel Tower — built for the 1889 World's Fair by Gustave Eiffel, and meant to be torn down after twenty years. Parisians hated it at first.",
+              fr: "La tour Eiffel — construite pour l'Exposition universelle de 1889 par Gustave Eiffel, et censée être démolie vingt ans plus tard. Les Parisiens l'ont détestée au début." },
+            historyNote: { en: "It was saved because it proved useful as a radio transmission tower — a role it's technically still played ever since.",
+              fr: "Elle a été sauvée parce qu'elle s'est révélée utile comme antenne de transmission radio — un rôle qu'elle joue techniquement encore aujourd'hui." } },
           { name: 'Notre-Dame & the Louvre', lat: 48.8568, lng: 2.3438,
-            say: "Notre-Dame Cathedral dates to 1163, and the Louvre began as a 12th-century fortress before becoming the world's largest art museum, home to the Mona Lisa.",
-            historyNote: "Notre-Dame suffered a major fire in 2019 and reopened to the public in December 2024 after a five-year restoration." },
+            say: { en: "Notre-Dame Cathedral dates to 1163, and the Louvre began as a 12th-century fortress before becoming the world's largest art museum, home to the Mona Lisa.",
+              fr: "La cathédrale Notre-Dame date de 1163, et le Louvre a commencé comme une forteresse du 12e siècle avant de devenir le plus grand musée d'art du monde, abritant la Joconde." },
+            historyNote: { en: "Notre-Dame suffered a major fire in 2019 and reopened to the public in December 2024 after a five-year restoration.",
+              fr: "Notre-Dame a été gravement endommagée par un incendie en 2019 et a rouvert au public en décembre 2024 après cinq ans de restauration." } },
           { name: 'Montmartre', lat: 48.8867, lng: 2.3431,
-            say: "Up here is Montmartre, the hilltop neighborhood that was home to Picasso, Van Gogh, and Toulouse-Lautrec — the Sacré-Cœur basilica crowns the top.",
-            historyNote: "It was its own independent village, known for cheap rent and cheaper wine, until Paris annexed it in 1860." },
+            say: { en: "Up here is Montmartre, the hilltop neighborhood that was home to Picasso, Van Gogh, and Toulouse-Lautrec — the Sacré-Cœur basilica crowns the top.",
+              fr: "Ici, c'est Montmartre, le quartier perché qui a abrité Picasso, Van Gogh et Toulouse-Lautrec — la basilique du Sacré-Cœur couronne la colline." },
+            historyNote: { en: "It was its own independent village, known for cheap rent and cheaper wine, until Paris annexed it in 1860.",
+              fr: "C'était un village indépendant, connu pour ses loyers bon marché et son vin encore moins cher, jusqu'à son rattachement à Paris en 1860." } },
           { name: 'Champs-Élysées & Arc de Triomphe', lat: 48.8738, lng: 2.2950,
-            say: "And this is the Champs-Élysées, running straight to the Arc de Triomphe, which Napoleon commissioned in 1806 to honor his army — though he didn't live to see it finished.",
-            historyNote: "Twelve avenues radiate out from the Arc in a star pattern; the square itself is officially named Place Charles de Gaulle." },
+            say: { en: "And this is the Champs-Élysées, running straight to the Arc de Triomphe, which Napoleon commissioned in 1806 to honor his army — though he didn't live to see it finished.",
+              fr: "Et voici les Champs-Élysées, qui mènent tout droit à l'Arc de Triomphe, commandé par Napoléon en 1806 pour honorer son armée — bien qu'il ne l'ait jamais vu achevé." },
+            historyNote: { en: "Twelve avenues radiate out from the Arc in a star pattern; the square itself is officially named Place Charles de Gaulle.",
+              fr: "Douze avenues rayonnent depuis l'Arc en forme d'étoile ; la place elle-même s'appelle officiellement la place Charles-de-Gaulle." } },
         ],
       },
       lagos: {
@@ -975,24 +1026,114 @@
         ],
       },
       hcmc: {
-        intro: "Welcome to Ho Chi Minh City — once a small settlement called Prey Nokor, it became the French colonial capital Saigon, and was renamed Ho Chi Minh City in 1976 after reunification. I'll fly you past the old French quarter, through Ben Thanh Market, and out to the Cu Chi Tunnels. Ask away, or say the word.",
-        outro: "That's Ho Chi Minh City. Ask me about pho, banh mi, or the best rooftop bar downtown, any time.",
+        intro: { en: "Welcome to Ho Chi Minh City — once a small settlement called Prey Nokor, it became the French colonial capital Saigon, and was renamed Ho Chi Minh City in 1976 after reunification. I'll fly you past the old French quarter, through Ben Thanh Market, and out to the Cu Chi Tunnels. Ask away, or say the word.",
+          vi: "Chào mừng đến với Thành phố Hồ Chí Minh — từng là một khu định cư nhỏ tên Prey Nokor, sau trở thành Sài Gòn, thủ phủ thuộc địa Pháp, và được đổi tên thành Thành phố Hồ Chí Minh vào năm 1976 sau ngày thống nhất đất nước. Tôi sẽ đưa bạn bay qua khu phố Pháp cổ, chợ Bến Thành, và ra đến địa đạo Củ Chi. Cứ hỏi thoải mái, hoặc nói một tiếng là chúng ta bắt đầu." },
+        outro: { en: "That's Ho Chi Minh City. Ask me about pho, banh mi, or the best rooftop bar downtown, any time.",
+          vi: "Đó là Thành phố Hồ Chí Minh. Cứ hỏi tôi về phở, bánh mì, hay quán bar trên sân thượng ngon nhất trung tâm, bất cứ lúc nào." },
         stops: [
           { name: 'Notre-Dame Cathedral & Central Post Office', lat: 10.7798, lng: 106.6990,
-            say: "This is Saigon's French quarter — a Notre-Dame Cathedral built in the 1880s with materials shipped over from France, and the Central Post Office from the same era, still in daily use.",
-            historyNote: "Both buildings date to French colonial rule, which lasted here from the 1860s until Vietnam's independence in the 1950s." },
+            say: { en: "This is Saigon's French quarter — a Notre-Dame Cathedral built in the 1880s with materials shipped over from France, and the Central Post Office from the same era, still in daily use.",
+              vi: "Đây là khu phố Pháp của Sài Gòn — Nhà thờ Đức Bà được xây vào thập niên 1880 bằng vật liệu chở từ Pháp sang, và Bưu điện Trung tâm cùng thời kỳ đó, vẫn còn được sử dụng hằng ngày." },
+            historyNote: { en: "Both buildings date to French colonial rule, which lasted here from the 1860s until Vietnam's independence in the 1950s.",
+              vi: "Cả hai công trình đều có từ thời Pháp thuộc, kéo dài từ thập niên 1860 cho đến khi Việt Nam giành độc lập vào thập niên 1950." } },
           { name: 'War Remnants Museum', lat: 10.7797, lng: 106.6919,
-            say: "The War Remnants Museum documents the Vietnam War from the Vietnamese side — tanks, aircraft, and photography from decades of conflict.",
-            historyNote: "It first opened in 1975, the same year the war ended, and remains one of the most visited museums in the country." },
+            say: { en: "The War Remnants Museum documents the Vietnam War from the Vietnamese side — tanks, aircraft, and photography from decades of conflict.",
+              vi: "Bảo tàng Chứng tích Chiến tranh ghi lại cuộc chiến tranh Việt Nam từ góc nhìn của phía Việt Nam — xe tăng, máy bay, và những bức ảnh từ nhiều thập kỷ xung đột." },
+            historyNote: { en: "It first opened in 1975, the same year the war ended, and remains one of the most visited museums in the country.",
+              vi: "Bảo tàng mở cửa lần đầu vào năm 1975, cùng năm chiến tranh kết thúc, và đến nay vẫn là một trong những bảo tàng được ghé thăm nhiều nhất cả nước." } },
           { name: 'Ben Thanh Market', lat: 10.7725, lng: 106.6980,
-            say: "This is Ben Thanh Market — the clock tower entrance has marked this spot since 1914, and it's still the city's most famous place for street food and souvenirs.",
-            historyNote: "The surrounding market area dates back even further, to street vendors trading near the old citadel in the 1800s." },
+            say: { en: "This is Ben Thanh Market — the clock tower entrance has marked this spot since 1914, and it's still the city's most famous place for street food and souvenirs.",
+              vi: "Đây là chợ Bến Thành — cổng tháp đồng hồ đã đánh dấu nơi này từ năm 1914, và đến nay vẫn là địa điểm nổi tiếng nhất thành phố cho ẩm thực đường phố và quà lưu niệm." },
+            historyNote: { en: "The surrounding market area dates back even further, to street vendors trading near the old citadel in the 1800s.",
+              vi: "Khu chợ xung quanh còn có lịch sử lâu đời hơn nữa, từ những người bán hàng rong buôn bán gần thành cổ vào thế kỷ 19." } },
           { name: 'Cu Chi Tunnels', lat: 11.1402, lng: 106.4542,
-            say: "Out here, northwest of the city, are the Cu Chi Tunnels — over 120 kilometers of underground passages used by Viet Cong fighters during the war.",
-            historyNote: "Some sections have been widened for visitors to crawl through; the originals were built narrow enough to slow down larger pursuers." },
+            say: { en: "Out here, northwest of the city, are the Cu Chi Tunnels — over 120 kilometers of underground passages used by Viet Cong fighters during the war.",
+              vi: "Ở đây, phía tây bắc thành phố, là địa đạo Củ Chi — hơn 120 ki-lô-mét đường hầm dưới lòng đất được quân Giải phóng sử dụng trong chiến tranh." },
+            historyNote: { en: "Some sections have been widened for visitors to crawl through; the originals were built narrow enough to slow down larger pursuers.",
+              vi: "Một số đoạn đã được mở rộng để du khách có thể chui qua; đường hầm nguyên bản được đào rất hẹp để làm chậm bước những kẻ truy đuổi to lớn hơn." } },
         ],
       },
     };
+
+    // Resolves a narration field, which is either a plain string (the
+    // English-only cities never got a translation pass) or a { en, <lang> }
+    // object, to the requested language — falling back to English when
+    // that language has no translation for this city. This is the one spot
+    // that needs to know both shapes exist, so every call site can just ask
+    // for a language and get text back.
+    function pick(val, lang) {
+      if (val == null) return '';
+      if (typeof val === 'string') return val;
+      return val[lang] || val.en || '';
+    }
+
+    // Short, reusable phrases Kali speaks around the curated narration —
+    // the Q&A invite, and the live-data-lookup responses — localized for
+    // every language a tour can currently be given in. Falls back to
+    // English for any language without an entry (e.g. Español, which this
+    // app offers for search results generally but no tour is written in,
+    // since none of the ten cities are Spanish-speaking).
+    const TOUR_UI_PHRASES = {
+      en: {
+        invite: (n) => `Any questions about ${n}? Ask away, or say the word and we'll keep moving.`,
+        checking: 'Checking nearby...',
+        nearHere: (n, r) => `Right near here: ${n}${r ? `, rated ${r}★` : ''}. Worth a stop.`,
+        noLiveData: (verb, city) => `I couldn't pull up a live ${verb} near here right now — try asking in the main Kali bar for "${verb}s in ${city}."`,
+        searchFailed: `Couldn't reach live places data just now — try asking again in a moment.`,
+        highlight: (n) => `${n} is one of the highlights around here — ask in the main Kali bar for more specific picks nearby.`,
+      },
+      ja: {
+        invite: (n) => `${n}について質問はありますか?なんでも聞いてくださいね。なければ、そのまま次へ進みましょう。`,
+        checking: '近くを確認しています...',
+        nearHere: (n, r) => `すぐ近くに${n}があります${r ? `(評価${r}★)` : ''}。立ち寄る価値ありです。`,
+        noLiveData: (verb, city) => `今は近くの${verb}情報を取得できませんでした。下のKaliの入力欄で「${city}の${verb}」と聞いてみてください。`,
+        searchFailed: '今は現地データに接続できませんでした。少ししてからもう一度聞いてみてください。',
+        highlight: (n) => `${n}はこのあたりの見どころの一つです。近くの詳しいおすすめは下のKaliバーで聞いてみてください。`,
+      },
+      'pt-BR': {
+        invite: (n) => `Alguma pergunta sobre ${n}? Pode perguntar, ou é só dizer e seguimos em frente.`,
+        checking: 'Verificando por perto...',
+        nearHere: (n, r) => `Bem pertinho daqui: ${n}${r ? `, avaliação ${r}★` : ''}. Vale a pena conhecer.`,
+        noLiveData: (verb, city) => `Não consegui achar um ${verb} ao vivo por aqui agora — tente perguntar na barra principal da Kali por "${verb} em ${city}".`,
+        searchFailed: 'Não consegui acessar os dados ao vivo agora — tente perguntar de novo em instantes.',
+        highlight: (n) => `${n} é um dos destaques por aqui — pergunte na barra principal da Kali para dicas mais específicas por perto.`,
+      },
+      fil: {
+        invite: (n) => `May tanong ka ba tungkol sa ${n}? Magtanong ka lang, o sabihin mo na lang at magpapatuloy tayo.`,
+        checking: 'Tinitingnan ang malapit...',
+        nearHere: (n, r) => `Malapit lang dito: ${n}${r ? `, rating na ${r}★` : ''}. Sulit puntahan.`,
+        noLiveData: (verb, city) => `Hindi ko makuha ang live na ${verb} malapit dito ngayon — subukan mong magtanong sa Kali bar tungkol sa "${verb} sa ${city}."`,
+        searchFailed: 'Hindi ko maabot ang live data ngayon — subukan ulit sandali.',
+        highlight: (n) => `Ang ${n} ay isa sa mga highlight dito — magtanong sa Kali bar para sa mas tiyak na rekomendasyon malapit dito.`,
+      },
+      th: {
+        invite: (n) => `มีคำถามเกี่ยวกับ${n}ไหม ถามได้เลย หรือจะบอกให้ไปต่อก็ได้`,
+        checking: 'กำลังตรวจสอบบริเวณใกล้เคียง...',
+        nearHere: (n, r) => `ใกล้ ๆ ตรงนี้มี ${n}${r ? ` ให้คะแนน ${r}★` : ''} น่าแวะไปดูนะ`,
+        noLiveData: (verb, city) => `ตอนนี้ดึงข้อมูล${verb}สดไม่ได้ ลองถามในช่อง Kali หลักว่า "${verb}ใน${city}" ดูนะ`,
+        searchFailed: 'ตอนนี้เชื่อมต่อข้อมูลสดไม่ได้ ลองถามอีกครั้งอีกสักครู่นะ',
+        highlight: (n) => `${n} เป็นหนึ่งไฮไลต์แถวนี้ ลองถามในช่อง Kali หลักเพื่อขอคำแนะนำที่เจาะจงกว่านี้`,
+      },
+      fr: {
+        invite: (n) => `Des questions sur ${n} ? Demandez-moi, ou dites-le et nous continuons.`,
+        checking: 'Je regarde aux alentours...',
+        nearHere: (n, r) => `Juste à côté : ${n}${r ? `, noté ${r}★` : ''}. Ça vaut le détour.`,
+        noLiveData: (verb, city) => `Je n'ai pas pu trouver de ${verb} en direct ici — essayez de demander dans la barre Kali principale "${verb} à ${city}".`,
+        searchFailed: "Je n'arrive pas à accéder aux données en direct pour l'instant — réessayez dans un instant.",
+        highlight: (n) => `${n} est l'un des incontournables du coin — demandez dans la barre Kali principale pour des recommandations plus précises.`,
+      },
+      vi: {
+        invite: (n) => `Bạn có câu hỏi gì về ${n} không? Cứ hỏi thoải mái, hoặc nói một tiếng là chúng ta đi tiếp.`,
+        checking: 'Đang kiểm tra khu vực gần đây...',
+        nearHere: (n, r) => `Ngay gần đây có: ${n}${r ? `, đánh giá ${r}★` : ''}. Đáng để ghé qua.`,
+        noLiveData: (verb, city) => `Hiện tôi không lấy được dữ liệu ${verb} trực tiếp gần đây — hãy thử hỏi ở thanh Kali chính về "${verb} ở ${city}".`,
+        searchFailed: 'Hiện không kết nối được dữ liệu trực tiếp — hãy thử hỏi lại sau giây lát.',
+        highlight: (n) => `${n} là một trong những điểm nổi bật ở đây — hãy hỏi thanh Kali chính để biết gợi ý cụ thể hơn gần đó.`,
+      },
+    };
+    function tourPhrases(lang) {
+      return TOUR_UI_PHRASES[lang] || TOUR_UI_PHRASES.en;
+    }
 
     function haversineMeters(aLat, aLng, bLat, bLng) {
       const R = 6371000;
@@ -1067,7 +1208,7 @@
     // of how it was started. Calls `onend` once speech actually finishes,
     // with a generous timed fallback in case the browser's onend never
     // fires (it occasionally doesn't).
-    function speakTour(text, onend) {
+    function speakTour(text, onend, langCode) {
       setKali(text);
       const clean = text.replace(/^Kali AI:\s*/, '');
       if (!window.speechSynthesis) {
@@ -1075,7 +1216,7 @@
         return;
       }
       window.speechSynthesis.cancel();
-      const u = makeUtterance(clean);
+      const u = makeUtterance(clean, langCode);
       let done = false;
       const finish = () => { if (done) return; done = true; onend && onend(); };
       u.onend = finish;
@@ -1092,16 +1233,18 @@
 
       const script = CITY_SCRIPTS[currentDest.id];
       if (script) {
+        const lang = resultsLanguage();
         tourState = {
           anchor: { name: currentDest.name, lat: currentDest.lat, lng: currentDest.lng },
           stops: script.stops,
           outro: script.outro,
+          lang,
           index: -1,
         };
         updateTourButton();
-        speakTour(`Kali AI: ${script.intro}`, () => {
+        speakTour(`Kali AI: ${pick(script.intro, lang)}`, () => {
           if (tourState) tourState.timer = setTimeout(runNextTourStop, 400);
-        });
+        }, lang);
         return;
       }
 
@@ -1145,17 +1288,18 @@
       tourState.index++;
       const { stops, anchor, index } = tourState;
 
+      const lang = tourState.lang || 'en';
       if (index >= stops.length) {
-        speakTour(`Kali AI: Heading back to ${anchor.name} to wrap up the tour.`, () => {});
+        speakTour(`Kali AI: Heading back to ${anchor.name} to wrap up the tour.`, () => {}, lang);
         flyToPlace(anchor.lat, anchor.lng, anchor.name, {
           fromTour: true,
           onArrive: () => {
             if (!tourState) return;
-            const outro = tourState.outro || `Tour complete — back at ${anchor.name}.`;
+            const outro = pick(tourState.outro, lang) || `Tour complete — back at ${anchor.name}.`;
             speakTour(`Kali AI: ${outro}`, () => {
               tourState = null;
               updateTourButton();
-            });
+            }, lang);
           },
         });
         return;
@@ -1167,7 +1311,7 @@
         onArrive: () => {
           if (!tourState) return;
           tourState.currentStop = stop;
-          let line = stop.say;
+          let line = pick(stop.say, lang);
           if (!line) {
             const bits = [`Stop ${index + 1} of ${stops.length}: ${stop.name}.`];
             if (stop.address) bits.push(`${stop.address}.`);
@@ -1176,7 +1320,7 @@
           }
           speakTour(`Kali AI: ${line}`, () => {
             if (tourState) openTourQA(stop);
-          });
+          }, lang);
         },
       });
     }
@@ -1216,7 +1360,8 @@
       document.getElementById('tour-question').value = '';
       panel.classList.remove('hidden');
       tourState.awaitingQA = true;
-      setKali(`Kali AI: Any questions about ${stop.name}? Ask away, or say the word and we'll keep moving.`);
+      const phrases = tourPhrases(tourState.lang || 'en');
+      setKali(`Kali AI: ${phrases.invite(stop.name)}`);
       startTourCountdown(10);
     }
 
@@ -1252,6 +1397,8 @@
       }
 
       const stop = tourState.currentStop;
+      const lang = tourState.lang || 'en';
+      const phrases = tourPhrases(lang);
       const answerEl = document.getElementById('tour-answer');
       const countdown = document.getElementById('tour-countdown');
       const route = TOUR_QA_ROUTES.find((r) => r.keywords.some((k) => lower.includes(k)));
@@ -1259,29 +1406,29 @@
 
       if (route) {
         answerEl.classList.remove('hidden');
-        answerEl.innerText = 'Checking nearby...';
+        answerEl.innerText = phrases.checking;
         countdown.innerText = '';
         try {
           const places = await searchPlaces(route.query(stop, currentDest), currentDest, 1);
           answer = places.length
-            ? `Right near here: ${places[0].name}${places[0].rating ? `, rated ${places[0].rating}★` : ''}. Worth a stop.`
-            : `I couldn't pull up a live ${route.verb} near here right now — try asking in the main Kali bar for "${route.verb}s in ${currentDest.name}."`;
+            ? phrases.nearHere(places[0].name, places[0].rating)
+            : phrases.noLiveData(route.verb, currentDest.name);
         } catch (err) {
           console.error('Tour Q&A search failed:', err);
-          answer = `Couldn't reach live places data just now — try asking again in a moment.`;
+          answer = phrases.searchFailed;
         }
       } else if (!tourState) {
         return; // cancelled mid-lookup
-      } else if (stop.historyNote) {
-        answer = stop.historyNote;
+      } else if (pick(stop.historyNote, lang)) {
+        answer = pick(stop.historyNote, lang);
       } else {
-        answer = `${stop.name} is one of the highlights around here — ask in the main Kali bar for more specific picks nearby.`;
+        answer = phrases.highlight(stop.name);
       }
 
       if (!tourState) return; // tour was stopped while we were answering
       answerEl.classList.remove('hidden');
       answerEl.innerText = answer;
-      speakTour(`Kali AI: ${answer}`, () => {});
+      speakTour(`Kali AI: ${answer}`, () => {}, lang);
       startTourCountdown(10);
     }
 
@@ -1448,42 +1595,56 @@
     // appears where it's supported; Kali's spoken reply is a short, quiet
     // confirmation and only follows a voice command.
     // Picks the most natural-sounding voice available in THIS visitor's
-    // browser/OS for Kali to speak with. Every device ships a different set
-    // of Web Speech API voices — this just scores what's actually on offer
-    // and prefers cloud/neural ones over the default robotic local ones,
-    // rather than hard-coding a single voice name that may not exist here.
-    let kaliVoice = null;
+    // browser/OS for Kali to speak with, per language. Every device ships a
+    // different set of Web Speech API voices — this scores what's actually
+    // on offer and prefers cloud/neural ones over the default robotic local
+    // ones, and prefers an exact language match hardest of all, so Kali can
+    // narrate a tour in Japanese, French, etc. with a fitting voice rather
+    // than reading non-English text in an English voice.
+    const kaliVoiceCache = {}; // lang code -> chosen SpeechSynthesisVoice
     const PREFERRED_VOICE_NAMES = [
       // Known high-quality natural voices, roughly best-first, across
-      // Chrome/Edge/Safari on desktop, mobile and ChromeOS/Linux.
+      // Chrome/Edge/Safari on desktop, mobile and ChromeOS/Linux. Mostly
+      // English names; voices in other languages just won't match these and
+      // get scored on the other signals below instead.
       'Google US English', 'Microsoft Aria Online (Natural)', 'Microsoft Jenny Online (Natural)',
       'Microsoft Ava Online (Natural)', 'Samantha', 'Microsoft Zira Desktop', 'Victoria',
       'Google UK English Female', 'Karen', 'Moira', 'Tessa',
     ];
-    function pickKaliVoice() {
-      if (!window.speechSynthesis) return;
+    function pickVoiceForLang(langCode) {
+      if (!window.speechSynthesis) return null;
       const voices = window.speechSynthesis.getVoices();
-      if (!voices.length) return;
+      if (!voices.length) return null;
+      const base = (langCode || 'en').split('-')[0].toLowerCase();
+      const matches = voices.filter((v) => v.lang.toLowerCase().startsWith(base));
+      const pool = matches.length ? matches : voices; // better an off-language voice than silence
       const score = (v) => {
         let s = 0;
         const i = PREFERRED_VOICE_NAMES.findIndex((n) => v.name.includes(n));
-        if (i !== -1) s += (PREFERRED_VOICE_NAMES.length - i) * 10; // named-match beats everything
+        if (i !== -1) s += (PREFERRED_VOICE_NAMES.length - i) * 10;
         if (!v.localService) s += 5; // cloud voices are almost always more natural than on-device ones
         if (/natural|neural|enhanced|premium/i.test(v.name)) s += 4;
-        if (/^en/i.test(v.lang)) s += 2;
+        if (v.lang.toLowerCase().startsWith(base)) s += 8; // exact-language match matters most
         if (/female|aria|jenny|ava|samantha|zira|victoria|karen|moira|tessa|salli|joanna/i.test(v.name)) s += 1;
         return s;
       };
-      kaliVoice = voices.reduce((best, v) => (score(v) > score(best || voices[0]) ? v : best), null) || voices[0];
+      return pool.reduce((best, v) => (score(v) > score(best || pool[0]) ? v : best), null) || pool[0];
+    }
+    function refreshKaliVoices() {
+      for (const k of Object.keys(kaliVoiceCache)) delete kaliVoiceCache[k];
     }
     if (window.speechSynthesis) {
-      pickKaliVoice();
-      window.speechSynthesis.onvoiceschanged = pickKaliVoice; // most browsers load voices asynchronously
+      window.speechSynthesis.onvoiceschanged = refreshKaliVoices; // most browsers load voices asynchronously
     }
 
-    function makeUtterance(text) {
+    // langCode is optional and defaults to English; pass the tour's current
+    // language (from resultsLanguage()) to speak narration in that language.
+    function makeUtterance(text, langCode) {
+      const lang = langCode || 'en';
       const u = new SpeechSynthesisUtterance(text);
-      if (kaliVoice) u.voice = kaliVoice;
+      if (!(lang in kaliVoiceCache)) kaliVoiceCache[lang] = pickVoiceForLang(lang);
+      const voice = kaliVoiceCache[lang];
+      if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = lang; }
       u.volume = 0.7;
       u.rate = 0.98; // a hair slower than default reads as calmer, less clipped/robotic
       u.pitch = 1.03;
