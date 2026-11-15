@@ -607,6 +607,13 @@
       if (!d) return;
       if (tourState && d.id !== currentDest.id) cancelCityTour();
       currentDest = d;
+      // Switching cities snaps the results/tour language to that city's own
+      // language automatically — Paris shows Français, Tokyo shows 日本語,
+      // etc. — so nobody has to go find the right option in the dropdown.
+      // It's still just a dropdown: pick English (or anything else) after
+      // landing and it stays that way until the next city switch.
+      const langSelect = document.getElementById('lang-select');
+      if (langSelect) langSelect.value = d.lang;
       cancelCinematic();
       document.getElementById('hud-env').innerText = d.name;
       if (cinematicOn && !opts.quiet) {
