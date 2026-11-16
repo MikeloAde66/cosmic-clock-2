@@ -7,6 +7,7 @@ import StudioOneConsole from './StudioOneConsole';
 import EqOrb from './EqOrb';
 import { useRadioPlayer } from './radio/RadioPlayerContext';
 import { extractIdentifier, buildArchiveEmbedUrl, fetchArchiveItemInfo } from '@/lib/archiveOrg';
+import { parseYouTubeLiveChannel, parseYouTubePathVideoId } from '@/lib/youtubeLive';
 // Shared with StarTrackerView's own YT.Player mount (Sky Fest's Space
 // Media tab) — see that file for why this lives in one place.
 import type { YouTubePlayer, YouTubePlayerEvent } from '@/lib/youtubeIframeApi';
@@ -72,6 +73,10 @@ function parseYouTubeUrl(rawUrl: string): {
       } else if (url.pathname.startsWith('/embed/')) {
         const embedId = url.pathname.match(/\/embed\/([\w-]+)/)?.[1];
         if (embedId && embedId !== 'videoseries') videoId = embedId;
+      } else {
+        // "youtube.com/live/ID" (what Share gives on a live stream) and
+        // "youtube.com/shorts/ID".
+        videoId = parseYouTubePathVideoId(rawUrl) || undefined;
       }
       // '/playlist' (and any other youtube.com path) has no specific video
       // — falls through with only listId (if present) set.
@@ -840,9 +845,43 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
   const ytPlayerReadyRef = useRef(false);
   const ytPendingLoadRef = useRef<{ videoId?: string; listId?: string } | null>(null);
 
+  // Live channel links ("youtube.com/@SkyNews/live") carry no video id, so
+  // there is nothing for the player to load until /api/youtube/live says
+  // which stream that channel has on air. The track keeps the channel link
+  // as its embedUrl, so the stream is looked up fresh each time the track
+  // is loaded rather than saved as an id that goes stale when the
+  // broadcaster restarts. Every other link skips this entirely.
+  const [liveLookup, setLiveLookup] = useState<{ source: string; embedUrl?: string; error?: string } | null>(null);
+  const liveChannel = useMemo(() => (isYouTubeEmbed ? parseYouTubeLiveChannel(activeEmbedUrl) : null), [isYouTubeEmbed, activeEmbedUrl]);
+  const liveAnswer = liveLookup?.source === activeEmbedUrl ? liveLookup : null;
+  const playerEmbedUrl = liveAnswer?.embedUrl || activeEmbedUrl;
+  const liveNotice = !liveChannel ? '' : !liveAnswer ? 'Finding the live stream…' : liveAnswer.error || '';
+
+  useEffect(() => {
+    if (!liveChannel) return;
+    const source = activeEmbedUrl;
+    let cancelled = false;
+    fetch(`/api/youtube/live?${liveChannel.kind}=${encodeURIComponent(liveChannel.value)}`)
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok && data.videoId) {
+          setLiveLookup({ source, embedUrl: `https://www.youtube.com/embed/${data.videoId}` });
+        } else {
+          setLiveLookup({ source, error: data.error || 'Could not find a live stream at that link.' });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLiveLookup({ source, error: 'Could not look up the live stream. Check your connection and try again.' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [liveChannel, activeEmbedUrl]);
+
   useEffect(() => {
     if (!isYouTubeEmbed) return;
-    const { videoId, listId, autoplay } = parseYouTubeUrl(activeEmbedUrl);
+    const { videoId, listId, autoplay } = parseYouTubeUrl(playerEmbedUrl);
     if (!videoId && !listId) return;
 
     const applyLoad = (target: { videoId?: string; listId?: string }) => {
@@ -925,7 +964,7 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
         document.head.appendChild(script);
       }
     }
-  }, [isYouTubeEmbed, activeEmbedUrl, pauseForExternalMedia]);
+  }, [isYouTubeEmbed, playerEmbedUrl, pauseForExternalMedia]);
 
   // Tear the player down when leaving the YouTube branch entirely (switched
   // to plain video/audio, or cleared media) — and on unmount.
@@ -2091,6 +2130,12 @@ export default function PodsModule({ isActive, onGoHome, pendingTrack, onPending
               {cameraError && (
                 <div className="p-2 font-mono text-xs text-red-300 border border-red-800 rounded bg-red-950/60">
                   {cameraError}
+                </div>
+              )}
+
+              {liveNotice && (
+                <div className="p-2 font-mono text-xs border rounded text-slate-300 border-slate-800 bg-slate-900/60">
+                  {liveNotice}
                 </div>
               )}
 
