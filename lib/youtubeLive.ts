@@ -71,10 +71,14 @@ export function buildLivePageUrl(target: LiveChannelTarget): string {
 }
 
 // When a channel is on air, its /live page is the watch page for that
-// stream, and the page's canonical link names the video. When nothing is on
-// air the canonical link is the channel itself, so this returns null.
+// stream. A browser gets the video in the page's canonical link; a server
+// gets a page whose canonical link is blank, but whose page data still
+// names the stream as "currentVideoEndpoint". When nothing is on air the
+// page is the channel itself and has neither, so this returns null.
 export function extractLiveVideoId(html: string): { videoId: string; isLiveNow: boolean } | null {
-  const canonical = html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/)?.[1];
-  if (!canonical) return null;
-  return { videoId: canonical, isLiveNow: /"isLiveNow":true/.test(html) };
+  const videoId =
+    html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/)?.[1] ||
+    html.match(/"currentVideoEndpoint":\{.{0,400}?"url":"\/watch\?v=([\w-]{11})/)?.[1];
+  if (!videoId) return null;
+  return { videoId, isLiveNow: /"isLiveNow":true|"isLive":true/.test(html) };
 }

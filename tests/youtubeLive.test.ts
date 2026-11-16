@@ -66,6 +66,11 @@ test('the stream on air is read from the page, and an off-air channel gives noth
   const scheduled = '<link rel="canonical" href="https://www.youtube.com/watch?v=YDvsBbKfLPA">{"isLiveNow":false}';
   assert.deepEqual(extractLiveVideoId(scheduled), { videoId: 'YDvsBbKfLPA', isLiveNow: false });
 
+  // What YouTube sends a server: a blank canonical link, the stream in the page data.
+  const toServer =
+    '<link rel="canonical" href="undefined">{"currentVideoEndpoint":{"clickTrackingParams":"CAAQ","commandMetadata":{"webCommandMetadata":{"url":"/watch?v=umLWFz4izTM","webPageType":"WEB_PAGE_TYPE_WATCH"}}},"autoplayVideo":{"url":"/watch?v=GC0dAsRl0ao"},"isLive":true}';
+  assert.deepEqual(extractLiveVideoId(toServer), { videoId: 'umLWFz4izTM', isLiveNow: true });
+
   const offAir = '<link rel="canonical" href="https://www.youtube.com/channel/UCoMdktPbSTixAyNGwb-UYkQ">';
   assert.equal(extractLiveVideoId(offAir), null);
 });
